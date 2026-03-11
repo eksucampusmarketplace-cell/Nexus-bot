@@ -45,3 +45,38 @@ A powerful group management bot with a integrated Telegram Mini App for easy con
 - Visit `/` for health check.
 - Use `/debug/db-ping` to check DB latency.
 - Enable `DEBUG=true` for more verbose logging.
+
+## ⚠️ Troubleshooting
+
+### "Network is unreachable" Error
+If you see this error in your Render logs:
+```
+OSError: [Errno 101] Network is unreachable
+```
+
+This means the application cannot connect to your Supabase database. Common causes:
+
+1. **Missing Environment Variables**: Make sure all required environment variables are set in your Render dashboard:
+   - `SUPABASE_CONNECTION_STRING` - Must be a valid PostgreSQL connection string
+   - `SUPABASE_URL` - Your Supabase project URL
+   - `SUPABASE_SERVICE_KEY` - Your Supabase service role key
+
+2. **Invalid Connection String**: The `SUPABASE_CONNECTION_STRING` should look like:
+   ```
+   postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+   ```
+   - Replace `[YOUR-PASSWORD]` with your actual database password
+   - Replace `[PROJECT-REF]` with your Supabase project reference
+
+3. **Connection Pooler**: On free Render plans, use Supabase's Connection Pooler (Transaction mode) for better stability:
+   ```
+   postgresql://postgres:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true
+   ```
+
+4. **IPv6 vs IPv4**: If you have network issues, ensure your connection uses IPv4 addresses.
+
+### Application Starts Without Database
+If the app starts but shows `"db": "disconnected"` in the health check:
+- Check that your Supabase database is active (not paused due to inactivity)
+- Verify your connection string credentials
+- Check Render's environment variable settings

@@ -18,6 +18,26 @@ def get_token_hash(token: str) -> str:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👋 I'm GroupGuard. Add me to a group and make me admin to start!")
 
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    help_text = """<b>📚 Available Commands</b>
+
+<b>Basic:</b>
+/start - Start the bot
+/help - Show this help message
+/panel - Open management panel
+/id - Get chat and user ID
+
+<b>Admin:</b>
+/warn - Warn a user (reply to message)
+/ban - Ban a user (reply to message)
+/mute - Mute a user (reply to message)
+/purge - Delete messages
+/rules - Show group rules
+
+<b>How to use:</b>
+Admin commands require you to reply to a user's message."""
+    await update.message.reply_text(help_text, parse_mode="HTML")
+
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
     url = f"{settings.webhook_url}/webapp"

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GroupGuard Panel</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=JetBrains+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #070b14;
+            --accent: #00d4ff;
+            --secondary: #7c3aed;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --success: #00ff88;
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --text: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Animated background mesh blobs */
+        .mesh-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .blob {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.15;
+            animation: drift 20s infinite alternate ease-in-out;
+        }
+
+        .blob-1 { background: var(--accent); top: -100px; left: -100px; }
+        .blob-2 { background: var(--secondary); bottom: -100px; right: -100px; animation-delay: -5s; }
+        .blob-3 { background: #ff00ff; top: 40%; left: 50%; animation-delay: -10s; }
+
+        @keyframes drift {
+            0% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(50px, 100px) scale(1.2); }
+        }
+
+        header {
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-weight: 800;
+            margin: 0;
+            font-size: 24px;
+            background: linear-gradient(90deg, var(--accent), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            max-width: 430px;
+            margin: 0 auto;
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .stat-card {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--accent);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
+        /* Tabs */
+        .tabs {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 430px;
+            background: rgba(7, 11, 20, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-around;
+            padding: 15px 0;
+            border-top: 1px solid var(--card-border);
+            z-index: 100;
+        }
+
+        .tab {
+            opacity: 0.5;
+            transition: 0.3s;
+            cursor: pointer;
+            font-size: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .tab.active {
+            opacity: 1;
+            color: var(--accent);
+        }
+
+        .tab.active::after {
+            content: '';
+            width: 20px;
+            height: 2px;
+            background: var(--accent);
+            margin-top: 5px;
+            box-shadow: 0 0 10px var(--accent);
+        }
+
+        /* Form elements */
+        .toggle-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px; width: 18px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
+        input:checked + .slider:before { transform: translateX(26px); }
+
+        .btn {
+            background: linear-gradient(90deg, var(--accent), var(--secondary));
+            border: none;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            width: 100%;
+            font-weight: bold;
+            cursor: pointer;
+            font-family: 'Syne', sans-serif;
+        }
+
+        .page { display: none; }
+        .page.active { display: block; }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--accent);
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            transition: 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.show { transform: translateX(-50%) translateY(0); }
+
+        .member-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--card-border);
+        }
+    </style>
+</head>
+<body>
+    <div class="mesh-container">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <header>
+        <h1>GROUPGUARD</h1>
+        <select id="group-selector" style="background: none; color: white; border: 1px solid var(--card-border); padding: 5px; border-radius: 5px; margin-top: 10px;">
+            <option value="">Select a Group</option>
+        </select>
+    </header>
+
+    <div class="container">
+        <!-- Dashboard -->
+        <div id="page-dashboard" class="page active">
+            <div class="stats-grid">
+                <div class="card stat-card">
+                    <div class="stat-value" id="stat-members">-</div>
+                    <div class="stat-label">Members</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-value" id="stat-messages">-</div>
+                    <div class="stat-label">Messages</div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Recent Actions</h3>
+                <div id="logs-container" style="font-size: 12px; font-family: 'JetBrains Mono';">
+                    No recent actions.
+                </div>
+            </div>
+        </div>
+
+        <!-- Commands -->
+        <div id="page-commands" class="page">
+            <div class="card">
+                <h3>Enabled Commands</h3>
+                <div id="commands-list">
+                    <!-- Toggles will be injected here -->
+                </div>
+                <button class="btn" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+
+        <!-- AutoMod -->
+        <div id="page-automod" class="page">
+             <div class="card">
+                <h3>AutoMod Settings</h3>
+                <div id="automod-list">
+                </div>
+                <button class="btn" onclick="saveSettings()">Save Settings</button>
+            </div>
+        </div>
+
+        <!-- Members -->
+        <div id="page-members" class="page">
+            <div class="card">
+                <input type="text" placeholder="Search members..." style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: white; padding: 10px; border-radius: 8px;">
+                <div id="members-list" style="margin-top: 15px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings -->
+        <div id="page-settings" class="page">
+            <div class="card">
+                <h3>Messages</h3>
+                <label>Welcome Text</label>
+                <textarea id="welcome-text" style="width: 100%; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: white; margin-top: 5px; border-radius: 5px;"></textarea>
+                <button class="btn" style="margin-top: 10px;" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showPage('dashboard', this)"><span>📊</span>Dashboard</div>
+        <div class="tab" onclick="showPage('commands', this)"><span>⌨️</span>Commands</div>
+        <div class="tab" onclick="showPage('automod', this)"><span>🛡️</span>AutoMod</div>
+        <div class="tab" onclick="showPage('members', this)"><span>👥</span>Members</div>
+        <div class="tab" onclick="showPage('settings', this)"><span>⚙️</span>Settings</div>
+    </div>
+
+    <div id="toast" class="toast">Settings Saved!</div>
+
+    <script>
+        const API = window.location.origin;
+        const initData = window.Telegram.WebApp.initData;
+        const WebApp = window.Telegram.WebApp;
+        WebApp.expand();
+
+        let currentChatId = null;
+        let groupData = null;
+
+        async function apiFetch(path, options = {}) {
+            const res = await fetch(`${API}${path}`, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Telegram-Init-Data': initData,
+                    ...(options.headers || {})
+                }
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Request failed');
+            }
+            return res.json();
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2200);
+        }
+
+        function showPage(pageId, el) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(`page-${pageId}`).classList.add('active');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            if (pageId === 'members') loadMembers();
+            if (pageId === 'dashboard') loadDashboard();
+        }
+
+        async function loadGroups() {
+            try {
+                const groups = await apiFetch('/api/groups');
+                const sel = document.getElementById('group-selector');
+                groups.forEach(g => {
+                    const opt = document.createElement('option');
+                    opt.value = g.chat_id;
+                    opt.innerText = g.title;
+                    sel.appendChild(opt);
+                });
+                sel.onchange = (e) => {
+                    currentChatId = e.target.value;
+                    loadGroupDetails();
+                };
+                if (groups.length > 0) {
+                    sel.value = groups[0].chat_id;
+                    currentChatId = groups[0].chat_id;
+                    loadGroupDetails();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadGroupDetails() {
+            if (!currentChatId) return;
+            groupData = await apiFetch(`/api/groups/${currentChatId}`);
+            renderSettings();
+            loadDashboard();
+        }
+
+        function renderSettings() {
+            const cmdList = document.getElementById('commands-list');
+            cmdList.innerHTML = '';
+            for (const [cmd, enabled] of Object.entries(groupData.settings.commands)) {
+                cmdList.innerHTML += `
+                    <div class="toggle-container">
+                        <span>/${cmd}</span>
+                        <label class="switch">
+                            <input type="checkbox" ${enabled ? 'checked' : ''} onchange="groupData.settings.commands['${cmd}'] = this.checked">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `;
+            }
+            document.getElementById('welcome-text').value = groupData.settings.welcome.text;
+        }
+
+        async function loadDashboard() {
+            if (!currentChatId) return;
+            // Simplified stats
+            document.getElementById('stat-members').innerText = '124'; // Mock
+            document.getElementById('stat-messages').innerText = groupData.settings.message_count || '8.2k';
+            
+            const logs = await apiFetch(`/api/groups/${currentChatId}/logs`);
+            const cont = document.getElementById('logs-container');
+            cont.innerHTML = logs.map(l => `<div>[${l.action.toUpperCase()}] ${l.target_username || 'user'} by ${l.by_username || 'admin'}</div>`).join('') || 'No logs.';
+        }
+
+        async function loadMembers() {
+            if (!currentChatId) return;
+            const members = await apiFetch(`/api/groups/${currentChatId}/members`);
+            const cont = document.getElementById('members-list');
+            cont.innerHTML = members.map(m => `
+                <div class="member-item">
+                    <span>${m.username || m.first_name}</span>
+                    <span style="font-size: 10px; opacity: 0.5;">${m.message_count} msgs</span>
+                </div>
+            `).join('');
+        }
+
+        async function saveSettings() {
+            try {
+                groupData.settings.welcome.text = document.getElementById('welcome-text').value;
+                await apiFetch(`/api/groups/${currentChatId}/settings`, {
+                    method: 'PUT',
+                    body: JSON.stringify(groupData.settings)
+                });
+                showToast('Settings Saved!');
+            } catch (e) {
+                showToast('Error saving!');
+            }
+        }
+
+        loadGroups();
+    </script>
+</body>
+</html>

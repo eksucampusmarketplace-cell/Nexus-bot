@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: groupguard-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PRIMARY_BOT_TOKEN
+        sync: false
+      - key: CLONE_TOKENS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_CONNECTION_STRING
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: SKIP_AUTH
+        value: "false"
+      - key: DEBUG
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+    healthCheckPath: /
+    autoDeploy: true

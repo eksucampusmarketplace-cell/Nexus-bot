@@ -9,14 +9,45 @@ class Database:
         self.pool = None
 
     async def connect(self):
-        try:
-            self.pool = await asyncpg.create_pool(settings.SUPABASE_CONNECTION_STRING)
-            logger.info("Successfully connected to Supabase PostgreSQL")
-            # Initialize schema
-            await self.init_db()
-        except Exception as e:
-            logger.error(f"Failed to connect to database: {e}")
-            raise
+        """Connect to the database with retry logic and better error messages."""
+        import asyncio
+        
+        conn_str = settings.SUPABASE_CONNECTION_STRING
+        
+        # Validate connection string format
+        if not conn_str or not conn_str.startswith("postgresql://"):
+            raise ValueError(
+                "Invalid SUPABASE_CONNECTION_STRING. "
+                "It should start with 'postgresql://' and contain valid connection details. "
+                "Example: postgresql://postgres:password@db.project.supabase.co:5432/postgres"
+            )
+        
+        max_retries = 3
+        last_error = None
+        
+        for attempt in range(1, max_retries + 1):
+            try:
+                self.pool = await asyncpg.create_pool(
+                    conn_str,
+                    min_size=1,
+                    max_size=10,
+                    command_timeout=60,
+                    server_settings={
+                        'application_name': 'groupguard-bot'
+                    }
+                )
+                logger.info("Successfully connected to Supabase PostgreSQL")
+                # Initialize schema
+                await self.init_db()
+                return
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Database connection attempt {attempt}/{max_retries} failed: {e}")
+                if attempt < max_retries:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+        
+        logger.error(f"Failed to connect to database after {max_retries} attempts")
+        raise last_error
 
     async def disconnect(self):
         if self.pool:

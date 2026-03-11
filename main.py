@@ -12,6 +12,9 @@ from bot.factory import create_bot_app
 from api.routes import groups, members, debug
 import hashlib
 
+# Validate settings before starting
+settings.validate_required_settings()
+
 # Structured logging
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
@@ -21,29 +24,47 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 bot_apps = []
+db_available = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # STARTUP
-    await db.connect()
+    global db_available
     
-    tokens = settings.all_tokens
-    for i, token in enumerate(tokens):
-        bot_app = create_bot_app(token)
-        await bot_app.initialize()
-        await bot_app.start()
-        
-        # Set webhook
-        webhook_path = f"/webhook/{i}"
-        webhook_url = f"{settings.webhook_url}{webhook_path}"
-        await bot_app.bot.set_webhook(url=webhook_url)
-        logger.info(f"Bot {i} webhook set to {webhook_url}")
-        
-        bot_apps.append(bot_app)
-        
-        # Verify bot
-        me = await bot_app.bot.get_me()
-        logger.info(f"Bot {i} started as @{me.username}")
+    # STARTUP
+    try:
+        await db.connect()
+        db_available = True
+        logger.info("Database connection established successfully")
+    except Exception as e:
+        db_available = False
+        logger.error(f"Failed to connect to database: {e}")
+        logger.error("Application will start without database functionality")
+        # Don't raise - allow the app to start for health checks
+    
+    # Only start bots if database is available
+    if db_available:
+        tokens = settings.all_tokens
+        for i, token in enumerate(tokens):
+            try:
+                bot_app = create_bot_app(token)
+                await bot_app.initialize()
+                await bot_app.start()
+                
+                # Set webhook
+                webhook_path = f"/webhook/{i}"
+                webhook_url = f"{settings.webhook_url}{webhook_path}"
+                await bot_app.bot.set_webhook(url=webhook_url)
+                logger.info(f"Bot {i} webhook set to {webhook_url}")
+                
+                bot_apps.append(bot_app)
+                
+                # Verify bot
+                me = await bot_app.bot.get_me()
+                logger.info(f"Bot {i} started as @{me.username}")
+            except Exception as e:
+                logger.error(f"Failed to start bot {i}: {e}")
+    else:
+        logger.warning("Skipping bot initialization due to database unavailability")
 
     yield
     # SHUTDOWN
@@ -69,10 +90,12 @@ app.include_router(debug.router)
 
 @app.get("/", response_class=JSONResponse)
 async def health():
+    db_status = "connected" if (db.pool and db_available) else "disconnected"
     return {
         "status": "ok",
         "bots": len(bot_apps),
-        "db": "connected" if db.pool else "disconnected"
+        "db": db_status,
+        "ready": db_available
     }
 
 @app.get("/webapp", response_class=HTMLResponse)

@@ -16,7 +16,45 @@ def get_token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()[:10]
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 I'm GroupGuard. Add me to a group and make me admin to start!")
+    from config import settings
+    url = f"{settings.webhook_url}/webapp"
+    await update.message.reply_text(
+        "👋 I'm GroupGuard. Add me to a group and make me admin to start!\n\nUse the panel below to manage your group settings:",
+        reply_markup={
+            "inline_keyboard": [[{"text": "📱 Open Panel", "web_app": {"url": url}}]]
+        }
+    )
+
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from config import settings
+    url = f"{settings.webhook_url}/webapp"
+    help_text = """<b>📚 Available Commands</b>
+
+<b>Basic:</b>
+/start - Start the bot
+/help - Show this help message
+/panel - Open management panel
+/id - Get chat and user ID
+
+<b>Admin:</b>
+/warn - Warn a user (reply to message)
+/ban - Ban a user (reply to message)
+/mute - Mute a user (reply to message)
+/purge - Delete messages
+/rules - Show group rules
+
+<b>How to use:</b>
+Admin commands require you to reply to a user's message.
+
+<b>Web Panel:</b>
+Manage your group settings via the web panel."""
+    await update.message.reply_text(
+        help_text,
+        parse_mode="HTML",
+        reply_markup={
+            "inline_keyboard": [[{"text": "📱 Open Panel", "web_app": {"url": url}}]]
+        }
+    )
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings

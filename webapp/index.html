@@ -381,8 +381,7 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo, useRef } = React;
-        const zustandLib = window.zustand || window.Zustand;
-        const create = zustandLib?.create;
+        const create = window.zustand?.default || window.zustand;
 
         // ZUSTAND STORE
         const useStore = create((set, get) => ({

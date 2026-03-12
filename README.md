@@ -1,4 +1,4 @@
-# GroupGuard - Production-Ready Telegram Management Bot
+# Nexus - Production-Ready Telegram Management Bot
 
 A powerful group management bot with an integrated Telegram Mini App for easy configuration.
 
@@ -9,6 +9,9 @@ A powerful group management bot with an integrated Telegram Mini App for easy co
 - **Mini App**: Manage all group settings via a beautiful dashboard.
 - **Bot Cloning**: Run multiple bot instances from a single server.
 - **Production-Ready**: Webhook-based, deployed on Render, powered by Supabase.
+- **Triple Prefix System**: Use `!`, `!!`, and `/` for different types of actions.
+- **Channel Management**: Link your group to a channel and post/schedule messages directly from Nexus.
+- **Trust Score**: Automated behavioral analysis to grant or restrict user permissions.
 
 ## 🛠️ Setup Guide
 
@@ -91,7 +94,7 @@ Access the Bot Manager tab in the Mini App to:
 
 ### Music Player
 
-The bot includes a powerful music player for groups with advanced features! Use these commands:
+Nexus includes a powerful music player for groups with advanced features! Use these commands:
 
 **Basic Commands:**
 - `/play` - Play music (reply to an audio/voice message or send an audio file)
@@ -99,84 +102,45 @@ The bot includes a powerful music player for groups with advanced features! Use 
 - `/queue` - View the music queue
 - `/stop` - Stop playing and clear the queue
 - `/pause` - Pause playback
-- `/resume` - Resume paused playback
-- `/nowplaying` - Show current track with interactive controls
+- `/resume` - Resume playback
+- `/nowplaying` - Show current track with controls
 
 **Advanced Commands:**
-- `/play_youtube <url>` - Play music directly from YouTube
-- `/volume <0-200>` - Set playback volume (100% is default)
-- `/repeat <mode>` - Set repeat mode (none/one/all)
+- `/play_youtube <url>` - Play audio from a YouTube video
+- `/volume <0-200>` - Set the playback volume
+- `/repeat <none|one|all>` - Set the repeat mode
 - `/shuffle` - Toggle shuffle mode
-- `/playlist_create <name>` - Save current queue as a playlist
-- `/playlist_list` - List all playlists
-- `/playlist_play <name>` - Load and play a playlist
+- `/playlist_create <name>` - Create a custom playlist
+- `/playlist_list` - List your playlists
+- `/playlist_play <name>` - Play a custom playlist
 - `/playlist_delete <name>` - Delete a playlist
-- `/history <n>` - View play history (last n tracks)
-- `/search <query>` - Search songs in queue and playlists
-- `/sync` - Sync music queue to all clone bots (owner only)
-- `/music_settings` - Interactive settings panel
+- `/history` - Show play history
+- `/search <query>` - Search for music online
+- `/sync` - Sync music to all clone bots
+- `/music_settings` - Open the music settings panel
 
-**How to play music:**
-1. Reply to an audio file or voice message with `/play`
-2. Send an audio file with `/play` command
-3. Use `/play_youtube <url>` to play from YouTube
-4. Use the Music tab in the Mini App for full visual controls
+## 📢 Channel Management
 
-**Advanced Features:**
-- 🎬 **YouTube Support** - Play directly from YouTube URLs
-- 📚 **Playlists** - Save and manage music playlists
-- 🔀 **Shuffle** - Randomize track order
-- 🔁 **Repeat** - Repeat tracks (none/one/all)
-- 🔊 **Volume Control** - Adjust volume (0-200%)
-- 🔄 **Multi-Bot Sync** - Sync music across all clone bots
-- 📜 **Play History** - Track what was played
-- 🔍 **Search** - Find songs in queue/playlists
-- 💾 **Database Persistence** - Queues and playlists saved
+Nexus can manage your Telegram channels!
 
-Note: The music player supports audio files, voice messages, and YouTube links. All queues, playlists, and settings are persisted in the database and survive bot restarts.
+1. Add @NexusBot (or your clone) as admin to your channel.
+2. Grant permissions: Post Messages, Edit Messages, Delete Messages.
+3. In Mini App → Channel tab → Link Channel → paste channel username or ID.
+4. Nexus will confirm the link.
 
-### Environment Variables
+**Channel Commands:**
+- `/channelpost <text>` - Post text or media (if replied) to the linked channel.
+- `/schedulepost <YYYY-MM-DD HH:MM> <text>` - Schedule a post for later.
+- `/approvepost` - (Reply to a message) Copies the message to the channel.
+- `/cancelpost <post_id>` - Cancel a scheduled post.
+- `/editpost <post_id> <new_text>` - Edit a sent or scheduled post.
+- `/deletepost <post_id>` - Delete a sent post from the channel.
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `PRIMARY_BOT_TOKEN` | Main bot token from BotFather | Yes |
-| `SECRET_KEY` | Fernet key for token encryption | Yes |
-| `SUPABASE_URL` | Your Supabase project URL | Yes |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key | Yes |
-| `SUPABASE_CONNECTION_STRING` | PostgreSQL connection string | Yes |
-| `OWNER_ID` | Your Telegram user ID | Yes |
-| `CLONE_ACCESS` | `owner_only` or `anyone` | No (default: owner_only) |
-| `SKIP_AUTH` | Skip auth for local dev | No |
-| `DEBUG` | Enable debug routes | No |
+## 🛡️ Trust Score System
 
-## 🔐 Troubleshooting
+Nexus automatically calculates a Trust Score (0-100) for every member based on:
+- **Activity**: Messages sent, days active.
+- **History**: Warnings, bans, mutes.
+- **Engagement**: Reactions, poll participation.
 
-### Clone Errors
-
-1. **RATE_LIMITED**: Wait an hour before trying again.
-2. **INVALID_FORMAT**: Token must be in format `1234567890:ABCdef...`.
-3. **ALREADY_REGISTERED**: This token is already used by another clone.
-4. **TELEGRAM_REJECTED**: The token was revoked or is invalid.
-5. **WEBHOOK_FAILED**: Could not register webhook - check your `RENDER_EXTERNAL_URL`.
-6. **NETWORK_ERROR**: Could not reach Telegram API.
-
-### Network Issues
-
-If you see "Network is unreachable" in logs:
-- Check your Supabase database is active
-- Verify connection string format
-- Consider using Supabase Connection Pooler for free plans
-
-### Token Decryption Failed
-
-This happens if `SECRET_KEY` was rotated. Generate a new key and update your environment. **Note**: Tokens encrypted with the old key cannot be recovered.
-
-## 📊 Debug Routes
-
-When `DEBUG=true`:
-
-- `GET /debug/health` - Full system status
-- `GET /debug/webhook-info?bot_id=123` - Webhook info from Telegram
-- `GET /debug/send-test?bot_id=123&chat_id=456` - Send test message
-- `GET /debug/registry` - List all registered bots
-- `GET /debug/db-ping` - Database latency check
+Low-trust users face extra scrutiny, while high-trust users may be exempt from certain restrictions like anti-flood.

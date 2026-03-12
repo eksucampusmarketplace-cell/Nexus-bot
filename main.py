@@ -146,8 +146,12 @@ async def lifespan(app: FastAPI):
             dead += 1
 
     logger.info(f"[STARTUP] Recovery complete | recovered={recovered} | dead={dead}")
-    logger.info(f"[STARTUP] Total bots in registry: {registry_register.__self__.count() if hasattr(registry_register, '__self__') else 'N/A'}")
+    logger.info(f"[STARTUP] Total bots in registry: {registry_get_all().__len__()}")
     logger.info("=" * 60)
+
+    # Start scheduled post runner
+    from bot.tasks.scheduler import scheduled_post_runner
+    asyncio.create_task(scheduled_post_runner(pool, registry_get))
 
     yield
 
@@ -165,13 +169,17 @@ async def lifespan(app: FastAPI):
 
 
 # Routes
-from api.routes import groups, members, debug, bots, music
+from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
 fastapi_app.include_router(debug.router)
 fastapi_app.include_router(bots.router)
 fastapi_app.include_router(music.router)
+fastapi_app.include_router(modules.router)
+fastapi_app.include_router(analytics.router)
+fastapi_app.include_router(channels.router)
+fastapi_app.include_router(text_config.router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)

@@ -3,21 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GroupGuard Panel</title>
+    <title>Nexus Bot Panel</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=JetBrains+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/zustand@4.4.1/dist/umd/index.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #070b14;
-            --accent: #00d4ff;
-            --secondary: #7c3aed;
-            --card-bg: rgba(255, 255, 255, 0.04);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --success: #00ff88;
-            --danger: #ff4757;
-            --warning: #ffa502;
+            --bg: #0b0e14;
+            --accent: #00e5ff;
+            --secondary: #7000ff;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --card-border: rgba(255, 255, 255, 0.1);
             --text: #ffffff;
+            --text-dim: rgba(255, 255, 255, 0.6);
+            --success: #00ffa3;
+            --danger: #ff4d4d;
+            --warning: #ffb100;
         }
 
         * {
@@ -30,344 +34,127 @@
             padding: 0;
             background-color: var(--bg);
             color: var(--text);
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
             overflow-x: hidden;
             min-height: 100vh;
         }
 
-        /* Animated background mesh blobs */
-        .mesh-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            overflow: hidden;
+        #root {
+            display: flex;
+            min-height: 100vh;
         }
 
-        .blob {
-            position: absolute;
-            width: 300px;
-            height: 300px;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.15;
-            animation: drift 20s infinite alternate ease-in-out;
-        }
-
-        .blob-1 { background: var(--accent); top: -100px; left: -100px; }
-        .blob-2 { background: var(--secondary); bottom: -100px; right: -100px; animation-delay: -5s; }
-        .blob-3 { background: #ff00ff; top: 40%; left: 50%; animation-delay: -10s; }
-
-        @keyframes drift {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(50px, 100px) scale(1.2); }
-        }
-
-        header {
+        /* Responsive Sidebar */
+        .sidebar {
+            width: 260px;
+            background: rgba(0, 0, 0, 0.3);
+            border-right: 1px solid var(--card-border);
+            display: flex;
+            flex-direction: column;
             padding: 20px;
-            text-align: center;
+            height: 100vh;
+            position: sticky;
+            top: 0;
         }
 
-        h1 {
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+        }
+
+        .main-content {
+            flex: 1;
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        @media (min-width: 769px) {
+            .main-content {
+                max-width: 1000px;
+            }
+        }
+
+        @media (max-width: 430px) {
+            .main-content {
+                max-width: 430px;
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
             font-family: 'Syne', sans-serif;
-            font-weight: 800;
+            font-size: 28px;
             margin: 0;
-            font-size: 24px;
             background: linear-gradient(90deg, var(--accent), var(--secondary));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .container {
-            max-width: 430px;
-            margin: 0 auto;
-            padding: 20px;
-            padding-bottom: 100px;
+        .header p {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin: 5px 0 0;
         }
 
         .card {
             background: var(--card-bg);
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(10px);
             border: 1px solid var(--card-border);
             border-radius: 16px;
             padding: 20px;
             margin-bottom: 20px;
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        .stat-card {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 24px;
-            font-weight: bold;
-            color: var(--accent);
-        }
-
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.6;
-        }
-
-        /* Bot cards */
-        .bot-card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        .bot-card.primary {
-            border-color: var(--accent);
-            background: rgba(0, 212, 255, 0.05);
-        }
-
-        .bot-card.dead {
-            border-color: var(--danger);
-            opacity: 0.7;
-        }
-
-        .bot-header {
+        .toggle-item {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .bot-status {
-            font-size: 18px;
-        }
-
-        .bot-name {
-            font-weight: bold;
-            flex: 1;
-        }
-
-        .bot-badge {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: var(--accent);
-            color: #000;
-        }
-
-        .bot-info {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 5px;
-        }
-
-        .bot-actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .btn-small {
-            padding: 6px 12px;
-            font-size: 11px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-warning {
-            background: var(--warning);
-            color: #000;
-        }
-
-        .btn-primary {
-            background: var(--accent);
-            color: #000;
-        }
-
-        /* Clone form */
-        .clone-section {
-            display: none;
-        }
-
-        .clone-section.active {
-            display: block;
-        }
-
-        .clone-form {
-            margin-top: 15px;
-        }
-
-        .clone-form input {
-            width: 100%;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid var(--card-border);
-            background: rgba(255,255,255,0.05);
-            color: white;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 12px;
-            margin-bottom: 10px;
-        }
-
-        .clone-form .btn {
-            margin-top: 10px;
-        }
-
-        .clone-error {
-            color: var(--danger);
-            font-size: 12px;
-            margin-top: 10px;
-            display: none;
-        }
-
-        .clone-error.visible {
-            display: block;
-        }
-
-        /* Group selector sheet */
-        .sheet-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 200;
-            display: none;
-        }
-
-        .sheet-overlay.visible {
-            display: block;
-        }
-
-        .group-sheet {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg);
-            border-top: 1px solid var(--card-border);
-            border-radius: 20px 20px 0 0;
-            padding: 20px;
-            z-index: 201;
-            transform: translateY(100%);
-            transition: transform 0.3s ease;
-        }
-
-        .group-sheet.visible {
-            transform: translateY(0);
-        }
-
-        .sheet-handle {
-            width: 40px;
-            height: 4px;
-            background: var(--card-border);
-            border-radius: 2px;
-            margin: 0 auto 20px;
-        }
-
-        .group-item {
-            padding: 15px;
+            justify-content: space-between;
+            padding: 12px 0;
             border-bottom: 1px solid var(--card-border);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
         }
 
-        .group-item:last-child {
+        .toggle-item:last-child {
             border-bottom: none;
         }
 
-        .group-icon {
-            font-size: 20px;
+        .toggle-info h4 {
+            margin: 0;
+            font-size: 15px;
         }
 
-        .group-title {
-            flex: 1;
-            font-weight: 500;
-        }
-
-        .group-members {
+        .toggle-info p {
+            margin: 4px 0 0;
             font-size: 12px;
-            opacity: 0.6;
+            color: var(--text-dim);
         }
 
-        /* Tabs */
-        .tabs {
-            position: fixed;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100%;
-            max-width: 430px;
-            background: rgba(7, 11, 20, 0.8);
-            backdrop-filter: blur(10px);
-            display: flex;
-            justify-content: space-around;
-            padding: 15px 0;
-            border-top: 1px solid var(--card-border);
-            z-index: 100;
-        }
-
-        .tab {
-            opacity: 0.5;
-            transition: 0.3s;
-            cursor: pointer;
-            font-size: 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .tab.active {
-            opacity: 1;
-            color: var(--accent);
-        }
-
-        .tab.active::after {
-            content: '';
-            width: 20px;
-            height: 2px;
-            background: var(--accent);
-            margin-top: 5px;
-            box-shadow: 0 0 10px var(--accent);
-        }
-
-        /* Form elements */
-        .toggle-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
+        /* Switch Styling */
         .switch {
             position: relative;
             display: inline-block;
-            width: 50px;
+            width: 44px;
             height: 24px;
         }
 
-        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
 
         .slider {
             position: absolute;
             cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             background-color: #333;
             transition: .4s;
             border-radius: 24px;
@@ -376,1047 +163,511 @@
         .slider:before {
             position: absolute;
             content: "";
-            height: 18px; width: 18px;
-            left: 3px; bottom: 3px;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
             background-color: white;
             transition: .4s;
             border-radius: 50%;
         }
 
-        input:checked + .slider { background-color: var(--accent); box-shadow: 0 0 10px var(--accent); }
-        input:checked + .slider:before { transform: translateX(26px); }
+        input:checked + .slider {
+            background-color: var(--accent);
+        }
 
-        .btn {
-            background: linear-gradient(90deg, var(--accent), var(--secondary));
-            border: none;
-            color: white;
-            padding: 12px;
-            border-radius: 8px;
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .loading-spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-left: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tabs */
+        .tab-nav {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+            position: fixed;
+            bottom: 0;
+            left: 0;
             width: 100%;
-            font-weight: bold;
+            padding: 10px 0;
+            border-top: 1px solid var(--card-border);
+            z-index: 100;
+        }
+
+        @media (min-width: 769px) {
+            .tab-nav {
+                display: none;
+            }
+        }
+
+        .tab-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: var(--text-dim);
             cursor: pointer;
-            font-family: 'Syne', sans-serif;
         }
 
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .tab-item.active {
+            color: var(--accent);
         }
 
-        .page { display: none; }
-        .page.active { display: block; }
+        .tab-item svg {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 4px;
+        }
 
+        /* Charts */
+        .chart-container {
+            width: 100%;
+            height: 200px;
+            margin-top: 20px;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Toast */
         .toast {
             position: fixed;
-            bottom: 80px;
+            top: 20px;
             left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: var(--accent);
-            color: #000;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-weight: bold;
-            transition: 0.3s;
-            z-index: 1000;
-        }
-
-        .toast.show { transform: translateX(-50%) translateY(0); }
-
-        .toast.error {
+            transform: translateX(-50%);
             background: var(--danger);
-            color: white;
-        }
-
-        .member-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--card-border);
-        }
-
-        .loading {
-            text-align: center;
-            padding: 20px;
-            opacity: 0.5;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            font-size: 14px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="mesh-container">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
-    </div>
+    <div id="root"></div>
 
-    <header>
-        <h1>GROUPGUARD</h1>
-        <select id="group-selector" style="background: none; color: white; border: 1px solid var(--card-border); padding: 5px; border-radius: 5px; margin-top: 10px;">
-            <option value="">Select a Group</option>
-        </select>
-    </header>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+        const { create } = zustand;
 
-    <div class="container">
-        <!-- Dashboard -->
-        <div id="page-dashboard" class="page active">
-            <div class="stats-grid">
-                <div class="card stat-card">
-                    <div class="stat-value" id="stat-members">-</div>
-                    <div class="stat-label">Members</div>
-                </div>
-                <div class="card stat-card">
-                    <div class="stat-value" id="stat-messages">-</div>
-                    <div class="stat-label">Messages</div>
-                </div>
-            </div>
-            <div class="card">
-                <h3>Recent Actions</h3>
-                <div id="logs-container" style="font-size: 12px; font-family: 'JetBrains Mono';">
-                    No recent actions.
-                </div>
-            </div>
-        </div>
+        // --- Store ---
+        const useStore = create((set, get) => ({
+            activeBotId: null,
+            activeGroupId: null,
+            activeGroupTitle: "Loading Group...",
+            modules: {},
+            modulesLoading: {},
+            groupSettings: {},
+            groupStats: {},
+            bots: [],
+            groupsByBot: {},
+            activeTab: "dashboard",
+            groupSelectorOpen: false,
 
-        <!-- Commands -->
-        <div id="page-commands" class="page">
-            <div class="card">
-                <h3>Enabled Commands</h3>
-                <div id="commands-list">
-                </div>
-                <button class="btn" onclick="saveSettings()">Save Settings</button>
-            </div>
-        </div>
+            setActiveTab: (tab) => set({ activeTab: tab }),
 
-        <!-- AutoMod -->
-        <div id="page-automod" class="page">
-             <div class="card">
-                <h3>AutoMod Settings</h3>
-                <div id="automod-list">
-                </div>
-                <button class="btn" onclick="saveSettings()">Save Settings</button>
-            </div>
-        </div>
+            setActiveGroup: (botId, groupId, title) => set({
+                activeBotId: botId,
+                activeGroupId: groupId,
+                activeGroupTitle: title
+            }),
 
-        <!-- Members -->
-        <div id="page-members" class="page">
-            <div class="card">
-                <input type="text" placeholder="Search members..." style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: white; padding: 10px; border-radius: 8px;">
-                <div id="members-list" style="margin-top: 15px;">
-                </div>
-            </div>
-        </div>
-
-        <!-- Music Player -->
-        <div id="page-music" class="page">
-            <!-- Now Playing -->
-            <div class="card">
-                <h3>🎵 Now Playing</h3>
-                <div id="now-playing" style="text-align: center; padding: 20px; margin-bottom: 20px;">
-                    <div style="font-size: 64px; margin-bottom: 15px;">🎵</div>
-                    <div id="np-title" style="font-size: 20px; font-weight: bold; margin-bottom: 5px;">No track playing</div>
-                    <div id="np-artist" style="opacity: 0.7; font-size: 14px;">-</div>
-                    <div id="np-duration" style="opacity: 0.5; font-size: 12px; margin-top: 5px;">-</div>
-                </div>
-
-                <!-- Playback Controls -->
-                <div style="display: flex; justify-content: center; gap: 12px; margin-bottom: 25px;">
-                    <button class="btn-small" onclick="sendMusicCommand('pause')">⏸️</button>
-                    <button class="btn-small btn-primary" onclick="sendMusicCommand('skip')">⏭️</button>
-                    <button class="btn-small" onclick="sendMusicCommand('resume')">▶️</button>
-                    <button class="btn-small btn-danger" onclick="sendMusicCommand('stop')">⏹️</button>
-                </div>
-
-                <!-- Volume -->
-                <div style="margin-bottom: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span>🔊 Volume</span>
-                        <span id="volume-value">100%</span>
-                    </div>
-                    <input type="range" id="volume-slider" min="0" max="200" value="100"
-                           style="width: 100%; accent-color: var(--accent);"
-                           onchange="setVolume(this.value)">
-                </div>
-
-                <!-- Playback Modes -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button class="btn-small" id="btn-shuffle" onclick="toggleShuffle()">
-                        🔀 Shuffle: OFF
-                    </button>
-                    <button class="btn-small" id="btn-repeat" onclick="cycleRepeat()">
-                        🔁 Repeat: OFF
-                    </button>
-                </div>
-            </div>
-
-            <!-- Queue -->
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3>📋 Queue</h3>
-                    <button class="btn-small btn-danger" onclick="sendMusicCommand('stop')">Clear</button>
-                </div>
-                <div id="music-queue" style="font-size: 14px;">
-                    <p style="opacity: 0.5; text-align: center; padding: 20px;">Queue is empty</p>
-                </div>
-            </div>
-
-            <!-- YouTube -->
-            <div class="card">
-                <h3>🎬 Play from YouTube</h3>
-                <input type="text" id="youtube-url" placeholder="Paste YouTube URL..."
-                       style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: white; padding: 12px; border-radius: 8px; margin-bottom: 10px;">
-                <button class="btn" onclick="playFromYouTube()">▶️ Play YouTube</button>
-            </div>
-
-            <!-- Playlists -->
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <h3>📚 Playlists</h3>
-                    <button class="btn-small btn-primary" onclick="showCreatePlaylist()">➕ Create</button>
-                </div>
-                <div id="playlists-list" style="font-size: 14px;">
-                    <p style="opacity: 0.5; text-align: center; padding: 20px;">No playlists yet</p>
-                </div>
-            </div>
-
-            <!-- History -->
-            <div class="card">
-                <h3>📜 History</h3>
-                <div id="play-history" style="font-size: 14px;">
-                    <p style="opacity: 0.5; text-align: center; padding: 20px;">No play history</p>
-                </div>
-            </div>
-
-            <!-- Search -->
-            <div class="card">
-                <h3>🔍 Search</h3>
-                <input type="text" id="search-input" placeholder="Search songs..."
-                       style="width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: white; padding: 12px; border-radius: 8px; margin-bottom: 10px;">
-                <button class="btn" onclick="searchMusic()">🔍 Search</button>
-                <div id="search-results" style="margin-top: 15px;"></div>
-            </div>
-
-            <!-- Multi-Bot Sync -->
-            <div class="card">
-                <h3>🔄 Multi-Bot Sync</h3>
-                <p style="font-size: 13px; opacity: 0.7; margin-bottom: 15px;">
-                    Sync current queue to all clone bots for consistent playback across all groups.
-                </p>
-                <button class="btn" onclick="syncToAllBots()">🔄 Sync to All Bots</button>
-            </div>
-
-            <!-- Help -->
-            <div class="card">
-                <h3>❓ Help & Tips</h3>
-                <div style="font-size: 13px; line-height: 1.6;">
-                    <p><b>Basic Commands:</b></p>
-                    <ul style="padding-left: 20px; opacity: 0.8;">
-                        <li><code>/play</code> - Play music (reply to audio)</li>
-                        <li><code>/skip</code> - Skip current track</li>
-                        <li><code>/queue</code> - View queue</li>
-                    </ul>
-                    <p><b>Advanced Commands:</b></p>
-                    <ul style="padding-left: 20px; opacity: 0.8;">
-                        <li><code>/play_youtube</code> - Play from YouTube</li>
-                        <li><code>/volume</code> - Set volume (0-200)</li>
-                        <li><code>/repeat</code> - Set repeat mode</li>
-                        <li><code>/shuffle</code> - Toggle shuffle</li>
-                        <li><code>/playlist_create</code> - Create playlist</li>
-                        <li><code>/playlist_play</code> - Play playlist</li>
-                        <li><code>/search</code> - Search music</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bot Manager -->
-        <div id="page-bots" class="page">
-            <div class="card">
-                <h3>🤖 Bot Manager</h3>
-                <p id="bot-count" style="font-size: 12px; opacity: 0.6;">Loading bots...</p>
-                <div id="bots-list">
-                </div>
-                
-                <div class="clone-section" id="clone-section">
-                    <div class="clone-form">
-                        <input type="text" id="clone-token" placeholder="Paste bot token from @BotFather (e.g., 1234567890:ABCdef...)">
-                        <button class="btn" id="clone-submit" onclick="submitClone()">Clone Bot</button>
-                        <div class="clone-error" id="clone-error"></div>
-                    </div>
-                </div>
-                
-                <button class="btn" id="clone-toggle" onclick="toggleCloneForm()" style="margin-top: 15px;">➕ Clone a new bot</button>
-            </div>
-        </div>
-
-        <!-- Settings -->
-        <div id="page-settings" class="page">
-            <div class="card">
-                <h3>Messages</h3>
-                <label>Welcome Text</label>
-                <textarea id="welcome-text" style="width: 100%; height: 80px; background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); color: white; margin-top: 5px; border-radius: 5px;"></textarea>
-                <button class="btn" style="margin-top: 10px;" onclick="saveSettings()">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Group selector sheet -->
-    <div class="sheet-overlay" id="sheet-overlay" onclick="closeGroupSheet()"></div>
-    <div class="group-sheet" id="group-sheet">
-        <div class="sheet-handle"></div>
-        <h3 id="sheet-title">Select a group</h3>
-        <div id="group-list"></div>
-    </div>
-
-    <div class="tabs">
-        <div class="tab active" onclick="showPage('dashboard', this)"><span>📊</span>Dashboard</div>
-        <div class="tab" onclick="showPage('commands', this)"><span>⌨️</span>Commands</div>
-        <div class="tab" onclick="showPage('automod', this)"><span>🛡️</span>AutoMod</div>
-        <div class="tab" onclick="showPage('members', this)"><span>👥</span>Members</div>
-        <div class="tab" onclick="showPage('music', this)"><span>🎵</span>Music</div>
-        <div class="tab" onclick="showPage('bots', this)"><span>🤖</span>Bots</div>
-        <div class="tab" onclick="showPage('settings', this)"><span>⚙️</span>Settings</div>
-    </div>
-
-    <div id="toast" class="toast">Settings Saved!</div>
-
-    <script>
-        const API = window.location.origin;
-        const initData = window.Telegram.WebApp.initData;
-        const WebApp = window.Telegram.WebApp;
-        WebApp.expand();
-
-        let currentChatId = null;
-        let groupData = null;
-        let currentBotId = null;
-        let supabaseClient = null;
-
-        // Initialize Supabase for realtime updates
-        async function initSupabase() {
-            try {
-                const res = await fetch(`${API}/api/groups`);
-                const groups = await res.json();
-                // Supabase credentials would be injected server-side
-                // For now, we'll use polling fallback
-                console.log('[REALTIME] Using polling fallback');
-            } catch (e) {
-                console.log('[REALTIME] Init failed:', e);
-            }
-        }
-
-        async function apiFetch(path, options = {}) {
-            const res = await fetch(`${API}${path}`, {
-                ...options,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Telegram-Init-Data': initData,
-                    ...(options.headers || {})
+            fetchModules: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/modules`);
+                    const data = await resp.json();
+                    set({ modules: data });
+                } catch (err) {
+                    console.error("Failed to fetch modules", err);
                 }
-            });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail?.error || 'Request failed');
-            }
-            return res.json();
-        }
+            },
 
-        function showToast(msg, isError = false) {
+            toggleModule: async (chatId, moduleName, enabled) => {
+                set(state => ({
+                    modulesLoading: { ...state.modulesLoading, [moduleName]: true }
+                }));
+
+                const oldState = get().modules[moduleName];
+                
+                // Optimistic update
+                set(state => ({
+                    modules: { ...state.modules, [moduleName]: enabled }
+                }));
+
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/modules/${moduleName}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ enabled })
+                    });
+                    
+                    if (!resp.ok) throw new Error("API call failed");
+                } catch (err) {
+                    // Revert
+                    set(state => ({
+                        modules: { ...state.modules, [moduleName]: oldState }
+                    }));
+                    showToast(`Failed to toggle ${moduleName}`);
+                } finally {
+                    set(state => ({
+                        modulesLoading: { ...state.modulesLoading, [moduleName]: false }
+                    }));
+                }
+            },
+
+            fetchAnalytics: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/analytics`);
+                    const data = await resp.json();
+                    set({ groupStats: data });
+                } catch (err) {}
+            },
+
+            fetchHeatmap: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/analytics/heatmap`);
+                    const data = await resp.json();
+                    set({ heatmapData: data });
+                } catch (err) {}
+            }
+        }));
+
+        function showToast(msg) {
             const t = document.getElementById('toast');
             t.innerText = msg;
-            t.classList.remove('error');
-            if (isError) t.classList.add('error');
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 2200);
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
         }
 
-        function showPage(pageId, el) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(`page-${pageId}`).classList.add('active');
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            el.classList.add('active');
-            if (pageId === 'members') loadMembers();
-            if (pageId === 'dashboard') loadDashboard();
-            if (pageId === 'bots') loadBots();
-            if (pageId === 'music') loadMusicPage();
-        }
+        // --- Components ---
 
-        async function loadGroups() {
-            try {
-                const groups = await apiFetch('/api/groups');
-                const sel = document.getElementById('group-selector');
-                groups.forEach(g => {
-                    const opt = document.createElement('option');
-                    opt.value = g.chat_id;
-                    opt.innerText = g.title;
-                    sel.appendChild(opt);
-                });
-                sel.onchange = (e) => {
-                    currentChatId = e.target.value;
-                    loadGroupDetails();
-                };
-                if (groups.length > 0) {
-                    sel.value = groups[0].chat_id;
-                    currentChatId = groups[0].chat_id;
-                    loadGroupDetails();
-                }
-            } catch (e) { console.error(e); }
-        }
+        const LoadingSpinner = () => <div className="loading-spinner"></div>;
 
-        async function loadGroupDetails() {
-            if (!currentChatId) return;
-            groupData = await apiFetch(`/api/groups/${currentChatId}`);
-            renderSettings();
-            loadDashboard();
-        }
+        const Toggle = ({ name, description, moduleName }) => {
+            const chatId = useStore(state => state.activeGroupId);
+            const enabled = useStore(state => state.modules[moduleName] || false);
+            const loading = useStore(state => state.modulesLoading[moduleName] || false);
+            const toggleModule = useStore(state => state.toggleModule);
 
-        function renderSettings() {
-            const cmdList = document.getElementById('commands-list');
-            cmdList.innerHTML = '';
-            for (const [cmd, enabled] of Object.entries(groupData.settings.commands)) {
-                cmdList.innerHTML += `
-                    <div class="toggle-container">
-                        <span>/${cmd}</span>
-                        <label class="switch">
-                            <input type="checkbox" ${enabled ? 'checked' : ''} onchange="groupData.settings.commands['${cmd}'] = this.checked">
-                            <span class="slider"></span>
-                        </label>
+            return (
+                <div className="toggle-item">
+                    <div className="toggle-info">
+                        <h4>{name}</h4>
+                        <p>{description}</p>
                     </div>
-                `;
-            }
-            document.getElementById('welcome-text').value = groupData.settings.welcome.text;
-        }
-
-        async function loadDashboard() {
-            if (!currentChatId) return;
-            document.getElementById('stat-members').innerText = '124';
-            document.getElementById('stat-messages').innerText = groupData.settings.message_count || '8.2k';
-            
-            const logs = await apiFetch(`/api/groups/${currentChatId}/logs`);
-            const cont = document.getElementById('logs-container');
-            cont.innerHTML = logs.map(l => `<div>[${l.action.toUpperCase()}] ${l.target_username || 'user'} by ${l.by_username || 'admin'}</div>`).join('') || 'No logs.';
-        }
-
-        async function loadMembers() {
-            if (!currentChatId) return;
-            const members = await apiFetch(`/api/groups/${currentChatId}/members`);
-            const cont = document.getElementById('members-list');
-            cont.innerHTML = members.map(m => `
-                <div class="member-item">
-                    <span>${m.username || m.first_name}</span>
-                    <span style="font-size: 10px; opacity: 0.5;">${m.message_count} msgs</span>
+                    <label className="switch">
+                        <input 
+                            type="checkbox" 
+                            checked={enabled} 
+                            disabled={loading}
+                            onChange={(e) => toggleModule(chatId, moduleName, e.target.checked)}
+                        />
+                        <span className="slider"></span>
+                        {loading && <div style={{position:'absolute', right:'-25px', top:'4px'}}><LoadingSpinner/></div>}
+                    </label>
                 </div>
-            `).join('');
-        }
-
-        async function saveSettings() {
-            try {
-                groupData.settings.welcome.text = document.getElementById('welcome-text').value;
-                await apiFetch(`/api/groups/${currentChatId}/settings`, {
-                    method: 'PUT',
-                    body: JSON.stringify(groupData.settings)
-                });
-                showToast('Settings Saved!');
-            } catch (e) {
-                showToast('Error saving!', true);
-            }
-        }
-
-        // Bot Manager functions
-        async function loadBots() {
-            const botsList = document.getElementById('bots-list');
-            const botCount = document.getElementById('bot-count');
-            
-            try {
-                const bots = await apiFetch('/api/bots');
-                botCount.innerText = `${bots.length} bot${bots.length !== 1 ? 's' : ''} registered`;
-                
-                if (bots.length === 0) {
-                    botsList.innerHTML = '<p style="opacity: 0.5; text-align: center;">No bots yet. Clone your first bot!</p>';
-                    return;
-                }
-                
-                botsList.innerHTML = bots.map(bot => {
-                    const isPrimary = bot.is_primary;
-                    const isDead = bot.status === 'dead';
-                    const statusIcon = isPrimary ? '👑' : (isDead ? '🔴' : '🟢');
-                    const cardClass = isPrimary ? 'primary' : (isDead ? 'dead' : '');
-                    
-                    return `
-                        <div class="bot-card ${cardClass}">
-                            <div class="bot-header">
-                                <span class="bot-status">${statusIcon}</span>
-                                <span class="bot-name">@${bot.username}</span>
-                                ${isPrimary ? '<span class="bot-badge">PRIMARY</span>' : ''}
-                            </div>
-                            <div class="bot-info">📛 ${bot.display_name}</div>
-                            <div class="bot-info">🆔 ${bot.bot_id}</div>
-                            <div class="bot-info">🔗 Webhook: ${bot.webhook_active ? 'active' : 'inactive'}</div>
-                            <div class="bot-info">👥 ${bot.groups_count || 0} groups</div>
-                            ${!isPrimary ? `
-                                <div class="bot-actions">
-                                    ${isDead ? `<button class="btn-small btn-warning" onclick="reauthBot(${bot.bot_id})">🔄 Re-auth</button>` : ''}
-                                    <button class="btn-small btn-danger" onclick="removeBot(${bot.bot_id})">🗑️ Remove</button>
-                                </div>
-                            ` : ''}
-                            <div class="bot-actions">
-                                <button class="btn-small btn-primary" onclick="selectBotGroup(${bot.bot_id})">Select a group ▼</button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                
-            } catch (e) {
-                botsList.innerHTML = `<p style="color: var(--danger);">Error loading bots: ${e.message}</p>`;
-            }
-        }
-
-        function toggleCloneForm() {
-            const section = document.getElementById('clone-section');
-            const btn = document.getElementById('clone-toggle');
-            if (section.classList.contains('active')) {
-                section.classList.remove('active');
-                btn.innerText = '➕ Clone a new bot';
-            } else {
-                section.classList.add('active');
-                btn.innerText = '✕ Cancel';
-            }
-        }
-
-        async function submitClone() {
-            const token = document.getElementById('clone-token').value.trim();
-            const errorEl = document.getElementById('clone-error');
-            const submitBtn = document.getElementById('clone-submit');
-            
-            if (!token) {
-                errorEl.innerText = 'Please enter a token';
-                errorEl.classList.add('visible');
-                return;
-            }
-            
-            submitBtn.disabled = true;
-            submitBtn.innerText = 'Cloning...';
-            errorEl.classList.remove('visible');
-            
-            try {
-                const result = await apiFetch('/api/bots/clone', {
-                    method: 'POST',
-                    body: JSON.stringify({ token })
-                });
-                
-                showToast(`Bot @${result.username} cloned successfully!`);
-                document.getElementById('clone-token').value = '';
-                toggleCloneForm();
-                loadBots(); // Refresh list
-            } catch (e) {
-                errorEl.innerText = e.message || 'Failed to clone bot';
-                errorEl.classList.add('visible');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerText = 'Clone Bot';
-            }
-        }
-
-        async function removeBot(botId) {
-            if (!confirm('Are you sure you want to remove this bot? This cannot be undone.')) {
-                return;
-            }
-            
-            try {
-                await apiFetch(`/api/bots/${botId}`, { method: 'DELETE' });
-                showToast('Bot removed successfully');
-                loadBots();
-            } catch (e) {
-                showToast('Error removing bot: ' + e.message, true);
-            }
-        }
-
-        async function reauthBot(botId) {
-            const token = prompt('Enter the new token for this bot from @BotFather:');
-            if (!token) return;
-            
-            try {
-                await apiFetch(`/api/bots/${botId}/reauth`, {
-                    method: 'POST',
-                    body: JSON.stringify({ token })
-                });
-                showToast('Bot re-authenticated successfully');
-                loadBots();
-            } catch (e) {
-                showToast('Error re-authenticating: ' + e.message, true);
-            }
-        }
-
-        async function selectBotGroup(botId) {
-            currentBotId = botId;
-            const sheet = document.getElementById('group-sheet');
-            const overlay = document.getElementById('sheet-overlay');
-            const list = document.getElementById('group-list');
-            
-            try {
-                const groups = await apiFetch(`/api/bots/${botId}/groups`);
-                
-                if (groups.length === 0) {
-                    list.innerHTML = '<p style="text-align: center; opacity: 0.5;">No groups found for this bot.</p>';
-                } else {
-                    list.innerHTML = groups.map(g => `
-                        <div class="group-item" onclick="selectGroupFromSheet(${g.chat_id})">
-                            <span class="group-icon">🔵</span>
-                            <span class="group-title">${g.title}</span>
-                            <span class="group-members">${g.member_count || 0} members</span>
-                        </div>
-                    `).join('');
-                }
-                
-                sheet.classList.add('visible');
-                overlay.classList.add('visible');
-            } catch (e) {
-                showToast('Error loading groups: ' + e.message, true);
-            }
-        }
-
-        function closeGroupSheet() {
-            const sheet = document.getElementById('group-sheet');
-            const overlay = document.getElementById('sheet-overlay');
-            sheet.classList.remove('visible');
-            overlay.classList.remove('visible');
-        }
-
-        function selectGroupFromSheet(chatId) {
-            closeGroupSheet();
-            // Navigate to dashboard with this group
-            const sel = document.getElementById('group-selector');
-            sel.value = chatId;
-            currentChatId = chatId;
-            loadGroupDetails();
-            // Switch to dashboard tab
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('page-dashboard').classList.add('active');
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelector('.tab:first-child').classList.add('active');
-        }
-
-        // Music Player Functions
-        let musicSettings = {
-            shuffle: false,
-            repeat: 'none',
-            volume: 100
+            );
         };
 
-        async function loadMusicPage() {
-            if (!currentChatId) {
-                document.getElementById('np-title').innerText = 'Select a group first';
-                return;
-            }
+        const LineChart = ({ data }) => {
+            if (!data || data.length === 0) return <div>No data</div>;
+            
+            const width = 400;
+            const height = 150;
+            const padding = 20;
 
-            try {
-                // Fetch music queue from API
-                const response = await fetch(`${API}/api/music/${currentChatId}/queue`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    }
-                });
+            const maxVal = Math.max(...data.map(d => d.messages), 10);
+            const points = data.map((d, i) => {
+                const x = (i / (data.length - 1)) * (width - 2 * padding) + padding;
+                const y = height - ((d.messages / maxVal) * (height - 2 * padding) + padding);
+                return `${x},${y}`;
+            }).join(' ');
 
-                if (response.ok) {
-                    const data = await response.json();
-                    updateMusicUI(data);
-                    musicSettings.shuffle = data.shuffle_mode || false;
-                    musicSettings.repeat = data.repeat_mode || 'none';
-                    musicSettings.volume = data.volume || 100;
-                    updateSettingsButtons();
-                } else {
-                    updateMusicUI({ current: null, queue: [], is_playing: false, volume: 100, repeat_mode: 'none', shuffle_mode: false });
-                }
+            const areaPath = `M ${padding},${height-padding} L ${points} L ${width-padding},${height-padding} Z`;
 
-                // Load playlists
-                loadPlaylists();
-                loadHistory();
+            return (
+                <svg viewBox={`0 0 ${width} ${height}`} className="chart">
+                    <defs>
+                        <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style={{stopColor:'var(--accent)', stopOpacity:0.3}} />
+                            <stop offset="100%" style={{stopColor:'var(--accent)', stopOpacity:0}} />
+                        </linearGradient>
+                    </defs>
+                    <path d={areaPath} fill="url(#grad)" />
+                    <polyline
+                        fill="none"
+                        stroke="var(--accent)"
+                        strokeWidth="2"
+                        points={points}
+                        strokeDasharray="1000"
+                        strokeDashoffset="1000"
+                    >
+                        <animate attributeName="stroke-dashoffset" from="1000" to="0" dur="2s" fill="freeze" />
+                    </polyline>
+                    {data.map((d, i) => {
+                        const x = (i / (data.length - 1)) * (width - 2 * padding) + padding;
+                        const y = height - ((d.messages / maxVal) * (height - 2 * padding) + padding);
+                        return <circle key={i} cx={x} cy={y} r="3" fill="var(--accent)" />;
+                    })}
+                </svg>
+            );
+        };
 
-            } catch (e) {
-                updateMusicUI({ current: null, queue: [], is_playing: false, volume: 100, repeat_mode: 'none', shuffle_mode: false });
-            }
-        }
+        const Dashboard = () => {
+            const stats = useStore(state => state.groupStats);
+            const chatId = useStore(state => state.activeGroupId);
+            const fetchAnalytics = useStore(state => state.fetchAnalytics);
 
-        function updateMusicUI(data) {
-            const titleEl = document.getElementById('np-title');
-            const artistEl = document.getElementById('np-artist');
-            const durationEl = document.getElementById('np-duration');
-            const queueEl = document.getElementById('music-queue');
-            const volumeSlider = document.getElementById('volume-slider');
-            const volumeValue = document.getElementById('volume-value');
+            useEffect(() => {
+                if (chatId) fetchAnalytics(chatId);
+            }, [chatId]);
 
-            if (data.current) {
-                titleEl.innerText = data.current.title || 'Unknown Track';
-                artistEl.innerText = data.current.performer || 'Unknown Artist';
-                durationEl.innerText = data.current.duration ? formatDuration(data.current.duration) : '-';
-            } else {
-                titleEl.innerText = 'No track playing';
-                artistEl.innerText = '-';
-                durationEl.innerText = '-';
-            }
-
-            if (data.queue && data.queue.length > 0) {
-                queueEl.innerHTML = data.queue.map((track, i) => `
-                    <div style="padding: 12px; border-bottom: 1px solid var(--card-border); display: flex; align-items: center; gap: 10px; cursor: pointer;"
-                         onclick="removeFromQueue(${i})">
-                        <span style="opacity: 0.5;">${i + 1}.</span>
-                        <span style="flex: 1;">${track.title || 'Unknown'}</span>
-                        ${track.performer ? `<span style="opacity: 0.6; font-size: 12px;">- ${track.performer}</span>` : ''}
-                        <span style="color: var(--danger);">✕</span>
+            return (
+                <div>
+                    <div className="card">
+                        <h3>Message Activity</h3>
+                        <div className="chart-container">
+                            <LineChart data={stats.activity || []} />
+                        </div>
                     </div>
-                `).join('');
-            } else {
-                queueEl.innerHTML = '<p style="opacity: 0.5; text-align: center; padding: 20px;">Queue is empty</p>';
-            }
+                    <div className="card">
+                        <h3>Member Growth</h3>
+                        <p>Total: {stats.growth ? stats.growth[stats.growth.length-1]?.total : '...'}</p>
+                    </div>
+                </div>
+            );
+        };
 
-            if (data.volume !== undefined) {
-                volumeSlider.value = data.volume;
-                volumeValue.innerText = data.volume + '%';
-            }
+        const Modules = () => {
+            const categories = {
+                "MODERATION": [
+                    { id: "warn_system", name: "Warn System", desc: "Track and limit user warnings" },
+                    { id: "auto_ban", name: "Auto Ban", desc: "Automatically ban malicious users" },
+                    { id: "timed_mute", name: "Timed Mute", desc: "Mute users for a set duration" },
+                    { id: "timed_ban", name: "Timed Ban", desc: "Ban users for a set duration" },
+                    { id: "silent_mode", name: "Silent Mode", desc: "Send mod logs privately" },
+                    { id: "require_reason", name: "Require Reason", desc: "Mandatory reason for mod actions" },
+                    { id: "reputation_system", name: "Reputation System", desc: "Community-driven trust" },
+                    { id: "trust_score", name: "Trust Score", desc: "Automated behavioral score" },
+                    { id: "ai_moderation", name: "AI Moderation", desc: "Intelligent message filtering" }
+                ],
+                "ANTI-SPAM": [
+                    { id: "antiflood", name: "Anti-Flood", desc: "Prevent rapid messaging" },
+                    { id: "antispam", name: "Anti-Spam", desc: "Block known spam patterns" },
+                    { id: "antilink", name: "Anti-Link", desc: "Control external link sharing" },
+                    { id: "anti_forward", name: "Anti-Forward", desc: "Block forwarded messages" },
+                    { id: "anti_rtl", name: "Anti-RTL", desc: "Block RTL script messages" },
+                    { id: "anti_sticker", name: "Anti-Sticker", desc: "Control sticker usage" },
+                    { id: "anti_media", name: "Anti-Media", desc: "Control media uploads" },
+                    { id: "anti_bot", name: "Anti-Bot", desc: "Filter automated accounts" }
+                ],
+                "GREETINGS": [
+                    { id: "welcome_message", name: "Welcome Message", desc: "Greet new members" },
+                    { id: "goodbye_message", name: "Goodbye Message", desc: "Bid farewell to members" },
+                    { id: "welcome_dm", name: "Welcome DM", desc: "Greet new members in private" },
+                    { id: "mute_on_join", name: "Mute on Join", desc: "Mute users until verified" },
+                    { id: "delete_old_welcome", name: "Delete Old Welcome", desc: "Keep group chat clean" },
+                    { id: "auto_delete_welcome", name: "Auto-Delete Welcome", desc: "Remove greetings after timer" }
+                ],
+                "SECURITY": [
+                    { id: "captcha", name: "Captcha", desc: "Verify new users are human" },
+                    { id: "anti_raid", name: "Anti-Raid", desc: "Protection during raid events" },
+                    { id: "global_ban_sync", name: "Global Ban Sync", desc: "Sync with Nexus global blacklist" },
+                    { id: "new_account_filter", name: "New Account Filter", desc: "Restrict fresh accounts" },
+                    { id: "suspicious_activity_alert", name: "Suspicious Activity", desc: "Alert on unusual patterns" }
+                ],
+                "CONTENT": [
+                    { id: "word_filter", name: "Word Filter", desc: "Filter prohibited words" },
+                    { id: "link_whitelist", name: "Link Whitelist", desc: "Allow specific domains" },
+                    { id: "media_whitelist", name: "Media Whitelist", desc: "Allow specific media types" },
+                    { id: "spoiler_filter", name: "Spoiler Filter", desc: "Filter unmasked spoilers" },
+                    { id: "translation_filter", name: "Translation Filter", desc: "Enforce specific languages" }
+                ],
+                "CHANNEL": [
+                    { id: "auto_post", name: "Auto Post", desc: "Mirror group activity to channel" },
+                    { id: "scheduled_posts", name: "Scheduled Posts", desc: "Manage future channel updates" },
+                    { id: "post_to_channel", name: "Post to Channel", desc: "Direct bot-to-channel posting" },
+                    { id: "channel_comments_mod", name: "Channel Comments", desc: "Moderate linked comments" },
+                    { id: "linked_channel_sync", name: "Linked Channel Sync", desc: "Sync group/channel admins" },
+                    { id: "post_approval", name: "Post Approval", desc: "Approve group msgs for channel" }
+                ],
+                "ANALYTICS": [
+                    { id: "activity_tracking", name: "Activity Tracking", desc: "Detailed group stats" },
+                    { id: "sentiment_analysis", name: "Sentiment Analysis", desc: "Track community mood" },
+                    { id: "growth_tracking", name: "Growth Tracking", desc: "Monitor member changes" },
+                    { id: "member_heatmap", name: "Member Heatmap", desc: "Peak activity visualization" }
+                ],
+                "UTILITIES": [
+                    { id: "rules_command", name: "Rules Command", desc: "Quick access to group rules" },
+                    { id: "afk_system", name: "AFK System", desc: "Manage away-from-keyboard status" },
+                    { id: "poll_manager", name: "Poll Manager", desc: "Enhanced poll creation" },
+                    { id: "notes_system", name: "Notes System", desc: "Save and retrieve group notes" },
+                    { id: "pin_manager", name: "Pin Manager", desc: "Advanced message pinning" }
+                ]
+            };
 
-            musicSettings.shuffle = data.shuffle_mode || false;
-            musicSettings.repeat = data.repeat_mode || 'none';
-            updateSettingsButtons();
-        }
+            return (
+                <div>
+                    {Object.entries(categories).map(([cat, mods]) => (
+                        <div key={cat} className="card">
+                            <h3 style={{fontSize:'14px', color:'var(--accent)', marginBottom:'15px'}}>{cat}</h3>
+                            {mods.map(m => (
+                                <Toggle key={m.id} name={m.name} description={m.desc} moduleName={m.id} />
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            );
+        };
 
-        function updateSettingsButtons() {
-            const shuffleBtn = document.getElementById('btn-shuffle');
-            const repeatBtn = document.getElementById('btn-repeat');
+        const ChannelManager = () => {
+            return (
+                <div className="card">
+                    <h3>📢 Channel Manager</h3>
+                    <p>Coming soon...</p>
+                </div>
+            );
+        };
 
-            shuffleBtn.innerText = `🔀 Shuffle: ${musicSettings.shuffle ? 'ON' : 'OFF'}`;
-            shuffleBtn.style.opacity = musicSettings.shuffle ? '1' : '0.6';
+        const Manage = () => {
+            const [activeSubTab, setActiveSubTab] = useState("greetings");
+            const [text, setText] = useState("");
+            const chatId = useStore(state => state.activeGroupId);
 
-            repeatBtn.innerText = `🔁 Repeat: ${musicSettings.repeat.toUpperCase()}`;
-            repeatBtn.style.opacity = musicSettings.repeat !== 'none' ? '1' : '0.6';
-        }
-
-        function formatDuration(seconds) {
-            const mins = Math.floor(seconds / 60);
-            const secs = seconds % 60;
-            return `${mins}:${secs.toString().padStart(2, '0')}`;
-        }
-
-        async function sendMusicCommand(command) {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
-
-            try {
-                await fetch(`${API}/api/music/${currentChatId}/command`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    },
-                    body: JSON.stringify({ command })
-                });
-
-                showToast(`${command.charAt(0).toUpperCase() + command.slice(1)} command sent`);
-                setTimeout(() => loadMusicPage(), 500);
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
-
-        async function setVolume(value) {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
-
-            document.getElementById('volume-value').innerText = value + '%';
-
-            try {
-                await fetch(`${API}/api/music/${currentChatId}/settings`, {
+            const saveConfig = async () => {
+                await fetch(`/api/groups/${chatId}/text-config`, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    },
-                    body: JSON.stringify({
-                        volume: parseInt(value),
-                        repeat_mode: musicSettings.repeat,
-                        shuffle_mode: musicSettings.shuffle
-                    })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ [activeSubTab]: text })
                 });
-                showToast(`Volume set to ${value}%`);
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
+                showToast("Saved!");
+            };
 
-        async function toggleShuffle() {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
+            return (
+                <div>
+                    <div className="card" style={{display:'flex', gap:'10px', marginBottom:'10px', padding:'10px'}}>
+                        <button onClick={() => setActiveSubTab("welcome")} style={{background: activeSubTab==='welcome'?'var(--accent)':'none', border:'none', color:'#fff', padding:'5px 10px', borderRadius:'5px'}}>Welcome</button>
+                        <button onClick={() => setActiveSubTab("goodbye")} style={{background: activeSubTab==='goodbye'?'var(--accent)':'none', border:'none', color:'#fff', padding:'5px 10px', borderRadius:'5px'}}>Goodbye</button>
+                        <button onClick={() => setActiveSubTab("rules")} style={{background: activeSubTab==='rules'?'var(--accent)':'none', border:'none', color:'#fff', padding:'5px 10px', borderRadius:'5px'}}>Rules</button>
+                    </div>
+                    <div className="card">
+                        <h4>Edit {activeSubTab}</h4>
+                        <textarea 
+                            style={{width:'100%', height:'150px', background:'rgba(0,0,0,0.2)', border:'1px solid var(--card-border)', borderRadius:'8px', color:'#fff', padding:'10px'}}
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                        />
+                        <div style={{marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'5px'}}>
+                            {['{first}', '{fullname}', '{username}', '{mention}', '{chatname}'].map(v => (
+                                <span key={v} onClick={() => setText(text + v)} style={{fontSize:'10px', background:'var(--card-border)', padding:'2px 5px', borderRadius:'3px', cursor:'pointer'}}>{v}</span>
+                            ))}
+                        </div>
+                        <button onClick={saveConfig} style={{marginTop:'20px', width:'100%', padding:'12px', background:'var(--accent)', border:'none', borderRadius:'8px', fontWeight:'bold'}}>Save Changes</button>
+                    </div>
+                </div>
+            );
+        };
 
-            musicSettings.shuffle = !musicSettings.shuffle;
-            updateSettingsButtons();
+        const App = () => {
+            const { activeTab, setActiveTab, activeGroupTitle, activeGroupId, fetchModules, fetchAnalytics } = useStore();
 
-            try {
-                await fetch(`${API}/api/music/${currentChatId}/settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    },
-                    body: JSON.stringify({
-                        volume: musicSettings.volume,
-                        repeat_mode: musicSettings.repeat,
-                        shuffle_mode: musicSettings.shuffle
-                    })
-                });
-                showToast(`Shuffle ${musicSettings.shuffle ? 'enabled' : 'disabled'}`);
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
+            useEffect(() => {
+                const tg = window.Telegram.WebApp;
+                tg.expand();
+                
+                // For demo, set a default chat_id
+                const params = new URLSearchParams(window.location.search);
+                const chatId = params.get('chat_id') || -100123456789;
+                useStore.getState().setActiveGroup(0, chatId, "Nexus Support Group");
+                
+                fetchModules(chatId);
+            }, []);
 
-        async function cycleRepeat() {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
-
-            const modes = ['none', 'one', 'all'];
-            const currentIndex = modes.indexOf(musicSettings.repeat);
-            musicSettings.repeat = modes[(currentIndex + 1) % 3];
-            updateSettingsButtons();
-
-            try {
-                await fetch(`${API}/api/music/${currentChatId}/settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    },
-                    body: JSON.stringify({
-                        volume: musicSettings.volume,
-                        repeat_mode: musicSettings.repeat,
-                        shuffle_mode: musicSettings.shuffle
-                    })
-                });
-                showToast(`Repeat: ${musicSettings.repeat}`);
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
-
-        async function playFromYouTube() {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
-
-            const url = document.getElementById('youtube-url').value.trim();
-            if (!url) {
-                showToast('Please enter a YouTube URL', true);
-                return;
-            }
-
-            try {
-                showToast('Downloading from YouTube...');
-                await fetch(`${API}/api/music/${currentChatId}/youtube`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    },
-                    body: JSON.stringify({ url })
-                });
-                showToast('Added to queue from YouTube');
-                document.getElementById('youtube-url').value = '';
-                setTimeout(() => loadMusicPage(), 1000);
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
-
-        async function loadPlaylists() {
-            try {
-                const response = await fetch(`${API}/api/music/${currentChatId}/playlists`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const playlistsList = document.getElementById('playlists-list');
-                    const playlists = data.playlists || [];
-
-                    if (playlists.length === 0) {
-                        playlistsList.innerHTML = '<p style="opacity: 0.5; text-align: center; padding: 20px;">No playlists yet</p>';
-                    } else {
-                        playlistsList.innerHTML = playlists.map(pl => `
-                            <div style="padding: 12px; border-bottom: 1px solid var(--card-border);">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <div style="font-weight: bold;">${pl.playlist_name}</div>
-                                        <div style="opacity: 0.6; font-size: 12px;">${pl.tracks.length} tracks</div>
-                                    </div>
-                                    <div>
-                                        <button class="btn-small btn-primary" onclick="playPlaylist('${pl.playlist_name}')">▶️</button>
-                                        <button class="btn-small btn-danger" onclick="deletePlaylist('${pl.playlist_name}')">🗑️</button>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('');
-                    }
+            const renderContent = () => {
+                switch(activeTab) {
+                    case 'dashboard': return <Dashboard />;
+                    case 'modules': return <Modules />;
+                    case 'manage': return <Manage />;
+                    case 'channel': return <ChannelManager />;
+                    default: return <Dashboard />;
                 }
-            } catch (e) {
-                console.error('Failed to load playlists:', e);
-            }
-        }
+            };
 
-        function showCreatePlaylist() {
-            const name = prompt('Enter playlist name:');
-            if (!name) return;
-            // This would call an API to create playlist
-            showToast(`Creating playlist "${name}"...`);
-        }
+            return (
+                <React.Fragment>
+                    <div id="toast" className="toast"></div>
+                    
+                    <div className="sidebar">
+                        <div className="header">
+                            <h1>⚡ Nexus</h1>
+                            <p>Intelligent Group Management</p>
+                        </div>
+                        <nav style={{display:'flex', flexDirection:'column', gap:'10px', marginTop:'40px'}}>
+                            <div onClick={() => setActiveTab('dashboard')} style={{padding:'10px', color: activeTab==='dashboard'?'var(--accent)':'#fff', cursor:'pointer'}}>Dashboard</div>
+                            <div onClick={() => setActiveTab('modules')} style={{padding:'10px', color: activeTab==='modules'?'var(--accent)':'#fff', cursor:'pointer'}}>Modules</div>
+                            <div onClick={() => setActiveTab('manage')} style={{padding:'10px', color: activeTab==='manage'?'var(--accent)':'#fff', cursor:'pointer'}}>Manage</div>
+                            <div onClick={() => setActiveTab('channel')} style={{padding:'10px', color: activeTab==='channel'?'var(--accent)':'#fff', cursor:'pointer'}}>Channel</div>
+                        </nav>
+                    </div>
 
-        async function playPlaylist(name) {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
+                    <div className="main-content">
+                        <div className="header" style={{display: window.innerWidth > 768 ? 'none' : 'block'}}>
+                            <h1>⚡ Nexus</h1>
+                            <p>Intelligent Group Management</p>
+                        </div>
 
-            try {
-                await fetch(`${API}/api/music/${currentChatId}/playlists/${encodeURIComponent(name)}/play`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    }
-                });
-                showToast(`Playing playlist: ${name}`);
-                setTimeout(() => loadMusicPage(), 500);
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
+                        <div className="card" style={{padding:'12px 20px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <span style={{fontSize:'14px', fontWeight:'600'}}>{activeGroupTitle}</span>
+                            <span style={{fontSize:'12px', color:'var(--accent)'}}>ID: {activeGroupId}</span>
+                        </div>
 
-        async function deletePlaylist(name) {
-            if (!confirm(`Delete playlist "${name}"?`)) return;
+                        {renderContent()}
+                    </div>
 
-            try {
-                await fetch(`${API}/api/music/${currentChatId}/playlists/${encodeURIComponent(name)}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    }
-                });
-                showToast(`Deleted playlist: ${name}`);
-                loadPlaylists();
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
+                    <div className="tab-nav">
+                        <div className={`tab-item ${activeTab==='dashboard'?'active':''}`} onClick={() => setActiveTab('dashboard')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                            <span>Dashboard</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='modules'?'active':''}`} onClick={() => setActiveTab('modules')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                            <span>Modules</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='manage'?'active':''}`} onClick={() => setActiveTab('manage')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            <span>Manage</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='channel'?'active':''}`} onClick={() => setActiveTab('channel')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            <span>Channel</span>
+                        </div>
+                    </div>
+                </React.Fragment>
+            );
+        };
 
-        async function loadHistory() {
-            try {
-                const response = await fetch(`${API}/api/music/${currentChatId}/history`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const historyList = document.getElementById('play-history');
-                    const history = data.history || [];
-
-                    if (history.length === 0) {
-                        historyList.innerHTML = '<p style="opacity: 0.5; text-align: center; padding: 20px;">No play history</p>';
-                    } else {
-                        historyList.innerHTML = history.map(h => `
-                            <div style="padding: 10px; border-bottom: 1px solid var(--card-border);">
-                                <div>${h.track_data.title || 'Unknown'}</div>
-                                <div style="opacity: 0.6; font-size: 12px;">
-                                    ${h.played_at ? new Date(h.played_at).toLocaleTimeString() : ''}
-                                </div>
-                            </div>
-                        `).join('');
-                    }
-                }
-            } catch (e) {
-                console.error('Failed to load history:', e);
-            }
-        }
-
-        async function searchMusic() {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
-
-            const query = document.getElementById('search-input').value.trim();
-            if (!query) {
-                showToast('Enter a search query', true);
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API}/api/music/${currentChatId}/search?query=${encodeURIComponent(query)}`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    }
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    const resultsDiv = document.getElementById('search-results');
-                    const results = data.results || [];
-
-                    if (results.length === 0) {
-                        resultsDiv.innerHTML = '<p style="opacity: 0.5; text-align: center;">No results found</p>';
-                    } else {
-                        resultsDiv.innerHTML = results.map(r => `
-                            <div style="padding: 10px; border-bottom: 1px solid var(--card-border);">
-                                <div>${r.title}</div>
-                                <div style="opacity: 0.6; font-size: 12px;">${r.source}</div>
-                            </div>
-                        `).join('');
-                    }
-                }
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
-
-        async function syncToAllBots() {
-            if (!currentChatId) {
-                showToast('Select a group first', true);
-                return;
-            }
-
-            if (!confirm('Sync queue to all clone bots? This will update music in all groups managed by your bots.')) {
-                return;
-            }
-
-            try {
-                await fetch(`${API}/api/music/${currentChatId}/sync`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Telegram-Init-Data': initData
-                    }
-                });
-                showToast('Synced to all bots!');
-            } catch (e) {
-                showToast('Error: ' + e.message, true);
-            }
-        }
-
-        // Initialize
-        loadGroups();
-        initSupabase();
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

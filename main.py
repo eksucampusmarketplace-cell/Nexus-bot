@@ -56,6 +56,15 @@ async def lifespan(app: FastAPI):
 
     pool = db.pool
 
+    # Initialize music player tables
+    try:
+        import db.ops.music as db_ops_music
+        await db_ops_music.create_music_tables(pool)
+        logger.info("[STARTUP] ✅ Music player tables initialized")
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ Failed to create music tables: {e}")
+        # Continue startup even if music tables fail
+
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
     primary_app = create_application(primary_token, is_primary=True)
@@ -156,12 +165,13 @@ async def lifespan(app: FastAPI):
 
 
 # Routes
-from api.routes import groups, members, debug, bots
+from api.routes import groups, members, debug, bots, music
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
 fastapi_app.include_router(debug.router)
 fastapi_app.include_router(bots.router)
+fastapi_app.include_router(music.router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)

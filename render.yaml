@@ -25,5 +25,7 @@ services:
         value: "3.11.0"
       - key: RENDER_EXTERNAL_URL
         sync: false
+      - key: SECRET_KEY
+        sync: false
     healthCheckPath: /
     autoDeploy: true

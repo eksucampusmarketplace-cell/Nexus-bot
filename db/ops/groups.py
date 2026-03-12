@@ -11,6 +11,34 @@ async def get_group(chat_id: int):
             return res
         return None
 
+async def get_or_create_group(db_pool, chat_id: int, title: str = None):
+    """Get existing group or create new one. Returns group record."""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM groups WHERE chat_id = $1", chat_id)
+        if row:
+            res = dict(row)
+            if isinstance(res.get('settings'), str):
+                res['settings'] = json.loads(res['settings'])
+            return res
+        # Create new group
+        if title is None:
+            title = f"Group {chat_id}"
+        await conn.execute(
+            "INSERT INTO groups (chat_id, title) VALUES ($1, $2)",
+            chat_id, title
+        )
+        row = await conn.fetchrow("SELECT * FROM groups WHERE chat_id = $1", chat_id)
+        return dict(row) if row else None
+
+async def get_group_miniapp_url(db_pool, chat_id: int) -> str | None:
+    """Get the Mini App URL configured for a group."""
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT settings->>'miniapp_url' as url FROM groups WHERE chat_id = $1",
+            chat_id
+        )
+        return row["url"] if row else None
+
 async def upsert_group(chat_id: int, title: str, bot_token_hash: str, settings: dict = None):
     if settings is None:
         settings = {
@@ -56,3 +84,57 @@ async def get_user_managed_groups(user_id: int):
     async with db.pool.acquire() as conn:
         rows = await conn.fetch("SELECT * FROM groups")
         return [dict(row) for row in rows]
+
+
+# ── Custom Messages ──────────────────────────────────────────────────────────
+
+async def get_custom_messages(chat_id: int) -> dict:
+    """Get all custom messages for a group. Returns dict of {key: body}."""
+    async with db.pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT message_key, body FROM group_custom_messages WHERE group_id = $1",
+            chat_id
+        )
+        return {row["message_key"]: row["body"] for row in rows}
+
+
+async def get_custom_message(chat_id: int, key: str) -> str | None:
+    """Get a single custom message for a group."""
+    async with db.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT body FROM group_custom_messages WHERE group_id = $1 AND message_key = $2",
+            chat_id, key
+        )
+        return row["body"] if row else None
+
+
+async def set_custom_message(chat_id: int, key: str, body: str, updated_by: int):
+    """Set or update a custom message for a group."""
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO group_custom_messages (group_id, message_key, body, updated_by)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (group_id, message_key)
+            DO UPDATE SET body = EXCLUDED.body, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+            """,
+            chat_id, key, body, updated_by
+        )
+
+
+async def delete_custom_message(chat_id: int, key: str):
+    """Delete a custom message, reverting to default."""
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM group_custom_messages WHERE group_id = $1 AND message_key = $2",
+            chat_id, key
+        )
+
+
+async def require_admin(db_pool, chat_id: int, user_id: int, bot) -> bool:
+    """Check if user is an admin in the chat."""
+    try:
+        member = await bot.get_chat_member(chat_id, user_id)
+        return member.status in ["creator", "administrator"]
+    except Exception:
+        return False

@@ -224,6 +224,7 @@ fastapi_app.add_middleware(
 from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats
 from api.routes.boost import router as boost_router
 from api.routes.channel_gate import router as channel_gate_router
+from api.routes.messages import router as messages_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -238,6 +239,7 @@ fastapi_app.include_router(boost_router)
 fastapi_app.include_router(channel_gate_router)
 fastapi_app.include_router(me.router)
 fastapi_app.include_router(member_stats.router)
+fastapi_app.include_router(messages_router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)

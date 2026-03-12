@@ -13,6 +13,36 @@ logger = logging.getLogger(__name__)
 async def create_music_tables(pool: asyncpg.Pool):
     """Create music streaming tables if they don't exist"""
     async with pool.acquire() as conn:
+        # Schema migration check: 
+        # The old music system used a different music_queues table without bot_id.
+        # If we detect it, we drop it to let the new schema be created.
+        try:
+            # Check if music_queues exists
+            table_exists = await conn.fetchval("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_name = 'music_queues'
+                )
+            """)
+            
+            if table_exists:
+                # Check for bot_id column
+                has_bot_id = await conn.fetchval("""
+                    SELECT EXISTS (
+                        SELECT 1 FROM information_schema.columns 
+                        WHERE table_name = 'music_queues' AND column_name = 'bot_id'
+                    )
+                """)
+                
+                if not has_bot_id:
+                    logger.info("[MUSIC_DB] Old music_queues schema detected. Dropping for migration.")
+                    # Drop old tables that might conflict
+                    await conn.execute("DROP TABLE IF EXISTS music_queues CASCADE")
+                    await conn.execute("DROP TABLE IF EXISTS music_sessions CASCADE")
+                    await conn.execute("DROP TABLE IF EXISTS music_settings CASCADE")
+        except Exception as e:
+            logger.warning(f"[MUSIC_DB] Migration check failed: {e}")
+
         # Read SQL from migrations file
         with open("db/migrations/add_music.sql", "r") as f:
             sql = f.read()

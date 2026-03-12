@@ -301,25 +301,59 @@ async def get_member_activity(
 ):
     """
     Get member's activity data for charts (last 7 days of messages).
+    Uses join_date and message_count from users table as approximation.
     """
     user_id = user.get('id')
 
-    # For now return mock data - in production this would query a message history table
-    # Could be implemented with proper message tracking
+    async with db.pool.acquire() as conn:
+        # Get user's activity data
+        user_row = await conn.fetchrow(
+            """SELECT message_count, join_date, last_seen
+               FROM users WHERE user_id = $1 AND chat_id = $2""",
+            user_id, chat_id
+        )
+
     from datetime import datetime, timedelta
 
+    total_messages = user_row['message_count'] if user_row else 0
+    join_date = user_row['join_date'] if user_row else None
+    last_seen = user_row['last_seen'] if user_row else None
+
+    # Build last 7 days activity (approximate since we don't have daily message counts)
+    # Distribute total messages across active days
     days = []
+    now = datetime.now()
+
     for i in range(6, -1, -1):
-        date = datetime.now() - timedelta(days=i)
-        # Mock message count - would be real data from analytics
+        date = now - timedelta(days=i)
+        date_str = date.strftime("%Y-%m-%d")
+        is_join_day = join_date and date.date() == join_date.date()
+        is_today = i == 0
+
+        # Simple approximation: messages are distributed with more weight to recent days
+        if i == 0 and total_messages > 0:
+            # Today gets higher weight
+            messages = max(1, int(total_messages * 0.3))
+        elif is_join_day:
+            # Join day gets some messages
+            messages = max(0, int(total_messages * 0.2))
+        elif total_messages > 0 and last_seen and date.date() <= last_seen.date():
+            # Active days get distributed remaining messages
+            messages = max(0, int(total_messages * 0.1))
+        else:
+            messages = 0
+
         days.append({
-            "date": date.strftime("%Y-%m-%d"),
+            "date": date_str,
             "day": date.strftime("%a"),
-            "messages": 0  # Placeholder
+            "messages": messages
         })
 
     return {
         "chat_id": chat_id,
         "user_id": user_id,
-        "activity": days
+        "activity": days,
+        "total_messages": total_messages,
+        "join_date": join_date.isoformat() if join_date else None,
+        "last_seen": last_seen.isoformat() if last_seen else None
     }

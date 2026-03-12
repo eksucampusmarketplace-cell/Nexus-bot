@@ -546,56 +546,265 @@
       }
     }
 
-    function renderDashboard(container) {
-      const stats = [
-        { label: 'Total Members', value: '0', icon: '👥', color: 'accent' },
-        { label: 'Messages Today', value: '0', icon: '💬', color: 'success' },
-        { label: 'Actions Today', value: '0', icon: '⚡', color: 'warning' },
-      ];
+    async function renderDashboard(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      const initData = window.Telegram?.WebApp?.initData || '';
 
+      // Show loading state
       container.innerHTML = '';
       const statsGrid = document.createElement('div');
       statsGrid.className = 'stats-grid';
-      stats.forEach(s => {
+      const loadingStats = [
+        { label: 'Total Members', value: '...', icon: '👥', color: 'accent' },
+        { label: 'Messages Today', value: '...', icon: '💬', color: 'success' },
+        { label: 'Actions Today', value: '...', icon: '⚡', color: 'warning' },
+      ];
+      loadingStats.forEach(s => {
         statsGrid.appendChild(StatCard(s));
       });
-
       container.appendChild(statsGrid);
 
-      // Recent activity card
-      container.appendChild(Card({
-        title: 'Recent Activity',
-        children: EmptyState({ icon: '📭', title: 'No recent activity', description: 'Activity will appear here as it happens' })
-      }));
+      // Fetch real data if we have a chat ID
+      if (chatId) {
+        try {
+          // Fetch analytics data
+          const analyticsRes = await fetch(`/api/groups/${chatId}/analytics`, {
+            headers: { 'x-init-data': initData }
+          });
+          const analytics = analyticsRes.ok ? await analyticsRes.json() : null;
+
+          // Fetch group details for member count
+          const groupRes = await fetch(`/api/groups/${chatId}`, {
+            headers: { 'x-init-data': initData }
+          });
+          const group = groupRes.ok ? await groupRes.json() : null;
+
+          // Fetch recent logs for activity
+          const logsRes = await fetch(`/api/groups/${chatId}/logs`, {
+            headers: { 'x-init-data': initData }
+          });
+          const logs = logsRes.ok ? await logsRes.json() : [];
+
+          // Calculate today's messages from activity data
+          const today = new Date().toISOString().split('T')[0];
+          const todayActivity = analytics?.activity?.find(a => a.date === today);
+          const todayMessages = todayActivity?.messages || 0;
+
+          // Calculate today's actions from logs
+          const todayStart = new Date();
+          todayStart.setHours(0, 0, 0, 0);
+          const todayActions = logs.filter(l => new Date(l.timestamp) >= todayStart).length;
+
+          // Update stats with real data
+          const memberCount = group?.member_count || 0;
+          const stats = [
+            { label: 'Total Members', value: memberCount.toLocaleString(), icon: '👥', color: 'accent' },
+            { label: 'Messages Today', value: todayMessages.toLocaleString(), icon: '💬', color: 'success' },
+            { label: 'Actions Today', value: todayActions.toLocaleString(), icon: '⚡', color: 'warning' },
+          ];
+
+          statsGrid.innerHTML = '';
+          stats.forEach(s => {
+            statsGrid.appendChild(StatCard(s));
+          });
+
+          // Store logs in state for later
+          state.setLogs(logs);
+
+          // Store stats
+          state.setStats({
+            memberCount,
+            todayMessages,
+            todayActions,
+            activity: analytics?.activity || [],
+            growth: analytics?.growth || [],
+            modules: analytics?.modules || []
+          });
+
+          // Recent activity card with real data
+          const recentLogs = logs.slice(0, 10);
+          if (recentLogs.length > 0) {
+            container.appendChild(Card({
+              title: 'Recent Activity',
+              children: recentLogs.map(log => `
+                <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 14px;">${getActionEmoji(log.action)}</span>
+                    <div style="flex: 1;">
+                      <div style="font-size: 13px; font-weight: 500;">${formatAction(log.action)}</div>
+                      <div style="font-size: 11px; color: var(--text-muted);">
+                        ${log.by_username ? `by ${log.by_username}` : 'System'}
+                        ${log.target_username ? ` → ${log.target_username}` : ''}
+                      </div>
+                    </div>
+                    <span style="font-size: 11px; color: var(--text-muted);">${formatTime(log.timestamp)}</span>
+                  </div>
+                </div>
+              `).join('')
+            }));
+          } else {
+            container.appendChild(Card({
+              title: 'Recent Activity',
+              children: EmptyState({ icon: '📭', title: 'No recent activity', description: 'Activity will appear here as it happens' })
+            }));
+          }
+
+        } catch (error) {
+          console.error('[Dashboard] Error loading data:', error);
+          container.appendChild(Card({
+            title: 'Recent Activity',
+            children: EmptyState({ icon: '⚠️', title: 'Failed to load data', description: 'Please try refreshing the page' })
+          }));
+        }
+      } else {
+        // No group selected
+        container.appendChild(Card({
+          title: 'Recent Activity',
+          children: EmptyState({ icon: '👆', title: 'Select a group', description: 'Choose a group from the dropdown above to view stats' })
+        }));
+      }
     }
 
-    function renderMembers(container) {
-      const members = getState().members || [];
-      
+    function getActionEmoji(action) {
+      const emojis = {
+        'ban': '🚫',
+        'unban': '✅',
+        'mute': '🔇',
+        'unmute': '🔊',
+        'warn': '⚠️',
+        'kick': '👢',
+        'purge': '🧹',
+        'join': '👋',
+        'leave': '👋'
+      };
+      return emojis[action] || '📋';
+    }
+
+    function formatAction(action) {
+      return action?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || action;
+    }
+
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+
+      if (minutes < 1) return 'Just now';
+      if (minutes < 60) return `${minutes}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      if (days < 7) return `${days}d ago`;
+      return date.toLocaleDateString();
+    }
+
+    async function renderMembers(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      const initData = window.Telegram?.WebApp?.initData || '';
+
       container.innerHTML = '';
-      container.appendChild(SearchInput({
-        placeholder: 'Search members...',
-        onChange: (val) => console.log('Search:', val)
+
+      if (!chatId) {
+        container.appendChild(EmptyState({
+          icon: '👆',
+          title: 'Select a group',
+          description: 'Choose a group from the dropdown above to view members'
+        }));
+        return;
+      }
+
+      // Show loading state
+      container.appendChild(EmptyState({
+        icon: '⏳',
+        title: 'Loading members...',
+        description: 'Fetching member list'
       }));
+
+      try {
+        // Fetch real members from API
+        const res = await fetch(`/api/groups/${chatId}/members`, {
+          headers: { 'x-init-data': initData }
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to load members');
+        }
+
+        const members = await res.json();
+        state.setMembers(members);
+
+        // Clear loading state
+        container.innerHTML = '';
+
+        // Add search input
+        container.appendChild(SearchInput({
+          placeholder: 'Search members...',
+          onChange: (val) => filterMembers(val, members, container)
+        }));
+
+        // Render member list
+        renderMemberList(container, members);
+
+      } catch (error) {
+        console.error('[Members] Error loading members:', error);
+        container.innerHTML = '';
+        container.appendChild(EmptyState({
+          icon: '⚠️',
+          title: 'Failed to load members',
+          description: 'Please try refreshing the page'
+        }));
+      }
+    }
+
+    function renderMemberList(container, members) {
+      const existingList = container.querySelector('.member-list');
+      if (existingList) existingList.remove();
 
       const memberList = document.createElement('div');
       memberList.className = 'member-list';
 
       if (members.length === 0) {
-        memberList.appendChild(EmptyState({ icon: '👥', title: 'No members', description: 'Members will appear here once loaded' }));
+        memberList.appendChild(EmptyState({
+          icon: '👥',
+          title: 'No members',
+          description: 'No members found in this group'
+        }));
       } else {
         members.forEach(m => {
           memberList.appendChild(MemberRow({
-            member: m,
+            member: {
+              id: m.user_id,
+              name: m.first_name || m.username || 'Unknown',
+              username: m.username,
+              avatar: m.first_name?.[0]?.toUpperCase() || '?',
+              trust_score: m.trust_score,
+              message_count: m.message_count,
+              warns: Array.isArray(m.warns) ? m.warns.length : 0,
+              is_muted: m.is_muted,
+              is_banned: m.is_banned,
+              last_seen: m.last_seen
+            },
             selectable: true,
             onSelect: (member, selected) => {
-              store.toggleMemberSelection(member.id);
+              store.getState().toggleMemberSelection(member.id);
             }
           }));
         });
       }
 
       container.appendChild(memberList);
+    }
+
+    function filterMembers(query, allMembers, container) {
+      const lowerQuery = query.toLowerCase();
+      const filtered = allMembers.filter(m =>
+        (m.first_name && m.first_name.toLowerCase().includes(lowerQuery)) ||
+        (m.username && m.username.toLowerCase().includes(lowerQuery))
+      );
+      renderMemberList(container, filtered);
     }
 
     function renderModules(container) {
@@ -635,22 +844,80 @@
       });
     }
 
-    function renderLogs(container) {
-      const logs = getState().logs || [];
-      
+    async function renderLogs(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      const initData = window.Telegram?.WebApp?.initData || '';
+
       container.innerHTML = '';
-      
-      if (logs.length === 0) {
-        container.appendChild(EmptyState({ icon: '📋', title: 'No logs', description: 'Bot actions will be logged here' }));
-      } else {
-        container.appendChild(Card({
-          title: 'Recent Logs',
-          children: logs.slice(0, 20).map(log => `
-            <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
-              <div style="font-size: 13px;">${log.action}</div>
-              <div style="font-size: 11px; color: var(--text-muted);">${new Date(log.timestamp).toLocaleString()}</div>
-            </div>
-          `).join('')
+
+      if (!chatId) {
+        container.appendChild(EmptyState({
+          icon: '👆',
+          title: 'Select a group',
+          description: 'Choose a group from the dropdown above to view logs'
+        }));
+        return;
+      }
+
+      // Show loading state
+      container.appendChild(EmptyState({
+        icon: '⏳',
+        title: 'Loading logs...',
+        description: 'Fetching recent bot actions'
+      }));
+
+      try {
+        // Fetch real logs from API
+        const res = await fetch(`/api/groups/${chatId}/logs`, {
+          headers: { 'x-init-data': initData }
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to load logs');
+        }
+
+        const logs = await res.json();
+        state.setLogs(logs);
+
+        // Clear loading state
+        container.innerHTML = '';
+
+        if (logs.length === 0) {
+          container.appendChild(EmptyState({
+            icon: '📋',
+            title: 'No logs',
+            description: 'Bot actions will be logged here'
+          }));
+        } else {
+          container.appendChild(Card({
+            title: 'Recent Logs',
+            children: logs.slice(0, 20).map(log => `
+              <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 14px;">${getActionEmoji(log.action)}</span>
+                  <div style="flex: 1;">
+                    <div style="font-size: 13px; font-weight: 500;">${formatAction(log.action)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">
+                      ${log.by_username ? `by ${log.by_username}` : 'System'}
+                      ${log.target_username ? ` → ${log.target_username}` : ''}
+                      ${log.reason ? ` • ${log.reason}` : ''}
+                    </div>
+                  </div>
+                  <span style="font-size: 11px; color: var(--text-muted);">${formatTime(log.timestamp)}</span>
+                </div>
+              </div>
+            `).join('')
+          }));
+        }
+
+      } catch (error) {
+        console.error('[Logs] Error loading logs:', error);
+        container.innerHTML = '';
+        container.appendChild(EmptyState({
+          icon: '⚠️',
+          title: 'Failed to load logs',
+          description: 'Please try refreshing the page'
         }));
       }
     }

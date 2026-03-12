@@ -11,7 +11,7 @@ from db.ops.music import (
     search_youtube, play_youtube
 )
 from db.ops.channels import link_channel, unlink_channel, get_linked_channel
-from db.ops.modules import get_modules, update_module
+from db.ops.modules import get_modules, set_module
 from db.ops.captcha import create_captcha, get_captcha, delete_captcha
 from db.ops.booster import (
     get_boost_config, save_boost_config, get_boost_stats,

@@ -9,8 +9,8 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, EmptyState, showToast } from '../lib/components.js';
-import { useStore } from '../store/index.js';
+import { Card, EmptyState, showToast } from '../../lib/components.js';
+import { useStore } from '../../store/index.js';
 
 const store = useStore;
 

@@ -11,9 +11,9 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, Toggle, Badge, EmptyState, showToast } from '../lib/components.js';
-import { RULE_TEMPLATES, applyTemplate } from '../lib/rule_templates.js';
-import { useStore } from '../store/index.js';
+import { Card, Toggle, Badge, EmptyState, showToast } from '../../lib/components.js';
+import { RULE_TEMPLATES, applyTemplate } from '../../lib/rule_templates.js';
+import { useStore } from '../../store/index.js';
 
 const store = useStore;
 

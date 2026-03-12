@@ -140,6 +140,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(MessageHandler(filters.TEXT & (filters.Regex(r'^!') | filters.Regex(r'^!!')), prefix_handler), group=0)
 
+    # Define filter constants (needed for handlers below)
+    GROUP = filters.ChatType.GROUPS
+    PRIVATE = filters.ChatType.PRIVATE
+
     # ── Basic commands (all bots) ─────────────────────────────────────────
     # Use the new start_help handlers for all bots
     app.add_handler(start_handler)  # /start from start_help.py
@@ -167,9 +171,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("deletepost",   delete_post_handler,   filters=GROUP))
 
     # ── Moderation commands (groups only) ─────────────────────────────────
-    GROUP = filters.ChatType.GROUPS
-    PRIVATE = filters.ChatType.PRIVATE
-
     app.add_handler(CommandHandler("warn",    warn_handler,    filters=GROUP))
     app.add_handler(CommandHandler("unwarn",  unwarn_handler,  filters=GROUP))
     app.add_handler(CommandHandler("warns",   warns_handler,   filters=GROUP))

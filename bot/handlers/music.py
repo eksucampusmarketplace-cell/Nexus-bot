@@ -1,5 +1,5 @@
 """
-Music Player Handler for GroupGuard Bot
+Music Player Handler for Nexus Bot
 Supports playing audio files, voice messages, and YouTube links (via yt-dlp)
 """
 

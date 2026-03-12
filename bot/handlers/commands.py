@@ -17,9 +17,9 @@ def get_token_hash(token: str) -> str:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
-    url = f"{settings.webhook_url}/webapp"
+    url = f"{settings.RENDER_EXTERNAL_URL}/webapp"
     await update.message.reply_text(
-        "👋 I'm GroupGuard. Add me to a group and make me admin to start!\n\nUse the panel below to manage your group settings:",
+        "👋 I'm Nexus. Add me to a group and make me admin to start!\n\nUse the panel below to manage your group settings:",
         reply_markup={
             "inline_keyboard": [[{"text": "📱 Open Panel", "web_app": {"url": url}}]]
         }

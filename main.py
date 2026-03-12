@@ -29,6 +29,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+fastapi_app = FastAPI(title="Nexus Bot API")
+
+fastapi_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
@@ -135,8 +146,12 @@ async def lifespan(app: FastAPI):
             dead += 1
 
     logger.info(f"[STARTUP] Recovery complete | recovered={recovered} | dead={dead}")
-    logger.info(f"[STARTUP] Total bots in registry: {registry_register.__self__.count() if hasattr(registry_register, '__self__') else 'N/A'}")
+    logger.info(f"[STARTUP] Total bots in registry: {registry_get_all().__len__()}")
     logger.info("=" * 60)
+
+    # Start scheduled post runner
+    from bot.tasks.scheduler import scheduled_post_runner
+    asyncio.create_task(scheduled_post_runner(pool, registry_get))
 
     yield
 
@@ -153,27 +168,21 @@ async def lifespan(app: FastAPI):
     logger.info("[SHUTDOWN] Complete")
 
 
-app = FastAPI(title="Nexus Bot API", lifespan=lifespan)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Routes
-from api.routes import groups, members, debug, bots, music
+from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config
 
-app.include_router(groups.router)
-app.include_router(members.router)
-app.include_router(debug.router)
-app.include_router(bots.router)
-app.include_router(music.router)
+fastapi_app.include_router(groups.router)
+fastapi_app.include_router(members.router)
+fastapi_app.include_router(debug.router)
+fastapi_app.include_router(bots.router)
+fastapi_app.include_router(music.router)
+fastapi_app.include_router(modules.router)
+fastapi_app.include_router(analytics.router)
+fastapi_app.include_router(channels.router)
+fastapi_app.include_router(text_config.router)
 
 
-@app.get("/", response_class=JSONResponse)
+@fastapi_app.get("/", response_class=JSONResponse)
 async def health():
     db_status = "connected" if (db.pool) else "disconnected"
     return {
@@ -184,13 +193,13 @@ async def health():
     }
 
 
-@app.get("/webapp", response_class=HTMLResponse)
+@fastapi_app.get("/webapp", response_class=HTMLResponse)
 async def serve_webapp():
     with open("webapp/index.html", "r") as f:
         return f.read()
 
 
-@app.post("/webhook/{bot_id}")
+@fastapi_app.post("/webhook/{bot_id}")
 async def webhook(bot_id: int, request: Request):
     """
     Receives all Telegram updates for all bots.
@@ -252,4 +261,4 @@ def _get_update_type(update: Update) -> str:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=settings.PORT)
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=settings.PORT)

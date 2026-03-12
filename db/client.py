@@ -33,7 +33,7 @@ class Database:
                     max_size=10,
                     command_timeout=60,
                     server_settings={
-                        'application_name': 'groupguard-bot'
+                        'application_name': 'nexus-bot'
                     }
                 )
                 logger.info("Successfully connected to Supabase PostgreSQL")
@@ -62,6 +62,8 @@ class Database:
                     title TEXT,
                     bot_token_hash TEXT,
                     settings JSONB DEFAULT '{}'::jsonb,
+                    modules JSONB DEFAULT '{}'::jsonb,
+                    text_config JSONB DEFAULT '{}'::jsonb,
                     member_count INTEGER DEFAULT 0,
                     last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
@@ -76,10 +78,44 @@ class Database:
                     mute_until TIMESTAMP WITH TIME ZONE,
                     is_banned BOOLEAN DEFAULT FALSE,
                     message_count INTEGER DEFAULT 0,
+                    trust_score INTEGER DEFAULT 50,
                     join_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (user_id, chat_id)
                 );
+
+                -- Linked channels per group
+                CREATE TABLE IF NOT EXISTS linked_channels (
+                    id BIGSERIAL PRIMARY KEY,
+                    group_chat_id BIGINT NOT NULL,
+                    channel_id BIGINT NOT NULL UNIQUE,
+                    channel_username TEXT,
+                    channel_title TEXT,
+                    bot_id BIGINT NOT NULL,
+                    linked_at TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                -- Scheduled and sent posts
+                CREATE TABLE IF NOT EXISTS channel_posts (
+                    id BIGSERIAL PRIMARY KEY,
+                    bot_id BIGINT NOT NULL,
+                    channel_id BIGINT NOT NULL,
+                    group_chat_id BIGINT NOT NULL,
+                    text TEXT,
+                    media_file_id TEXT,
+                    media_type TEXT,       -- photo | video | animation | document
+                    parse_mode TEXT DEFAULT 'HTML',
+                    status TEXT DEFAULT 'scheduled',  -- scheduled | sent | failed | cancelled
+                    scheduled_at TIMESTAMPTZ,
+                    sent_at TIMESTAMPTZ,
+                    sent_message_id BIGINT,    -- Telegram message_id of the sent post (for edit/delete)
+                    fail_reason TEXT,
+                    created_by BIGINT,     -- user_id of admin who created the post
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_posts_scheduled ON channel_posts(status, scheduled_at)
+                  WHERE status = 'scheduled';
 
                 CREATE TABLE IF NOT EXISTS actions_log (
                     id SERIAL PRIMARY KEY,

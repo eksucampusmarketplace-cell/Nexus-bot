@@ -85,10 +85,47 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     )
     from bot.handlers.errors import error_handler as global_error_handler
     
+    from bot.handlers.prefix_handler import prefix_handler
+    from bot.handlers.greetings import (
+        welcome_handler, goodbye_handler, 
+        set_welcome_handler, set_goodbye_handler, set_rules_handler,
+        welcome_preview_handler, goodbye_preview_handler,
+        reset_welcome_handler, reset_goodbye_handler, reset_rules_handler,
+        rules_handler as nexus_rules_handler
+    )
+    from bot.handlers.channel import (
+        channel_post_handler, schedule_post_handler, approve_post_handler,
+        cancel_post_handler, edit_post_handler, delete_post_handler
+    )
+    from bot.handlers.help import help_handler as nexus_help_handler, help_callback_handler
+    from bot.utils.aliases import register_aliases
+
+    # ── Prefix system (highest priority) ─────────────────────────────────
+    app.add_handler(MessageHandler(filters.TEXT & (filters.Regex(r'^!') | filters.Regex(r'^!!')), prefix_handler), group=0)
+
     # ── Basic commands (all bots) ─────────────────────────────────────────
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_handler))
+    app.add_handler(CommandHandler("help", nexus_help_handler))
     app.add_handler(CommandHandler("panel", panel))
+    
+    # ── Nexus Greetings & Rules ──────────────────────────────────────────
+    app.add_handler(CommandHandler("setwelcome",  set_welcome_handler,  filters=GROUP))
+    app.add_handler(CommandHandler("setgoodbye",  set_goodbye_handler,  filters=GROUP))
+    app.add_handler(CommandHandler("setrules",    set_rules_handler,    filters=GROUP))
+    app.add_handler(CommandHandler("welcome",     welcome_preview_handler, filters=GROUP))
+    app.add_handler(CommandHandler("goodbye",     goodbye_preview_handler, filters=GROUP))
+    app.add_handler(CommandHandler("rules",       nexus_rules_handler,     filters=GROUP))
+    app.add_handler(CommandHandler("resetwelcome", reset_welcome_handler, filters=GROUP))
+    app.add_handler(CommandHandler("resetgoodbye", reset_goodbye_handler, filters=GROUP))
+    app.add_handler(CommandHandler("resetrules",   reset_rules_handler,   filters=GROUP))
+
+    # ── Nexus Channel Management ─────────────────────────────────────────
+    app.add_handler(CommandHandler("channelpost",  channel_post_handler,  filters=GROUP))
+    app.add_handler(CommandHandler("schedulepost", schedule_post_handler, filters=GROUP))
+    app.add_handler(CommandHandler("approvepost",  approve_post_handler,  filters=GROUP))
+    app.add_handler(CommandHandler("cancelpost",   cancel_post_handler,   filters=GROUP))
+    app.add_handler(CommandHandler("editpost",     edit_post_handler,     filters=GROUP))
+    app.add_handler(CommandHandler("deletepost",   delete_post_handler,   filters=GROUP))
     
     # ── Moderation commands (groups only) ─────────────────────────────────
     GROUP = filters.ChatType.GROUPS
@@ -158,6 +195,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     else:
         logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
     
+    # ── Help callbacks (all bots) ─────────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
+
     # ── Captcha callbacks (all bots) ──────────────────────────────────────
     app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha:'))
 
@@ -170,12 +210,50 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
     app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
     
-    # ── New member joins ──────────────────────────────────────────────────
-    app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
+    # ── New member joins/leaves ──────────────────────────────────────────
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
+    
+    # Keep old captcha handler if needed, but in separate groups or combined
+    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
     
     # ── Global error handler ──────────────────────────────────────────────
     app.add_error_handler(global_error_handler)
     
+    # ── Register all aliases ──────────────────────────────────────────────
+    nexus_handlers = {
+        "/warn": warn_handler,
+        "/unwarn": unwarn_handler,
+        "/mute": mute_handler,
+        "/unmute": unmute_handler,
+        "/ban": ban_handler,
+        "/unban": unban_handler,
+        "/kick": kick_handler,
+        "/purge": purge_handler,
+        "/pin": pin_handler,
+        "/unpin": unpin_handler,
+        "/rules": nexus_rules_handler,
+        "/info": info_handler,
+        "/stats": stats_handler,
+        "/id": id_handler,
+        "/report": report_handler,
+        "/setwelcome": set_welcome_handler,
+        "/setgoodbye": set_goodbye_handler,
+        "/setrules": set_rules_handler,
+        "/welcome": welcome_preview_handler,
+        "/goodbye": goodbye_preview_handler,
+        "/resetwelcome": reset_welcome_handler,
+        "/resetgoodbye": reset_goodbye_handler,
+        "/resetrules": reset_rules_handler,
+        "/channelpost": channel_post_handler,
+        "/schedulepost": schedule_post_handler,
+        "/approvepost": approve_post_handler,
+        "/cancelpost": cancel_post_handler,
+        "/editpost": edit_post_handler,
+        "/deletepost": delete_post_handler,
+    }
+    register_aliases(app, nexus_handlers)
+
     logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
     return app
 

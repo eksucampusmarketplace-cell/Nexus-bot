@@ -48,8 +48,8 @@ async def lifespan(app: FastAPI):
 
     # Initialize music player tables
     try:
-        import db.ops.music as db_ops_music
-        await db_ops_music.create_music_tables(pool)
+        import db.ops.music_new as db_music
+        await db_music.create_music_tables(pool)
         logger.info("[STARTUP] ✅ Music player tables initialized")
     except Exception as e:
         logger.warning(f"[STARTUP] ⚠️ Failed to create music tables: {e}")
@@ -72,6 +72,7 @@ async def lifespan(app: FastAPI):
     try:
         primary_app = create_application(primary_token, is_primary=True)
         primary_app.bot_data["db_pool"] = pool
+        primary_app.bot_data["db"] = pool
 
         logger.info("[STARTUP] Initializing primary bot...")
         await primary_app.initialize()
@@ -131,6 +132,13 @@ async def lifespan(app: FastAPI):
     await registry_register(primary_me.id, primary_app)
     logger.info(f"[STARTUP] ✅ Primary bot @{primary_me.username} (id={primary_me.id}) live | webhook={primary_webhook}")
 
+    # Setup music worker for primary bot
+    try:
+        from bot.factory import setup_music_worker
+        await setup_music_worker(primary_app, primary_me.id, is_primary=True, db=pool)
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ Failed to setup music worker for primary bot: {e}")
+
     # Recover clones
     active_clones = await db_ops_bots.get_all_active_bots(pool)
     # Filter out primary from clone recovery
@@ -153,6 +161,7 @@ async def lifespan(app: FastAPI):
 
             clone_app = create_application(token, is_primary=False)
             clone_app.bot_data["db_pool"] = pool
+            clone_app.bot_data["db"] = pool
             await clone_app.initialize()
             await clone_app.start()
 
@@ -179,6 +188,13 @@ async def lifespan(app: FastAPI):
             await registry_register(clone["bot_id"], clone_app)
             logger.info(f"[STARTUP]   ✅ Recovered @{clone['username']} (id={clone['bot_id']})")
             recovered += 1
+
+            # Setup music worker for clone bot
+            try:
+                from bot.factory import setup_music_worker
+                await setup_music_worker(clone_app, clone["bot_id"], is_primary=False, db=pool)
+            except Exception as e:
+                logger.warning(f"[STARTUP]   ⚠️ Failed to setup music worker for clone {clone['bot_id']}: {e}")
 
         except Exception as e:
             await db_ops_bots.update_bot_status(
@@ -225,6 +241,7 @@ from api.routes import groups, members, debug, bots, music, modules, analytics, 
 from api.routes.boost import router as boost_router
 from api.routes.channel_gate import router as channel_gate_router
 from api.routes.messages import router as messages_router
+from api.routes.music_auth import router as music_auth_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -240,6 +257,7 @@ fastapi_app.include_router(channel_gate_router)
 fastapi_app.include_router(me.router)
 fastapi_app.include_router(member_stats.router)
 fastapi_app.include_router(messages_router)
+fastapi_app.include_router(music_auth_router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)

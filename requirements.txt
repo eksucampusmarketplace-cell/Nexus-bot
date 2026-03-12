@@ -15,7 +15,7 @@ qrcode==7.4.2
 pillow>=11.0.0
 pyrogram>=2.0.106
 tgcrypto>=1.2.5
-pytgcalls==3.0.0.dev29
+pytgcalls>=2.1.0
 redis==5.0.4
 aioredis==2.0.1
 psutil==5.9.8

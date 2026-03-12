@@ -9,16 +9,16 @@ python-dotenv>=1.0.0
 httpx>=0.25.2
 aiofiles>=23.2.1
 cryptography>=42.0.0
-yt-dlp==2024.3.10
-ffmpeg-python==0.2.0
-qrcode==7.4.2
+yt-dlp>=2024.3.10
+ffmpeg-python>=0.2.0
+qrcode>=7.4.2
 pillow>=11.0.0
 pyrogram>=2.0.106
 tgcrypto>=1.2.5
 pytgcalls>=2.1.0
-redis==5.0.4
-aioredis==2.0.1
-psutil==5.9.8
+redis>=5.0.4
+aioredis>=2.0.1
+psutil>=5.9.8
 # Note: pytgcalls requires Python 3.11 or lower due to tgcalls binary dependency
 # On Render with Python 3.11, use: uv pip install "pytgcalls>=2.0.0" --prerelease=allow
 # Local dev may need specific Python version

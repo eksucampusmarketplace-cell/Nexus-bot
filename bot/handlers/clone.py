@@ -796,7 +796,7 @@ async def _complete_clone_registration(
         f"Add it to any group as admin — it will appear in your Mini App dashboard\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🚀 Open Mini App", web_app={"url": f"{render_url}/webapp"})
+            InlineKeyboardButton("🚀 Open Mini App", web_app={"url": f"{render_url}/miniapp"})
         ]])
     )
 

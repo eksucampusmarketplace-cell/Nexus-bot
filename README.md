@@ -28,7 +28,7 @@ A powerful group management bot with an integrated Telegram Mini App for easy co
 
 1. Create a bot with [@BotFather](https://t.me/BotFather).
 2. Save the API Token.
-3. Use `/setmenubutton` to point to `https://YOUR_URL.onrender.com/webapp`.
+3. Use `/setmenubutton` to point to `https://YOUR_URL.onrender.com/miniapp`.
 4. (Optional) Create more bots for cloning via Mini App.
 
 ### 3. Deploy to Render

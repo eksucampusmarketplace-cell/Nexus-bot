@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     MAIN_BOT_USERNAME: str = "NexusBot"  # Username for support redirects
     SUPPORT_GROUP_ID: int = 0  # Internal alerts group (0 = disabled)
     DOCS_URL: Optional[str] = None  # Documentation link for help messages
-    MINI_APP_URL: Optional[str] = None  # Base URL for the Mini App (if not set, defaults to RENDER_EXTERNAL_URL/webapp)
+    MINI_APP_URL: Optional[str] = None  # Base URL for the Mini App (if not set, defaults to RENDER_EXTERNAL_URL/miniapp)
     PRIVACY_POLICY_URL: Optional[str] = None  # Link to Privacy Policy (if not set, uses GitHub/inline)
     
     # ── Alert Settings ────────────────────────────────────────────────────────

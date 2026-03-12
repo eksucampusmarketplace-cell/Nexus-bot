@@ -320,6 +320,43 @@ async def serve_miniapp():
     return await serve_webapp()
 
 
+@fastapi_app.get("/privacy", response_class=HTMLResponse)
+async def serve_privacy_policy():
+    """Serve the Privacy Policy HTML page."""
+    import os
+    privacy_path = os.path.join(os.path.dirname(__file__), "PRIVACY_POLICY.html")
+    if os.path.exists(privacy_path):
+        with open(privacy_path, "r", encoding="utf-8") as f:
+            return f.read()
+    else:
+        # Fallback to markdown version
+        privacy_md_path = os.path.join(os.path.dirname(__file__), "PRIVACY_POLICY.md")
+        if os.path.exists(privacy_md_path):
+            with open(privacy_md_path, "r", encoding="utf-8") as f:
+                md_content = f.read()
+            # Simple markdown to HTML conversion
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Privacy Policy - Nexus Bot</title>
+                <style>
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }}
+                    pre {{ background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }}
+                    code {{ background: #f4f4f4; padding: 2px 5px; border-radius: 3px; }}
+                </style>
+            </head>
+            <body>
+                <h1>Privacy Policy</h1>
+                <pre>{md_content}</pre>
+            </body>
+            </html>
+            """
+            return html_content
+    return "Privacy Policy not found. Please contact support@nexus-bot.com"
+
+
 @fastapi_app.post("/webhook/{bot_id}")
 async def webhook(bot_id: int, request: Request):
     """

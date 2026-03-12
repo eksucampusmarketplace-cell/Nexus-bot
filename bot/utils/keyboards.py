@@ -12,7 +12,8 @@ from config import settings
 def support_keyboard(
     include_miniapp: bool = False,
     miniapp_url: str | None = None,
-    include_docs: bool = False
+    include_docs: bool = False,
+    include_privacy: bool = True
 ) -> InlineKeyboardMarkup:
     """
     Standard support keyboard shown in help/start messages.
@@ -21,6 +22,7 @@ def support_keyboard(
         include_miniapp: Show Mini App button
         miniapp_url: URL to open Mini App (falls back to settings.MINI_APP_URL)
         include_docs: Show documentation button
+        include_privacy: Show Privacy Policy button
 
     Returns:
         InlineKeyboardMarkup with support buttons
@@ -47,6 +49,14 @@ def support_keyboard(
         buttons.append([InlineKeyboardButton(
             "📚 Documentation",
             url=settings.DOCS_URL
+        )])
+
+    # Privacy Policy button - show a link to online version if available
+    if include_privacy:
+        privacy_url = settings.PRIVACY_POLICY_URL or "https://github.com/yourusername/nexus/blob/main/PRIVACY_POLICY.md"
+        buttons.append([InlineKeyboardButton(
+            "🔒 Privacy Policy",
+            url=privacy_url
         )])
 
     return InlineKeyboardMarkup(buttons)

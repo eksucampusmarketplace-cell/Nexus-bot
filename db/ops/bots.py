@@ -297,9 +297,9 @@ async def count_recent_clone_attempts(
     async with pool.acquire() as conn:
         count = await conn.fetchval(
             """
-            SELECT COUNT(*) FROM clone_attempts 
-            WHERE user_id = $1 
-            AND attempted_at > NOW() - INTERVAL '$2 minutes'
+            SELECT COUNT(*) FROM clone_attempts
+            WHERE user_id = $1
+            AND attempted_at > NOW() - ($2 || ' minutes')::INTERVAL
             """,
             user_id, window_minutes
         )

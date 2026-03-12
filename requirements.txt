@@ -10,3 +10,11 @@ httpx>=0.25.2
 aiofiles>=23.2.1
 cryptography>=42.0.0
 yt-dlp>=2023.11.0
+ffmpeg-python==0.2.0
+qrcode==7.4.2
+pillow==10.3.0
+pyrogram>=2.0.106
+tgcrypto>=1.2.5
+# Note: pytgcalls requires Python 3.11 or lower due to tgcalls binary dependency
+# On Render with Python 3.11, use: uv pip install "pytgcalls>=2.0.0" --prerelease=allow
+# Local dev may need specific Python version

@@ -30,6 +30,24 @@ class Settings(BaseSettings):
     ALERT_ON_NEW_CLONES: bool = True  # Post new clone registrations
     ALERT_ON_DEAD_CLONES: bool = True  # Post when clone token becomes invalid
 
+    # ── Music Settings ───────────────────────────────────────────────────────
+    MUSIC_WORKER_COUNT: int = 1
+    # How many userbot accounts the MAIN BOT uses for music
+    # Each account can stream in multiple groups via PyTGCalls
+    # Clone bots always use exactly 1 (their own account)
+
+    MUSIC_MAX_QUEUE: int = 50
+    MUSIC_MAX_DURATION: int = 3600  # seconds — reject tracks over 1hr
+    MUSIC_IDLE_TIMEOUT: int = 180  # seconds — leave VC after idle
+    MUSIC_DEFAULT_VOLUME: int = 100  # 0–200
+    MUSIC_DOWNLOAD_DIR: str = "/tmp/nexus_music"
+    # Temp dir for downloaded audio before streaming
+    # Files deleted immediately after streaming begins
+
+    # Pyrogram API credentials for userbot authentication
+    PYROGRAM_API_ID: Optional[int] = None
+    PYROGRAM_API_HASH: Optional[str] = None
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def validate_required_settings(self):

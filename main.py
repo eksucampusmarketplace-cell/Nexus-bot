@@ -262,3 +262,6 @@ def _get_update_type(update: Update) -> str:
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(fastapi_app, host="0.0.0.0", port=settings.PORT)
+
+
+app = fastapi_app

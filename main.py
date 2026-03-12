@@ -25,21 +25,10 @@ settings.validate_required_settings()
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s | %(message)s",
-    datefmt="%%Y-%%m-%%d %%H:%%M:%%S",
+    datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
-
-fastapi_app = FastAPI(title="Nexus Bot API")
-
-fastapi_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -70,11 +59,12 @@ async def lifespan(app: FastAPI):
     primary_token = settings.PRIMARY_BOT_TOKEN
 
     # Validate token format before attempting to initialize
-    token_pattern = r'^\d{8,10}:[\w-]{35}$'
+    # Telegram tokens: bot_id (up to 12 digits now):secret (35-45 chars)
+    token_pattern = r'^\d{8,12}:[\w-]{35,50}$'
     if not re.match(token_pattern, primary_token):
         logger.error(
             f"[STARTUP] ❌ Invalid PRIMARY_BOT_TOKEN format. "
-            f"Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz (bot ID: 8-10 digits, token: 35 chars). "
+            f"Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz (bot ID: 8-12 digits, token: 35-50 chars). "
             f"Please check your environment variables."
         )
         raise ValueError("Invalid bot token format. Bot tokens should be in format: BOT_ID:TOKEN")
@@ -220,6 +210,15 @@ async def lifespan(app: FastAPI):
     await db.disconnect()
     logger.info("[SHUTDOWN] Complete")
 
+fastapi_app = FastAPI(title="Nexus Bot API", lifespan=lifespan)
+
+fastapi_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Routes
 from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats

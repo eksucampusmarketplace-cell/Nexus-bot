@@ -111,6 +111,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.utils.alerts import alert_error
     from config import settings
 
+    # ── Filter definitions ─────────────────────────────────────────────────
+    GROUP = filters.ChatType.GROUPS
+    PRIVATE = filters.ChatType.PRIVATE
+
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(MessageHandler(filters.TEXT & (filters.Regex(r'^!') | filters.Regex(r'^!!')), prefix_handler), group=0)
 
@@ -139,10 +143,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("cancelpost",   cancel_post_handler,   filters=GROUP))
     app.add_handler(CommandHandler("editpost",     edit_post_handler,     filters=GROUP))
     app.add_handler(CommandHandler("deletepost",   delete_post_handler,   filters=GROUP))
-    
+
     # ── Moderation commands (groups only) ─────────────────────────────────
-    GROUP = filters.ChatType.GROUPS
-    PRIVATE = filters.ChatType.PRIVATE
     
     app.add_handler(CommandHandler("warn",    warn_handler,    filters=GROUP))
     app.add_handler(CommandHandler("unwarn",  unwarn_handler,  filters=GROUP))

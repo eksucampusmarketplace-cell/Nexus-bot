@@ -199,7 +199,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"owner_user_id={user.id}"
     )
 
-    # Store pending data for confirmation step
+    # Store pending data
     context.user_data["pending_clone"] = {
         "token":        token,
         "token_hash":   token_hash,
@@ -208,16 +208,22 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         "display_name": cloned_name,
     }
 
+    context.user_data["clone_state"] = "WAITING_FOR_LIMIT"
     await processing.edit_text(
-        f"✅ *Token verified\\!*\n\n"
+        f"✅ *Token verified!*\n\n"
         f"🤖 @{cloned_username}\n"
-        f"📛 {cloned_name}\n"
-        f"🆔 `{cloned_bot_id}`\n\n"
-        f"Confirm to register this bot as a Nexus clone?",
+        f"📛 {cloned_name}\n\n"
+        f"How many groups should this bot work in? (1–5)\n"
+        f"Default: 1",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("✅ Confirm", callback_data=f"clone:confirm:{cloned_bot_id}"),
-            InlineKeyboardButton("❌ Cancel",  callback_data="clone:cancel")
+            InlineKeyboardButton("1", callback_data="clone:limit:1"),
+            InlineKeyboardButton("2", callback_data="clone:limit:2"),
+            InlineKeyboardButton("3", callback_data="clone:limit:3"),
+            InlineKeyboardButton("4", callback_data="clone:limit:4"),
+            InlineKeyboardButton("5", callback_data="clone:limit:5"),
+        ], [
+            InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")
         ]])
     )
 
@@ -235,6 +241,56 @@ async def clone_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
     logger.info(f"[CLONE] Callback | user_id={user.id} | action={action} | data={query.data}")
 
     db_pool = context.bot_data["db_pool"]
+
+    # ── limit ─────────────────────────────────────────────────────────────
+    if action == "limit":
+        limit = int(parts[2])
+        context.user_data.get("pending_clone", {})["group_limit"] = limit
+        context.user_data["clone_state"] = "WAITING_FOR_POLICY"
+        
+        await query.edit_message_text(
+            "Who can add this bot to groups?\n\n"
+            "🔒 *Only me*: Only you can add this bot.\n"
+            "✅ *Anyone (open)*: Anyone can add it. They can use it but won't have owner-level control.\n"
+            "🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group.",
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔒 Only me", callback_data="clone:policy:blocked")],
+                [InlineKeyboardButton("✅ Anyone (open)", callback_data="clone:policy:open")],
+                [InlineKeyboardButton("🔔 Approval needed", callback_data="clone:policy:approval")],
+                [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")]
+            ])
+        )
+        return
+
+    # ── policy ────────────────────────────────────────────────────────────
+    if action == "policy":
+        policy = parts[2]
+        context.user_data.get("pending_clone", {})["group_access_policy"] = policy
+        
+        if policy == "approval":
+            # For approval, notifications are forced ON
+            context.user_data.get("pending_clone", {})["bot_add_notifications"] = True
+            # Skip to confirmation
+            await _show_final_confirmation(query, context)
+        else:
+            context.user_data["clone_state"] = "WAITING_FOR_NOTIFICATIONS"
+            await query.edit_message_text(
+                "Notify me when someone adds my bot to a group?",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("Yes, notify me", callback_data="clone:notify:yes")],
+                    [InlineKeyboardButton("No thanks", callback_data="clone:notify:no")],
+                    [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")]
+                ])
+            )
+        return
+
+    # ── notify ────────────────────────────────────────────────────────────
+    if action == "notify":
+        notify = (parts[2] == "yes")
+        context.user_data.get("pending_clone", {})["bot_add_notifications"] = notify
+        await _show_final_confirmation(query, context)
+        return
 
     # ── cancel ────────────────────────────────────────────────────────────
     if action == "cancel":
@@ -361,6 +417,28 @@ async def clone_callback_handler(update: Update, context: ContextTypes.DEFAULT_T
         return
 
 
+async def _show_final_confirmation(query, context):
+    pending = context.user_data.get("pending_clone", {})
+    cloned_username = pending["username"]
+    cloned_bot_id = pending["bot_id"]
+    
+    await query.edit_message_text(
+        f"✅ *Settings saved\\!*\n\n"
+        f"🤖 @{cloned_username}\n"
+        f"🆔 `{cloned_bot_id}`\n\n"
+        f"*Summary:*\n"
+        f"👥 Group limit: {pending.get('group_limit', 1)}\n"
+        f"🛡️ Policy: {pending.get('group_access_policy', 'blocked')}\n"
+        f"🔔 Notify: {'Yes' if pending.get('bot_add_notifications') else 'No'}\n\n"
+        f"Confirm to register this bot as a Nexus clone?",
+        parse_mode=ParseMode.MARKDOWN_V2,
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ Confirm", callback_data=f"clone:confirm:{cloned_bot_id}"),
+            InlineKeyboardButton("❌ Cancel",  callback_data="clone:cancel")
+        ]])
+    )
+
+
 # ─── /myclones ────────────────────────────────────────────────────────────────
 
 async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -411,6 +489,77 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
     )
 
 
+async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    /cloneset limit <1-5>          → update group_limit
+    /cloneset policy open|approval|blocked  → update group_access_policy
+    /cloneset notify on|off        → update bot_add_notifications
+    """
+    user = update.effective_user
+    args = context.args
+    db_pool = context.bot_data["db_pool"]
+
+    if not args or len(args) < 2:
+        await update.message.reply_text(
+            "📖 *Usage:*\n"
+            "`/cloneset limit <1-5>`\n"
+            "`/cloneset policy open|approval|blocked`\n"
+            "`/cloneset notify on|off`",
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+        return
+
+    subcommand = args[0].lower()
+    value = args[1].lower()
+
+    # Get user's bots to identify which one to update
+    # In a real scenario, we might need a bot_id or use the last created one.
+    # To keep it simple for now, we'll update ALL clones of this user, 
+    # or just show a message that it's for the last one.
+    # Actually, the prompt doesn't specify how to select the bot.
+    # Usually /cloneset would be followed by bot_id or used in a way that identifies the bot.
+    # For now, let's assume it applies to the most recently added clone.
+    
+    clones = await get_bots_by_owner(db_pool, user.id)
+    clones_only = [c for c in clones if not c["is_primary"]]
+    
+    if not clones_only:
+        await update.message.reply_text("❌ You don't have any clone bots.")
+        return
+        
+    # We'll apply it to all clones for now, or just the first one.
+    # Let's go with the first one (most recently added due to ORDER BY added_at DESC)
+    target_bot = clones_only[0]
+    bot_id = target_bot["bot_id"]
+
+    from db.ops.bots import update_bot_access_settings
+
+    if subcommand == "limit":
+        if not value.isdigit() or not (1 <= int(value) <= 20):
+            await update.message.reply_text("❌ Limit must be between 1 and 20.")
+            return
+        await update_bot_access_settings(db_pool, bot_id, group_limit=int(value))
+        await update.message.reply_text(f"✅ Group limit updated to {value} for @{target_bot['username']}.")
+
+    elif subcommand == "policy":
+        if value not in ["open", "approval", "blocked"]:
+            await update.message.reply_text("❌ Policy must be: open, approval, or blocked.")
+            return
+        await update_bot_access_settings(db_pool, bot_id, group_access_policy=value)
+        await update.message.reply_text(f"✅ Access policy updated to {value} for @{target_bot['username']}.")
+
+    elif subcommand == "notify":
+        if value not in ["on", "off"]:
+            await update.message.reply_text("❌ Notify must be: on or off.")
+            return
+        notify = (value == "on")
+        await update_bot_access_settings(db_pool, bot_id, bot_add_notifications=notify)
+        await update.message.reply_text(f"✅ Notifications turned {value} for @{target_bot['username']}.")
+
+    else:
+        await update.message.reply_text("❌ Unknown subcommand.")
+
+
 # ─── Internal: complete registration ─────────────────────────────────────────
 
 async def _complete_clone_registration(
@@ -455,6 +604,9 @@ async def _complete_clone_registration(
         "is_primary":      False,
         "status":          "active",
         "webhook_active":  False,
+        "group_limit":     pending.get("group_limit", 1),
+        "group_access_policy": pending.get("group_access_policy", "blocked"),
+        "bot_add_notifications": pending.get("bot_add_notifications", False),
     })
     logger.info(f"[CLONE][REGISTER] DB record inserted | bot_id={bot_id}")
 

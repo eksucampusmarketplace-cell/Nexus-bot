@@ -1,0 +1,9 @@
+{
+  "name": "nexus-miniapp",
+  "version": "1.0.0",
+  "description": "Nexus Bot Telegram Mini App",
+  "dependencies": {
+    "@mtproto/core": "^6.3.3",
+    "@mtproto/transport": "^1.0.0"
+  }
+}

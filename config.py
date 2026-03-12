@@ -120,7 +120,7 @@ class Settings(BaseSettings):
         if self.MINI_APP_URL:
             return self.MINI_APP_URL
         if self.RENDER_EXTERNAL_URL:
-            return f"{self.RENDER_EXTERNAL_URL.rstrip('/')}/webapp"
+            return f"{self.RENDER_EXTERNAL_URL.rstrip('/')}/miniapp"
         return None
 
 settings = Settings()

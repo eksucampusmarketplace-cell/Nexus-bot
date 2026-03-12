@@ -14,7 +14,7 @@ from telegram import Update
 from config import settings
 from db.client import db
 from bot.factory import create_application
-from bot.registry import register as registry_register, get as registry_get, get_all as registry_get_all, get_summary
+from bot.registry import register as registry_register, get as registry_get, get_all as registry_get_all
 from bot.utils.crypto import encrypt_token, hash_token, decrypt_token
 import db.ops.bots as db_ops_bots
 
@@ -46,6 +46,29 @@ async def lifespan(app: FastAPI):
 
     pool = db.pool
 
+    # Initialize Redis for music service
+    try:
+        import redis.asyncio as aioredis
+        redis_client = aioredis.from_url(
+            settings.REDIS_URL,
+            decode_responses=True
+        )
+        await redis_client.ping()
+        logger.info("[STARTUP] ✅ Redis connected")
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ Failed to connect to Redis: {e}")
+        redis_client = None
+
+    # Initialize lazy manager for Pyrogram clients
+    try:
+        from bot.userbot.lazy_manager import LazyClientManager
+        lazy_manager = LazyClientManager(pool)
+        await lazy_manager.start()
+        logger.info("[STARTUP] ✅ LazyClientManager started")
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ Failed to start LazyClientManager: {e}")
+        lazy_manager = None
+
     # Initialize music player tables
     try:
         import db.ops.music_new as db_music
@@ -54,6 +77,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[STARTUP] ⚠️ Failed to create music tables: {e}")
         # Continue startup even if music tables fail
+
+    # Run stars economy migration
+    try:
+        migration_path = os.path.join(os.path.dirname(__file__), "db", "migrations", "add_stars_economy.sql")
+        if os.path.exists(migration_path):
+            with open(migration_path, 'r') as f:
+                migration_sql = f.read()
+            await pool.execute(migration_sql)
+            logger.info("[STARTUP] ✅ Stars economy tables migrated")
+    except Exception as e:
+        logger.debug(f"[STARTUP] Stars economy migration info: {e}")
 
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
@@ -73,6 +107,8 @@ async def lifespan(app: FastAPI):
         primary_app = create_application(primary_token, is_primary=True)
         primary_app.bot_data["db_pool"] = pool
         primary_app.bot_data["db"] = pool
+        primary_app.bot_data["redis"] = redis_client
+        primary_app.bot_data["lazy_manager"] = lazy_manager
 
         logger.info("[STARTUP] Initializing primary bot...")
         await primary_app.initialize()
@@ -132,12 +168,7 @@ async def lifespan(app: FastAPI):
     await registry_register(primary_me.id, primary_app)
     logger.info(f"[STARTUP] ✅ Primary bot @{primary_me.username} (id={primary_me.id}) live | webhook={primary_webhook}")
 
-    # Setup music worker for primary bot
-    try:
-        from bot.factory import setup_music_worker
-        await setup_music_worker(primary_app, primary_me.id, is_primary=True, db=pool)
-    except Exception as e:
-        logger.warning(f"[STARTUP] ⚠️ Failed to setup music worker for primary bot: {e}")
+    # No music worker for primary bot - music is handled by separate music_service.py
 
     # Recover clones
     active_clones = await db_ops_bots.get_all_active_bots(pool)
@@ -162,6 +193,8 @@ async def lifespan(app: FastAPI):
             clone_app = create_application(token, is_primary=False)
             clone_app.bot_data["db_pool"] = pool
             clone_app.bot_data["db"] = pool
+            clone_app.bot_data["redis"] = redis_client
+            clone_app.bot_data["lazy_manager"] = lazy_manager
             await clone_app.initialize()
             await clone_app.start()
 
@@ -189,12 +222,7 @@ async def lifespan(app: FastAPI):
             logger.info(f"[STARTUP]   ✅ Recovered @{clone['username']} (id={clone['bot_id']})")
             recovered += 1
 
-            # Setup music worker for clone bot
-            try:
-                from bot.factory import setup_music_worker
-                await setup_music_worker(clone_app, clone["bot_id"], is_primary=False, db=pool)
-            except Exception as e:
-                logger.warning(f"[STARTUP]   ⚠️ Failed to setup music worker for clone {clone['bot_id']}: {e}")
+            # No music worker for clone bots - music is handled by separate music_service.py
 
         except Exception as e:
             await db_ops_bots.update_bot_status(
@@ -242,6 +270,9 @@ from api.routes.boost import router as boost_router
 from api.routes.channel_gate import router as channel_gate_router
 from api.routes.messages import router as messages_router
 from api.routes.music_auth import router as music_auth_router
+from api.routes.auth import router as auth_router
+from api.routes.admin import router as admin_router
+from api.routes.billing import router as billing_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -258,6 +289,9 @@ fastapi_app.include_router(me.router)
 fastapi_app.include_router(member_stats.router)
 fastapi_app.include_router(messages_router)
 fastapi_app.include_router(music_auth_router)
+fastapi_app.include_router(auth_router)
+fastapi_app.include_router(admin_router)
+fastapi_app.include_router(billing_router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)
@@ -300,8 +334,8 @@ async def webhook(bot_id: int, request: Request):
     if bot_id == 0:
         logger.error(
             f"[WEBHOOK] Received webhook for invalid bot_id=0. "
-            f"This usually means the bot token is invalid or webhook was misconfigured. "
-            f"Please check PRIMARY_BOT_TOKEN environment variable and ensure webhook is set correctly."
+            f"This usually means the bot token is invalid or the webhook was misconfigured. "
+            f"Please check the PRIMARY_BOT_TOKEN environment variable and ensure the webhook is set correctly."
         )
         return {"ok": True, "note": "invalid_bot_id_zero"}
 

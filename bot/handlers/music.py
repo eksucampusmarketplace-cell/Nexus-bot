@@ -1,340 +1,247 @@
 """
-Music Player Handler for Nexus Bot
-Supports playing audio files, voice messages, and YouTube links (via yt-dlp)
+bot/handlers/music.py (refactored for microservice)
+
+Music commands now push jobs to Redis instead of calling MusicWorker directly.
+Waits up to MUSIC_SERVICE_TIMEOUT seconds for result.
+If music service is down: shows friendly error, never crashes bot.
+
+Job dispatch helper: _dispatch(context, chat_id, action, **kwargs)
+Status reader:       _get_status(context, chat_id)
+Service check:       _service_alive(context)
 """
 
-import logging
-import os
-import tempfile
 import asyncio
-from typing import Optional, Dict, List
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Audio, Voice
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+import json
+import logging
+import time
+import uuid
+
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import (
+    ContextTypes, CommandHandler, CallbackQueryHandler, filters
+)
 from telegram.constants import ParseMode
 
-logger = logging.getLogger(__name__)
+from config import settings
 
-# In-memory queue storage (for demo purposes - use Redis/DB in production)
-# Structure: {chat_id: {'queue': [], 'current': None, 'is_playing': False}}
-music_queues: Dict[int, dict] = {}
+log = logging.getLogger("music_cmd")
+
+SOURCE_EMOJI = {
+    "youtube": "▶️ YouTube", "soundcloud": "🔶 SoundCloud",
+    "spotify": "🟢 Spotify",  "direct": "🔗 Direct",
+    "voice": "🎤 Voice", "unknown": "🎵 Audio",
+}
 
 
-async def play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /play command - play audio from reply or attachment"""
-    chat_id = update.effective_chat.id
-    
-    if not update.message:
-        return
-    
-    # Check if there's a replied message with audio/voice
-    if update.message.reply_to_message:
-        replied_msg = update.message.reply_to_message
-        audio = replied_msg.audio or replied_msg.voice
-        
-        if audio:
-            await _add_to_queue(chat_id, {
-                'type': 'telegram',
-                'file_id': audio.file_id,
-                'title': audio.title or 'Audio',
-                'performer': audio.performer or 'Unknown',
-                'duration': audio.duration or 0
-            })
-            await update.message.reply_text(
-                f"🎵 Added to queue: <b>{audio.title or 'Audio'}</b>",
+async def _redis(context):
+    return context.bot_data.get("redis")
+
+
+async def _service_alive(context) -> bool:
+    """Check music service heartbeat in Redis."""
+    r = await _redis(context)
+    if not r:
+        return False
+    return bool(await r.exists("music:worker:heartbeat"))
+
+
+async def _dispatch(context, chat_id: int, action: str, **kwargs) -> dict:
+    """
+    Push job to music service and wait for result.
+    Returns result dict or {"ok": False, "error": "..."} on timeout/error.
+    """
+    r = await _redis(context)
+    if not r:
+        return {"ok": False, "error": "Music service unavailable."}
+
+    if not await _service_alive(context):
+        return {"ok": False, "error": "🎵 Music service is currently offline. Try again shortly."}
+
+    bot_id = context.bot.id
+    job_id = str(uuid.uuid4())
+    job    = {
+        "job_id":        job_id,
+        "action":        action,
+        "chat_id":       chat_id,
+        "bot_id":        bot_id,
+        "created_at":    time.time(),
+        "reply_bot_token": (await context.bot.get_me()).token
+        if hasattr(context.bot, 'token') else "",
+        **kwargs
+    }
+
+    await r.lpush(f"music:dispatch:{bot_id}", json.dumps(job))
+
+    # Wait for result
+    deadline = time.time() + settings.MUSIC_SERVICE_TIMEOUT
+    while time.time() < deadline:
+        raw = await r.get(f"music:result:{job_id}")
+        if raw:
+            return json.loads(raw)
+        await asyncio.sleep(0.25)
+
+    return {"ok": False, "error": "Music service timed out. Try again."}
+
+
+async def _get_status(context, chat_id: int) -> dict:
+    """Get current playback status from Redis."""
+    r = await _redis(context)
+    if not r:
+        return {}
+    bot_id = context.bot.id
+    data   = await r.hgetall(f"music:status:{chat_id}:{bot_id}")
+    return data or {}
+
+
+async def cmd_play(update: Update, context: ContextTypes.DEFAULT_TYPE, playnow=False):
+    chat    = update.effective_chat
+    user    = update.effective_user
+    message = update.effective_message
+    db      = context.bot_data.get("db")
+
+    # Handle voice message reply
+    url = None
+    if message.reply_to_message and message.reply_to_message.voice:
+        from bot.userbot.music_voice import resolve_voice_message
+        track_data = await resolve_voice_message(message.reply_to_message, context.bot)
+        if track_data:
+            url = track_data["url"]
+
+    if not url:
+        url = " ".join(context.args) if context.args else None
+        if not url:
+            await message.reply_text(
+                "❓ <b>Usage:</b> /play <YouTube, Spotify, SoundCloud URL or direct link>\n"
+                "Or reply to a voice message with /play",
                 parse_mode=ParseMode.HTML
             )
-            if not music_queues.get(chat_id, {}).get('is_playing'):
-                await _play_next(chat_id, context)
             return
-    
-    # Check for attached audio file
-    if update.message.audio:
-        audio = update.message.audio
-        await _add_to_queue(chat_id, {
-            'type': 'telegram',
-            'file_id': audio.file_id,
-            'title': audio.title or 'Audio',
-            'performer': audio.performer or 'Unknown',
-            'duration': audio.duration or 0
-        })
-        await update.message.reply_text(
-            f"🎵 Added to queue: <b>{audio.title or 'Audio'}</b>",
+
+    loading = await message.reply_text("⏳ Loading track...")
+
+    result = await _dispatch(
+        context, chat.id, "play",
+        url=url,
+        playnow=playnow,
+        requested_by=user.id,
+        requested_by_name=user.full_name,
+        reply_chat_id=chat.id,
+    )
+
+    await loading.delete()
+
+    if not result.get("ok"):
+        await message.reply_text(f"❌ {result.get('error', 'Failed')}")
+        return
+
+    data = result.get("data", {})
+    if data.get("queued"):
+        await message.reply_text(
+            f"📋 Added to queue (position {data['position']})\n"
+            f"<b>{data['title']}</b>",
             parse_mode=ParseMode.HTML
         )
-        if not music_queues.get(chat_id, {}).get('is_playing'):
-            await _play_next(chat_id, context)
+    # Now-playing card is sent by music service directly
+
+
+async def cmd_pause(update, context):
+    result = await _dispatch(context, update.effective_chat.id, "pause")
+    await update.effective_message.reply_text(
+        "⏸ Paused." if result.get("ok") else f"❌ {result.get('error')}"
+    )
+
+async def cmd_resume(update, context):
+    result = await _dispatch(context, update.effective_chat.id, "resume")
+    await update.effective_message.reply_text(
+        "▶️ Resumed." if result.get("ok") else f"❌ {result.get('error')}"
+    )
+
+async def cmd_skip(update, context):
+    result = await _dispatch(context, update.effective_chat.id, "skip")
+    await update.effective_message.reply_text(
+        "⏭ Skipped." if result.get("ok") else f"❌ {result.get('error')}"
+    )
+
+async def cmd_stop(update, context):
+    result = await _dispatch(context, update.effective_chat.id, "stop")
+    await update.effective_message.reply_text(
+        "⏹ Stopped." if result.get("ok") else f"❌ {result.get('error')}"
+    )
+
+async def cmd_volume(update, context):
+    try:
+        vol = int(context.args[0])
+    except (IndexError, ValueError):
+        await update.effective_message.reply_text("❓ Usage: /volume <0-200>")
         return
-    
-    # Check for voice message
-    if update.message.voice:
-        voice = update.message.voice
-        await _add_to_queue(chat_id, {
-            'type': 'telegram',
-            'file_id': voice.file_id,
-            'title': 'Voice Message',
-            'performer': 'Unknown',
-            'duration': voice.duration or 0
-        })
-        await update.message.reply_text("🎵 Voice message added to queue")
-        if not music_queues.get(chat_id, {}).get('is_playing'):
-            await _play_next(chat_id, context)
+    result = await _dispatch(context, update.effective_chat.id, "volume", volume=vol)
+    await update.effective_message.reply_text(
+        f"🔊 Volume: {result['data']['volume']}%" if result.get("ok") else f"❌ {result.get('error')}"
+    )
+
+async def cmd_loop(update, context):
+    result = await _dispatch(context, update.effective_chat.id, "loop")
+    if result.get("ok"):
+        state = "on 🔁" if result["data"]["looping"] else "off"
+        await update.effective_message.reply_text(f"Loop {state}")
+    else:
+        await update.effective_message.reply_text(f"❌ {result.get('error')}")
+
+async def cmd_queue(update, context):
+    status = await _get_status(context, update.effective_chat.id)
+    if not status:
+        await update.effective_message.reply_text("📋 Queue is empty.")
         return
-    
-    # Check for URL argument
-    if context.args and len(context.args) > 0:
-        url = context.args[0]
-        await _add_to_queue(chat_id, {
-            'type': 'url',
-            'url': url,
-            'title': url,
-            'performer': 'Unknown',
-            'duration': 0
-        })
-        await update.message.reply_text(f"🎵 Added to queue: {url}")
-        if not music_queues.get(chat_id, {}).get('is_playing'):
-            await _play_next(chat_id, context)
-        return
-    
-    # No audio found
-    await update.message.reply_text(
-        "🎵 <b>How to play music:</b>\n\n"
-        "1. Reply to an audio/voice message with /play\n"
-        "2. Send an audio file with /play command\n"
-        "3. Use /play <url> to play from URL",
+    current = status.get("current_title", "")
+    queue_len = int(status.get("queue_length", 0))
+    lines = []
+    if current:
+        lines.append(f"🎵 <b>Now:</b> {current}")
+    lines.append(f"📋 {queue_len} track(s) in queue")
+    await update.effective_message.reply_text(
+        "\n".join(lines) + f"\n\n⚡ {settings.BOT_DISPLAY_NAME}",
         parse_mode=ParseMode.HTML
     )
 
-
-async def skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Skip the current track"""
-    chat_id = update.effective_chat.id
-    
-    if chat_id not in music_queues or not music_queues[chat_id]['queue']:
-        await update.message.reply_text("❌ No music playing")
-        return
-    
-    current = music_queues[chat_id]['current']
-    if current:
-        await update.message.reply_text(f"⏭️ Skipped: <b>{current['title']}</b>", parse_mode=ParseMode.HTML)
-        await _play_next(chat_id, context)
-    else:
-        await update.message.reply_text("❌ No track playing")
-
-
-async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show the current music queue"""
-    chat_id = update.effective_chat.id
-    
-    if chat_id not in music_queues or not music_queues[chat_id]['queue']:
-        await update.message.reply_text("📭 Queue is empty")
-        return
-    
-    queue = music_queues[chat_id]['queue']
-    current = music_queues[chat_id]['current']
-    
-    text = "🎵 <b>Music Queue</b>\n\n"
-    
-    if current:
-        text += f"▶️ <b>Now Playing:</b>\n"
-        text += f"   {current['title']}\n"
-        if current.get('performer'):
-            text += f"   By: {current['performer']}\n"
-        text += "\n"
-    
-    if queue:
-        text += "<b>Up Next:</b>\n"
-        for i, track in enumerate(queue[:10], 1):  # Show max 10 tracks
-            text += f"{i}. {track['title']}\n"
-        
-        if len(queue) > 10:
-            text += f"\n... and {len(queue) - 10} more tracks"
-    
-    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
-
-
-async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Stop playing music and clear the queue"""
-    chat_id = update.effective_chat.id
-    
-    if chat_id not in music_queues:
-        await update.message.reply_text("❌ No music playing")
-        return
-    
-    music_queues[chat_id]['queue'] = []
-    music_queues[chat_id]['current'] = None
-    music_queues[chat_id]['is_playing'] = False
-    
-    await update.message.reply_text("⏹️ Music stopped and queue cleared")
-
-
-async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Pause playback (simulated - Telegram doesn't support actual pause)"""
-    chat_id = update.effective_chat.id
-    
-    if chat_id not in music_queues or not music_queues[chat_id]['is_playing']:
-        await update.message.reply_text("❌ No music playing")
-        return
-    
-    music_queues[chat_id]['is_playing'] = False
-    await update.message.reply_text("⏸️ Paused (simulated)")
-
-
-async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Resume playback"""
-    chat_id = update.effective_chat.id
-    
-    if chat_id not in music_queues or not music_queues[chat_id]['current']:
-        await update.message.reply_text("❌ No paused music")
-        return
-    
-    music_queues[chat_id]['is_playing'] = True
-    current = music_queues[chat_id]['current']
-    await update.message.reply_text(f"▶️ Resumed: <b>{current['title']}</b>", parse_mode=ParseMode.HTML)
-    await _play_next(chat_id, context)
-
-
-async def nowplaying_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show the currently playing track"""
-    chat_id = update.effective_chat.id
-    
-    if chat_id not in music_queues or not music_queues[chat_id]['current']:
-        await update.message.reply_text("❌ No music playing")
-        return
-    
-    current = music_queues[chat_id]['current']
-    text = f"🎵 <b>Now Playing:</b>\n"
-    text += f"<b>{current['title']}</b>\n"
-    if current.get('performer'):
-        text += f"By: {current['performer']}\n"
-    if current.get('duration'):
-        text += f"Duration: {current['duration']}s\n"
-    
-    keyboard = [
-        [
-            InlineKeyboardButton("⏸️ Pause", callback_data=f"music:pause:{chat_id}"),
-            InlineKeyboardButton("⏭️ Skip", callback_data=f"music:skip:{chat_id}")
-        ],
-        [
-            InlineKeyboardButton("📋 Queue", callback_data=f"music:queue:{chat_id}"),
-            InlineKeyboardButton("⏹️ Stop", callback_data=f"music:stop:{chat_id}")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await update.message.reply_text(text, parse_mode=ParseMode.HTML, reply_markup=reply_markup)
-
-
-async def music_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle inline keyboard callbacks for music controls"""
-    query = update.callback_query
+async def music_callback(update, context):
+    query  = update.callback_query
     await query.answer()
-    
-    parts = query.data.split(':')
-    if len(parts) < 3:
+    parts  = query.data.split(":")
+    action = parts[1]
+    chat_id = int(parts[2])
+
+    if action in ("pause", "skip", "stop", "loop"):
+        await _dispatch(context, chat_id, action)
+    elif action == "queue":
+        status = await _get_status(context, chat_id)
+        qlen   = status.get("queue_length", "0")
+        await query.answer(f"Queue: {qlen} track(s)", show_alert=True)
         return
-    
-    action, chat_id_str = parts[1], parts[2]
-    
-    try:
-        # Simulate the command by calling the handler
-        # Create a fake update object
-        fake_update = type('Update', (), {
-            'effective_chat': type('Chat', (), {'id': int(chat_id_str)})(),
-            'message': type('Message', (), {
-                'reply_text': lambda text, **kwargs: asyncio.create_task(
-                    query.edit_message_text(text=text, **kwargs)
-                )
-            })(),
-            'callback_query': query
-        })()
-        
-        if action == 'skip':
-            await skip_command(fake_update, context)
-        elif action == 'stop':
-            await stop_command(fake_update, context)
-        elif action == 'queue':
-            await queue_command(fake_update, context)
-        elif action == 'pause':
-            await pause_command(fake_update, context)
-            
-    except Exception as e:
-        logger.error(f"Error in music callback: {e}")
-
-
-def _get_queue(chat_id: int) -> dict:
-    """Get or create queue for a chat"""
-    if chat_id not in music_queues:
-        music_queues[chat_id] = {
-            'queue': [],
-            'current': None,
-            'is_playing': False
-        }
-    return music_queues[chat_id]
-
-
-async def _add_to_queue(chat_id: int, track: dict):
-    """Add a track to the queue"""
-    queue_data = _get_queue(chat_id)
-    queue_data['queue'].append(track)
-
-
-async def _play_next(chat_id: int, context: ContextTypes.DEFAULT_TYPE):
-    """Play the next track in the queue"""
-    queue_data = _get_queue(chat_id)
-    
-    if not queue_data['queue']:
-        queue_data['current'] = None
-        queue_data['is_playing'] = False
+    elif action == "vol":
+        await query.answer("Use /volume <0-200>", show_alert=True)
         return
-    
-    track = queue_data['queue'].pop(0)
-    queue_data['current'] = track
-    queue_data['is_playing'] = True
-    
-    try:
-        if track['type'] == 'telegram':
-            # Send audio/voice file
-            file_id = track['file_id']
-            
-            # Check if it's a voice message or audio file
-            # Note: We can't easily determine file type from file_id alone
-            # so we'll try audio first, then voice
-            
-            try:
-                await context.bot.send_audio(
-                    chat_id=chat_id,
-                    audio=file_id,
-                    caption=f"🎵 <b>{track['title']}</b>",
-                    parse_mode=ParseMode.HTML
-                )
-            except Exception:
-                try:
-                    await context.bot.send_voice(
-                        chat_id=chat_id,
-                        voice=file_id,
-                        caption=f"🎵 {track['title']}"
-                    )
-                except Exception as e:
-                    logger.error(f"Error sending audio/voice: {e}")
-                    await _play_next(chat_id, context)
-                    return
-        
-        elif track['type'] == 'url':
-            # For URL playback, we just send the URL as text
-            # In a production system, you'd use yt-dlp or similar to download and send
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"🎵 <b>Now Playing from URL:</b>\n{track['url']}\n\n"
-                     f"<i>Note: Telegram bots cannot directly stream audio from URLs. "
-                     f"Download the file and send it with /play</i>",
-                parse_mode=ParseMode.HTML
-            )
-        
-        # Auto-play next track after a delay
-        if queue_data['queue'] and queue_data['is_playing']:
-            await asyncio.sleep(5)  # Wait 5 seconds before next track
-            await _play_next(chat_id, context)
-    
-    except Exception as e:
-        logger.error(f"Error playing track: {e}")
-        await _play_next(chat_id, context)
+
+
+async def _get_bot_owner(context, db) -> int:
+    """Get owner_id for current bot."""
+    if not db:
+        return settings.OWNER_ID
+    bot_id = context.bot.id
+    row = await db.fetchrow(
+        "SELECT owner_id FROM clone_bots WHERE bot_id=$1", bot_id
+    )
+    return row["owner_id"] if row else settings.OWNER_ID
+
+
+music_handlers = [
+    CommandHandler("play",      cmd_play),
+    CommandHandler("playnow",   lambda u,c: cmd_play(u,c,playnow=True)),
+    CommandHandler("pause",     cmd_pause),
+    CommandHandler("resume",    cmd_resume),
+    CommandHandler("skip",      cmd_skip),
+    CommandHandler("stop",      cmd_stop),
+    CommandHandler("queue",     cmd_queue),
+    CommandHandler("volume",    cmd_volume),
+    CommandHandler("loop",      cmd_loop),
+    CallbackQueryHandler(music_callback, pattern=r"^music:"),
+]

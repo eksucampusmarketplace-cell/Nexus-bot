@@ -48,6 +48,23 @@ class Settings(BaseSettings):
     PYROGRAM_API_ID: Optional[int] = None
     PYROGRAM_API_HASH: Optional[str] = None
 
+    # ── Redis & Music Service ─────────────────────────────────────────────
+    REDIS_URL: str = "redis://localhost:6379"
+    MUSIC_JOB_TTL: int = 3600  # seconds
+    MUSIC_SERVICE_TIMEOUT: int = 10  # seconds
+    MUSIC_MAX_RETRIES: int = 3
+    MUSIC_YTDLP_VERSION: str = "2024.3.10"
+
+    # ── Memory Management ──────────────────────────────────────────────────
+    PYROGRAM_MAX_ACTIVE: int = 10
+    LAZY_UNLOAD_TIMEOUT: int = 1800
+    MEMORY_WARN_MB: int = 800
+    MEMORY_CRITICAL_MB: int = 1200
+
+    # ── Stars Economy ──────────────────────────────────────────────────────
+    REFERRAL_BONUS_STARS: int = 100
+    REFERRAL_REFERRED_BONUS: int = 50
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def validate_required_settings(self):

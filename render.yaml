@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: groupguard-bot
+    name: nexus-bot
     env: python
     buildCommand: apt-get install -y ffmpeg && pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
@@ -27,5 +27,29 @@ services:
         sync: false
       - key: SECRET_KEY
         sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: PYROGRAM_API_ID
+        sync: false
+      - key: PYROGRAM_API_HASH
+        sync: false
     healthCheckPath: /
+    autoDeploy: true
+
+  - type: worker
+    name: nexus-music
+    env: python
+    buildCommand: apt-get install -y ffmpeg && pip install -r requirements.txt
+    startCommand: python music_service.py
+    envVars:
+      - key: SUPABASE_CONNECTION_STRING
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: PYROGRAM_API_ID
+        sync: false
+      - key: PYROGRAM_API_HASH
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.9"
     autoDeploy: true

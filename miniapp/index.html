@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Nexus Bot Panel</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/zustand@4.4.7/vanilla.umd.min.js"></script>
+  <!-- Design System -->
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/animations.css">
+  <style>
+    /* ── Additional component styles ───────────────────────────────────── */
+    
+    /* Button styles */
+    .btn {
+      padding: var(--sp-3) var(--sp-4);
+      border-radius: var(--r-lg);
+      border: none;
+      font-weight: var(--fw-medium);
+      font-size: var(--text-sm);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-2);
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--bg-hover); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    /* Input styles */
+    .input {
+      width: 100%;
+      padding: var(--sp-3) var(--sp-4);
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      color: var(--text-primary);
+      font-size: var(--text-sm);
+      transition: border-color var(--dur-fast);
+    }
+    .input:focus { outline: none; border-color: var(--accent); }
+    .input::placeholder { color: var(--text-disabled); }
+    
+    /* Sidebar nav */
+    .sidebar-nav { display: flex; flex-direction: column; gap: var(--sp-1); padding: var(--sp-2); }
+    .sidebar-item {
+      padding: var(--sp-3) var(--sp-4);
+      border-radius: var(--r-lg);
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-weight: var(--fw-medium);
+      font-size: var(--text-sm);
+      transition: all var(--dur-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+    }
+    .sidebar-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .sidebar-item.active { background: var(--accent-dim); color: var(--accent); }
+    .sidebar-item svg { width: 20px; height: 20px; }
+    
+    /* Bottom nav (mobile) */
+    .bottom-nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--sp-2);
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      cursor: pointer;
+      transition: all var(--dur-fast);
+      gap: 4px;
+    }
+    .bottom-nav-item:hover { color: var(--text-secondary); }
+    .bottom-nav-item.active { color: var(--accent); }
+    .bottom-nav-item svg { width: 24px; height: 24px; }
+    
+    /* Logo */
+    .sidebar-logo {
+      padding: var(--sp-4) var(--sp-5);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: var(--sp-4);
+    }
+    .logo-text { font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 18px; font-weight: var(--fw-bold); }
+    
+    /* Loading state */
+    .loading-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: var(--sp-4);
+    }
+    .loading-logo { font-size: 48px; animation: pulse 1.5s infinite; }
+    
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: var(--sp-16) var(--sp-6);
+      color: var(--text-muted);
+    }
+    
+    /* Member list */
+    .member-list { display: flex; flex-direction: column; gap: var(--sp-2); }
+    
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-6);
+    }
+    
+    /* Notification bell */
+    .notification-bell {
+      position: relative;
+      cursor: pointer;
+      padding: var(--sp-2);
+      border-radius: var(--r-lg);
+      transition: background var(--dur-fast);
+    }
+    .notification-bell:hover { background: var(--bg-hover); }
+    .notification-badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      min-width: 18px;
+      height: 18px;
+      background: var(--danger);
+      color: white;
+      border-radius: var(--r-full);
+      font-size: 10px;
+      font-weight: var(--fw-bold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      display: none;
+    }
+    .notification-badge.visible { display: flex; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Topbar -->
+    <div id="topbar">
+      <div id="group-switcher"></div>
+      <div style="flex: 1"></div>
+      <div id="notification-bell" class="notification-bell">
+        <span style="font-size: 20px;">🔔</span>
+        <span class="notification-badge" id="notification-count">0</span>
+      </div>
+      <button id="theme-toggle" class="btn btn-secondary" style="padding: 8px;">
+        🎨
+      </button>
+    </div>
+
+    <!-- Sidebar (desktop) -->
+    <div id="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-text">⚡ Nexus</span>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    </div>
+
+    <!-- Main Content -->
+    <div id="main">
+      <!-- Dashboard Page -->
+      <div id="page-dashboard" class="page"></div>
+      
+      <!-- Members Page -->
+      <div id="page-members" class="page"></div>
+      
+      <!-- Modules Page -->
+      <div id="page-modules" class="page"></div>
+      
+      <!-- Settings Page -->
+      <div id="page-settings" class="page"></div>
+      
+      <!-- Logs Page -->
+      <div id="page-logs" class="page"></div>
+    </div>
+
+    <!-- Bottom Nav (mobile) -->
+    <div id="bottom-nav">
+      <div class="bottom-nav-item" data-page="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="bottom-nav-item" data-page="members">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Members</span>
+      </div>
+      <div class="bottom-nav-item" data-page="modules">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Modules</span>
+      </div>
+      <div class="bottom-nav-item" data-page="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 0 2 2 0 0 1-1.42 4.58l-.06.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51 1.3H15a2 2 0 0 1 0-2-2 2 2 0 0 0 1-1.69-1.97l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3H8.66a1.65 1.65 0 0 0-1.51 1.3 1.65 1.65 0 0 0-.33 1.82l-.06.06a2 2 0 0 1-1.63 2.83 2 2 0 0 1-1.42-4.58l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51 1.3H15a2 2 0 0 1 0 2 2 2 2 0 0 1 1.69-1.97l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51-1.3H19a2 2 0 0 1 0 2-2 2 2 0 0 1 1.42-4.58l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3z"/></svg>
+        <span>Settings</span>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { create } from 'https://cdn.jsdelivr.net/npm/zustand@4.4.7/vanilla.umd.min.js';
+    import { ThemeEngine } from './lib/theme.js';
+    import { GroupSwitcher } from './lib/group_switcher.js';
+    import { NotificationCenter } from './lib/notifications.js';
+    import { SSEClient } from './lib/sse.js';
+    import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow } from './lib/components.js';
+    import { useStore } from './store/index.js';
+
+    // Initialize theme
+    ThemeEngine.init();
+
+    // Store helpers
+    const store = useStore;
+    const getState = store.getState;
+
+    // Initialize components
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Setup Telegram WebApp
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.expand();
+        tg.setHeaderColor(getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim());
+        tg.enableClosingConfirmation();
+      }
+
+      // Initialize group switcher
+      const groupSwitcher = new GroupSwitcher(
+        document.getElementById('topbar'),
+        store
+      );
+      await groupSwitcher.init();
+
+      // Initialize notification center
+      const notificationBell = document.getElementById('notification-bell');
+      const notificationCount = document.getElementById('notification-count');
+      const nc = new NotificationCenter(notificationBell);
+      
+      // Connect SSE if active chat
+      const activeChatId = getState().activeChatId;
+      if (activeChatId) {
+        const sse = new SSEClient();
+        sse.on('connected', () => {
+          console.log('[SSE] Connected');
+        });
+        sse.on('member_join', (data) => {
+          nc.push({ type: 'member_action', title: 'New member', body: `User joined the group` });
+        });
+        sse.on('bot_action', (data) => {
+          nc.push({ type: 'bot_action', title: 'Bot action', body: data.action });
+        });
+        sse.connect(activeChatId);
+      }
+
+      // Theme toggle
+      const themeToggle = document.getElementById('theme-toggle');
+      themeToggle.onclick = () => {
+        const current = ThemeEngine.getTheme();
+        ThemeEngine.setTheme(current === 'dark' ? 'light' : 'dark');
+      };
+
+      // Navigation setup
+      setupNavigation();
+      
+      // Render initial page
+      const activePage = getState().activePage || 'dashboard';
+      navigateToPage(activePage);
+    });
+
+    function setupNavigation() {
+      const sidebarNav = document.getElementById('sidebar-nav');
+      const bottomNavItems = document.querySelectorAll('.bottom-nav-item');
+
+      const pages = [
+        { id: 'dashboard', label: 'Dashboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>' },
+        { id: 'members', label: 'Members', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
+        { id: 'modules', label: 'Modules', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
+        { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 0 2 2 0 0 1-1.42 4.58l-.06.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51 1.3H15a2 2 0 0 1 0-2-2 2 2 0 0 1-1.69-1.97l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3H8.66a1.65 1.65 0 0 0-1.51 1.3 1.65 1.65 0 0 0-.33 1.82l-.06.06a2 2 0 0 1-1.63 2.83 2 2 0 0 1-1.42-4.58l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51 1.3H15a2 2 0 0 1 0 2 2 2 0 0 1 1.69-1.97l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51-1.3H19a2 2 0 0 1 0 2-2 2 2 0 0 1 1.42-4.58l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3z"/></svg>' },
+        { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
+      ];
+
+      // Build sidebar nav
+      sidebarNav.innerHTML = pages.map(p => `
+        <div class="sidebar-item ${getState().activePage === p.id ? 'active' : ''}" data-page="${p.id}">
+          ${p.icon}
+          <span>${p.label}</span>
+        </div>
+      `).join('');
+
+      // Setup click handlers
+      document.querySelectorAll('[data-page]').forEach(el => {
+        el.onclick = () => navigateToPage(el.dataset.page);
+      });
+    }
+
+    function navigateToPage(pageId) {
+      // Update state
+      store.setState({ activePage: pageId });
+      getState().setActivePage?.(pageId);
+
+      // Update UI
+      document.querySelectorAll('.page').forEach(p => {
+        p.classList.remove('active');
+        if (p.id === `page-${pageId}`) {
+          p.classList.add('active');
+          renderPage(pageId);
+        }
+      });
+
+      document.querySelectorAll('.sidebar-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === pageId);
+      });
+      document.querySelectorAll('.bottom-nav-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.page === pageId);
+      });
+    }
+
+    function renderPage(pageId) {
+      const container = document.getElementById(`page-${pageId}`);
+      if (!container) return;
+
+      switch (pageId) {
+        case 'dashboard':
+          renderDashboard(container);
+          break;
+        case 'members':
+          renderMembers(container);
+          break;
+        case 'modules':
+          renderModules(container);
+          break;
+        case 'settings':
+          renderSettings(container);
+          break;
+        case 'logs':
+          renderLogs(container);
+          break;
+      }
+    }
+
+    function renderDashboard(container) {
+      const stats = [
+        { label: 'Total Members', value: '0', icon: '👥', color: 'accent' },
+        { label: 'Messages Today', value: '0', icon: '💬', color: 'success' },
+        { label: 'Actions Today', value: '0', icon: '⚡', color: 'warning' },
+      ];
+
+      container.innerHTML = '';
+      const statsGrid = document.createElement('div');
+      statsGrid.className = 'stats-grid';
+      stats.forEach(s => {
+        statsGrid.appendChild(StatCard(s));
+      });
+
+      container.appendChild(statsGrid);
+
+      // Recent activity card
+      container.appendChild(Card({
+        title: 'Recent Activity',
+        children: EmptyState({ icon: '📭', title: 'No recent activity', description: 'Activity will appear here as it happens' })
+      }));
+    }
+
+    function renderMembers(container) {
+      const members = getState().members || [];
+      
+      container.innerHTML = '';
+      container.appendChild(SearchInput({
+        placeholder: 'Search members...',
+        onChange: (val) => console.log('Search:', val)
+      }));
+
+      const memberList = document.createElement('div');
+      memberList.className = 'member-list';
+
+      if (members.length === 0) {
+        memberList.appendChild(EmptyState({ icon: '👥', title: 'No members', description: 'Members will appear here once loaded' }));
+      } else {
+        members.forEach(m => {
+          memberList.appendChild(MemberRow({
+            member: m,
+            selectable: true,
+            onSelect: (member, selected) => {
+              store.toggleMemberSelection(member.id);
+            }
+          }));
+        });
+      }
+
+      container.appendChild(memberList);
+    }
+
+    function renderModules(container) {
+      const modules = getState().modules || {};
+      const moduleList = [
+        { id: 'antiflood', name: 'Anti-Flood', desc: 'Prevent rapid messaging' },
+        { id: 'antispam', name: 'Anti-Spam', desc: 'Block known spam patterns' },
+        { id: 'antilink', name: 'Anti-Link', desc: 'Control external links' },
+        { id: 'welcome', name: 'Welcome Message', desc: 'Auto-greet new members' },
+        { id: 'rules', name: 'Rules Display', desc: 'Show group rules' },
+      ];
+
+      container.innerHTML = moduleList.map(m => {
+        const enabled = modules[m.id] || false;
+        return Card({
+          title: m.name,
+          subtitle: m.desc,
+          actions: Toggle({
+            checked: enabled,
+            onChange: (v) => {
+              store.toggleModule(m.id, v);
+            }
+          })
+        });
+      }).join('');
+    }
+
+    function renderSettings(container) {
+      container.innerHTML = Card({
+        title: 'Theme & Appearance',
+        children: '<div id="theme-picker-container"></div>'
+      });
+
+      const pickerContainer = container.querySelector('#theme-picker-container');
+      ThemeEngine.renderPicker(pickerContainer, (color) => {
+        console.log('Accent changed:', color);
+      });
+    }
+
+    function renderLogs(container) {
+      const logs = getState().logs || [];
+      
+      container.innerHTML = '';
+      
+      if (logs.length === 0) {
+        container.appendChild(EmptyState({ icon: '📋', title: 'No logs', description: 'Bot actions will be logged here' }));
+      } else {
+        container.appendChild(Card({
+          title: 'Recent Logs',
+          children: logs.slice(0, 20).map(log => `
+            <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+              <div style="font-size: 13px;">${log.action}</div>
+              <div style="font-size: 11px; color: var(--text-muted);">${new Date(log.timestamp).toLocaleString()}</div>
+            </div>
+          `).join('')
+        }));
+      }
+    }
+  </script>
+</body>
+</html>

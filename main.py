@@ -265,7 +265,7 @@ fastapi_app.add_middleware(
 )
 
 # Routes
-from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats
+from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats, events
 from api.routes.boost import router as boost_router
 from api.routes.channel_gate import router as channel_gate_router
 from api.routes.messages import router as messages_router
@@ -292,6 +292,7 @@ fastapi_app.include_router(music_auth_router)
 fastapi_app.include_router(auth_router)
 fastapi_app.include_router(admin_router)
 fastapi_app.include_router(billing_router)
+fastapi_app.include_router(events.router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)
@@ -316,7 +317,16 @@ async def serve_webapp():
 
 @fastapi_app.get("/miniapp", response_class=HTMLResponse)
 async def serve_miniapp():
-    """Alias for /webapp - Mini App entry point."""
+    """New Vanilla JS Mini App entry point."""
+    import os
+    miniapp_path = os.path.join(os.path.dirname(__file__), "miniapp", "index.html")
+    with open(miniapp_path, "r") as f:
+        return f.read()
+
+
+@fastapi_app.get("/miniapp-react", response_class=HTMLResponse)
+async def serve_miniapp_react():
+    """Legacy React Mini App entry point."""
     return await serve_webapp()
 
 

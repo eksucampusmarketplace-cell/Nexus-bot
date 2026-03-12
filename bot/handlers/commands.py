@@ -56,7 +56,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
-    url = settings.mini_app_url or f"{settings.webhook_url}/webapp"
+    url = settings.mini_app_url or f"{settings.webhook_url}/miniapp"
     help_text = """<b>📚 Available Commands</b>
 
 <b>Basic:</b>

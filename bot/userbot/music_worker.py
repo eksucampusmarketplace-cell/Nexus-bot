@@ -27,10 +27,26 @@ from dataclasses import dataclass, field
 from typing import Optional, Callable, Awaitable
 
 from pyrogram import Client
-from pytgcalls import PyTGCalls
-from pytgcalls.types import Update as TGUpdate
-from pytgcalls.types.input_stream import AudioPiped
-from pytgcalls.types.input_stream.quality import HighQualityAudio
+try:
+    from pytgcalls import PyTGCalls
+    from pytgcalls.types import Update as TGUpdate
+    from pytgcalls.types.input_stream import AudioPiped
+    from pytgcalls.types.input_stream.quality import HighQualityAudio
+    HAS_PYTGCALLS = True
+except ImportError:
+    HAS_PYTGCALLS = False
+    log.warning("[MUSIC] pytgcalls not installed. Music features will be disabled.")
+    # Define dummy classes for type hinting if needed
+    class PyTGCalls:
+        def __init__(self, *args, **kwargs): pass
+        def on_stream_end(self, *args, **kwargs):
+            def decorator(f): return f
+            return decorator
+        async def start(self): pass
+    class AudioPiped: pass
+    class HighQualityAudio: pass
+    class TGUpdate:
+        chat_id: int
 import yt_dlp
 
 from config import settings
@@ -112,6 +128,9 @@ class MusicWorker:
         on_track_end: async callback(chat_id, next_track_or_None)
                       PTB bot uses this to update the now-playing message.
         """
+        if not HAS_PYTGCALLS:
+            return MusicResult(ok=False, error="Music features are not available on this server due to missing dependencies (pytgcalls).")
+        
         log.info(f"[MUSIC] Play request | bot={self.bot_id} chat={chat_id} url={url[:60]}")
 
         # Resolve track info

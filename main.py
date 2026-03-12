@@ -29,17 +29,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-fastapi_app = FastAPI(title="Nexus Bot API")
-
-fastapi_app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("=" * 60)
@@ -164,17 +153,27 @@ async def lifespan(app: FastAPI):
     logger.info("[SHUTDOWN] Complete")
 
 
+app = FastAPI(title="Nexus Bot API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Routes
 from api.routes import groups, members, debug, bots, music
 
-fastapi_app.include_router(groups.router)
-fastapi_app.include_router(members.router)
-fastapi_app.include_router(debug.router)
-fastapi_app.include_router(bots.router)
-fastapi_app.include_router(music.router)
+app.include_router(groups.router)
+app.include_router(members.router)
+app.include_router(debug.router)
+app.include_router(bots.router)
+app.include_router(music.router)
 
 
-@fastapi_app.get("/", response_class=JSONResponse)
+@app.get("/", response_class=JSONResponse)
 async def health():
     db_status = "connected" if (db.pool) else "disconnected"
     return {
@@ -185,13 +184,13 @@ async def health():
     }
 
 
-@fastapi_app.get("/webapp", response_class=HTMLResponse)
+@app.get("/webapp", response_class=HTMLResponse)
 async def serve_webapp():
     with open("webapp/index.html", "r") as f:
         return f.read()
 
 
-@fastapi_app.post("/webhook/{bot_id}")
+@app.post("/webhook/{bot_id}")
 async def webhook(bot_id: int, request: Request):
     """
     Receives all Telegram updates for all bots.
@@ -253,4 +252,4 @@ def _get_update_type(update: Update) -> str:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=settings.PORT)
+    uvicorn.run(app, host="0.0.0.0", port=settings.PORT)

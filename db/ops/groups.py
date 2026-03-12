@@ -39,8 +39,9 @@ async def get_group_miniapp_url(db_pool, chat_id: int) -> str | None:
         )
         return row["url"] if row else None
 
-async def upsert_group(chat_id: int, title: str, bot_token_hash: str, settings: dict = None):
+async def upsert_group(chat_id: int, title: str, bot_token_hash: str, settings: dict = None, member_count: int = 0):
     if settings is None:
+        # ... (keep existing settings default logic)
         settings = {
             "commands": {
                 "warn": True, "ban": True, "mute": True, "kick": True,
@@ -64,11 +65,14 @@ async def upsert_group(chat_id: int, title: str, bot_token_hash: str, settings: 
     
     async with db.pool.acquire() as conn:
         await conn.execute("""
-            INSERT INTO groups (chat_id, title, bot_token_hash, settings)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO groups (chat_id, title, bot_token_hash, settings, member_count)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (chat_id) DO UPDATE
-            SET title = EXCLUDED.title, bot_token_hash = EXCLUDED.bot_token_hash, settings = EXCLUDED.settings
-        """, chat_id, title, bot_token_hash, json.dumps(settings))
+            SET title = EXCLUDED.title, 
+                bot_token_hash = EXCLUDED.bot_token_hash, 
+                settings = EXCLUDED.settings,
+                member_count = CASE WHEN EXCLUDED.member_count > 0 THEN EXCLUDED.member_count ELSE groups.member_count END
+        """, chat_id, title, bot_token_hash, json.dumps(settings), member_count or 0)
 
 async def update_group_settings(chat_id: int, settings: dict):
     async with db.pool.acquire() as conn:

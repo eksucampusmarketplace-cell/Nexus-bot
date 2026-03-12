@@ -141,7 +141,7 @@ async def insert_bot(pool: asyncpg.Pool, bot_data: dict) -> dict:
             bot_data.get("group_access_policy", "blocked"),
             bot_data.get("bot_add_notifications", False)
         )
-
+    duration = (time.monotonic() - start) * 1000
     logger.info(f"[DB][bots][INSERT] bot_id={bot_data['bot_id']} username=@{bot_data['username']} | duration={duration:.1f}ms")
     return dict(row)
 

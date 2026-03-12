@@ -366,6 +366,12 @@
       <!-- Members Page -->
       <div id="page-members" class="page"></div>
 
+      <!-- Music Page -->
+      <div id="page-music" class="page"></div>
+
+      <!-- Commands Page -->
+      <div id="page-commands" class="page"></div>
+
       <!-- Modules Page -->
       <div id="page-modules" class="page"></div>
 
@@ -390,9 +396,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Members</span>
       </div>
-      <div class="bottom-nav-item" data-page="modules">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-        <span>Modules</span>
+      <div class="bottom-nav-item" data-page="music">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span>Music</span>
       </div>
       <div class="bottom-nav-item" data-page="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 0 2 2 0 0 1-1.42 4.58l-.06.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51 1.3H15a2 2 0 0 1 0-2-2 2 2 0 0 0 1-1.69-1.97l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3H8.66a1.65 1.65 0 0 0-1.51 1.3 1.65 1.65 0 0 0-.33 1.82l-.06.06a2 2 0 0 1-1.63 2.83 2 2 0 0 1-1.42-4.58l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51 1.3H15a2 2 0 0 1 0 2 2 2 2 0 0 1 1.69-1.97l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51-1.3H19a2 2 0 0 1 0 2-2 2 2 0 0 1 1.42-4.58l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3z"/></svg>
@@ -410,6 +416,8 @@
     import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow } from './lib/components.js';
     import { useStore } from './store/index.js';
     import { renderAutomodPage } from './src/pages/automod.js';
+    import { renderCommandsPage } from './src/pages/commands.js';
+    import { renderMusicPage } from './src/pages/music.js';
 
     // Initialize theme
     ThemeEngine.init();
@@ -479,6 +487,8 @@
         { id: 'dashboard', label: 'Dashboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>' },
         { id: 'automod', label: 'AutoMod', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
         { id: 'members', label: 'Members', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
+        { id: 'music', label: 'Music', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },
+        { id: 'commands', label: 'Commands', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>' },
         { id: 'modules', label: 'Modules', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
         { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 0 2 2 0 0 1-1.42 4.58l-.06.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51 1.3H15a2 2 0 0 1 0-2-2 2 2 0 0 1-1.69-1.97l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3H8.66a1.65 1.65 0 0 0-1.51 1.3 1.65 1.65 0 0 0-.33 1.82l-.06.06a2 2 0 0 1-1.63 2.83 2 2 0 0 1-1.42-4.58l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51 1.3H15a2 2 0 0 1 0 2 2 2 0 0 1 1.69-1.97l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0 1.51-1.3H19a2 2 0 0 1 0 2-2 2 2 0 0 1 1.42-4.58l-.06-.06a1.65 1.65 0 0 0-.33-1.82 1.65 1.65 0 0 0-1.51-1.3z"/></svg>' },
         { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
@@ -533,6 +543,12 @@
           break;
         case 'members':
           renderMembers(container);
+          break;
+        case 'music':
+          renderMusicPage(container);
+          break;
+        case 'commands':
+          renderCommandsPage(container);
           break;
         case 'modules':
           renderModules(container);

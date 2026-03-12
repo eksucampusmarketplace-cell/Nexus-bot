@@ -151,3 +151,51 @@ async def play_youtube(chat_id: int, url: str):
 async def health_check():
     """Check if music API is healthy"""
     return {"status": "healthy", "service": "music-player"}
+
+
+@router.post("/{chat_id}/command")
+async def send_music_command(chat_id: int, command: MusicCommand):
+    """Send a control command to the music player"""
+    from bot.registry import get_all
+    
+    # Get bot app for this group
+    bots = get_all()
+    bot_app = None
+    for bid, app in bots.items():
+        bot_app = app
+        break
+    
+    if not bot_app:
+        raise HTTPException(status_code=503, detail="Bot service unavailable")
+    
+    # Command mapping
+    valid_commands = ['play', 'pause', 'resume', 'skip', 'stop', 'loop', 'shuffle', 'volume']
+    if command.command not in valid_commands:
+        raise HTTPException(status_code=400, detail=f"Invalid command. Valid: {valid_commands}")
+    
+    # Get music worker
+    worker = bot_app.bot_data.get("music_worker")
+    if not worker:
+        return {"status": "no_worker", "message": "Music worker not configured"}
+    
+    # Execute command
+    result = None
+    try:
+        if command.command == 'pause':
+            result = await worker.pause(chat_id)
+        elif command.command == 'resume':
+            result = await worker.resume(chat_id)
+        elif command.command == 'skip':
+            result = await worker.skip(chat_id)
+        elif command.command == 'stop':
+            result = await worker.stop(chat_id)
+        elif command.command == 'loop':
+            result = await worker.toggle_loop(chat_id)
+        elif command.command == 'volume' and command.value:
+            result = await worker.set_volume(chat_id, int(command.value))
+        else:
+            result = {"ok": True, "message": "Command queued"}
+        
+        return {"status": "ok", "command": command.command, "result": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

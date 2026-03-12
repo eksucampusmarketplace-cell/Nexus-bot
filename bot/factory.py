@@ -118,6 +118,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.start_help import start_handler, help_handler
     from bot.handlers.setmessage import setmessage_conversation
     from bot.handlers.privacy import privacy_handler
+    from bot.handlers.fun import fun_handlers
+    from bot.handlers.admin_tools import admin_tool_handlers
 
     # Import alerts utility for error handling
     from bot.utils.alerts import alert_error
@@ -372,6 +374,16 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── Member Booster handlers ──────────────────────────────────────────────
     register_booster_handlers(app)
     logger.info(f"[FACTORY] Booster handlers registered")
+
+    # ── Fun and utility handlers ──────────────────────────────────────────────
+    for h in fun_handlers:
+        app.add_handler(h)
+    logger.info(f"[FACTORY] Fun handlers registered")
+
+    # ── Admin tools handlers ──────────────────────────────────────────────
+    for h in admin_tool_handlers:
+        app.add_handler(h)
+    logger.info(f"[FACTORY] Admin tools handlers registered")
 
     logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
     return app

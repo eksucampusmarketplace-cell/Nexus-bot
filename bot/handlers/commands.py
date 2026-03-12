@@ -70,20 +70,34 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /ban - Ban a user (reply to message)
 /mute - Mute a user (reply to message)
 /purge - Delete messages
+/pin - Pin a message
+/unpin - Unpin message
 /rules - Show group rules
+/announce - Send announcement
+/pinmessage - Pin custom message
+/slowmode - Set slow mode
+/filters - List word filters
+/addfilter - Add word filter
+/delfilter - Remove word filter
+/setflood - Set flood limit
+/exportsettings - Export settings
+/admininfo - Show detailed info
 
 <b>🎵 Music - Basic:</b>
 /play - Play music (reply to audio/voice or send file)
+/playnow - Play immediately
 /skip - Skip to next track
 /queue - Show music queue
 /stop - Stop music and clear queue
 /pause - Pause playback
 /resume - Resume playback
 /nowplaying - Show current track with controls
+/volume - Set volume
+/loop - Toggle loop mode
+/musicmode - Set who can use music
 
 <b>🎵 Music - Advanced:</b>
 /play_youtube <url> - Play from YouTube
-/volume <0-200> - Set volume
 /repeat <mode> - Set repeat (none/one/all)
 /shuffle - Toggle shuffle mode
 /playlist_create <name> - Create playlist
@@ -94,6 +108,21 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /search <query> - Search music
 /sync - Sync music to all clone bots
 /music_settings - Interactive settings panel
+
+<b>🎮 Fun:</b>
+/afk - Set AFK status
+/back - Clear AFK status
+/poll - Create a poll
+/dice - Roll a dice
+/coin - Flip a coin
+/choose - Randomly choose between options
+/8ball - Magic 8-ball
+/roll - Roll random number
+/joke - Get a random joke
+/quote - Get a quote
+/roast - Playful roast
+/compliment - Give compliment
+/calc - Calculator
 
 <b>How to use:</b>
 Admin commands require you to reply to a user's message.

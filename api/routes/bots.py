@@ -132,6 +132,9 @@ async def clone_bot(request: Request, user: dict = Depends(get_current_user)):
         "is_primary": False,
         "status": "active",
         "webhook_active": False,
+        "group_limit": body.get("group_limit", 1),
+        "group_access_policy": body.get("group_access_policy", "blocked"),
+        "bot_add_notifications": body.get("bot_add_notifications", False),
     })
     
     # Step 3: Register webhook with retries
@@ -326,14 +329,14 @@ async def reauth_bot(bot_id: int, request: Request, user: dict = Depends(get_cur
 
 @router.get("/{bot_id}/groups")
 async def get_bot_groups(bot_id: int, user: dict = Depends(get_current_user)):
-    """Get all groups managed by a specific bot."""
+    """Get all active groups for this clone bot."""
     from db.client import db
+    from db.ops.clone_groups import list_active_groups
     
     if not db.pool:
         raise HTTPException(status_code=503, detail="Database not available")
     
     user_id = user.get("id")
-    
     bot_record = await get_bot_by_id(db.pool, bot_id)
     
     if not bot_record:
@@ -342,11 +345,77 @@ async def get_bot_groups(bot_id: int, user: dict = Depends(get_current_user)):
     if bot_record["owner_user_id"] != user_id:
         raise HTTPException(status_code=403, detail={"error": "Not authorized"})
     
-    # Get groups for this bot using token_hash
     async with db.pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT chat_id, title, member_count, last_active FROM groups WHERE bot_token_hash = $1",
-            bot_record["token_hash"]
-        )
+        groups = await list_active_groups(conn, bot_id)
     
-    return [dict(r) for r in rows]
+    return groups
+
+
+@router.delete("/{bot_id}/groups/{chat_id}")
+async def remove_bot_from_group(bot_id: int, chat_id: int, user: dict = Depends(get_current_user)):
+    """Owner force-removes bot from a group."""
+    from db.client import db
+    from db.ops.clone_groups import mark_group_left
+    from bot.registry import get as registry_get
+    
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    user_id = user.get("id")
+    bot_record = await get_bot_by_id(db.pool, bot_id)
+    
+    if not bot_record:
+        raise HTTPException(status_code=404, detail={"error": "Bot not found"})
+    
+    if bot_record["owner_user_id"] != user_id:
+        raise HTTPException(status_code=403, detail={"error": "Not authorized"})
+        
+    # Make bot leave the group
+    clone_app = registry_get(bot_id)
+    if clone_app:
+        try:
+            await clone_app.bot.send_message(
+                chat_id=chat_id,
+                text="👋 The bot owner has requested me to leave this group. Goodbye!"
+            )
+            await clone_app.bot.leave_chat(chat_id)
+        except Exception as e:
+            logger.warning(f"[API] Failed to make bot leave chat {chat_id}: {e}")
+            
+    async with db.pool.acquire() as conn:
+        await mark_group_left(conn, bot_id, chat_id)
+        
+    return {"status": "left", "bot_id": bot_id, "chat_id": chat_id}
+
+
+@router.put("/{bot_id}/access")
+async def update_bot_access(bot_id: int, request: Request, user: dict = Depends(get_current_user)):
+    """Update clone access settings."""
+    from db.client import db
+    from db.ops.bots import update_bot_access_settings
+    
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    user_id = user.get("id")
+    bot_record = await get_bot_by_id(db.pool, bot_id)
+    
+    if not bot_record:
+        raise HTTPException(status_code=404, detail={"error": "Bot not found"})
+    
+    if bot_record["owner_user_id"] != user_id:
+        raise HTTPException(status_code=403, detail={"error": "Not authorized"})
+        
+    body = await request.json()
+    group_limit = body.get("group_limit")
+    group_access_policy = body.get("group_access_policy")
+    bot_add_notifications = body.get("bot_add_notifications")
+    
+    await update_bot_access_settings(
+        db.pool, bot_id, 
+        group_limit=group_limit,
+        group_access_policy=group_access_policy,
+        bot_add_notifications=bot_add_notifications
+    )
+    
+    return {"status": "updated", "bot_id": bot_id}

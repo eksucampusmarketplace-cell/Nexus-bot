@@ -122,8 +122,9 @@ async def insert_bot(pool: asyncpg.Pool, bot_data: dict) -> dict:
             """
             INSERT INTO bots (
                 bot_id, username, display_name, token_encrypted, token_hash,
-                owner_user_id, webhook_url, is_primary, status, webhook_active
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                owner_user_id, webhook_url, is_primary, status, webhook_active,
+                group_limit, group_access_policy, bot_add_notifications
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *
             """,
             bot_data["bot_id"],
@@ -135,9 +136,12 @@ async def insert_bot(pool: asyncpg.Pool, bot_data: dict) -> dict:
             bot_data.get("webhook_url"),
             bot_data.get("is_primary", False),
             bot_data.get("status", "active"),
-            bot_data.get("webhook_active", False)
+            bot_data.get("webhook_active", False),
+            bot_data.get("group_limit", 1),
+            bot_data.get("group_access_policy", "blocked"),
+            bot_data.get("bot_add_notifications", False)
         )
-    duration = (time.monotonic() - start) * 1000
+
     logger.info(f"[DB][bots][INSERT] bot_id={bot_data['bot_id']} username=@{bot_data['username']} | duration={duration:.1f}ms")
     return dict(row)
 
@@ -177,6 +181,48 @@ async def update_bot_status(
     
     duration = (time.monotonic() - start) * 1000
     logger.info(f"[DB][bots][UPDATE] bot_id={bot_id} status={status} | duration={duration:.1f}ms")
+
+
+async def update_bot_access_settings(
+    pool: asyncpg.Pool,
+    bot_id: int,
+    group_limit: int = None,
+    group_access_policy: str = None,
+    bot_add_notifications: bool = None
+) -> None:
+    """
+    Update bot access settings. Only updates fields that are not None.
+    Logs: [DB][bots][UPDATE] access settings | bot_id={bot_id}
+    """
+    start = time.monotonic()
+    async with pool.acquire() as conn:
+        updates = []
+        params = [bot_id]
+        param_idx = 2
+        
+        if group_limit is not None:
+            updates.append(f"group_limit = ${param_idx}")
+            params.append(group_limit)
+            param_idx += 1
+            
+        if group_access_policy is not None:
+            updates.append(f"group_access_policy = ${param_idx}")
+            params.append(group_access_policy)
+            param_idx += 1
+            
+        if bot_add_notifications is not None:
+            updates.append(f"bot_add_notifications = ${param_idx}")
+            params.append(bot_add_notifications)
+            param_idx += 1
+            
+        if not updates:
+            return
+            
+        query = f"UPDATE bots SET {', '.join(updates)} WHERE bot_id = $1"
+        await conn.execute(query, *params)
+        
+    duration = (time.monotonic() - start) * 1000
+    logger.info(f"[DB][bots][UPDATE] access settings | bot_id={bot_id} | duration={duration:.1f}ms")
 
 
 async def update_bot_last_seen(pool: asyncpg.Pool, bot_id: int) -> None:

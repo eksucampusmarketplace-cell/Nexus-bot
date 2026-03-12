@@ -76,6 +76,13 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         pause_command, resume_command, nowplaying_command,
         music_callback_handler
     )
+    from bot.handlers.music_advanced import (
+        play_youtube_command, volume_command, repeat_command,
+        shuffle_command, playlist_create_command, playlist_list_command,
+        playlist_play_command, playlist_delete_command, history_command,
+        search_command, sync_command, music_settings_command,
+        music_advanced_callback_handler
+    )
     from bot.handlers.errors import error_handler as global_error_handler
     
     # ── Basic commands (all bots) ─────────────────────────────────────────
@@ -110,13 +117,27 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("report",  report_handler))
     
     # ── Music commands (groups only) ───────────────────────────────────────
-    app.add_handler(CommandHandler("play",        play_command,        filters=GROUP))
-    app.add_handler(CommandHandler("skip",        skip_command,        filters=GROUP))
-    app.add_handler(CommandHandler("queue",       queue_command,       filters=GROUP))
-    app.add_handler(CommandHandler("stop",        stop_command,        filters=GROUP))
-    app.add_handler(CommandHandler("pause",       pause_command,       filters=GROUP))
-    app.add_handler(CommandHandler("resume",      resume_command,      filters=GROUP))
-    app.add_handler(CommandHandler("nowplaying",  nowplaying_command,  filters=GROUP))
+    app.add_handler(CommandHandler("play",           play_command,           filters=GROUP))
+    app.add_handler(CommandHandler("skip",           skip_command,           filters=GROUP))
+    app.add_handler(CommandHandler("queue",          queue_command,          filters=GROUP))
+    app.add_handler(CommandHandler("stop",           stop_command,           filters=GROUP))
+    app.add_handler(CommandHandler("pause",          pause_command,          filters=GROUP))
+    app.add_handler(CommandHandler("resume",         resume_command,         filters=GROUP))
+    app.add_handler(CommandHandler("nowplaying",     nowplaying_command,     filters=GROUP))
+
+    # ── Advanced music commands (groups only) ─────────────────────────────
+    app.add_handler(CommandHandler("play_youtube",   play_youtube_command,   filters=GROUP))
+    app.add_handler(CommandHandler("volume",         volume_command,         filters=GROUP))
+    app.add_handler(CommandHandler("repeat",         repeat_command,         filters=GROUP))
+    app.add_handler(CommandHandler("shuffle",        shuffle_command,        filters=GROUP))
+    app.add_handler(CommandHandler("playlist_create", playlist_create_command, filters=GROUP))
+    app.add_handler(CommandHandler("playlist_list",   playlist_list_command,   filters=GROUP))
+    app.add_handler(CommandHandler("playlist_play",   playlist_play_command,   filters=GROUP))
+    app.add_handler(CommandHandler("playlist_delete", playlist_delete_command, filters=GROUP))
+    app.add_handler(CommandHandler("history",        history_command,        filters=GROUP))
+    app.add_handler(CommandHandler("search",         search_command,         filters=GROUP))
+    app.add_handler(CommandHandler("sync",           sync_command,           filters=GROUP))
+    app.add_handler(CommandHandler("music_settings", music_settings_command, filters=GROUP))
     
     # ── Clone commands — PRIMARY BOT ONLY ─────────────────────────────────
     if is_primary:
@@ -139,9 +160,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     
     # ── Captcha callbacks (all bots) ──────────────────────────────────────
     app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha:'))
-    
+
     # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:'))
+    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
+    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
     
     # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
     app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)

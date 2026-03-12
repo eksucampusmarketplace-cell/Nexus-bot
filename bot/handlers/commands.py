@@ -43,7 +43,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /purge - Delete messages
 /rules - Show group rules
 
-<b>🎵 Music:</b>
+<b>🎵 Music - Basic:</b>
 /play - Play music (reply to audio/voice or send file)
 /skip - Skip to next track
 /queue - Show music queue
@@ -51,6 +51,20 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /pause - Pause playback
 /resume - Resume playback
 /nowplaying - Show current track with controls
+
+<b>🎵 Music - Advanced:</b>
+/play_youtube <url> - Play from YouTube
+/volume <0-200> - Set volume
+/repeat <mode> - Set repeat (none/one/all)
+/shuffle - Toggle shuffle mode
+/playlist_create <name> - Create playlist
+/playlist_list - List all playlists
+/playlist_play <name> - Play a playlist
+/playlist_delete <name> - Delete playlist
+/history <n> - Show play history
+/search <query> - Search music
+/sync - Sync music to all clone bots
+/music_settings - Interactive settings panel
 
 <b>How to use:</b>
 Admin commands require you to reply to a user's message.

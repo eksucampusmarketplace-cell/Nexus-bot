@@ -13,4 +13,7 @@ api/routes/__pycache__/
 api/__pycache__/
 bot/__pycache__/
 bot/handlers/__pycache__/
+bot/utils/__pycache__/
+db/__pycache__/
+db/ops/__pycache__/
 

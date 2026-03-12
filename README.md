@@ -91,8 +91,9 @@ Access the Bot Manager tab in the Mini App to:
 
 ### Music Player
 
-The bot includes a built-in music player for groups! Use these commands:
+The bot includes a powerful music player for groups with advanced features! Use these commands:
 
+**Basic Commands:**
 - `/play` - Play music (reply to an audio/voice message or send an audio file)
 - `/skip` - Skip the current track
 - `/queue` - View the music queue
@@ -101,12 +102,38 @@ The bot includes a built-in music player for groups! Use these commands:
 - `/resume` - Resume paused playback
 - `/nowplaying` - Show current track with interactive controls
 
+**Advanced Commands:**
+- `/play_youtube <url>` - Play music directly from YouTube
+- `/volume <0-200>` - Set playback volume (100% is default)
+- `/repeat <mode>` - Set repeat mode (none/one/all)
+- `/shuffle` - Toggle shuffle mode
+- `/playlist_create <name>` - Save current queue as a playlist
+- `/playlist_list` - List all playlists
+- `/playlist_play <name>` - Load and play a playlist
+- `/playlist_delete <name>` - Delete a playlist
+- `/history <n>` - View play history (last n tracks)
+- `/search <query>` - Search songs in queue and playlists
+- `/sync` - Sync music queue to all clone bots (owner only)
+- `/music_settings` - Interactive settings panel
+
 **How to play music:**
 1. Reply to an audio file or voice message with `/play`
 2. Send an audio file with `/play` command
-3. Use the Music tab in the Mini App for visual controls
+3. Use `/play_youtube <url>` to play from YouTube
+4. Use the Music tab in the Mini App for full visual controls
 
-Note: The music player supports audio files and voice messages shared in the group. The bot will replay them in the queue order.
+**Advanced Features:**
+- 🎬 **YouTube Support** - Play directly from YouTube URLs
+- 📚 **Playlists** - Save and manage music playlists
+- 🔀 **Shuffle** - Randomize track order
+- 🔁 **Repeat** - Repeat tracks (none/one/all)
+- 🔊 **Volume Control** - Adjust volume (0-200%)
+- 🔄 **Multi-Bot Sync** - Sync music across all clone bots
+- 📜 **Play History** - Track what was played
+- 🔍 **Search** - Find songs in queue/playlists
+- 💾 **Database Persistence** - Queues and playlists saved
+
+Note: The music player supports audio files, voice messages, and YouTube links. All queues, playlists, and settings are persisted in the database and survive bot restarts.
 
 ### Environment Variables
 

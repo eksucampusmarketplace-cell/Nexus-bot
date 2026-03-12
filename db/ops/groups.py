@@ -6,8 +6,11 @@ async def get_group(chat_id: int):
         row = await conn.fetchrow("SELECT * FROM groups WHERE chat_id = $1", chat_id)
         if row:
             res = dict(row)
-            if isinstance(res['settings'], str):
-                res['settings'] = json.loads(res['settings'])
+            if isinstance(res.get('settings'), str):
+                try:
+                    res['settings'] = json.loads(res['settings'])
+                except Exception:
+                    res['settings'] = {}
             return res
         return None
 
@@ -18,7 +21,10 @@ async def get_or_create_group(db_pool, chat_id: int, title: str = None):
         if row:
             res = dict(row)
             if isinstance(res.get('settings'), str):
-                res['settings'] = json.loads(res['settings'])
+                try:
+                    res['settings'] = json.loads(res['settings'])
+                except Exception:
+                    res['settings'] = {}
             return res
         # Create new group
         if title is None:
@@ -87,7 +93,18 @@ async def get_user_managed_groups(user_id: int):
     # we would filter by admin status.
     async with db.pool.acquire() as conn:
         rows = await conn.fetch("SELECT * FROM groups")
-        return [dict(row) for row in rows]
+        res = []
+        for row in rows:
+            d = dict(row)
+            if isinstance(d.get('settings'), str):
+                try:
+                    d['settings'] = json.loads(d['settings'])
+                except Exception:
+                    d['settings'] = {}
+            elif not d.get('settings'):
+                d['settings'] = {}
+            res.append(d)
+        return res
 
 
 # ── Custom Messages ──────────────────────────────────────────────────────────

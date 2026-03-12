@@ -45,6 +45,7 @@ HELP_CATEGORIES = {
     "🔧 Utilities": [
         "/notes - Manage group notes",
         "/afk - Set AFK status",
+        "/privacy - View privacy policy",
     ]
 }
 

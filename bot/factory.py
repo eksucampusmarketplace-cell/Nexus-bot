@@ -109,6 +109,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Import new start_help and setmessage handlers (for all bots)
     from bot.handlers.start_help import start_handler, help_handler
     from bot.handlers.setmessage import setmessage_conversation
+    from bot.handlers.privacy import privacy_handler
 
     # Import alerts utility for error handling
     from bot.utils.alerts import alert_error
@@ -148,6 +149,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Use the new start_help handlers for all bots
     app.add_handler(start_handler)  # /start from start_help.py
     app.add_handler(help_handler)   # /help from start_help.py
+    app.add_handler(privacy_handler)  # /privacy from privacy.py
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(setmessage_conversation)  # /setmessage for customizing messages
 

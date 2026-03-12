@@ -16,35 +16,67 @@ HELP_CATEGORIES = {
         "/unban - Unban a user",
         "/kick - Kick a user",
         "/purge - Delete recent messages",
+        "/pin - Pin a message",
+        "/unpin - Unpin the pinned message",
     ],
     "🚫 Anti-Spam": [
         "!antispam - Enable anti-spam",
         "!!antispam - Disable anti-spam",
         "!antiflood - Enable anti-flood",
+        "!antilink - Enable anti-link",
     ],
     "👋 Greetings": [
         "/setwelcome - Set welcome message",
         "/setgoodbye - Set goodbye message",
         "/welcome - Preview welcome message",
+        "/goodbye - Preview goodbye message",
         "/rules - Show group rules",
+        "/setrules - Set group rules",
     ],
     "🔒 Security": [
         "!captcha - Enable captcha",
         "!antiraid - Enable anti-raid mode",
+        "/slowmode - Set slow mode delay",
+        "/setflood - Set flood limit",
+        "/addfilter - Add word filter",
+        "/delfilter - Remove word filter",
     ],
     "📢 Channel": [
         "/channelpost - Post to linked channel",
         "/schedulepost - Schedule a channel post",
+        "/announce - Send announcement",
+        "/pinmessage - Pin custom message",
     ],
     "📊 Analytics": [
-        "!analytics - Enable activity tracking",
+        "/stats - Show group statistics",
+        "/admininfo - Show detailed group info",
+        "/exportsettings - Export settings",
     ],
     "📝 Content": [
-        "!wordfilter - Enable word filtering",
+        "/filters - List word filters",
+        "/poll - Create a poll",
+    ],
+    "🎮 Fun": [
+        "/afk - Set AFK status",
+        "/back - Clear AFK status",
+        "/dice - Roll a dice",
+        "/coin - Flip a coin",
+        "/choose - Randomly choose",
+        "/8ball - Magic 8-ball",
+        "/roll - Roll random number",
+        "/joke - Get a joke",
+        "/quote - Get a quote",
+        "/roast - Playful roast",
+        "/compliment - Give compliment",
+        "/calc - Calculator",
     ],
     "🔧 Utilities": [
-        "/notes - Manage group notes",
-        "/afk - Set AFK status",
+        "/panel - Open mini app panel",
+        "/help - Show this help",
+        "/id - Get chat/user ID",
+        "/info - Show group info",
+        "/admins - List admins",
+        "/report - Report a message",
         "/privacy - View privacy policy",
     ]
 }
@@ -71,8 +103,8 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🛡️ Moderation", callback_data="help_mod"), InlineKeyboardButton("🚫 Anti-Spam", callback_data="help_spam")],
         [InlineKeyboardButton("👋 Greetings", callback_data="help_greet"), InlineKeyboardButton("🔒 Security", callback_data="help_sec")],
         [InlineKeyboardButton("📢 Channel", callback_data="help_chan"), InlineKeyboardButton("📊 Analytics", callback_data="help_ana")],
-        [InlineKeyboardButton("📝 Content", callback_data="help_cont"), InlineKeyboardButton("🔧 Utilities", callback_data="help_util")],
-        [InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")]
+        [InlineKeyboardButton("📝 Content", callback_data="help_cont"), InlineKeyboardButton("🎮 Fun", callback_data="help_fun")],
+        [InlineKeyboardButton("🔧 Utilities", callback_data="help_util"), InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -115,6 +147,7 @@ async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         "help_chan": "📢 Channel",
         "help_ana": "📊 Analytics",
         "help_cont": "📝 Content",
+        "help_fun": "🎮 Fun",
         "help_util": "🔧 Utilities",
     }
     

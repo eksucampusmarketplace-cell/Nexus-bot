@@ -1,6 +1,6 @@
-# Nexus Mini App - Foundation
+# Nexus Mini App
 
-This is the new foundation for the Nexus Bot Mini App, built with Vanilla JS + Zustand.
+The Nexus Bot Mini App - a comprehensive group management interface built with Vanilla JS + Zustand.
 
 ## 📁 Structure
 
@@ -19,6 +19,10 @@ miniapp/
 │   ├── bulk_actions.js       # Bulk member actions
 │   ├── rule_templates.js      # Preset automod templates
 │   └── mtproto_auth.js       # Telegram MTProto auth
+├── src/pages/
+│   ├── automod.js            # AutoMod configuration page
+│   ├── commands.js           # Commands reference page
+│   └── music.js              # Music player control page
 ├── store/
 │   └── index.js              # Zustand store
 ├── index.html               # Main app entry point
@@ -227,14 +231,81 @@ Uses Telegram WebApp initData for auth:
 - MTProto for userbot session export
 - Secure token storage in backend
 
-## 📝 Next Steps (Prompts A-F)
+## 🆕 New Features
 
-This foundation enables:
-- Prompt A: Advanced Automod Engine
-- Prompt B: Anti-Raid + CAPTCHA + Approval
-- Prompt C: Notes + Filters + Blocklist
-- Prompt D: Scheduling + Automation
-- Prompt E: Log Channel + Import/Export
-- Prompt F: Analytics + Member Tools
+### Commands Page (`/commands`)
+Comprehensive command reference with:
+- **Searchable** command database
+- **7 categories**: Moderation, Security, Greetings, Music, Fun, Admin Tools, Utilities
+- **50+ commands** documented
+- Mobile-friendly card layout
 
-Each subsequent prompt builds panels on top of this foundation.
+### Music Page (`/music`)
+Full music player control panel:
+- **Now Playing** display with track info
+- **Playback controls**: Play, Pause, Skip, Stop
+- **Queue visualization** with track list
+- **Volume control** slider
+- **Quick action** buttons
+- **Music settings**: Play mode (all/admins)
+
+### Enhanced Navigation
+- **9 pages total**: Dashboard, AutoMod, Members, Music, Commands, Modules, Settings, Logs
+- Bottom navigation on mobile
+- Sidebar navigation on desktop
+
+## 🌐 Backend API Endpoints
+
+### Music API (`/api/music`)
+- `GET /{chat_id}/queue` - Get current queue
+- `POST /{chat_id}/command` - Send control commands (play, pause, skip, etc.)
+- `PUT /{chat_id}/settings` - Update music settings
+
+### Group Management (`/api/groups`)
+- `GET /{chat_id}/members` - List members
+- `POST /{chat_id}/members/bulk` - Bulk actions
+- `GET /{chat_id}/logs` - Activity logs
+- `GET /{chat_id}/analytics` - Statistics and charts
+- `PUT /{chat_id}/settings` - Update settings
+- `PUT /{chat_id}/settings/bulk` - Bulk settings apply
+
+### Boost API (`/api/groups/{chat_id}/boost`)
+- `GET /config` - Boost configuration
+- `PUT /config` - Update boost settings
+- `GET /stats` - Boost statistics
+- `GET /records` - Member boost records
+- `POST /credits/request` - Request manual add credit
+- `POST /unlock/{user_id}` - Manually unlock member
+
+## 📝 Bot Commands (50+)
+
+### Moderation
+/warn, /unwarn, /warns, /mute, /unmute, /ban, /unban, /kick, /purge, /pin, /unpin
+
+### Security
+!antispam, !antiflood, !antilink, !captcha, !antiraid, /slowmode, /setflood, /addfilter, /delfilter
+
+### Greetings
+/setwelcome, /setgoodbye, /welcome, /goodbye, /setrules, /rules
+
+### Music
+/play, /playnow, /pause, /resume, /skip, /stop, /queue, /volume, /loop, /musicmode
+
+### Fun 🎮 NEW
+/afk, /back, /poll, /dice, /coin, /choose, /8ball, /roll, /joke, /quote, /roast, /compliment, /calc
+
+### Admin Tools 🆕 NEW
+/announce, /pinmessage, /slowmode, /filters, /addfilter, /delfilter, /setflood, /exportsettings, /importsettings, /admininfo, /cleardata
+
+## 🛠️ Implemented Features
+
+- ✅ Advanced Automod Engine
+- ✅ Anti-Raid + CAPTCHA + Approval
+- ✅ Word Filters
+- ✅ Music Player with Queue Management
+- ✅ Member Boost System
+- ✅ Command Reference
+- ✅ Real-time Analytics
+- ✅ Bulk Member Actions
+- ✅ Settings Import/Export
+- ✅ 50+ Bot Commands

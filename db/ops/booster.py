@@ -405,9 +405,9 @@ async def get_unassigned_adds(group_id: int, hours: int = 24) -> list:
     """Get manual adds that haven't been credited yet."""
     async with db.pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT * FROM manual_adds_detected 
-            WHERE group_id = $1 AND credited_to IS NULL 
-            AND detected_at > NOW() - INTERVAL '$2 hours'
+            SELECT * FROM manual_adds_detected
+            WHERE group_id = $1 AND credited_to IS NULL
+            AND detected_at > NOW() - ($2 || ' hours')::INTERVAL
             ORDER BY detected_at DESC
         """, group_id, hours)
         return [dict(row) for row in rows]
@@ -417,8 +417,8 @@ async def get_recent_manual_adds(group_id: int, hours: int = 2) -> list:
     """Get recent manual adds for correlation with credit claims."""
     async with db.pool.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT * FROM manual_adds_detected 
-            WHERE group_id = $1 AND detected_at > NOW() - INTERVAL '$2 hours'
+            SELECT * FROM manual_adds_detected
+            WHERE group_id = $1 AND detected_at > NOW() - ($2 || ' hours')::INTERVAL
             ORDER BY detected_at DESC
         """, group_id, hours)
         return [dict(row) for row in rows]

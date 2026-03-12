@@ -81,7 +81,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         member_group_ids = [row['group_id'] for row in member_group_ids]
 
         # Get all groups from DB to check admin status
-        all_groups = await conn.fetch("SELECT chat_id, title, username, member_count, settings FROM groups")
+        all_groups = await conn.fetch("SELECT chat_id, title, member_count, settings FROM groups")
 
     # Check Telegram status for each group
     admin_groups = []
@@ -91,7 +91,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     for group_row in all_groups:
         chat_id = group_row['chat_id']
         title = group_row['title']
-        username = group_row['username']
+        username = None
         member_count = group_row['member_count']
         group_settings = group_row['settings'] or {}
 

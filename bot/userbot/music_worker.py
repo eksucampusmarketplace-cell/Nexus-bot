@@ -26,6 +26,8 @@ import tempfile
 from dataclasses import dataclass, field
 from typing import Optional, Callable, Awaitable
 
+log = logging.getLogger("music_worker")
+
 from pyrogram import Client
 try:
     from pytgcalls import PyTGCalls
@@ -50,8 +52,6 @@ except ImportError:
 import yt_dlp
 
 from config import settings
-
-log = logging.getLogger("music_worker")
 
 os.makedirs(settings.MUSIC_DOWNLOAD_DIR, exist_ok=True)
 

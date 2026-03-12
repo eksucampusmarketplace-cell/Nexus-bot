@@ -11,7 +11,9 @@
  *   useStore.setState({ key: value });
  */
 
-import { createStore } from 'zustand/vanilla';
+// Use global zustand if available from CDN
+const zustandGlobal = typeof window !== 'undefined' ? window.zustand : null;
+const createStore = zustandGlobal?.createStore || zustandGlobal?.create;
 
 export const useStore = createStore((set, get) => ({
   // ── User & Auth ─────────────────────────────────────────

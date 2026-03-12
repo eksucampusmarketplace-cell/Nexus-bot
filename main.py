@@ -8,6 +8,7 @@ import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
 from telegram import Update
 
@@ -306,6 +307,16 @@ fastapi_app.include_router(admin_router)
 fastapi_app.include_router(billing_router)
 fastapi_app.include_router(events.router)
 fastapi_app.include_router(automod_router.router)
+
+# Serve miniapp static files
+miniapp_dir = os.path.join(os.path.dirname(__file__), "miniapp")
+if os.path.exists(miniapp_dir):
+    fastapi_app.mount("/miniapp", StaticFiles(directory=miniapp_dir), name="miniapp")
+
+# Serve webapp static files (for legacy React version)
+webapp_dir = os.path.join(os.path.dirname(__file__), "webapp")
+if os.path.exists(webapp_dir):
+    fastapi_app.mount("/webapp", StaticFiles(directory=webapp_dir), name="webapp")
 
 
 @fastapi_app.get("/", response_class=JSONResponse)

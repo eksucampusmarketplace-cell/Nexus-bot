@@ -103,6 +103,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Import booster handlers
     from bot.handlers.booster import register_handlers as register_booster_handlers
 
+    # ── Filter definitions ─────────────────────────────────────────────────
+    GROUP = filters.ChatType.GROUPS
+    PRIVATE = filters.ChatType.PRIVATE
+
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(MessageHandler(filters.TEXT & (filters.Regex(r'^!') | filters.Regex(r'^!!')), prefix_handler), group=0)
 
@@ -110,7 +114,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", nexus_help_handler))
     app.add_handler(CommandHandler("panel", panel))
-    
+
     # ── Nexus Greetings & Rules ──────────────────────────────────────────
     app.add_handler(CommandHandler("setwelcome",  set_welcome_handler,  filters=GROUP))
     app.add_handler(CommandHandler("setgoodbye",  set_goodbye_handler,  filters=GROUP))
@@ -129,10 +133,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("cancelpost",   cancel_post_handler,   filters=GROUP))
     app.add_handler(CommandHandler("editpost",     edit_post_handler,     filters=GROUP))
     app.add_handler(CommandHandler("deletepost",   delete_post_handler,   filters=GROUP))
-    
+
     # ── Moderation commands (groups only) ─────────────────────────────────
-    GROUP = filters.ChatType.GROUPS
-    PRIVATE = filters.ChatType.PRIVATE
     
     app.add_handler(CommandHandler("warn",    warn_handler,    filters=GROUP))
     app.add_handler(CommandHandler("unwarn",  unwarn_handler,  filters=GROUP))

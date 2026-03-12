@@ -1215,7 +1215,7 @@ async def check_channel_on_message(update: Update, context: ContextTypes.DEFAULT
             await update.message.delete()
         except TelegramError:
             pass
-        
+
         action = config.get('force_channel_action', 'restrict')
         if action == 'restrict':
             try:

@@ -15,6 +15,7 @@ from api.auth import get_current_user
 from db.client import db
 from config import settings
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,11 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         username = None
         member_count = group_row['member_count']
         group_settings = group_row['settings'] or {}
+        if isinstance(group_settings, str):
+            try:
+                group_settings = json.loads(group_settings)
+            except Exception:
+                group_settings = {}
 
         status = await get_user_telegram_status(bot_app.bot, chat_id, user_id)
 

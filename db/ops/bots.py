@@ -243,6 +243,31 @@ async def update_bot_last_seen(pool: asyncpg.Pool, bot_id: int) -> None:
         logger.warning(f"[DB][bots][UPDATE] failed to touch last_seen | bot_id={bot_id} | error={e}")
 
 
+async def update_bot_token(
+    pool: asyncpg.Pool,
+    bot_id: int,
+    token_encrypted: str,
+    token_hash: str
+) -> None:
+    """
+    Update bot token for reauthentication.
+    Used when a dead bot gets a new token from @BotFather.
+    Logs: [DB][bots][UPDATE] token | bot_id={bot_id}
+    """
+    start = time.monotonic()
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            UPDATE bots 
+            SET token_encrypted = $1, token_hash = $2, status = 'active', updated_at = NOW()
+            WHERE bot_id = $3
+            """,
+            token_encrypted, token_hash, bot_id
+        )
+    duration = (time.monotonic() - start) * 1000
+    logger.info(f"[DB][bots][UPDATE] token | bot_id={bot_id} | duration={duration:.1f}ms")
+
+
 async def update_bot_groups_count(pool: asyncpg.Pool, bot_id: int) -> None:
     """
     Count groups managed by this bot from the groups table and update groups_count.

@@ -223,20 +223,18 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── Clone commands — PRIMARY BOT ONLY ─────────────────────────────────
     if is_primary:
         from bot.handlers.clone import (
-            clone_command_handler,
+            clone_conversation,
             myclones_command_handler,
             cloneset_handler,
-            token_input_handler,
-            clone_callback_handler
+            clone_management_callback
         )
-        app.add_handler(CommandHandler("clone",    clone_command_handler,    filters=PRIVATE))
+        # ConversationHandler for /clone flow (must be added before other clone handlers)
+        app.add_handler(clone_conversation)
+        # Non-conversation commands
         app.add_handler(CommandHandler("myclones", myclones_command_handler, filters=PRIVATE))
         app.add_handler(CommandHandler("cloneset", cloneset_handler,         filters=PRIVATE))
-        app.add_handler(MessageHandler(
-            PRIVATE & filters.TEXT & filters.Regex(r"^\d{8,12}:[\w-]{35,50}$"),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r"^clone:"))
+        # Management callbacks outside of conversation (remove, confirm_remove, keep)
+        app.add_handler(CallbackQueryHandler(clone_management_callback, pattern=r"^clone:(remove|confirm_remove|keep)$"))
         logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
     else:
         logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")

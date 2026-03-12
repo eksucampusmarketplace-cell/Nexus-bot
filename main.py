@@ -89,6 +89,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.debug(f"[STARTUP] Stars economy migration info: {e}")
 
+    # Run anti-raid and captcha migration
+    try:
+        ar_migration_path = os.path.join(os.path.dirname(__file__), "db", "migrations", "add_antiraid_captcha.sql")
+        if os.path.exists(ar_migration_path):
+            with open(ar_migration_path, 'r') as f:
+                ar_migration_sql = f.read()
+            await pool.execute(ar_migration_sql)
+            logger.info("[STARTUP] ✅ Anti-raid and CAPTCHA tables migrated")
+    except Exception as e:
+        logger.error(f"[STARTUP] ❌ Anti-raid and CAPTCHA migration failed: {e}")
+
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
 

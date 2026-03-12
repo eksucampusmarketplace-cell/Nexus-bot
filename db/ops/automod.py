@@ -291,23 +291,48 @@ async def save_rule_priority(pool, chat_id: int, rule_order: list):
 # ── Group Settings Helpers ───────────────────────────────────────────────
 
 async def update_group_setting(pool, chat_id: int, key: str, value):
-    """Update a single setting in group_settings."""
+    """Update a single setting (either a column in 'groups' or a key in 'settings' JSONB)."""
     import json
+    
+    # List of known individual columns in 'groups' table
+    INDIVIDUAL_COLUMNS = {
+        "antiraid_enabled", "antiraid_mode", "antiraid_threshold",
+        "antiraid_duration_mins", "auto_antiraid_enabled",
+        "auto_antiraid_threshold", "captcha_enabled", "captcha_mode",
+        "captcha_timeout_mins", "captcha_kick_on_timeout",
+        "self_destruct_enabled", "self_destruct_minutes", "lock_admins",
+        "unofficial_tg_lock", "bot_inviter_ban", "duplicate_limit",
+        "duplicate_window_mins", "min_words", "max_words", "min_lines",
+        "max_lines", "min_chars", "max_chars", "necessary_words_active",
+        "regex_active"
+    }
+
     async with pool.acquire() as conn:
-        # Get current settings
+        if key in INDIVIDUAL_COLUMNS:
+            await conn.execute(
+                f"UPDATE groups SET {key} = $1 WHERE chat_id=$2",
+                value, chat_id
+            )
+            return
+
+        # Fallback to settings JSONB
         row = await conn.fetchrow(
             "SELECT settings FROM groups WHERE chat_id=$1",
             chat_id
         )
-        if not row or not row["settings"]:
+        if not row:
             settings = {}
-        elif isinstance(row["settings"], str):
-            try:
-                settings = json.loads(row["settings"])
-            except:
-                settings = {}
         else:
-            settings = dict(row["settings"]) or {}
+            settings = row["settings"]
+            if isinstance(settings, str):
+                try:
+                    settings = json.loads(settings)
+                except:
+                    settings = {}
+            elif settings is None:
+                settings = {}
+            else:
+                settings = dict(settings)
 
         # Update nested key
         if "." in key:
@@ -321,7 +346,6 @@ async def update_group_setting(pool, chat_id: int, key: str, value):
         else:
             settings[key] = value
 
-        # Save back
         await conn.execute(
             "UPDATE groups SET settings = $1::jsonb WHERE chat_id=$2",
             json.dumps(settings), chat_id
@@ -428,17 +452,25 @@ async def remove_timed_lock(pool, chat_id: int, rule_key: str):
 # ── Whitelist ────────────────────────────────────────────────────────────
 
 async def get_whitelist(pool, chat_id: int) -> list:
-    """Get whitelist of user IDs exempt from automod."""
+    """Get whitelist of user IDs exempt from automod (settings + approved_members)."""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT settings->'automod'->'whitelist' as whitelist
+            SELECT (
+                COALESCE(settings->'automod'->'whitelist', '[]'::jsonb) || 
+                COALESCE((SELECT jsonb_agg(user_id) FROM approved_members WHERE chat_id=$1), '[]'::jsonb)
+            ) as full_whitelist
             FROM groups WHERE chat_id=$1
             """,
             chat_id
         )
-    if row and row["whitelist"]:
-        return list(row["whitelist"])
+        if row and row["full_whitelist"]:
+            import json
+            # JSONB might come back as a list already with asyncpg
+            val = row["full_whitelist"]
+            if isinstance(val, str):
+                return list(set(json.loads(val)))
+            return list(set(val))
     return []
 
 
@@ -459,18 +491,26 @@ async def get_user_warning_count(pool, chat_id: int, user_id: int) -> int:
 
 
 async def get_group_settings(pool, chat_id: int) -> dict:
-    """Get full settings dict for a group."""
+    """Get full settings dict for a group (merges settings JSONB with individual columns)."""
     import json
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT settings FROM groups WHERE chat_id=$1",
+            "SELECT * FROM groups WHERE chat_id=$1",
             chat_id
         )
     if not row:
         return {}
-    if isinstance(row["settings"], str):
+    
+    res = dict(row)
+    settings_json = res.pop("settings", {})
+    if isinstance(settings_json, str):
         try:
-            return json.loads(row["settings"])
+            settings_json = json.loads(settings_json)
         except:
-            return {}
-    return dict(row["settings"]) or {}
+            settings_json = {}
+    
+    # Merge settings_json into the main dict
+    if settings_json:
+        res.update(settings_json)
+    
+    return res

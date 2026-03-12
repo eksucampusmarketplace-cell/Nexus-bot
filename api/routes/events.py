@@ -75,6 +75,17 @@ class EventBus:
             cls.unsubscribe(chat_id, q)
 
 
+def push_event(owner_id: int, data: dict):
+    """
+    Push event to the bot owner's live feed.
+    Broadcasts to the relevant chat_id.
+    """
+    chat_id = data.get("chat_id")
+    if chat_id:
+        import asyncio
+        asyncio.create_task(EventBus.publish(chat_id, data.get("type", "notification"), data))
+
+
 @router.get("/api/events")
 async def sse_events(request: Request, chat_id: int, token: str = ""):
     """SSE stream for a specific chat_id."""

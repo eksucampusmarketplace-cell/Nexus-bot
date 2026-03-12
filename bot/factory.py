@@ -69,6 +69,13 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         message_handler, member_join_handler
     )
     from bot.handlers.advanced_automod import handle_automod_command
+    from bot.handlers.new_member import handle_chat_member_update
+    from bot.handlers.captcha_callback import handle_captcha_callback
+    from bot.handlers.captcha_message import handle_captcha_message
+    from bot.handlers.approval import (
+        cmd_approve, cmd_unapprove, cmd_approved,
+        cmd_antiraid, cmd_autoantiraid, cmd_captcha, cmd_captchamode
+    )
     from bot.handlers.captcha import (
         new_member_handler, captcha_callback_handler
     )
@@ -145,6 +152,15 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Define filter constants (needed for handlers below)
     GROUP = filters.ChatType.GROUPS
     PRIVATE = filters.ChatType.PRIVATE
+
+    # ── Approval & Anti-raid & CAPTCHA (all bots) ─────────────────────────
+    app.add_handler(CommandHandler("approve",      cmd_approve,      filters=GROUP))
+    app.add_handler(CommandHandler("unapprove",    cmd_unapprove,    filters=GROUP))
+    app.add_handler(CommandHandler("approved",     cmd_approved,     filters=GROUP))
+    app.add_handler(CommandHandler("antiraid",     cmd_antiraid,     filters=GROUP))
+    app.add_handler(CommandHandler("autoantiraid", cmd_autoantiraid, filters=GROUP))
+    app.add_handler(CommandHandler("captcha",      cmd_captcha,      filters=GROUP))
+    app.add_handler(CommandHandler("captchamode",  cmd_captchamode,  filters=GROUP))
 
     # ── Basic commands (all bots) ─────────────────────────────────────────
     # Use the new start_help handlers for all bots
@@ -249,7 +265,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
 
     # ── Captcha callbacks (all bots) ──────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(handle_captcha_callback, pattern=r'^captcha:'))
     app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
+
+    # ── CAPTCHA message handler (before automod) ──────────────────────────
+    app.add_handler(MessageHandler(GROUP & filters.TEXT & ~filters.COMMAND, handle_captcha_message), group=0)
 
     # ── Music callbacks (all bots) ─────────────────────────────────────────
     # OLD MUSIC SYSTEM - REPLACED BY NEW STREAMING SYSTEM
@@ -261,13 +281,14 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
     app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
     app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
+    app.add_handler(MessageHandler(GROUP & ~filters.COMMAND, message_handler), group=4)
 
     # ── New member joins/leaves ──────────────────────────────────────────
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
 
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
+    # Advanced member join/leave handler
+    app.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
 
     # ── Global error handler with alert ─────────────────────────────────────
     # Group lifecycle - on ALL bots

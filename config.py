@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     SUPPORT_GROUP_ID: int = 0  # Internal alerts group (0 = disabled)
     DOCS_URL: Optional[str] = None  # Documentation link for help messages
     MINI_APP_URL: Optional[str] = None  # Base URL for the Mini App (if not set, defaults to RENDER_EXTERNAL_URL/webapp)
+    PRIVACY_POLICY_URL: Optional[str] = None  # Link to Privacy Policy (if not set, uses GitHub/inline)
     
     # ── Alert Settings ────────────────────────────────────────────────────────
     ALERT_ON_ERRORS: bool = True  # Post errors to support group

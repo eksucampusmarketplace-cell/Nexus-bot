@@ -12,6 +12,7 @@ A powerful group management bot with an integrated Telegram Mini App for easy co
 - **Triple Prefix System**: Use `!`, `!!`, and `/` for different types of actions.
 - **Channel Management**: Link your group to a channel and post/schedule messages directly from Nexus.
 - **Trust Score**: Automated behavioral analysis to grant or restrict user permissions.
+- **Privacy**: Comprehensive GDPR-compliant privacy policy with `/privacy` command.
 
 ## 🛠️ Setup Guide
 
@@ -19,7 +20,7 @@ A powerful group management bot with an integrated Telegram Mini App for easy co
 
 1. Create a project at [supabase.com](https://supabase.com).
 2. Go to Project Settings → Database.
-3. Copy the **Connection String** (Transaction mode recommended for Render).
+3. Copy **Connection String** (Transaction mode recommended for Render).
 4. Go to Project Settings → API.
 5. Copy **Project URL** and **service_role API Key**.
 
@@ -144,3 +145,22 @@ Nexus automatically calculates a Trust Score (0-100) for every member based on:
 - **Engagement**: Reactions, poll participation.
 
 Low-trust users face extra scrutiny, while high-trust users may be exempt from certain restrictions like anti-flood.
+
+## 🔒 Privacy
+
+Nexus is committed to protecting your privacy. We comply with GDPR regulations and provide transparent information about data collection.
+
+**View Privacy Policy:**
+- Bot command: `/privacy` (displays the full policy inline)
+- Web version: `https://YOUR_URL.onrender.com/privacy`
+- GitHub: `PRIVACY_POLICY.md` in the repository
+
+**Key Privacy Features:**
+- EU-based data storage (Supabase, Render)
+- Fernet encryption for sensitive data (bot tokens, auth tokens)
+- Minimal data collection - only what's necessary for group management
+- GDPR-compliant with full user rights (access, correction, deletion, portability)
+- Group admins can only see data for their own groups
+- No selling or sharing of personal data with third parties
+
+For complete details, see `PRIVACY_POLICY.md` or use `/privacy` in any bot.

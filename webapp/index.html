@@ -247,20 +247,102 @@
             height: 100%;
         }
 
-        /* Toast */
-        .toast {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--danger);
-            color: #fff;
-            padding: 10px 20px;
-            border-radius: 8px;
-            z-index: 1000;
-            font-size: 14px;
-            display: none;
+        /* Toast success */
+        .toast.success { background: var(--success); }
+        
+        /* Stepper */
+        .stepper { display: flex; align-items: center; gap: 10px; }
+        .stepper button {
+            width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--card-border);
+            background: var(--card-bg); color: var(--text); font-size: 18px; cursor: pointer;
         }
+        .stepper button:hover { background: var(--accent); border-color: var(--accent); }
+        .stepper span { min-width: 40px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 16px; }
+        
+        /* Chips */
+        .chip {
+            display: inline-flex; align-items: center; gap: 5px;
+            padding: 5px 10px; border-radius: 20px;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            font-size: 12px; margin: 2px;
+        }
+        .chip button { background: none; border: none; color: var(--danger); cursor: pointer; padding: 0; font-size: 14px; }
+        
+        /* Style picker */
+        .style-picker { display: flex; gap: 10px; flex-wrap: wrap; }
+        .style-picker .style-option {
+            padding: 8px 16px; border-radius: 8px; border: 1px solid var(--card-border);
+            background: var(--card-bg); cursor: pointer; font-family: 'JetBrains Mono', monospace;
+        }
+        .style-picker .style-option.selected {
+            border-color: var(--accent); box-shadow: 0 0 10px rgba(0,229,255,0.3);
+        }
+        
+        /* Stats cards */
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
+        .stat-card {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 12px; padding: 15px; text-align: center;
+        }
+        .stat-card .value { font-family: 'Syne', sans-serif; font-size: 28px; color: var(--accent); }
+        .stat-card .label { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
+        
+        /* Action buttons */
+        .action-btn {
+            padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 5px;
+        }
+        .action-btn.primary { background: var(--accent); color: #000; }
+        .action-btn.secondary { background: var(--card-bg); border: 1px solid var(--card-border); color: var(--text); }
+        .action-btn.danger { background: var(--danger); color: #fff; }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Input */
+        .input-field {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--card-border);
+            background: rgba(0,0,0,0.2); color: var(--text); font-size: 14px;
+        }
+        .input-field:focus { outline: none; border-color: var(--accent); }
+        
+        /* Sub tabs */
+        .sub-tabs { display: flex; gap: 5px; margin-bottom: 20px; flex-wrap: wrap; }
+        .sub-tab {
+            padding: 8px 16px; border-radius: 20px; border: none; background: var(--card-bg);
+            color: var(--text-dim); cursor: pointer; font-size: 13px;
+        }
+        .sub-tab.active { background: var(--accent); color: #000; }
+        
+        /* Leaderboard */
+        .leaderboard-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .leaderboard-item .rank { font-family: 'Syne', sans-serif; font-size: 18px; width: 30px; }
+        .leaderboard-item .rank.gold { color: #FFD700; }
+        .leaderboard-item .rank.silver { color: #C0C0C0; }
+        .leaderboard-item .rank.bronze { color: #CD7F32; }
+        .leaderboard-item .name { flex: 1; }
+        .leaderboard-item .count { color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+        
+        /* Credit request card */
+        .credit-card {
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 12px; padding: 15px; margin-bottom: 10px;
+        }
+        .credit-card .header { display: flex; justify-content: space-between; align-items: center; }
+        .credit-card .matched { color: var(--success); font-size: 12px; }
+        .credit-card .unmatched { color: var(--warning); font-size: 12px; }
+        .credit-card .actions { display: flex; gap: 10px; margin-top: 10px; }
+        
+        /* Channel card */
+        .channel-card {
+            background: linear-gradient(135deg, rgba(112,0,255,0.2), rgba(0,229,255,0.2));
+            border: 1px solid var(--card-border); border-radius: 12px; padding: 20px;
+            text-align: center;
+        }
+        .channel-card .channel-name { font-family: 'Syne', sans-serif; font-size: 20px; color: var(--accent); }
+        .channel-card .channel-id { color: var(--text-dim); font-size: 12px; margin-top: 5px; }
+        .channel-card .actions { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
     </style>
 </head>
 <body>
@@ -349,14 +431,120 @@
                     const data = await resp.json();
                     set({ heatmapData: data });
                 } catch (err) {}
+            },
+
+            // Boost config
+            boostConfig: {},
+            boostStats: {},
+            boostLoading: false,
+
+            fetchBoostConfig: async (chatId) => {
+                set({ boostLoading: true });
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/boost/config`);
+                    const data = await resp.json();
+                    set({ boostConfig: data });
+                } catch (err) {
+                    console.error('[BOOST] Fetch config error', err);
+                } finally {
+                    set({ boostLoading: false });
+                }
+            },
+
+            saveBoostConfig: async (chatId, config) => {
+                set({ boostLoading: true });
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/boost/config`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(config)
+                    });
+                    if (!resp.ok) throw new Error('Save failed');
+                    set({ boostConfig: config });
+                    showToast('✅ Boost settings saved');
+                } catch (err) {
+                    console.error('[BOOST] Save error', err);
+                    showToast('❌ Failed to save');
+                } finally {
+                    set({ boostLoading: false });
+                }
+            },
+
+            fetchBoostStats: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/boost/stats`);
+                    const data = await resp.json();
+                    set({ boostStats: data });
+                } catch (err) {
+                    console.error('[BOOST] Fetch stats error', err);
+                }
+            },
+
+            // Channel gate config
+            channelConfig: {},
+            channelStats: {},
+            channelLoading: false,
+
+            fetchChannelConfig: async (chatId) => {
+                set({ channelLoading: true });
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/channel-gate/config`);
+                    const data = await resp.json();
+                    set({ channelConfig: data });
+                } catch (err) {
+                    console.error('[CHANNEL] Fetch config error', err);
+                } finally {
+                    set({ channelLoading: false });
+                }
+            },
+
+            saveChannelConfig: async (chatId, config) => {
+                set({ channelLoading: true });
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/channel-gate/config`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(config)
+                    });
+                    if (!resp.ok) throw new Error('Save failed');
+                    set({ channelConfig: config });
+                    showToast('✅ Channel settings saved');
+                } catch (err) {
+                    console.error('[CHANNEL] Save error', err);
+                    showToast('❌ Failed to save');
+                } finally {
+                    set({ channelLoading: false });
+                }
+            },
+
+            fetchChannelStats: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/channel-gate/stats`);
+                    const data = await resp.json();
+                    set({ channelStats: data });
+                } catch (err) {
+                    console.error('[CHANNEL] Fetch stats error', err);
+                }
+            },
+
+            fetchChannelPending: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/channel-gate/pending`);
+                    const data = await resp.json();
+                    set({ channelPending: data });
+                } catch (err) {
+                    console.error('[CHANNEL] Fetch pending error', err);
+                }
             }
         }));
 
-        function showToast(msg) {
+        function showToast(msg, isSuccess = false) {
             const t = document.getElementById('toast');
             t.innerText = msg;
             t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
+            if (isSuccess) t.classList.add('success');
+            else t.classList.remove('success');
+            setTimeout(() => { t.style.display = 'none'; t.classList.remove('success'); }, 3000);
         }
 
         // --- Components ---
@@ -549,6 +737,471 @@
             );
         };
 
+        // --- Boost Configuration Component ---
+        const BoostConfig = () => {
+            const chatId = useStore(state => state.activeGroupId);
+            const config = useStore(state => state.boostConfig);
+            const stats = useStore(state => state.boostStats);
+            const loading = useStore(state => state.boostLoading);
+            const fetchBoostConfig = useStore(state => state.fetchBoostConfig);
+            const fetchBoostStats = useStore(state => state.fetchBoostStats);
+            const saveBoostConfig = useStore(state => state.saveBoostConfig);
+
+            const [localConfig, setLocalConfig] = useState({});
+
+            useEffect(() => {
+                if (chatId) {
+                    fetchBoostConfig(chatId);
+                    fetchBoostStats(chatId);
+                }
+            }, [chatId]);
+
+            useEffect(() => {
+                setLocalConfig(config);
+            }, [config]);
+
+            const handleChange = (key, value) => {
+                setLocalConfig(prev => ({ ...prev, [key]: value }));
+            };
+
+            const handleSave = () => {
+                saveBoostConfig(chatId, localConfig);
+            };
+
+            if (!localConfig.force_add_enabled && !localConfig.force_add_required) {
+                return (
+                    <div>
+                        <div className="card" style={{textAlign: 'center', padding: '40px'}}>
+                            <h2>⚡ Set Up Member Booster</h2>
+                            <p style={{color: 'var(--text-dim)', marginBottom: '20px'}}>
+                                Grow your group organically by requiring new members to invite others before they can chat.
+                            </p>
+                            <button className="action-btn primary" onClick={() => {
+                                const newConfig = {...localConfig, force_add_enabled: true, force_add_required: 5};
+                                setLocalConfig(newConfig);
+                                saveBoostConfig(chatId, newConfig);
+                            }}>
+                                🚀 Quick Setup — takes 30 seconds
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    {/* Master Toggle */}
+                    <div className="card">
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <h3>⚡ Member Booster</h3>
+                                <p style={{color: 'var(--text-dim)', fontSize: '13px'}}>Require invites before members can chat</p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={localConfig.force_add_enabled || false}
+                                    onChange={(e) => handleChange('force_add_enabled', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Invite Requirement */}
+                    <div className="card">
+                        <h4>📋 Invite Requirement</h4>
+                        
+                        <div style={{marginBottom: '15px'}}>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Invites required</label>
+                            <div className="stepper">
+                                <button onClick={() => handleChange('force_add_required', Math.max(1, (localConfig.force_add_required || 5) - 1))}>−</button>
+                                <span>{localConfig.force_add_required || 5}</span>
+                                <button onClick={() => handleChange('force_add_required', Math.min(100, (localConfig.force_add_required || 5) + 1))}>+</button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Action on join</label>
+                            {[
+                                {value: 'mute', label: '🔇 Mute until complete'},
+                                {value: 'restrict_media', label: '🚫 Restrict media only'},
+                                {value: 'kick', label: '👢 Kick if zero after 1h'}
+                            ].map(opt => (
+                                <label key={opt.value} style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px', cursor:'pointer'}}>
+                                    <input 
+                                        type="radio" 
+                                        name="action"
+                                        checked={localConfig.force_add_action === opt.value}
+                                        onChange={() => handleChange('force_add_action', opt.value)}
+                                    />
+                                    {opt.label}
+                                </label>
+                            ))}
+                        </div>
+
+                        <div style={{marginTop: '15px'}}>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Progress bar style</label>
+                            <div className="style-picker">
+                                {['blocks', 'dots', 'emoji', 'numbers'].map(style => (
+                                    <div 
+                                        key={style}
+                                        className={`style-option ${localConfig.force_add_progress_style === style ? 'selected' : ''}`}
+                                        onClick={() => handleChange('force_add_progress_style', style)}
+                                    >
+                                        {style === 'blocks' ? '████░░' : style === 'dots' ? '●●●○○' : style === 'emoji' ? '🟩🟩⬜' : '3/5'}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Exemptions */}
+                    <div className="card">
+                        <h4>🛡️ Exemptions</h4>
+                        <div className="toggle-item">
+                            <div className="toggle-info">
+                                <h4>Exempt admins</h4>
+                                <p>Admins don't need to boost</p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={localConfig.exempt_admins !== false}
+                                    onChange={(e) => handleChange('exempt_admins', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Manual Add Credits */}
+                    <div className="card">
+                        <h4>📝 Manual Add Credits</h4>
+                        <div className="toggle-item">
+                            <div className="toggle-info">
+                                <h4>Allow credit requests</h4>
+                                <p>Members can claim credit for contact adds</p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={localConfig.manual_add_credit_enabled !== false}
+                                    onChange={(e) => handleChange('manual_add_credit_enabled', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                        <div className="toggle-item">
+                            <div className="toggle-info">
+                                <h4>Auto-detect manual adds</h4>
+                                <p>Notify when someone joins without link</p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={localConfig.manual_add_auto_detect !== false}
+                                    onChange={(e) => handleChange('manual_add_auto_detect', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                        <div className="toggle-item">
+                            <div className="toggle-info">
+                                <h4>Witness mode</h4>
+                                <p>DM new members asking who invited them</p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={localConfig.manual_add_witness_mode || false}
+                                    onChange={(e) => handleChange('manual_add_witness_mode', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Messages */}
+                    <div className="card">
+                        <h4>💬 Messages</h4>
+                        <div style={{marginBottom: '15px'}}>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Boost message</label>
+                            <textarea 
+                                className="input-field"
+                                rows={4}
+                                value={localConfig.force_add_message || ''}
+                                onChange={(e) => handleChange('force_add_message', e.target.value)}
+                            />
+                            <div style={{marginTop:'8px'}}>
+                                {['{first_name}', '{required}', '{current}', '{remaining}', '{link}', '{bar}'].map(v => (
+                                    <span 
+                                        key={v} 
+                                        onClick={() => handleChange('force_add_message', (localConfig.force_add_message || '') + v)}
+                                        style={{fontSize:'10px', background:'var(--card-border)', padding:'2px 5px', borderRadius:'3px', cursor:'pointer', marginRight:'5px'}}
+                                    >
+                                        {v}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Unlock message</label>
+                            <textarea 
+                                className="input-field"
+                                rows={2}
+                                value={localConfig.force_add_unlock_message || ''}
+                                onChange={(e) => handleChange('force_add_unlock_message', e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <div className="value">{stats.locked_count || 0}</div>
+                            <div className="label">🔒 Locked</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="value">{stats.unlocked_count || 0}</div>
+                            <div className="label">✅ Unlocked</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="value">{stats.exempted_count || 0}</div>
+                            <div className="label">⭐ Exempted</div>
+                        </div>
+                    </div>
+
+                    {/* Leaderboard */}
+                    {stats.top_inviters && stats.top_inviters.length > 0 && (
+                        <div className="card">
+                            <h4>🏆 Top Inviters</h4>
+                            {stats.top_inviters.slice(0, 5).map((inviter, i) => (
+                                <div key={inviter.user_id} className="leaderboard-item">
+                                    <span className={`rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}`}>
+                                        {i+1}
+                                    </span>
+                                    <span className="name">@{inviter.username || inviter.first_name || 'Unknown'}</span>
+                                    <span className="count">{inviter.total_invites || 0}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <button 
+                        className="action-btn primary" 
+                        style={{width:'100%', marginTop:'20px'}}
+                        onClick={handleSave}
+                        disabled={loading}
+                    >
+                        {loading ? <LoadingSpinner/> : '💾 Save Boost Settings'}
+                    </button>
+                </div>
+            );
+        };
+
+        // --- Channel Gate Configuration Component ---
+        const ChannelGate = () => {
+            const chatId = useStore(state => state.activeGroupId);
+            const config = useStore(state => state.channelConfig);
+            const stats = useStore(state => state.channelStats);
+            const loading = useStore(state => state.channelLoading);
+            const fetchChannelConfig = useStore(state => state.fetchChannelConfig);
+            const fetchChannelStats = useStore(state => state.fetchChannelStats);
+            const saveChannelConfig = useStore(state => state.saveChannelConfig);
+
+            const [localConfig, setLocalConfig] = useState({});
+            const [channelInput, setChannelInput] = useState('');
+
+            useEffect(() => {
+                if (chatId) {
+                    fetchChannelConfig(chatId);
+                    fetchChannelStats(chatId);
+                }
+            }, [chatId]);
+
+            useEffect(() => {
+                setLocalConfig(config);
+                setChannelInput(config.force_channel_username || '');
+            }, [config]);
+
+            const handleChange = (key, value) => {
+                setLocalConfig(prev => ({ ...prev, [key]: value }));
+            };
+
+            const handleSave = () => {
+                saveChannelConfig(chatId, localConfig);
+            };
+
+            const handleLinkChannel = async () => {
+                if (!channelInput) return;
+                const newConfig = {
+                    ...localConfig,
+                    force_channel_enabled: true,
+                    force_channel_username: channelInput.startsWith('@') ? channelInput.slice(1) : channelInput
+                };
+                setLocalConfig(newConfig);
+                saveChannelConfig(chatId, newConfig);
+            };
+
+            const handleUnlink = () => {
+                const newConfig = {
+                    ...localConfig,
+                    force_channel_enabled: false,
+                    force_channel_id: null,
+                    force_channel_username: null
+                };
+                setLocalConfig(newConfig);
+                saveChannelConfig(chatId, newConfig);
+            };
+
+            if (!localConfig.force_channel_enabled && !localConfig.force_channel_id) {
+                return (
+                    <div>
+                        <div className="card">
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <div>
+                                    <h3>📢 Force Join Channel</h3>
+                                    <p style={{color: 'var(--text-dim)', fontSize:'13px'}}>Require channel membership to chat</p>
+                                </div>
+                                <label className="switch">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={localConfig.force_channel_enabled || false}
+                                        onChange={(e) => handleChange('force_channel_enabled', e.target.checked)}
+                                    />
+                                    <span className="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="card" style={{textAlign:'center', padding:'40px'}}>
+                            <h3>Link a Channel</h3>
+                            <input 
+                                className="input-field" 
+                                placeholder="@channel or -100123456789"
+                                value={channelInput}
+                                onChange={(e) => setChannelInput(e.target.value)}
+                                style={{marginBottom:'15px'}}
+                            />
+                            <button className="action-btn primary" onClick={handleLinkChannel}>
+                                🔗 Link Channel
+                            </button>
+                            <p style={{fontSize:'12px', color:'var(--text-dim)', marginTop:'15px'}}>
+                                Bot must be admin of the channel to verify memberships
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    {/* Master Toggle */}
+                    <div className="card">
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <h3>📢 Force Join Channel</h3>
+                                <p style={{color: 'var(--text-dim)', fontSize: '13px'}}>Require channel membership to chat</p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={localConfig.force_channel_enabled || false}
+                                    onChange={(e) => handleChange('force_channel_enabled', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Channel Card */}
+                    <div className="channel-card">
+                        <div className="channel-name">@{localConfig.force_channel_username || 'Not set'}</div>
+                        <div className="channel-id">ID: {localConfig.force_channel_id || '—'}</div>
+                        <div className="actions">
+                            <button className="action-btn secondary" onClick={handleUnlink}>✕ Remove</button>
+                        </div>
+                    </div>
+
+                    {/* Enforcement */}
+                    <div className="card">
+                        <h4>⚖️ Enforcement</h4>
+                        {[
+                            {value: 'restrict', label: '🔇 Restrict (can\'t send)'},
+                            {value: 'delete_only', label: '🗑️ Delete messages only'},
+                            {value: 'kick', label: '👢 Kick if not joined'},
+                            {value: 'silent', label: '🤫 Silent restrict'}
+                        ].map(opt => (
+                            <label key={opt.value} style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px', cursor:'pointer'}}>
+                                <input 
+                                    type="radio" 
+                                    name="channel_action"
+                                    checked={localConfig.force_channel_action === opt.value}
+                                    onChange={() => handleChange('force_channel_action', opt.value)}
+                                />
+                                {opt.label}
+                            </label>
+                        ))}
+                    </div>
+
+                    {/* Message */}
+                    <div className="card">
+                        <h4>💬 Gate Message</h4>
+                        <textarea 
+                            className="input-field"
+                            rows={3}
+                            value={localConfig.force_channel_message || ''}
+                            onChange={(e) => handleChange('force_channel_message', e.target.value)}
+                        />
+                    </div>
+
+                    {/* Exemptions */}
+                    <div className="card">
+                        <div className="toggle-item">
+                            <div className="toggle-info">
+                                <h4>Exempt admins</h4>
+                                <p>Admins don't need to join channel</p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={localConfig.exempt_admins !== false}
+                                    onChange={(e) => handleChange('exempt_admins', e.target.checked)}
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="stats-grid">
+                        <div className="stat-card">
+                            <div className="value">{stats.pending_count || 0}</div>
+                            <div className="label">⏳ Pending</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="value">{stats.verified_count || 0}</div>
+                            <div className="label">✅ Verified</div>
+                        </div>
+                        <div className="stat-card">
+                            <div className="value">{stats.avg_verify_seconds || 0}s</div>
+                            <div className="label">📊 Avg Time</div>
+                        </div>
+                    </div>
+
+                    <button 
+                        className="action-btn primary" 
+                        style={{width:'100%', marginTop:'20px'}}
+                        onClick={handleSave}
+                        disabled={loading}
+                    >
+                        {loading ? <LoadingSpinner/> : '💾 Save Channel Settings'}
+                    </button>
+                </div>
+            );
+        };
+
         const Manage = () => {
             const [activeSubTab, setActiveSubTab] = useState("greetings");
             const [text, setText] = useState("");
@@ -560,30 +1213,38 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ [activeSubTab]: text })
                 });
-                showToast("Saved!");
+                showToast("Saved!", true);
             };
 
             return (
                 <div>
-                    <div className="card" style={{display:'flex', gap:'10px', marginBottom:'10px', padding:'10px'}}>
-                        <button onClick={() => setActiveSubTab("welcome")} style={{background: activeSubTab==='welcome'?'var(--accent)':'none', border:'none', color:'#fff', padding:'5px 10px', borderRadius:'5px'}}>Welcome</button>
-                        <button onClick={() => setActiveSubTab("goodbye")} style={{background: activeSubTab==='goodbye'?'var(--accent)':'none', border:'none', color:'#fff', padding:'5px 10px', borderRadius:'5px'}}>Goodbye</button>
-                        <button onClick={() => setActiveSubTab("rules")} style={{background: activeSubTab==='rules'?'var(--accent)':'none', border:'none', color:'#fff', padding:'5px 10px', borderRadius:'5px'}}>Rules</button>
+                    <div className="sub-tabs">
+                        <button className={`sub-tab ${activeSubTab==='welcome'?'active':''}`} onClick={() => setActiveSubTab("welcome")}>Welcome</button>
+                        <button className={`sub-tab ${activeSubTab==='goodbye'?'active':''}`} onClick={() => setActiveSubTab("goodbye")}>Goodbye</button>
+                        <button className={`sub-tab ${activeSubTab==='rules'?'active':''}`} onClick={() => setActiveSubTab("rules")}>Rules</button>
+                        <button className={`sub-tab ${activeSubTab==='boost'?'active':''}`} onClick={() => setActiveSubTab("boost")}>⚡ Boost</button>
+                        <button className={`sub-tab ${activeSubTab==='channel'?'active':''}`} onClick={() => setActiveSubTab("channel")}>📢 Channel</button>
                     </div>
-                    <div className="card">
-                        <h4>Edit {activeSubTab}</h4>
-                        <textarea 
-                            style={{width:'100%', height:'150px', background:'rgba(0,0,0,0.2)', border:'1px solid var(--card-border)', borderRadius:'8px', color:'#fff', padding:'10px'}}
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                        />
-                        <div style={{marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'5px'}}>
-                            {['{first}', '{fullname}', '{username}', '{mention}', '{chatname}'].map(v => (
-                                <span key={v} onClick={() => setText(text + v)} style={{fontSize:'10px', background:'var(--card-border)', padding:'2px 5px', borderRadius:'3px', cursor:'pointer'}}>{v}</span>
-                            ))}
+                    
+                    {activeSubTab === 'boost' && <BoostConfig />}
+                    {activeSubTab === 'channel' && <ChannelGate />}
+                    
+                    {activeSubTab !== 'boost' && activeSubTab !== 'channel' && (
+                        <div className="card">
+                            <h4>Edit {activeSubTab}</h4>
+                            <textarea 
+                                style={{width:'100%', height:'150px', background:'rgba(0,0,0,0.2)', border:'1px solid var(--card-border)', borderRadius:'8px', color:'#fff', padding:'10px'}}
+                                value={text}
+                                onChange={(e) => setText(e.target.value)}
+                            />
+                            <div style={{marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'5px'}}>
+                                {['{first}', '{fullname}', '{username}', '{mention}', '{chatname}'].map(v => (
+                                    <span key={v} onClick={() => setText(text + v)} style={{fontSize:'10px', background:'var(--card-border)', padding:'2px 5px', borderRadius:'3px', cursor:'pointer'}}>{v}</span>
+                                ))}
+                            </div>
+                            <button onClick={saveConfig} style={{marginTop:'20px', width:'100%', padding:'12px', background:'var(--accent)', border:'none', borderRadius:'8px', fontWeight:'bold'}}>Save Changes</button>
                         </div>
-                        <button onClick={saveConfig} style={{marginTop:'20px', width:'100%', padding:'12px', background:'var(--accent)', border:'none', borderRadius:'8px', fontWeight:'bold'}}>Save Changes</button>
-                    </div>
+                    )}
                 </div>
             );
         };

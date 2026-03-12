@@ -325,3 +325,123 @@ async def get_all_active_queues(pool: asyncpg.Pool) -> List[Dict]:
             "SELECT * FROM music_queues WHERE queue::text != '[]'::text OR current_track IS NOT NULL"
         )
         return [dict(row) for row in rows]
+
+
+# Aliases and missing functions for API compatibility
+
+# Aliases for import compatibility
+set_repeat = set_repeat_mode
+set_shuffle = set_shuffle_mode
+
+
+async def add_to_queue(pool: asyncpg.Pool, chat_id: int, track: Dict):
+    """Add a track to the queue"""
+    queue_data = await get_or_create_queue(pool, chat_id)
+    queue = queue_data.get('queue', []) or []
+    queue.append(track)
+    await update_queue(
+        pool, chat_id, queue,
+        current_track=queue_data.get('current_track'),
+        is_playing=queue_data.get('is_playing', False)
+    )
+
+
+async def get_queue(pool: asyncpg.Pool, chat_id: int) -> List[Dict]:
+    """Get queue for a chat"""
+    queue_data = await get_or_create_queue(pool, chat_id)
+    return queue_data.get('queue', []) or []
+
+
+async def skip_track(pool: asyncpg.Pool, chat_id: int) -> Optional[Dict]:
+    """Skip current track and return next track"""
+    queue_data = await get_or_create_queue(pool, chat_id)
+    queue = queue_data.get('queue', []) or []
+    next_track = queue.pop(0) if queue else None
+    await update_queue(
+        pool, chat_id, queue,
+        current_track=next_track,
+        is_playing=next_track is not None
+    )
+    return next_track
+
+
+async def pause_track(pool: asyncpg.Pool, chat_id: int):
+    """Pause current track"""
+    queue_data = await get_or_create_queue(pool, chat_id)
+    await update_queue(
+        pool, chat_id, queue_data.get('queue', []) or [],
+        current_track=queue_data.get('current_track'),
+        is_playing=False
+    )
+
+
+async def resume_track(pool: asyncpg.Pool, chat_id: int):
+    """Resume current track"""
+    queue_data = await get_or_create_queue(pool, chat_id)
+    await update_queue(
+        pool, chat_id, queue_data.get('queue', []) or [],
+        current_track=queue_data.get('current_track'),
+        is_playing=True
+    )
+
+
+async def get_current_track(pool: asyncpg.Pool, chat_id: int) -> Optional[Dict]:
+    """Get current playing track"""
+    queue_data = await get_or_create_queue(pool, chat_id)
+    return queue_data.get('current_track')
+
+
+async def get_player_state(pool: asyncpg.Pool, chat_id: int) -> Dict:
+    """Get full player state for a chat"""
+    queue_data = await get_or_create_queue(pool, chat_id)
+    return {
+        'current_track': queue_data.get('current_track'),
+        'queue': queue_data.get('queue', []) or [],
+        'is_playing': queue_data.get('is_playing', False),
+        'volume': queue_data.get('volume', 100),
+        'repeat_mode': queue_data.get('repeat_mode', 'none'),
+        'shuffle_mode': queue_data.get('shuffle_mode', False),
+    }
+
+
+async def add_to_playlist(
+    pool: asyncpg.Pool,
+    chat_id: int,
+    playlist_name: str,
+    track: Dict
+):
+    """Add a track to a playlist"""
+    playlist = await get_playlist(pool, chat_id, playlist_name)
+    if not playlist:
+        raise ValueError(f"Playlist '{playlist_name}' not found")
+
+    tracks = playlist.get('tracks', []) or []
+    tracks.append(track)
+    await update_playlist(pool, chat_id, playlist_name, tracks)
+
+
+async def get_playlist_tracks(pool: asyncpg.Pool, chat_id: int, playlist_name: str) -> List[Dict]:
+    """Get tracks from a playlist"""
+    playlist = await get_playlist(pool, chat_id, playlist_name)
+    return playlist.get('tracks', []) if playlist else []
+
+
+async def search_youtube(query: str) -> List[Dict]:
+    """Search YouTube for tracks (placeholder - requires yt-dlp integration)"""
+    # This is a placeholder - actual implementation would use yt-dlp
+    logger.warning("search_youtube called but not fully implemented")
+    return []
+
+
+async def play_youtube(pool: asyncpg.Pool, chat_id: int, url: str, requested_by: int) -> Dict:
+    """Play a YouTube URL (placeholder - requires yt-dlp integration)"""
+    # This is a placeholder - actual implementation would use yt-dlp
+    logger.warning("play_youtube called but not fully implemented")
+    track = {
+        'title': 'Unknown',
+        'url': url,
+        'requested_by': requested_by,
+        'duration': 0,
+    }
+    await add_to_queue(pool, chat_id, track)
+    return track

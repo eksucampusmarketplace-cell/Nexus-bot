@@ -1,0 +1,476 @@
+"""
+db/ops/automod.py
+
+All database operations for advanced automod features.
+"""
+
+from db.client import db
+
+
+# ── Rule Time Windows ───────────────────────────────────────────────────────
+
+async def get_rule_time_windows(pool, chat_id: int) -> dict:
+    """Get all time windows as dict {rule_key: {start, end, is_active}}."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT rule_key, start_time, end_time, is_active "
+            "FROM rule_time_windows WHERE chat_id=$1",
+            chat_id
+        )
+    return {row["rule_key"]: dict(row) for row in rows}
+
+
+async def set_rule_time_window(pool, chat_id: int, rule_key: str,
+                           start_time: str, end_time: str):
+    """Set or update time window for a rule."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO rule_time_windows (chat_id, rule_key, start_time, end_time)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (chat_id, rule_key)
+            DO UPDATE SET start_time = EXCLUDED.start_time,
+                        end_time = EXCLUDED.end_time,
+                        is_active = TRUE
+            """,
+            chat_id, rule_key, start_time, end_time
+        )
+
+
+async def remove_rule_time_window(pool, chat_id: int, rule_key: str):
+    """Remove time window for a rule."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM rule_time_windows WHERE chat_id=$1 AND rule_key=$2",
+            chat_id, rule_key
+        )
+
+
+# ── Rule Penalties ───────────────────────────────────────────────────────
+
+async def get_rule_penalties(pool, chat_id: int) -> dict:
+    """Get all penalties as dict {rule_key: {penalty, duration_hours}}."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT rule_key, penalty, duration_hours "
+            "FROM rule_penalties WHERE chat_id=$1",
+            chat_id
+        )
+    return {row["rule_key"]: dict(row) for row in rows}
+
+
+async def set_rule_penalty(pool, chat_id: int, rule_key: str,
+                        penalty: str, duration_hours: int = 0):
+    """Set or update penalty for a rule."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO rule_penalties (chat_id, rule_key, penalty, duration_hours)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (chat_id, rule_key)
+            DO UPDATE SET penalty = EXCLUDED.penalty,
+                        duration_hours = EXCLUDED.duration_hours
+            """,
+            chat_id, rule_key, penalty, duration_hours
+        )
+
+
+async def remove_rule_penalty(pool, chat_id: int, rule_key: str):
+    """Remove custom penalty for a rule (fall back to default)."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM rule_penalties WHERE chat_id=$1 AND rule_key=$2",
+            chat_id, rule_key
+        )
+
+
+# ── Silent Times ──────────────────────────────────────────────────────────
+
+async def get_silent_times(pool, chat_id: int) -> list:
+    """Get all silent time slots for a chat."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT slot, start_time, end_time, is_active, start_text, end_text "
+            "FROM silent_times WHERE chat_id=$1 ORDER BY slot",
+            chat_id
+        )
+    return [dict(row) for row in rows]
+
+
+async def upsert_silent_time(pool, chat_id: int, slot: int,
+                           start_time: str, end_time: str,
+                           is_active: bool = True,
+                           start_text: str = "", end_text: str = ""):
+    """Set or update a silent time slot."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO silent_times
+                (chat_id, slot, start_time, end_time, is_active, start_text, end_text)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (chat_id, slot)
+            DO UPDATE SET start_time = EXCLUDED.start_time,
+                        end_time = EXCLUDED.end_time,
+                        is_active = EXCLUDED.is_active,
+                        start_text = EXCLUDED.start_text,
+                        end_text = EXCLUDED.end_text
+            """,
+            chat_id, slot, start_time, end_time, is_active, start_text, end_text
+        )
+
+
+async def disable_silent_time(pool, chat_id: int, slot: int):
+    """Disable a specific silent time slot."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE silent_times SET is_active=FALSE WHERE chat_id=$1 AND slot=$2",
+            chat_id, slot
+        )
+
+
+async def clear_all_silent_times(pool, chat_id: int):
+    """Delete all silent time slots for a chat."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM silent_times WHERE chat_id=$1",
+            chat_id
+        )
+
+
+# ── Message Hashes (Duplicate Detection) ─────────────────────────────
+
+async def record_message_hash(pool, chat_id: int, msg_hash: str, user_id: int):
+    """Record a message hash for duplicate detection."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO message_hashes (chat_id, msg_hash, user_id) "
+            "VALUES ($1, $2, $3)",
+            chat_id, msg_hash, user_id
+        )
+
+
+async def get_recent_hash_count(pool, chat_id: int, msg_hash: str,
+                             window_mins: int) -> int:
+    """Count how many times this hash appeared in the time window."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT COUNT(*) FROM message_hashes
+            WHERE chat_id=$1 AND msg_hash=$2
+            AND sent_at > NOW() - INTERVAL '1 minute' * $3
+            """,
+            chat_id, msg_hash, window_mins
+        )
+    return row["count"] if row else 0
+
+
+async def cleanup_old_hashes(pool, days: int = 7):
+    """Clean up old message hashes (run periodically)."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM message_hashes WHERE sent_at < NOW() - INTERVAL '1 day' * $1",
+            days
+        )
+
+
+# ── REGEX Patterns ────────────────────────────────────────────────────────
+
+async def get_regex_patterns(pool, chat_id: int) -> list:
+    """Get all REGEX patterns for a chat."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT id, pattern, penalty, is_active "
+            "FROM regex_patterns WHERE chat_id=$1 ORDER BY created_at",
+            chat_id
+        )
+    return [dict(row) for row in rows]
+
+
+async def add_regex_pattern(pool, chat_id: int, pattern: str,
+                         penalty: str = "delete"):
+    """Add a REGEX pattern."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO regex_patterns (chat_id, pattern, penalty) "
+            "VALUES ($1, $2, $3)",
+            chat_id, pattern, penalty
+        )
+
+
+async def remove_regex_pattern(pool, chat_id: int, pattern: str):
+    """Remove a REGEX pattern by pattern string."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM regex_patterns WHERE chat_id=$1 AND pattern=$2",
+            chat_id, pattern
+        )
+
+
+async def toggle_regex_pattern(pool, chat_id: int, pattern: str, is_active: bool):
+    """Enable/disable a REGEX pattern."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE regex_patterns SET is_active=$1 "
+            "WHERE chat_id=$2 AND pattern=$3",
+            is_active, chat_id, pattern
+        )
+
+
+# ── Necessary Words ────────────────────────────────────────────────────────
+
+async def get_necessary_words(pool, chat_id: int) -> list:
+    """Get list of necessary words for a chat."""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT word FROM necessary_words "
+            "WHERE chat_id=$1 AND is_active=TRUE ORDER BY word",
+            chat_id
+        )
+    return [row["word"] for row in rows]
+
+
+async def add_necessary_word(pool, chat_id: int, word: str):
+    """Add a necessary word."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO necessary_words (chat_id, word)
+            VALUES ($1, $2)
+            ON CONFLICT (chat_id, word)
+            DO UPDATE SET is_active=TRUE
+            """,
+            chat_id, word
+        )
+
+
+async def remove_necessary_word(pool, chat_id: int, word: str):
+    """Remove a necessary word."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM necessary_words WHERE chat_id=$1 AND word=$2",
+            chat_id, word
+        )
+
+
+async def clear_necessary_words(pool, chat_id: int):
+    """Clear all necessary words for a chat."""
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "DELETE FROM necessary_words WHERE chat_id=$1",
+            chat_id
+        )
+
+
+# ── Rule Priority ────────────────────────────────────────────────────────
+
+async def get_rule_priority(pool, chat_id: int) -> list:
+    """Get rule evaluation order as list."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT rule_order FROM rule_priority WHERE chat_id=$1",
+            chat_id
+        )
+    return row["rule_order"] if row else []
+
+
+async def save_rule_priority(pool, chat_id: int, rule_order: list):
+    """Save rule evaluation order."""
+    import json
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO rule_priority (chat_id, rule_order)
+            VALUES ($1, $2::jsonb)
+            ON CONFLICT (chat_id)
+            DO UPDATE SET rule_order = EXCLUDED.rule_order, updated_at = NOW()
+            """,
+            chat_id, json.dumps(rule_order)
+        )
+
+
+# ── Group Settings Helpers ───────────────────────────────────────────────
+
+async def update_group_setting(pool, chat_id: int, key: str, value):
+    """Update a single setting in group_settings."""
+    import json
+    async with pool.acquire() as conn:
+        # Get current settings
+        row = await conn.fetchrow(
+            "SELECT settings FROM groups WHERE chat_id=$1",
+            chat_id
+        )
+        if not row or not row["settings"]:
+            settings = {}
+        elif isinstance(row["settings"], str):
+            try:
+                settings = json.loads(row["settings"])
+            except:
+                settings = {}
+        else:
+            settings = dict(row["settings"]) or {}
+
+        # Update nested key
+        if "." in key:
+            parts = key.split(".")
+            d = settings
+            for p in parts[:-1]:
+                if p not in d:
+                    d[p] = {}
+                d = d[p]
+            d[parts[-1]] = value
+        else:
+            settings[key] = value
+
+        # Save back
+        await conn.execute(
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id=$2",
+            json.dumps(settings), chat_id
+        )
+
+
+async def bulk_update_group_settings(pool, chat_id: int, settings: dict):
+    """Bulk update multiple settings."""
+    import json
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT settings FROM groups WHERE chat_id=$1",
+            chat_id
+        )
+        if not row or not row["settings"]:
+            current = {}
+        elif isinstance(row["settings"], str):
+            try:
+                current = json.loads(row["settings"])
+            except:
+                current = {}
+        else:
+            current = dict(row["settings"]) or {}
+
+        # Merge settings
+        def deep_merge(base, new):
+            result = dict(base) if base else {}
+            for k, v in new.items():
+                if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+                    result[k] = deep_merge(result[k], v)
+                else:
+                    result[k] = v
+            return result
+
+        current = deep_merge(current, settings)
+
+        await conn.execute(
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id=$2",
+            json.dumps(current), chat_id
+        )
+
+
+# ── Timed Locks ──────────────────────────────────────────────────────────
+
+async def set_timed_lock(pool, chat_id: int, rule_key: str,
+                       start_time: str, end_time: str):
+    """Set a timed lock in the timed_locks JSONB."""
+    import json
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT settings FROM groups WHERE chat_id=$1",
+            chat_id
+        )
+        if not row or not row["settings"]:
+            settings = {}
+        elif isinstance(row["settings"], str):
+            try:
+                settings = json.loads(row["settings"])
+            except:
+                settings = {}
+        else:
+            settings = dict(row["settings"]) or {}
+
+        timed_locks = settings.get("timed_locks", {})
+        timed_locks[rule_key] = {"start": start_time, "end": end_time}
+        settings["timed_locks"] = timed_locks
+
+        await conn.execute(
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id=$2",
+            json.dumps(settings), chat_id
+        )
+
+
+async def remove_timed_lock(pool, chat_id: int, rule_key: str):
+    """Remove a timed lock."""
+    import json
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT settings FROM groups WHERE chat_id=$1",
+            chat_id
+        )
+        if not row or not row["settings"]:
+            return
+
+        if isinstance(row["settings"], str):
+            try:
+                settings = json.loads(row["settings"])
+            except:
+                return
+        else:
+            settings = dict(row["settings"]) or {}
+
+        timed_locks = settings.get("timed_locks", {})
+        if rule_key in timed_locks:
+            del timed_locks[rule_key]
+            settings["timed_locks"] = timed_locks
+
+        await conn.execute(
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id=$2",
+            json.dumps(settings), chat_id
+        )
+
+
+# ── Whitelist ────────────────────────────────────────────────────────────
+
+async def get_whitelist(pool, chat_id: int) -> list:
+    """Get whitelist of user IDs exempt from automod."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT settings->'automod'->'whitelist' as whitelist
+            FROM groups WHERE chat_id=$1
+            """,
+            chat_id
+        )
+    if row and row["whitelist"]:
+        return list(row["whitelist"])
+    return []
+
+
+# ── Warning Tracking ─────────────────────────────────────────────────────
+
+async def get_user_warning_count(pool, chat_id: int, user_id: int) -> int:
+    """Count user's active warnings."""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            SELECT COUNT(*) FROM user_warnings
+            WHERE chat_id=$1 AND user_id=$2
+            AND created_at > NOW() - INTERVAL '7 days'
+            """,
+            chat_id, user_id
+        )
+    return row["count"] if row else 0
+
+
+async def get_group_settings(pool, chat_id: int) -> dict:
+    """Get full settings dict for a group."""
+    import json
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT settings FROM groups WHERE chat_id=$1",
+            chat_id
+        )
+    if not row:
+        return {}
+    if isinstance(row["settings"], str):
+        try:
+            return json.loads(row["settings"])
+        except:
+            return {}
+    return dict(row["settings"]) or {}

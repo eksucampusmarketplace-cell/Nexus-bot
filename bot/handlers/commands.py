@@ -41,7 +41,12 @@ def get_token_hash(token: str) -> str:
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
-    url = f"{settings.RENDER_EXTERNAL_URL}/webapp"
+    url = settings.mini_app_url
+    if not url:
+        await update.message.reply_text(
+            "👋 I'm Nexus. Add me to a group and make me admin to start!\n\nMini App is not configured."
+        )
+        return
     await update.message.reply_text(
         "👋 I'm Nexus. Add me to a group and make me admin to start!\n\nUse the panel below to manage your group settings:",
         reply_markup={
@@ -51,7 +56,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
-    url = f"{settings.webhook_url}/webapp"
+    url = settings.mini_app_url or f"{settings.webhook_url}/webapp"
     help_text = """<b>📚 Available Commands</b>
 
 <b>Basic:</b>
@@ -105,7 +110,10 @@ Manage your group settings via the web panel."""
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
-    url = f"{settings.webhook_url}/webapp"
+    url = settings.mini_app_url
+    if not url:
+        await update.message.reply_text("Mini App is not configured. Please set MINI_APP_URL or RENDER_EXTERNAL_URL.")
+        return
     await update.message.reply_text(
         "Open the management panel:",
         reply_markup={

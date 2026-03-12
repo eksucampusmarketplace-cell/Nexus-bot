@@ -29,7 +29,7 @@ def support_keyboard(
 
     # Mini App button (if configured) - shown first as primary action
     if include_miniapp:
-        url = miniapp_url or settings.MINI_APP_URL
+        url = miniapp_url or settings.mini_app_url
         if url:
             buttons.append([InlineKeyboardButton(
                 "⚡ Open Mini App",
@@ -57,12 +57,12 @@ def mini_app_keyboard(miniapp_url: str | None = None) -> InlineKeyboardMarkup:
     Simple Mini App keyboard - single button to open the settings webapp.
 
     Args:
-        miniapp_url: URL to open Mini App (falls back to settings.MINI_APP_URL)
+        miniapp_url: URL to open Mini App (falls back to settings.mini_app_url)
 
     Returns:
         InlineKeyboardMarkup with single Mini App button
     """
-    url = miniapp_url or settings.MINI_APP_URL
+    url = miniapp_url or settings.mini_app_url
     if not url:
         # Fall back to support keyboard if no miniapp URL
         return support_keyboard()

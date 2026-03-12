@@ -60,7 +60,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Get miniapp URL for this bot if configured
-        miniapp_url = settings.MINI_APP_URL  # from existing config
+        miniapp_url = settings.mini_app_url  # auto-constructed from RENDER_EXTERNAL_URL or MINI_APP_URL
 
         await update.message.reply_text(
             text=msg,

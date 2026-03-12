@@ -379,10 +379,11 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        try {
         const { useState, useEffect, useMemo, useRef, useSyncExternalStore } = React;
 
         // Simple Zustand-like store implementation using React's useSyncExternalStore
-        function create(createState) {
+        const createStore = function(createStateFn) {
             const listeners = new Set();
             let state;
             const setState = (partial) => {
@@ -399,7 +400,7 @@
                 return () => listeners.delete(listener);
             };
             const api = { setState, getState, subscribe };
-            state = createState(setState, getState, api);
+            state = createStateFn(setState, getState, api);
 
             // Create bound hook that uses this specific api
             const useBoundStore = (selector = (s) => s) => {
@@ -413,10 +414,10 @@
             // Attach store methods to the hook
             Object.assign(useBoundStore, api);
             return useBoundStore;
-        }
+        };
 
         // ZUSTAND STORE
-        const useStore = create((set, get) => ({
+        const useStore = createStore((set, get) => ({
             userContext: { user: null, role: null, adminGroups: [], modGroups: [], memberGroups: [], botInfo: null, supportGroup: null, isLoading: true, error: null },
             memberStats: {}, memberRankings: {}, memberInviteLinks: {},
             activeBotId: null, activeGroupId: null, activeGroupTitle: "Loading Group...",
@@ -1186,6 +1187,10 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+        } catch (e) {
+            console.error('Failed to initialize React app:', e);
+            document.getElementById('root').innerHTML = '<div style="padding: 20px; color: white; text-align: center;"><h2>Error loading app</h2><p>' + e.message + '</p></div>';
+        }
     </script>
     <div id="toast" className="toast"></div>
 </body>

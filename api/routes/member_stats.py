@@ -65,8 +65,9 @@ async def get_member_group_stats(
     # Get group settings for warn limit
     group = await get_group(chat_id)
     warn_limit = 3
-    if group and group.get('settings'):
-        warn_limit = group['settings'].get('warnings', {}).get('threshold', 3)
+    if group:
+        group_settings = group.get('settings') or {}
+        warn_limit = group_settings.get('warnings', {}).get('threshold', 3)
 
     return {
         "invited_count": invited_count,
@@ -282,8 +283,8 @@ async def get_group_rules(
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    settings = group.get('settings', {})
-    rules = settings.get('rules', [])
+    group_settings = group.get('settings') or {}
+    rules = group_settings.get('rules', [])
 
     return {
         "chat_id": chat_id,

@@ -11,9 +11,8 @@
  *   useStore.setState({ key: value });
  */
 
-// Use global zustand if available from CDN
-const zustandGlobal = typeof window !== 'undefined' ? window.zustand : null;
-const createStore = zustandGlobal?.createStore || zustandGlobal?.create;
+// Use ESM import for Zustand
+import { createStore } from 'https://cdn.jsdelivr.net/npm/zustand@4.5.0/esm/vanilla.mjs';
 
 export const useStore = createStore((set, get) => ({
   // ── User & Auth ─────────────────────────────────────────

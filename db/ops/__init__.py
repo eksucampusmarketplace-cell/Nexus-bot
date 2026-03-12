@@ -2,7 +2,7 @@
 from db.ops.groups import get_group, upsert_group, update_group_settings
 from db.ops.users import add_warn, remove_warn, update_user_status, get_user
 from db.ops.logs import log_action
-from db.ops.bots import get_all_bots, get_bot, insert_bot, update_bot_status, get_bot_by_token_hash
+from db.ops.bots import get_all_active_bots, get_bot_by_id, insert_bot, update_bot_status, get_bot_by_token_hash
 from db.ops.music import (
     create_music_tables, add_to_queue, get_queue, clear_queue,
     skip_track, pause_track, resume_track, get_current_track,

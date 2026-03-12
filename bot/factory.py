@@ -33,14 +33,14 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     DO NOT call app.run_webhook() or app.run_polling().
     Updates arrive via process_update() in the /webhook/{bot_id} FastAPI route.
     """
-    
+
     from bot.utils.crypto import mask_token
     logger.info(
         f"[FACTORY] Creating application | "
         f"token={mask_token(token)} | "
         f"is_primary={is_primary}"
     )
-    
+
     app = (
         ApplicationBuilder()
         .token(token)
@@ -51,7 +51,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         .pool_timeout(30)
         .build()
     )
-    
+
     # ── Import all handlers ───────────────────────────────────────────────
     from bot.handlers.commands import (
         warn_handler, unwarn_handler, warns_handler,
@@ -84,10 +84,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         music_advanced_callback_handler
     )
     from bot.handlers.errors import error_handler as global_error_handler
-    
+
     from bot.handlers.prefix_handler import prefix_handler
     from bot.handlers.greetings import (
-        welcome_handler, goodbye_handler, 
+        welcome_handler, goodbye_handler,
         set_welcome_handler, set_goodbye_handler, set_rules_handler,
         welcome_preview_handler, goodbye_preview_handler,
         reset_welcome_handler, reset_goodbye_handler, reset_rules_handler,
@@ -101,14 +101,14 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.group_approval import group_approval_handler
     from bot.handlers.help import help_handler as nexus_help_handler, help_callback_handler
     from bot.utils.aliases import register_aliases
-    
+
     # Import booster handlers
     from bot.handlers.booster import register_handlers as register_booster_handlers
-    
+
     # Import new start_help and setmessage handlers (for all bots)
     from bot.handlers.start_help import start_handler, help_handler
     from bot.handlers.setmessage import setmessage_conversation
-    
+
     # Import alerts utility for error handling
     from bot.utils.alerts import alert_error
     from config import settings
@@ -122,7 +122,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(help_handler)   # /help from start_help.py
     app.add_handler(CommandHandler("panel", panel))
     app.add_handler(setmessage_conversation)  # /setmessage for customizing messages
-    
+
     # ── Nexus Greetings & Rules ──────────────────────────────────────────
     app.add_handler(CommandHandler("setwelcome",  set_welcome_handler,  filters=GROUP))
     app.add_handler(CommandHandler("setgoodbye",  set_goodbye_handler,  filters=GROUP))
@@ -141,11 +141,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("cancelpost",   cancel_post_handler,   filters=GROUP))
     app.add_handler(CommandHandler("editpost",     edit_post_handler,     filters=GROUP))
     app.add_handler(CommandHandler("deletepost",   delete_post_handler,   filters=GROUP))
-    
+
     # ── Moderation commands (groups only) ─────────────────────────────────
     GROUP = filters.ChatType.GROUPS
     PRIVATE = filters.ChatType.PRIVATE
-    
+
     app.add_handler(CommandHandler("warn",    warn_handler,    filters=GROUP))
     app.add_handler(CommandHandler("unwarn",  unwarn_handler,  filters=GROUP))
     app.add_handler(CommandHandler("warns",   warns_handler,   filters=GROUP))
@@ -159,7 +159,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("unlock",  unlock_handler,  filters=GROUP))
     app.add_handler(CommandHandler("pin",     pin_handler,     filters=GROUP))
     app.add_handler(CommandHandler("unpin",   unpin_handler,   filters=GROUP))
-    
+
     # ── Utility commands ──────────────────────────────────────────────────
     app.add_handler(CommandHandler("rules",   rules_handler))
     app.add_handler(CommandHandler("info",    info_handler))
@@ -167,7 +167,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("stats",   stats_handler))
     app.add_handler(CommandHandler("id",      id_handler))
     app.add_handler(CommandHandler("report",  report_handler))
-    
+
     # ── Music commands (groups only) ───────────────────────────────────────
     app.add_handler(CommandHandler("play",           play_command,           filters=GROUP))
     app.add_handler(CommandHandler("skip",           skip_command,           filters=GROUP))
@@ -190,7 +190,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("search",         search_command,         filters=GROUP))
     app.add_handler(CommandHandler("sync",           sync_command,           filters=GROUP))
     app.add_handler(CommandHandler("music_settings", music_settings_command, filters=GROUP))
-    
+
     # ── Clone commands — PRIMARY BOT ONLY ─────────────────────────────────
     if is_primary:
         from bot.handlers.clone import (
@@ -211,7 +211,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
     else:
         logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
+
     # ── Help callbacks (all bots) ─────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
 
@@ -221,19 +221,19 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── Music callbacks (all bots) ─────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
     app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
+
     # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
     app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
     app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
     app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
+
     # ── New member joins/leaves ──────────────────────────────────────────
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
+
     # Keep old captcha handler if needed, but in separate groups or combined
     # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
+
     # ── Global error handler with alert ─────────────────────────────────────
     # Group lifecycle - on ALL bots
     app.add_handler(group_lifecycle_handler)
@@ -278,7 +278,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
             pass
 
     app.add_error_handler(global_error_handler_with_alert)
-    
+
     # ── Register all aliases ──────────────────────────────────────────────
     nexus_handlers = {
         "/warn": warn_handler,
@@ -312,854 +312,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         "/deletepost": delete_post_handler,
     }
     register_aliases(app, nexus_handlers)
-    
-    # ── Member Booster handlers ──────────────────────────────────────────────
-    register_booster_handlers(app)
-    logger.info(f"[FACTORY] Booster handlers registered")
 
-    logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
-    return app
-
-
-# Keep backward compatibility
-def create_bot_app(token: str) -> Application:
-    """Legacy function - use create_application instead."""
-    return create_application(token, is_primary=False)
-),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r'^clone:'))
-        logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
-    else:
-        logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
-    # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
-
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
-    # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
-    app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
-    # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
-    app.add_handler(group_lifecycle_handler)
-
-    # Clone approval callbacks (PRIMARY bot only)
-    if is_primary:
-        app.add_handler(group_approval_handler)
-
-    async def global_error_handler_with_alert(update, context):
-        """Enhanced error handler that posts alerts to support group."""
-        import traceback
-        import logging
-        log = logging.getLogger(__name__)
-        error_str = "".join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
-        log.error(f"[ERROR] {error_str[:500]}")
-
-        # Try to get bot username for alert
-        try:
-            me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
-        except Exception:
-            pass
-
-        # Call original error handler
-        try:
-            await global_error_handler(update, context)
-        except Exception:
-            pass
-
-        # Try to notify user something went wrong
-        try:
-            if update and update.effective_message:
-                from bot.utils.messages import DEFAULTS
-                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
-        except Exception:
-            pass
-
-    app.add_error_handler(global_error_handler_with_alert)
-    
-    # ── Register all aliases ──────────────────────────────────────────────
-    nexus_handlers = {
-        "/warn": warn_handler,
-        "/unwarn": unwarn_handler,
-        "/mute": mute_handler,
-        "/unmute": unmute_handler,
-        "/ban": ban_handler,
-        "/unban": unban_handler,
-        "/kick": kick_handler,
-        "/purge": purge_handler,
-        "/pin": pin_handler,
-        "/unpin": unpin_handler,
-        "/rules": nexus_rules_handler,
-        "/info": info_handler,
-        "/stats": stats_handler,
-        "/id": id_handler,
-        "/report": report_handler,
-        "/setwelcome": set_welcome_handler,
-        "/setgoodbye": set_goodbye_handler,
-        "/setrules": set_rules_handler,
-        "/welcome": welcome_preview_handler,
-        "/goodbye": goodbye_preview_handler,
-        "/resetwelcome": reset_welcome_handler,
-        "/resetgoodbye": reset_goodbye_handler,
-        "/resetrules": reset_rules_handler,
-        "/channelpost": channel_post_handler,
-        "/schedulepost": schedule_post_handler,
-        "/approvepost": approve_post_handler,
-        "/cancelpost": cancel_post_handler,
-        "/editpost": edit_post_handler,
-        "/deletepost": delete_post_handler,
-    }
-    register_aliases(app, nexus_handlers)
-    
-    # ── Member Booster handlers ──────────────────────────────────────────────
-    register_booster_handlers(app)
-    logger.info(f"[FACTORY] Booster handlers registered")
-
-    logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
-    return app
-
-
-# Keep backward compatibility
-def create_bot_app(token: str) -> Application:
-    """Legacy function - use create_application instead."""
-    return create_application(token, is_primary=False)
-),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r'^clone:'))
-        logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
-    else:
-        logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
-    # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
-
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
-    # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
-    app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
-    # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
-    app.add_handler(group_lifecycle_handler)
-
-    # Clone approval callbacks (PRIMARY bot only)
-    if is_primary:
-        app.add_handler(group_approval_handler)
-
-    async def global_error_handler_with_alert(update, context):
-        """Enhanced error handler that posts alerts to support group."""
-        import traceback
-        import logging
-        log = logging.getLogger(__name__)
-        error_str = "".join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
-        log.error(f"[ERROR] {error_str[:500]}")
-
-        # Try to get bot username for alert
-        try:
-            me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
-        except Exception:
-            pass
-
-        # Call original error handler
-        try:
-            await global_error_handler(update, context)
-        except Exception:
-            pass
-
-        # Try to notify user something went wrong
-        try:
-            if update and update.effective_message:
-                from bot.utils.messages import DEFAULTS
-                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
-        except Exception:
-            pass
-
-    app.add_error_handler(global_error_handler_with_alert)
-    
-    # ── Register all aliases ──────────────────────────────────────────────
-    nexus_handlers = {
-        "/warn": warn_handler,
-        "/unwarn": unwarn_handler,
-        "/mute": mute_handler,
-        "/unmute": unmute_handler,
-        "/ban": ban_handler,
-        "/unban": unban_handler,
-        "/kick": kick_handler,
-        "/purge": purge_handler,
-        "/pin": pin_handler,
-        "/unpin": unpin_handler,
-        "/rules": nexus_rules_handler,
-        "/info": info_handler,
-        "/stats": stats_handler,
-        "/id": id_handler,
-        "/report": report_handler,
-        "/setwelcome": set_welcome_handler,
-        "/setgoodbye": set_goodbye_handler,
-        "/setrules": set_rules_handler,
-        "/welcome": welcome_preview_handler,
-        "/goodbye": goodbye_preview_handler,
-        "/resetwelcome": reset_welcome_handler,
-        "/resetgoodbye": reset_goodbye_handler,
-        "/resetrules": reset_rules_handler,
-        "/channelpost": channel_post_handler,
-        "/schedulepost": schedule_post_handler,
-        "/approvepost": approve_post_handler,
-        "/cancelpost": cancel_post_handler,
-        "/editpost": edit_post_handler,
-        "/deletepost": delete_post_handler,
-    }
-    register_aliases(app, nexus_handlers)
-    
-    # ── Member Booster handlers ──────────────────────────────────────────────
-    register_booster_handlers(app)
-    logger.info(f"[FACTORY] Booster handlers registered")
-
-    logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
-    return app
-
-
-# Keep backward compatibility
-def create_bot_app(token: str) -> Application:
-    """Legacy function - use create_application instead."""
-    return create_application(token, is_primary=False)
-),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r'^clone:'))
-        logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
-    else:
-        logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
-    # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
-
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
-    # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
-    app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
-    # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
-    app.add_handler(group_lifecycle_handler)
-
-    # Clone approval callbacks (PRIMARY bot only)
-    if is_primary:
-        app.add_handler(group_approval_handler)
-
-    async def global_error_handler_with_alert(update, context):
-        """Enhanced error handler that posts alerts to support group."""
-        import traceback
-        import logging
-        log = logging.getLogger(__name__)
-        error_str = "".join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
-        log.error(f"[ERROR] {error_str[:500]}")
-
-        # Try to get bot username for alert
-        try:
-            me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
-        except Exception:
-            pass
-
-        # Call original error handler
-        try:
-            await global_error_handler(update, context)
-        except Exception:
-            pass
-
-        # Try to notify user something went wrong
-        try:
-            if update and update.effective_message:
-                from bot.utils.messages import DEFAULTS
-                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
-        except Exception:
-            pass
-
-    app.add_error_handler(global_error_handler_with_alert)
-    
-    # ── Register all aliases ──────────────────────────────────────────────
-    nexus_handlers = {
-        "/warn": warn_handler,
-        "/unwarn": unwarn_handler,
-        "/mute": mute_handler,
-        "/unmute": unmute_handler,
-        "/ban": ban_handler,
-        "/unban": unban_handler,
-        "/kick": kick_handler,
-        "/purge": purge_handler,
-        "/pin": pin_handler,
-        "/unpin": unpin_handler,
-        "/rules": nexus_rules_handler,
-        "/info": info_handler,
-        "/stats": stats_handler,
-        "/id": id_handler,
-        "/report": report_handler,
-        "/setwelcome": set_welcome_handler,
-        "/setgoodbye": set_goodbye_handler,
-        "/setrules": set_rules_handler,
-        "/welcome": welcome_preview_handler,
-        "/goodbye": goodbye_preview_handler,
-        "/resetwelcome": reset_welcome_handler,
-        "/resetgoodbye": reset_goodbye_handler,
-        "/resetrules": reset_rules_handler,
-        "/channelpost": channel_post_handler,
-        "/schedulepost": schedule_post_handler,
-        "/approvepost": approve_post_handler,
-        "/cancelpost": cancel_post_handler,
-        "/editpost": edit_post_handler,
-        "/deletepost": delete_post_handler,
-    }
-    register_aliases(app, nexus_handlers)
-    
-    # ── Member Booster handlers ──────────────────────────────────────────────
-    register_booster_handlers(app)
-    logger.info(f"[FACTORY] Booster handlers registered")
-
-    logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
-    return app
-
-
-# Keep backward compatibility
-def create_bot_app(token: str) -> Application:
-    """Legacy function - use create_application instead."""
-    return create_application(token, is_primary=False)
-),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r'^clone:'))
-        logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
-    else:
-        logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
-    # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
-
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
-    # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
-    app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
-    # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
-    app.add_handler(group_lifecycle_handler)
-
-    # Clone approval callbacks (PRIMARY bot only)
-    if is_primary:
-        app.add_handler(group_approval_handler)
-
-    async def global_error_handler_with_alert(update, context):
-        """Enhanced error handler that posts alerts to support group."""
-        import traceback
-        import logging
-        log = logging.getLogger(__name__)
-        error_str = "".join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
-        log.error(f"[ERROR] {error_str[:500]}")
-
-        # Try to get bot username for alert
-        try:
-            me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
-        except Exception:
-            pass
-
-        # Call original error handler
-        try:
-            await global_error_handler(update, context)
-        except Exception:
-            pass
-
-        # Try to notify user something went wrong
-        try:
-            if update and update.effective_message:
-                from bot.utils.messages import DEFAULTS
-                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
-        except Exception:
-            pass
-
-    app.add_error_handler(global_error_handler_with_alert)
-    
-    # ── Register all aliases ──────────────────────────────────────────────
-    nexus_handlers = {
-        "/warn": warn_handler,
-        "/unwarn": unwarn_handler,
-        "/mute": mute_handler,
-        "/unmute": unmute_handler,
-        "/ban": ban_handler,
-        "/unban": unban_handler,
-        "/kick": kick_handler,
-        "/purge": purge_handler,
-        "/pin": pin_handler,
-        "/unpin": unpin_handler,
-        "/rules": nexus_rules_handler,
-        "/info": info_handler,
-        "/stats": stats_handler,
-        "/id": id_handler,
-        "/report": report_handler,
-        "/setwelcome": set_welcome_handler,
-        "/setgoodbye": set_goodbye_handler,
-        "/setrules": set_rules_handler,
-        "/welcome": welcome_preview_handler,
-        "/goodbye": goodbye_preview_handler,
-        "/resetwelcome": reset_welcome_handler,
-        "/resetgoodbye": reset_goodbye_handler,
-        "/resetrules": reset_rules_handler,
-        "/channelpost": channel_post_handler,
-        "/schedulepost": schedule_post_handler,
-        "/approvepost": approve_post_handler,
-        "/cancelpost": cancel_post_handler,
-        "/editpost": edit_post_handler,
-        "/deletepost": delete_post_handler,
-    }
-    register_aliases(app, nexus_handlers)
-    
-    # ── Member Booster handlers ──────────────────────────────────────────────
-    register_booster_handlers(app)
-    logger.info(f"[FACTORY] Booster handlers registered")
-
-    logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
-    return app
-
-
-# Keep backward compatibility
-def create_bot_app(token: str) -> Application:
-    """Legacy function - use create_application instead."""
-    return create_application(token, is_primary=False)
-),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r'^clone:'))
-        logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
-    else:
-        logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
-    # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
-
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
-    # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
-    app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
-    # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
-    app.add_handler(group_lifecycle_handler)
-
-    # Clone approval callbacks (PRIMARY bot only)
-    if is_primary:
-        app.add_handler(group_approval_handler)
-
-    async def global_error_handler_with_alert(update, context):
-        """Enhanced error handler that posts alerts to support group."""
-        import traceback
-        import logging
-        log = logging.getLogger(__name__)
-        error_str = "".join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
-        log.error(f"[ERROR] {error_str[:500]}")
-
-        # Try to get bot username for alert
-        try:
-            me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
-        except Exception:
-            pass
-
-        # Call original error handler
-        try:
-            await global_error_handler(update, context)
-        except Exception:
-            pass
-
-        # Try to notify user something went wrong
-        try:
-            if update and update.effective_message:
-                from bot.utils.messages import DEFAULTS
-                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
-        except Exception:
-            pass
-
-    app.add_error_handler(global_error_handler_with_alert)
-    
-    # ── Register all aliases ──────────────────────────────────────────────
-    nexus_handlers = {
-        "/warn": warn_handler,
-        "/unwarn": unwarn_handler,
-        "/mute": mute_handler,
-        "/unmute": unmute_handler,
-        "/ban": ban_handler,
-        "/unban": unban_handler,
-        "/kick": kick_handler,
-        "/purge": purge_handler,
-        "/pin": pin_handler,
-        "/unpin": unpin_handler,
-        "/rules": nexus_rules_handler,
-        "/info": info_handler,
-        "/stats": stats_handler,
-        "/id": id_handler,
-        "/report": report_handler,
-        "/setwelcome": set_welcome_handler,
-        "/setgoodbye": set_goodbye_handler,
-        "/setrules": set_rules_handler,
-        "/welcome": welcome_preview_handler,
-        "/goodbye": goodbye_preview_handler,
-        "/resetwelcome": reset_welcome_handler,
-        "/resetgoodbye": reset_goodbye_handler,
-        "/resetrules": reset_rules_handler,
-        "/channelpost": channel_post_handler,
-        "/schedulepost": schedule_post_handler,
-        "/approvepost": approve_post_handler,
-        "/cancelpost": cancel_post_handler,
-        "/editpost": edit_post_handler,
-        "/deletepost": delete_post_handler,
-    }
-    register_aliases(app, nexus_handlers)
-    
-    # ── Member Booster handlers ──────────────────────────────────────────────
-    register_booster_handlers(app)
-    logger.info(f"[FACTORY] Booster handlers registered")
-
-    logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
-    return app
-
-
-# Keep backward compatibility
-def create_bot_app(token: str) -> Application:
-    """Legacy function - use create_application instead."""
-    return create_application(token, is_primary=False)
-),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r'^clone:'))
-        logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
-    else:
-        logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
-    # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
-
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
-    # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
-    app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
-    # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
-    app.add_handler(group_lifecycle_handler)
-
-    # Clone approval callbacks (PRIMARY bot only)
-    if is_primary:
-        app.add_handler(group_approval_handler)
-
-    async def global_error_handler_with_alert(update, context):
-        """Enhanced error handler that posts alerts to support group."""
-        import traceback
-        import logging
-        log = logging.getLogger(__name__)
-        error_str = "".join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
-        log.error(f"[ERROR] {error_str[:500]}")
-
-        # Try to get bot username for alert
-        try:
-            me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
-        except Exception:
-            pass
-
-        # Call original error handler
-        try:
-            await global_error_handler(update, context)
-        except Exception:
-            pass
-
-        # Try to notify user something went wrong
-        try:
-            if update and update.effective_message:
-                from bot.utils.messages import DEFAULTS
-                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
-        except Exception:
-            pass
-
-    app.add_error_handler(global_error_handler_with_alert)
-    
-    # ── Register all aliases ──────────────────────────────────────────────
-    nexus_handlers = {
-        "/warn": warn_handler,
-        "/unwarn": unwarn_handler,
-        "/mute": mute_handler,
-        "/unmute": unmute_handler,
-        "/ban": ban_handler,
-        "/unban": unban_handler,
-        "/kick": kick_handler,
-        "/purge": purge_handler,
-        "/pin": pin_handler,
-        "/unpin": unpin_handler,
-        "/rules": nexus_rules_handler,
-        "/info": info_handler,
-        "/stats": stats_handler,
-        "/id": id_handler,
-        "/report": report_handler,
-        "/setwelcome": set_welcome_handler,
-        "/setgoodbye": set_goodbye_handler,
-        "/setrules": set_rules_handler,
-        "/welcome": welcome_preview_handler,
-        "/goodbye": goodbye_preview_handler,
-        "/resetwelcome": reset_welcome_handler,
-        "/resetgoodbye": reset_goodbye_handler,
-        "/resetrules": reset_rules_handler,
-        "/channelpost": channel_post_handler,
-        "/schedulepost": schedule_post_handler,
-        "/approvepost": approve_post_handler,
-        "/cancelpost": cancel_post_handler,
-        "/editpost": edit_post_handler,
-        "/deletepost": delete_post_handler,
-    }
-    register_aliases(app, nexus_handlers)
-    
-    # ── Member Booster handlers ──────────────────────────────────────────────
-    register_booster_handlers(app)
-    logger.info(f"[FACTORY] Booster handlers registered")
-
-    logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
-    return app
-
-
-# Keep backward compatibility
-def create_bot_app(token: str) -> Application:
-    """Legacy function - use create_application instead."""
-    return create_application(token, is_primary=False)
-),
-            token_input_handler
-        ))
-        app.add_handler(CallbackQueryHandler(clone_callback_handler, pattern=r'^clone:'))
-        logger.info(f"[FACTORY] Clone handlers registered (primary bot only)")
-    else:
-        logger.info(f"[FACTORY] Clone handlers SKIPPED (clone bot)")
-    
-    # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
-
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    
-    # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
-    app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antispam_handler),  group=2)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, antilink_handler),  group=3)
-    
-    # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
-    
-    # Keep old captcha handler if needed, but in separate groups or combined
-    # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
-    
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
-    app.add_handler(group_lifecycle_handler)
-
-    # Clone approval callbacks (PRIMARY bot only)
-    if is_primary:
-        app.add_handler(group_approval_handler)
-
-    async def global_error_handler_with_alert(update, context):
-        """Enhanced error handler that posts alerts to support group."""
-        import traceback
-        import logging
-        log = logging.getLogger(__name__)
-        error_str = "".join(traceback.format_exception(
-            type(context.error), context.error, context.error.__traceback__
-        ))
-        log.error(f"[ERROR] {error_str[:500]}")
-
-        # Try to get bot username for alert
-        try:
-            me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
-        except Exception:
-            pass
-
-        # Call original error handler
-        try:
-            await global_error_handler(update, context)
-        except Exception:
-            pass
-
-        # Try to notify user something went wrong
-        try:
-            if update and update.effective_message:
-                from bot.utils.messages import DEFAULTS
-                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
-        except Exception:
-            pass
-
-    app.add_error_handler(global_error_handler_with_alert)
-    
-    # ── Register all aliases ──────────────────────────────────────────────
-    nexus_handlers = {
-        "/warn": warn_handler,
-        "/unwarn": unwarn_handler,
-        "/mute": mute_handler,
-        "/unmute": unmute_handler,
-        "/ban": ban_handler,
-        "/unban": unban_handler,
-        "/kick": kick_handler,
-        "/purge": purge_handler,
-        "/pin": pin_handler,
-        "/unpin": unpin_handler,
-        "/rules": nexus_rules_handler,
-        "/info": info_handler,
-        "/stats": stats_handler,
-        "/id": id_handler,
-        "/report": report_handler,
-        "/setwelcome": set_welcome_handler,
-        "/setgoodbye": set_goodbye_handler,
-        "/setrules": set_rules_handler,
-        "/welcome": welcome_preview_handler,
-        "/goodbye": goodbye_preview_handler,
-        "/resetwelcome": reset_welcome_handler,
-        "/resetgoodbye": reset_goodbye_handler,
-        "/resetrules": reset_rules_handler,
-        "/channelpost": channel_post_handler,
-        "/schedulepost": schedule_post_handler,
-        "/approvepost": approve_post_handler,
-        "/cancelpost": cancel_post_handler,
-        "/editpost": edit_post_handler,
-        "/deletepost": delete_post_handler,
-    }
-    register_aliases(app, nexus_handlers)
-    
     # ── Member Booster handlers ──────────────────────────────────────────────
     register_booster_handlers(app)
     logger.info(f"[FACTORY] Booster handlers registered")

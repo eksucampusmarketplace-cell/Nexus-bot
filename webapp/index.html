@@ -8,7 +8,6 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/zustand/4.4.1/umd/index.development.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -380,8 +379,41 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
-        const create = window.zustand?.default || window.zustand;
+        const { useState, useEffect, useMemo, useRef, useSyncExternalStore } = React;
+
+        // Simple Zustand-like store implementation using React's useSyncExternalStore
+        function create(createState) {
+            const listeners = new Set();
+            let state;
+            const setState = (partial) => {
+                const nextState = typeof partial === 'function' ? partial(state) : partial;
+                if (!Object.is(nextState, state)) {
+                    const prevState = state;
+                    state = Object.assign({}, state, nextState);
+                    listeners.forEach(listener => listener(state, prevState));
+                }
+            };
+            const getState = () => state;
+            const subscribe = (listener) => {
+                listeners.add(listener);
+                return () => listeners.delete(listener);
+            };
+            const api = { setState, getState, subscribe };
+            state = createState(setState, getState, api);
+
+            // Create bound hook that uses this specific api
+            const useBoundStore = (selector = (s) => s) => {
+                return useSyncExternalStore(
+                    api.subscribe,
+                    () => selector(api.getState()),
+                    () => selector(api.getState())
+                );
+            };
+
+            // Attach store methods to the hook
+            Object.assign(useBoundStore, api);
+            return useBoundStore;
+        }
 
         // ZUSTAND STORE
         const useStore = create((set, get) => ({

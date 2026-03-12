@@ -5,6 +5,7 @@ A powerful group management bot with an integrated Telegram Mini App for easy co
 ## 🚀 Features
 - **Moderation**: Warn, Ban, Mute, Kick, Purge.
 - **AutoMod**: Anti-flood, Anti-spam, Anti-link, Captcha, Anti-bot.
+- **Music Player**: Play audio files and voice messages in groups with queue management.
 - **Mini App**: Manage all group settings via a beautiful dashboard.
 - **Bot Cloning**: Run multiple bot instances from a single server.
 - **Production-Ready**: Webhook-based, deployed on Render, powered by Supabase.
@@ -87,6 +88,25 @@ Access the Bot Manager tab in the Mini App to:
 - Clone new bots
 - Remove clones
 - Re-authenticate dead bots
+
+### Music Player
+
+The bot includes a built-in music player for groups! Use these commands:
+
+- `/play` - Play music (reply to an audio/voice message or send an audio file)
+- `/skip` - Skip the current track
+- `/queue` - View the music queue
+- `/stop` - Stop playing and clear the queue
+- `/pause` - Pause playback
+- `/resume` - Resume paused playback
+- `/nowplaying` - Show current track with interactive controls
+
+**How to play music:**
+1. Reply to an audio file or voice message with `/play`
+2. Send an audio file with `/play` command
+3. Use the Music tab in the Mini App for visual controls
+
+Note: The music player supports audio files and voice messages shared in the group. The bot will replay them in the queue order.
 
 ### Environment Variables
 

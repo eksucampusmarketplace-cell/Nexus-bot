@@ -156,12 +156,13 @@ async def lifespan(app: FastAPI):
 
 
 # Routes
-from api.routes import groups, members, debug, bots
+from api.routes import groups, members, debug, bots, music
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
 fastapi_app.include_router(debug.router)
 fastapi_app.include_router(bots.router)
+fastapi_app.include_router(music.router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)

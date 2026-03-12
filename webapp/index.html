@@ -506,6 +506,49 @@
             </div>
         </div>
 
+        <!-- Music Player -->
+        <div id="page-music" class="page">
+            <div class="card">
+                <h3>🎵 Music Player</h3>
+                
+                <!-- Now Playing -->
+                <div id="now-playing" style="text-align: center; padding: 20px; margin-bottom: 20px;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">🎵</div>
+                    <div id="np-title" style="font-size: 18px; font-weight: bold;">No track playing</div>
+                    <div id="np-artist" style="opacity: 0.6; font-size: 14px;">-</div>
+                </div>
+                
+                <!-- Controls -->
+                <div style="display: flex; justify-content: center; gap: 15px; margin-bottom: 30px;">
+                    <button class="btn-small" onclick="sendMusicCommand('pause')">⏸️ Pause</button>
+                    <button class="btn-small btn-primary" onclick="sendMusicCommand('skip')">⏭️ Skip</button>
+                    <button class="btn-small" onclick="sendMusicCommand('resume')">▶️ Resume</button>
+                    <button class="btn-small btn-danger" onclick="sendMusicCommand('stop')">⏹️ Stop</button>
+                </div>
+                
+                <!-- Queue -->
+                <h4 style="margin-bottom: 15px;">📋 Queue</h4>
+                <div id="music-queue" style="font-size: 14px;">
+                    <p style="opacity: 0.5; text-align: center;">Queue is empty</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>How to Play Music</h3>
+                <div style="font-size: 14px; line-height: 1.6;">
+                    <p><b>1. Reply to Audio:</b> Use <code>/play</code> when replying to an audio file or voice message</p>
+                    <p><b>2. Send Audio:</b> Send an audio file with the <code>/play</code> command</p>
+                    <p><b>3. Use Commands:</b></p>
+                    <ul style="padding-left: 20px; opacity: 0.8;">
+                        <li><code>/queue</code> - View the queue</li>
+                        <li><code>/skip</code> - Skip current track</li>
+                        <li><code>/stop</code> - Clear queue and stop</li>
+                        <li><code>/nowplaying</code> - Show current track</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
         <!-- Bot Manager -->
         <div id="page-bots" class="page">
             <div class="card">
@@ -550,6 +593,7 @@
         <div class="tab" onclick="showPage('commands', this)"><span>⌨️</span>Commands</div>
         <div class="tab" onclick="showPage('automod', this)"><span>🛡️</span>AutoMod</div>
         <div class="tab" onclick="showPage('members', this)"><span>👥</span>Members</div>
+        <div class="tab" onclick="showPage('music', this)"><span>🎵</span>Music</div>
         <div class="tab" onclick="showPage('bots', this)"><span>🤖</span>Bots</div>
         <div class="tab" onclick="showPage('settings', this)"><span>⚙️</span>Settings</div>
     </div>
@@ -613,6 +657,7 @@
             if (pageId === 'members') loadMembers();
             if (pageId === 'dashboard') loadDashboard();
             if (pageId === 'bots') loadBots();
+            if (pageId === 'music') loadMusicPage();
         }
 
         async function loadGroups() {
@@ -868,6 +913,85 @@
             document.getElementById('page-dashboard').classList.add('active');
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelector('.tab:first-child').classList.add('active');
+        }
+
+        // Music Player Functions
+        async function loadMusicPage() {
+            if (!currentChatId) {
+                document.getElementById('np-title').innerText = 'Select a group first';
+                return;
+            }
+            
+            try {
+                // Simulate fetching music queue from API
+                // In a real implementation, you'd have an API endpoint for music queue
+                const response = await fetch(`${API}/api/music/${currentChatId}/queue`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': initData
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateMusicUI(data);
+                } else {
+                    // If endpoint doesn't exist, show default state
+                    updateMusicUI({ current: null, queue: [] });
+                }
+            } catch (e) {
+                // Fallback to default state
+                updateMusicUI({ current: null, queue: [] });
+            }
+        }
+        
+        function updateMusicUI(data) {
+            const titleEl = document.getElementById('np-title');
+            const artistEl = document.getElementById('np-artist');
+            const queueEl = document.getElementById('music-queue');
+            
+            if (data.current) {
+                titleEl.innerText = data.current.title || 'Unknown Track';
+                artistEl.innerText = data.current.performer || 'Unknown Artist';
+            } else {
+                titleEl.innerText = 'No track playing';
+                artistEl.innerText = '-';
+            }
+            
+            if (data.queue && data.queue.length > 0) {
+                queueEl.innerHTML = data.queue.map((track, i) => `
+                    <div style="padding: 10px; border-bottom: 1px solid var(--card-border); display: flex; align-items: center; gap: 10px;">
+                        <span style="opacity: 0.5;">${i + 1}.</span>
+                        <span>${track.title || 'Unknown'}</span>
+                        ${track.performer ? `<span style="opacity: 0.6; font-size: 12px;">- ${track.performer}</span>` : ''}
+                    </div>
+                `).join('');
+            } else {
+                queueEl.innerHTML = '<p style="opacity: 0.5; text-align: center;">Queue is empty</p>';
+            }
+        }
+        
+        async function sendMusicCommand(command) {
+            if (!currentChatId) {
+                showToast('Select a group first', true);
+                return;
+            }
+            
+            try {
+                await fetch(`${API}/api/music/${currentChatId}/command`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Init-Data': initData
+                    },
+                    body: JSON.stringify({ command })
+                });
+                
+                showToast(`${command.charAt(0).toUpperCase() + command.slice(1)} command sent`);
+                loadMusicPage(); // Refresh the UI
+            } catch (e) {
+                showToast('Error: ' + e.message, true);
+            }
         }
 
         // Initialize

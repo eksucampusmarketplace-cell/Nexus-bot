@@ -43,6 +43,15 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /purge - Delete messages
 /rules - Show group rules
 
+<b>🎵 Music:</b>
+/play - Play music (reply to audio/voice or send file)
+/skip - Skip to next track
+/queue - Show music queue
+/stop - Stop music and clear queue
+/pause - Pause playback
+/resume - Resume playback
+/nowplaying - Show current track with controls
+
 <b>How to use:</b>
 Admin commands require you to reply to a user's message.
 

@@ -71,6 +71,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.captcha import (
         new_member_handler, captcha_callback_handler
     )
+    from bot.handlers.music import (
+        play_command, skip_command, queue_command, stop_command,
+        pause_command, resume_command, nowplaying_command,
+        music_callback_handler
+    )
     from bot.handlers.errors import error_handler as global_error_handler
     
     # ── Basic commands (all bots) ─────────────────────────────────────────
@@ -104,6 +109,15 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("id",      id_handler))
     app.add_handler(CommandHandler("report",  report_handler))
     
+    # ── Music commands (groups only) ───────────────────────────────────────
+    app.add_handler(CommandHandler("play",        play_command,        filters=GROUP))
+    app.add_handler(CommandHandler("skip",        skip_command,        filters=GROUP))
+    app.add_handler(CommandHandler("queue",       queue_command,       filters=GROUP))
+    app.add_handler(CommandHandler("stop",        stop_command,        filters=GROUP))
+    app.add_handler(CommandHandler("pause",       pause_command,       filters=GROUP))
+    app.add_handler(CommandHandler("resume",      resume_command,      filters=GROUP))
+    app.add_handler(CommandHandler("nowplaying",  nowplaying_command,  filters=GROUP))
+    
     # ── Clone commands — PRIMARY BOT ONLY ─────────────────────────────────
     if is_primary:
         from bot.handlers.clone import (
@@ -125,6 +139,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     
     # ── Captcha callbacks (all bots) ──────────────────────────────────────
     app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha:'))
+    
+    # ── Music callbacks (all bots) ─────────────────────────────────────────
+    app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:'))
     
     # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
     app.add_handler(MessageHandler(GROUP & filters.ALL,  antiflood_handler), group=1)

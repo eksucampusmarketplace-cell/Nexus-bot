@@ -8,3 +8,9 @@ env/
 .idea/
 *.log
 .DS_Store
+# API routes cache
+api/routes/__pycache__/
+api/__pycache__/
+bot/__pycache__/
+bot/handlers/__pycache__/
+

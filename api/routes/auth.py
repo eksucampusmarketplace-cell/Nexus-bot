@@ -24,7 +24,7 @@ from pyrogram.storage import MemoryStorage
 from config import settings
 from bot.utils.crypto import encrypt_token
 from db.ops.music_new import save_music_userbot
-from bot.registry import get_app_by_bot_id
+from bot.registry import get
 from bot.userbot.music_worker import MusicWorker
 
 log = logging.getLogger("auth_api")
@@ -151,7 +151,7 @@ async def _to_pyrogram_session(raw: str) -> str | None:
 async def _reload_music_worker(bot_id: int, session_string: str, db):
     """Reload the MusicWorker for a clone bot after new session added."""
     try:
-        clone_app = get_app_by_bot_id(bot_id)
+        clone_app = get(bot_id)
         if not clone_app:
             return
 

@@ -58,8 +58,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await upsert_group(chat_id, update.effective_chat.title, "")
         return
 
-    settings = group.get('settings', {})
-    
+    settings = group.get('settings', {}) or {}
+
     # 1. Anti-link
     antilink = get_setting(settings, 'automod', 'antilink')
     if antilink['enabled'] and update.message.text:
@@ -112,15 +112,15 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not update.message:
         return
-    
+
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    
+
     group = await get_group(chat_id)
     if not group:
         return
-    
-    settings = group.get('settings', {})
+
+    settings = group.get('settings', {}) or {}
     antiflood = get_setting(settings, 'automod', 'antiflood')
     
     if antiflood['enabled']:
@@ -172,14 +172,14 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not update.message or not update.message.text:
         return
-    
+
     chat_id = update.effective_chat.id
-    
+
     group = await get_group(chat_id)
     if not group:
         return
-    
-    settings = group.get('settings', {})
+
+    settings = group.get('settings', {}) or {}
     antilink = get_setting(settings, 'automod', 'antilink')
     
     if antilink['enabled']:
@@ -202,8 +202,8 @@ async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
     group = await get_group(chat_id)
     if not group: return
-    
-    settings = group.get('settings', {})
+
+    settings = group.get('settings', {}) or {}
     for member in update.message.new_chat_members:
         if member.is_bot: continue
         

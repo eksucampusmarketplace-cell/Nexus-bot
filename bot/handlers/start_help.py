@@ -5,7 +5,7 @@ Handles /start and /help for ALL bots (primary + every clone).
 These handlers are registered in factory.py for every bot instance.
 
 Key behaviors:
-  - /start in private: show welcome + support keyboard
+  - /start in private: show welcome + support keyboard + set menu button
   - /start in group: silently init group, DM the adding admin
   - /help anywhere: show help message + support keyboard
   - "Powered by {bot_name}" always present via get_message()
@@ -13,7 +13,7 @@ Key behaviors:
 """
 
 import logging
-from telegram import Update
+from telegram import Update, MenuButtonWebApp, WebAppInfo
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ParseMode
 
@@ -23,6 +23,26 @@ from bot.utils.messages import get_message
 from db.ops.groups import get_or_create_group, get_group_miniapp_url
 
 log = logging.getLogger("start_help")
+
+
+async def set_menu_button(bot, chat_id: int, miniapp_url: str | None = None):
+    """Set the menu button to open the Mini App."""
+    if not miniapp_url:
+        miniapp_url = settings.MINI_APP_URL
+    if not miniapp_url:
+        return
+
+    try:
+        await bot.set_chat_menu_button(
+            chat_id=chat_id,
+            menu_button=MenuButtonWebApp(
+                text="⚡ Panel",
+                web_app=WebAppInfo(url=miniapp_url)
+            )
+        )
+        log.info(f"[MENU] Set menu button for chat={chat_id}")
+    except Exception as e:
+        log.warning(f"[MENU] Failed to set menu button for chat={chat_id}: {e}")
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -61,6 +81,9 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Get miniapp URL for this bot if configured
         miniapp_url = settings.MINI_APP_URL  # from existing config
+
+        # Set menu button to open Mini App
+        await set_menu_button(context.bot, chat.id, miniapp_url)
 
         await update.message.reply_text(
             text=msg,

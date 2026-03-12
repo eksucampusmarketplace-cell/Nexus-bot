@@ -20,7 +20,7 @@ On REMOVE — mark group as left in DB.
 """
 
 import logging
-from telegram import Update, ChatMemberUpdated
+from telegram import Update, ChatMemberUpdated, MenuButtonWebApp, WebAppInfo
 from telegram.ext import ContextTypes, ChatMemberHandler
 from telegram.constants import ParseMode
 
@@ -34,6 +34,25 @@ from db.ops.clone_groups import (
 )
 
 log = logging.getLogger("group_lifecycle")
+
+
+async def set_group_menu_button(bot, chat_id: int):
+    """Set the menu button to open the Mini App for groups."""
+    miniapp_url = settings.MINI_APP_URL
+    if not miniapp_url:
+        return
+
+    try:
+        await bot.set_chat_menu_button(
+            chat_id=chat_id,
+            menu_button=MenuButtonWebApp(
+                text="⚡ Panel",
+                web_app=WebAppInfo(url=miniapp_url)
+            )
+        )
+        log.info(f"[MENU] Set group menu button for chat={chat_id}")
+    except Exception as e:
+        log.warning(f"[MENU] Failed to set group menu button for chat={chat_id}: {e}")
 
 
 def _is_bot_add(update: ChatMemberUpdated, bot_id: int) -> bool:
@@ -118,6 +137,9 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
             )
             log.info(f"[LIFECYCLE] Owner group registered | bot={bot_id} chat={chat.id}")
 
+            # Set menu button for the group
+            await set_group_menu_button(context.bot, chat.id)
+
             # Send setup DM to owner
             await _send_owner_setup_dm(context, owner_id, chat, bot_id)
             return
@@ -145,6 +167,8 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 is_owner_group=False,
                 access_status="active"
             )
+            # Set menu button for the group
+            await set_group_menu_button(context.bot, chat.id)
             # Onboard the stranger
             await _send_stranger_onboard_dm(context, actor, chat, policy="open")
             # Notify owner if enabled

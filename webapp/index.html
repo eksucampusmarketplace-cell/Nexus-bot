@@ -382,7 +382,7 @@
         const { useState, useEffect, useMemo, useRef, useSyncExternalStore } = React;
 
         // Simple Zustand-like store implementation using React's useSyncExternalStore
-        function create(createState) {
+        const createStore = (createState) => {
             const listeners = new Set();
             let state;
             const setState = (partial) => {
@@ -400,23 +400,22 @@
             };
             const api = { setState, getState, subscribe };
             state = createState(setState, getState, api);
+            return api;
+        };
 
-            // Create bound hook that uses this specific api
-            const useBoundStore = (selector = (s) => s) => {
+        // Create hook from store
+        const useStoreFactory = (storeApi) => {
+            return (selector = (s) => s) => {
                 return useSyncExternalStore(
-                    api.subscribe,
-                    () => selector(api.getState()),
-                    () => selector(api.getState())
+                    storeApi.subscribe,
+                    () => selector(storeApi.getState()),
+                    () => selector(storeApi.getState())
                 );
             };
-
-            // Attach store methods to the hook
-            Object.assign(useBoundStore, api);
-            return useBoundStore;
-        }
+        };
 
         // ZUSTAND STORE
-        const useStore = create((set, get) => ({
+        const storeApi = createStore((set, get, api) => ({
             userContext: { user: null, role: null, adminGroups: [], modGroups: [], memberGroups: [], botInfo: null, supportGroup: null, isLoading: true, error: null },
             memberStats: {}, memberRankings: {}, memberInviteLinks: {},
             activeBotId: null, activeGroupId: null, activeGroupTitle: "Loading Group...",
@@ -426,7 +425,7 @@
             channelConfig: {}, channelStats: {}, channelLoading: false,
 
             setUserContext: (context) => set({ userContext: { ...get().userContext, ...context, isLoading: false, error: null } }),
-            setUserError: (err) => set(state => ({ userContext: { ...state.userContext, error: err, isLoading: false } })),
+            setUserError: (err) => set({ userContext: { ...get().userContext, error: err, isLoading: false } }),
 
             fetchUserContext: async (initData) => {
                 try {
@@ -442,7 +441,7 @@
                     });
                     return data;
                 } catch (err) {
-                    set(state => ({ userContext: { ...state.userContext, error: err.message, isLoading: false } }));
+                    set({ userContext: { ...get().userContext, error: err.message, isLoading: false } });
                     throw err;
                 }
             },
@@ -451,7 +450,7 @@
                 try {
                     const resp = await fetch(`/api/me/groups/${chatId}/stats`, { headers: { 'X-Telegram-Init-Data': initData } });
                     const data = await resp.json();
-                    set(state => ({ memberStats: { ...state.memberStats, [chatId]: data } }));
+                    set({ memberStats: { ...get().memberStats, [chatId]: data } });
                 } catch (err) { console.error('[STORE] Failed to fetch member stats:', err); }
             },
 
@@ -459,7 +458,7 @@
                 try {
                     const resp = await fetch(`/api/me/groups/${chatId}/rankings?type=${type}&page=${page}`, { headers: { 'X-Telegram-Init-Data': initData } });
                     const data = await resp.json();
-                    set(state => ({ memberRankings: { ...state.memberRankings, [`${chatId}-${type}`]: data } }));
+                    set({ memberRankings: { ...get().memberRankings, [`${chatId}-${type}`]: data } });
                 } catch (err) { console.error('[STORE] Failed to fetch rankings:', err); }
             },
 
@@ -467,7 +466,7 @@
                 try {
                     const resp = await fetch(`/api/me/groups/${chatId}/invitelink`, { headers: { 'X-Telegram-Init-Data': initData } });
                     const data = await resp.json();
-                    set(state => ({ memberInviteLinks: { ...state.memberInviteLinks, [chatId]: data } }));
+                    set({ memberInviteLinks: { ...get().memberInviteLinks, [chatId]: data } });
                 } catch (err) { console.error('[STORE] Failed to fetch invite link:', err); }
             },
 
@@ -483,19 +482,19 @@
             },
 
             toggleModule: async (chatId, moduleName, enabled) => {
-                set(state => ({ modulesLoading: { ...state.modulesLoading, [moduleName]: true } }));
+                set({ modulesLoading: { ...get().modulesLoading, [moduleName]: true } });
                 const oldState = get().modules[moduleName];
-                set(state => ({ modules: { ...state.modules, [moduleName]: enabled } }));
+                set({ modules: { ...get().modules, [moduleName]: enabled } });
                 try {
                     const resp = await fetch(`/api/groups/${chatId}/modules/${moduleName}`, {
                         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled })
                     });
                     if (!resp.ok) throw new Error("API call failed");
                 } catch (err) {
-                    set(state => ({ modules: { ...state.modules, [moduleName]: oldState } }));
+                    set({ modules: { ...get().modules, [moduleName]: oldState } });
                     showToast(`Failed to toggle ${moduleName}`);
                 } finally {
-                    set(state => ({ modulesLoading: { ...state.modulesLoading, [moduleName]: false } }));
+                    set({ modulesLoading: { ...get().modulesLoading, [moduleName]: false } });
                 }
             },
 
@@ -563,6 +562,11 @@
                 } catch (err) {}
             }
         }));
+
+        // Create the useStore hook
+        const useStore = useStoreFactory(storeApi);
+        // Attach store methods to the hook for direct access
+        Object.assign(useStore, storeApi);
 
         function showToast(msg, isSuccess = false) {
             const t = document.getElementById('toast');

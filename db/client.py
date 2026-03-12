@@ -61,7 +61,9 @@ class Database:
                     chat_id BIGINT PRIMARY KEY,
                     title TEXT,
                     bot_token_hash TEXT,
-                    settings JSONB DEFAULT '{}'::jsonb
+                    settings JSONB DEFAULT '{}'::jsonb,
+                    member_count INTEGER DEFAULT 0,
+                    last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
 
                 CREATE TABLE IF NOT EXISTS users (
@@ -99,6 +101,43 @@ class Database:
                     expires_at TIMESTAMP WITH TIME ZONE,
                     PRIMARY KEY (user_id, chat_id)
                 );
+
+                -- Core bots table
+                CREATE TABLE IF NOT EXISTS bots (
+                    id BIGSERIAL PRIMARY KEY,
+                    bot_id BIGINT UNIQUE NOT NULL,
+                    username TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    token_encrypted TEXT NOT NULL,
+                    token_hash TEXT UNIQUE NOT NULL,
+                    owner_user_id BIGINT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    webhook_url TEXT,
+                    webhook_active BOOLEAN DEFAULT FALSE,
+                    groups_count INT DEFAULT 0,
+                    is_primary BOOLEAN DEFAULT FALSE,
+                    added_at TIMESTAMPTZ DEFAULT NOW(),
+                    last_seen TIMESTAMPTZ DEFAULT NOW(),
+                    death_reason TEXT
+                );
+
+                -- Rate limiting table
+                CREATE TABLE IF NOT EXISTS clone_attempts (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    attempted_at TIMESTAMPTZ DEFAULT NOW(),
+                    success BOOLEAN DEFAULT FALSE,
+                    fail_reason TEXT,
+                    token_hash TEXT
+                );
+            """)
+            
+            # Create indexes
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_bots_owner ON bots(owner_user_id);
+                CREATE INDEX IF NOT EXISTS idx_bots_status ON bots(status);
+                CREATE INDEX IF NOT EXISTS idx_bots_token_hash ON bots(token_hash);
+                CREATE INDEX IF NOT EXISTS idx_clone_attempts_user ON clone_attempts(user_id, attempted_at);
             """)
             logger.info("Database schema initialized")
 

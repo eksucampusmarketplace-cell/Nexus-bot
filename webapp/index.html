@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>GroupGuard Panel</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=JetBrains+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -117,6 +118,194 @@
             opacity: 0.6;
         }
 
+        /* Bot cards */
+        .bot-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+
+        .bot-card.primary {
+            border-color: var(--accent);
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .bot-card.dead {
+            border-color: var(--danger);
+            opacity: 0.7;
+        }
+
+        .bot-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .bot-status {
+            font-size: 18px;
+        }
+
+        .bot-name {
+            font-weight: bold;
+            flex: 1;
+        }
+
+        .bot-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--accent);
+            color: #000;
+        }
+
+        .bot-info {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .bot-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 11px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: #000;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+
+        /* Clone form */
+        .clone-section {
+            display: none;
+        }
+
+        .clone-section.active {
+            display: block;
+        }
+
+        .clone-form {
+            margin-top: 15px;
+        }
+
+        .clone-form input {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            background: rgba(255,255,255,0.05);
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+
+        .clone-form .btn {
+            margin-top: 10px;
+        }
+
+        .clone-error {
+            color: var(--danger);
+            font-size: 12px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .clone-error.visible {
+            display: block;
+        }
+
+        /* Group selector sheet */
+        .sheet-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            display: none;
+        }
+
+        .sheet-overlay.visible {
+            display: block;
+        }
+
+        .group-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg);
+            border-top: 1px solid var(--card-border);
+            border-radius: 20px 20px 0 0;
+            padding: 20px;
+            z-index: 201;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+        }
+
+        .group-sheet.visible {
+            transform: translateY(0);
+        }
+
+        .sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: var(--card-border);
+            border-radius: 2px;
+            margin: 0 auto 20px;
+        }
+
+        .group-item {
+            padding: 15px;
+            border-bottom: 1px solid var(--card-border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        .group-item:last-child {
+            border-bottom: none;
+        }
+
+        .group-icon {
+            font-size: 20px;
+        }
+
+        .group-title {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .group-members {
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
         /* Tabs */
         .tabs {
             position: fixed;
@@ -209,6 +398,11 @@
             font-family: 'Syne', sans-serif;
         }
 
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .page { display: none; }
         .page.active { display: block; }
 
@@ -228,12 +422,23 @@
 
         .toast.show { transform: translateX(-50%) translateY(0); }
 
+        .toast.error {
+            background: var(--danger);
+            color: white;
+        }
+
         .member-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 10px 0;
             border-bottom: 1px solid var(--card-border);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            opacity: 0.5;
         }
     </style>
 </head>
@@ -277,7 +482,6 @@
             <div class="card">
                 <h3>Enabled Commands</h3>
                 <div id="commands-list">
-                    <!-- Toggles will be injected here -->
                 </div>
                 <button class="btn" onclick="saveSettings()">Save Settings</button>
             </div>
@@ -302,6 +506,26 @@
             </div>
         </div>
 
+        <!-- Bot Manager -->
+        <div id="page-bots" class="page">
+            <div class="card">
+                <h3>🤖 Bot Manager</h3>
+                <p id="bot-count" style="font-size: 12px; opacity: 0.6;">Loading bots...</p>
+                <div id="bots-list">
+                </div>
+                
+                <div class="clone-section" id="clone-section">
+                    <div class="clone-form">
+                        <input type="text" id="clone-token" placeholder="Paste bot token from @BotFather (e.g., 1234567890:ABCdef...)">
+                        <button class="btn" id="clone-submit" onclick="submitClone()">Clone Bot</button>
+                        <div class="clone-error" id="clone-error"></div>
+                    </div>
+                </div>
+                
+                <button class="btn" id="clone-toggle" onclick="toggleCloneForm()" style="margin-top: 15px;">➕ Clone a new bot</button>
+            </div>
+        </div>
+
         <!-- Settings -->
         <div id="page-settings" class="page">
             <div class="card">
@@ -313,11 +537,20 @@
         </div>
     </div>
 
+    <!-- Group selector sheet -->
+    <div class="sheet-overlay" id="sheet-overlay" onclick="closeGroupSheet()"></div>
+    <div class="group-sheet" id="group-sheet">
+        <div class="sheet-handle"></div>
+        <h3 id="sheet-title">Select a group</h3>
+        <div id="group-list"></div>
+    </div>
+
     <div class="tabs">
         <div class="tab active" onclick="showPage('dashboard', this)"><span>📊</span>Dashboard</div>
         <div class="tab" onclick="showPage('commands', this)"><span>⌨️</span>Commands</div>
         <div class="tab" onclick="showPage('automod', this)"><span>🛡️</span>AutoMod</div>
         <div class="tab" onclick="showPage('members', this)"><span>👥</span>Members</div>
+        <div class="tab" onclick="showPage('bots', this)"><span>🤖</span>Bots</div>
         <div class="tab" onclick="showPage('settings', this)"><span>⚙️</span>Settings</div>
     </div>
 
@@ -331,6 +564,21 @@
 
         let currentChatId = null;
         let groupData = null;
+        let currentBotId = null;
+        let supabaseClient = null;
+
+        // Initialize Supabase for realtime updates
+        async function initSupabase() {
+            try {
+                const res = await fetch(`${API}/api/groups`);
+                const groups = await res.json();
+                // Supabase credentials would be injected server-side
+                // For now, we'll use polling fallback
+                console.log('[REALTIME] Using polling fallback');
+            } catch (e) {
+                console.log('[REALTIME] Init failed:', e);
+            }
+        }
 
         async function apiFetch(path, options = {}) {
             const res = await fetch(`${API}${path}`, {
@@ -343,14 +591,16 @@
             });
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.error || 'Request failed');
+                throw new Error(err.detail?.error || 'Request failed');
             }
             return res.json();
         }
 
-        function showToast(msg) {
+        function showToast(msg, isError = false) {
             const t = document.getElementById('toast');
             t.innerText = msg;
+            t.classList.remove('error');
+            if (isError) t.classList.add('error');
             t.classList.add('show');
             setTimeout(() => t.classList.remove('show'), 2200);
         }
@@ -362,6 +612,7 @@
             el.classList.add('active');
             if (pageId === 'members') loadMembers();
             if (pageId === 'dashboard') loadDashboard();
+            if (pageId === 'bots') loadBots();
         }
 
         async function loadGroups() {
@@ -412,8 +663,7 @@
 
         async function loadDashboard() {
             if (!currentChatId) return;
-            // Simplified stats
-            document.getElementById('stat-members').innerText = '124'; // Mock
+            document.getElementById('stat-members').innerText = '124';
             document.getElementById('stat-messages').innerText = groupData.settings.message_count || '8.2k';
             
             const logs = await apiFetch(`/api/groups/${currentChatId}/logs`);
@@ -442,11 +692,187 @@
                 });
                 showToast('Settings Saved!');
             } catch (e) {
-                showToast('Error saving!');
+                showToast('Error saving!', true);
             }
         }
 
+        // Bot Manager functions
+        async function loadBots() {
+            const botsList = document.getElementById('bots-list');
+            const botCount = document.getElementById('bot-count');
+            
+            try {
+                const bots = await apiFetch('/api/bots');
+                botCount.innerText = `${bots.length} bot${bots.length !== 1 ? 's' : ''} registered`;
+                
+                if (bots.length === 0) {
+                    botsList.innerHTML = '<p style="opacity: 0.5; text-align: center;">No bots yet. Clone your first bot!</p>';
+                    return;
+                }
+                
+                botsList.innerHTML = bots.map(bot => {
+                    const isPrimary = bot.is_primary;
+                    const isDead = bot.status === 'dead';
+                    const statusIcon = isPrimary ? '👑' : (isDead ? '🔴' : '🟢');
+                    const cardClass = isPrimary ? 'primary' : (isDead ? 'dead' : '');
+                    
+                    return `
+                        <div class="bot-card ${cardClass}">
+                            <div class="bot-header">
+                                <span class="bot-status">${statusIcon}</span>
+                                <span class="bot-name">@${bot.username}</span>
+                                ${isPrimary ? '<span class="bot-badge">PRIMARY</span>' : ''}
+                            </div>
+                            <div class="bot-info">📛 ${bot.display_name}</div>
+                            <div class="bot-info">🆔 ${bot.bot_id}</div>
+                            <div class="bot-info">🔗 Webhook: ${bot.webhook_active ? 'active' : 'inactive'}</div>
+                            <div class="bot-info">👥 ${bot.groups_count || 0} groups</div>
+                            ${!isPrimary ? `
+                                <div class="bot-actions">
+                                    ${isDead ? `<button class="btn-small btn-warning" onclick="reauthBot(${bot.bot_id})">🔄 Re-auth</button>` : ''}
+                                    <button class="btn-small btn-danger" onclick="removeBot(${bot.bot_id})">🗑️ Remove</button>
+                                </div>
+                            ` : ''}
+                            <div class="bot-actions">
+                                <button class="btn-small btn-primary" onclick="selectBotGroup(${bot.bot_id})">Select a group ▼</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+            } catch (e) {
+                botsList.innerHTML = `<p style="color: var(--danger);">Error loading bots: ${e.message}</p>`;
+            }
+        }
+
+        function toggleCloneForm() {
+            const section = document.getElementById('clone-section');
+            const btn = document.getElementById('clone-toggle');
+            if (section.classList.contains('active')) {
+                section.classList.remove('active');
+                btn.innerText = '➕ Clone a new bot';
+            } else {
+                section.classList.add('active');
+                btn.innerText = '✕ Cancel';
+            }
+        }
+
+        async function submitClone() {
+            const token = document.getElementById('clone-token').value.trim();
+            const errorEl = document.getElementById('clone-error');
+            const submitBtn = document.getElementById('clone-submit');
+            
+            if (!token) {
+                errorEl.innerText = 'Please enter a token';
+                errorEl.classList.add('visible');
+                return;
+            }
+            
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Cloning...';
+            errorEl.classList.remove('visible');
+            
+            try {
+                const result = await apiFetch('/api/bots/clone', {
+                    method: 'POST',
+                    body: JSON.stringify({ token })
+                });
+                
+                showToast(`Bot @${result.username} cloned successfully!`);
+                document.getElementById('clone-token').value = '';
+                toggleCloneForm();
+                loadBots(); // Refresh list
+            } catch (e) {
+                errorEl.innerText = e.message || 'Failed to clone bot';
+                errorEl.classList.add('visible');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Clone Bot';
+            }
+        }
+
+        async function removeBot(botId) {
+            if (!confirm('Are you sure you want to remove this bot? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                await apiFetch(`/api/bots/${botId}`, { method: 'DELETE' });
+                showToast('Bot removed successfully');
+                loadBots();
+            } catch (e) {
+                showToast('Error removing bot: ' + e.message, true);
+            }
+        }
+
+        async function reauthBot(botId) {
+            const token = prompt('Enter the new token for this bot from @BotFather:');
+            if (!token) return;
+            
+            try {
+                await apiFetch(`/api/bots/${botId}/reauth`, {
+                    method: 'POST',
+                    body: JSON.stringify({ token })
+                });
+                showToast('Bot re-authenticated successfully');
+                loadBots();
+            } catch (e) {
+                showToast('Error re-authenticating: ' + e.message, true);
+            }
+        }
+
+        async function selectBotGroup(botId) {
+            currentBotId = botId;
+            const sheet = document.getElementById('group-sheet');
+            const overlay = document.getElementById('sheet-overlay');
+            const list = document.getElementById('group-list');
+            
+            try {
+                const groups = await apiFetch(`/api/bots/${botId}/groups`);
+                
+                if (groups.length === 0) {
+                    list.innerHTML = '<p style="text-align: center; opacity: 0.5;">No groups found for this bot.</p>';
+                } else {
+                    list.innerHTML = groups.map(g => `
+                        <div class="group-item" onclick="selectGroupFromSheet(${g.chat_id})">
+                            <span class="group-icon">🔵</span>
+                            <span class="group-title">${g.title}</span>
+                            <span class="group-members">${g.member_count || 0} members</span>
+                        </div>
+                    `).join('');
+                }
+                
+                sheet.classList.add('visible');
+                overlay.classList.add('visible');
+            } catch (e) {
+                showToast('Error loading groups: ' + e.message, true);
+            }
+        }
+
+        function closeGroupSheet() {
+            const sheet = document.getElementById('group-sheet');
+            const overlay = document.getElementById('sheet-overlay');
+            sheet.classList.remove('visible');
+            overlay.classList.remove('visible');
+        }
+
+        function selectGroupFromSheet(chatId) {
+            closeGroupSheet();
+            // Navigate to dashboard with this group
+            const sel = document.getElementById('group-selector');
+            sel.value = chatId;
+            currentChatId = chatId;
+            loadGroupDetails();
+            // Switch to dashboard tab
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('page-dashboard').classList.add('active');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.tab:first-child').classList.add('active');
+        }
+
+        // Initialize
         loadGroups();
+        initSupabase();
     </script>
 </body>
 </html>

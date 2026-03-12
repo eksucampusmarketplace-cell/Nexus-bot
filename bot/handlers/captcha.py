@@ -1,7 +1,87 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ChatMemberHandler
 from db.ops.captcha import add_captcha_pending, get_captcha_pending, remove_captcha_pending
 from datetime import datetime, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+async def new_member_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handler for new chat members - used by ChatMemberHandler.
+    This is called when a user's chat member status changes (e.g., they join).
+    """
+    chat_id = update.effective_chat.id
+    if not update.chat_member or not update.chat_member.new_chat_member:
+        return
+    
+    new_member = update.chat_member.new_chat_member
+    
+    # Only process users who were added (not left/kicked)
+    if new_member.status not in ["member", "restricted"]:
+        return
+    
+    member = new_member.user
+    
+    # Skip bots
+    if member.is_bot:
+        return
+    
+    from db.ops.groups import get_group
+    group = await get_group(chat_id)
+    if not group:
+        return
+    
+    settings = group.get('settings', {})
+    
+    # Anti-bot check
+    antibot = settings.get('automod', {}).get('antibot', {})
+    if antibot.get('enabled') and not member.username:
+        try:
+            await context.bot.unban_chat_member(chat_id, member.id)
+            logger.info(f"[AUTOMOD] Kicked user without username: {member.id}")
+        except Exception as e:
+            logger.warning(f"[AUTOMOD] Failed to kick user without username: {e}")
+        return
+    
+    # Captcha check
+    captcha = settings.get('automod', {}).get('captcha', {})
+    if captcha.get('enabled'):
+        await send_captcha(update, context, member)
+        return
+    
+    # Welcome message
+    welcome = settings.get('welcome', {})
+    if welcome.get('enabled'):
+        text = welcome.get('text', 'Welcome {first_name}!').format(
+            first_name=member.first_name,
+            last_name=member.last_name or "",
+            username=member.username or ""
+        )
+        try:
+            msg = await context.bot.send_message(chat_id, text)
+            delete_after = welcome.get('delete_after', 0)
+            if delete_after > 0:
+                context.job_queue.run_once(
+                    delete_msg_job,
+                    delete_after,
+                    data={"chat_id": chat_id, "message_id": msg.message_id}
+                )
+        except Exception as e:
+            logger.warning(f"[WELCOME] Failed to send welcome message: {e}")
+
+
+async def delete_msg_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to delete a message after a delay."""
+    try:
+        await context.bot.delete_message(
+            context.job.data["chat_id"],
+            context.job.data["message_id"]
+        )
+    except:
+        pass
+
 
 async def send_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE, member):
     chat_id = update.effective_chat.id

@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     PORT: int = 8000
     RENDER_EXTERNAL_URL: Optional[str] = None
+    CLONE_ACCESS: str = "owner_only"  # owner_only | anyone
+    SECRET_KEY: Optional[str] = None  # Fernet key for token encryption
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -32,6 +34,9 @@ class Settings(BaseSettings):
         
         if not self.SUPABASE_CONNECTION_STRING or "your" in self.SUPABASE_CONNECTION_STRING.lower():
             missing.append("SUPABASE_CONNECTION_STRING")
+        
+        if not self.SECRET_KEY or len(self.SECRET_KEY) < 32:
+            missing.append("SECRET_KEY")
         
         if missing:
             print("=" * 60, file=sys.stderr)

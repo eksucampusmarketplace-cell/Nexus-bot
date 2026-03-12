@@ -14,6 +14,11 @@ class Database:
         
         conn_str = settings.SUPABASE_CONNECTION_STRING
         
+        # Note: statement_cache_size=0 is required for Supabase/pgbouncer compatibility
+        # Supabase uses pgbouncer with transaction pooling, which doesn't support
+        # prepared statements properly. Setting statement_cache_size to 0 disables
+        # the prepared statement cache and allows the application to work correctly.
+        
         # Validate connection string format
         if not conn_str or not conn_str.startswith("postgresql://"):
             raise ValueError(
@@ -32,6 +37,7 @@ class Database:
                     min_size=1,
                     max_size=10,
                     command_timeout=60,
+                    statement_cache_size=0,
                     server_settings={
                         'application_name': 'nexus-bot'
                     }

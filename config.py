@@ -17,6 +17,18 @@ class Settings(BaseSettings):
     CLONE_ACCESS: str = "owner_only"  # owner_only | anyone
     SECRET_KEY: Optional[str] = None  # Fernet key for token encryption
     SUPPORT_GROUP_URL: Optional[str] = None  # Optional support group link for the Mini App
+    
+    # ── Bot Display & Support ────────────────────────────────────────────────
+    BOT_DISPLAY_NAME: str = "Nexus"  # Displayed in "Powered by {bot_name}"
+    MAIN_BOT_USERNAME: str = "NexusBot"  # Username for support redirects
+    SUPPORT_GROUP_ID: int = 0  # Internal alerts group (0 = disabled)
+    DOCS_URL: Optional[str] = None  # Documentation link for help messages
+    MINI_APP_URL: Optional[str] = None  # Base URL for the Mini App
+    
+    # ── Alert Settings ────────────────────────────────────────────────────────
+    ALERT_ON_ERRORS: bool = True  # Post errors to support group
+    ALERT_ON_NEW_CLONES: bool = True  # Post new clone registrations
+    ALERT_ON_DEAD_CLONES: bool = True  # Post when clone token becomes invalid
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

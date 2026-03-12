@@ -110,7 +110,7 @@ async def captcha_timeout(context: ContextTypes.DEFAULT_TYPE):
             pass
         await remove_captcha_pending(data['user_id'], data['chat_id'])
 
-async def captcha_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def captcha_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     data = query.data
     if not data.startswith("captcha_verify_"):

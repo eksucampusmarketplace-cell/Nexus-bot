@@ -44,14 +44,14 @@ def get_setting(settings: dict, *keys, default=None):
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or update.effective_chat.type == "private":
         return
-    
+
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    
+
     # Track stats
     await upsert_user(user_id, chat_id, update.effective_user.username, update.effective_user.first_name)
     await increment_message_count(user_id, chat_id)
-    
+
     group = await get_group(chat_id)
     if not group:
         # Auto-register group if not exists
@@ -59,7 +59,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     settings = group.get('settings') or {}
-    
+
+    # ── Advanced Automod Engine Check ───────────────────────────────────
+    # Call the new advanced automod engine first
+    from bot.automod.engine import check_message
+    result = await check_message(update, context)
+    if result.violated:
+        return  # Message handled by engine
+
+    # ── Legacy automod (for backward compatibility) ──────────────
     # 1. Anti-link
     antilink = get_setting(settings, 'automod', 'antilink')
     if antilink['enabled'] and update.message.text:
@@ -81,21 +89,21 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         now = datetime.now()
         if chat_id not in flood_data: flood_data[chat_id] = {}
         if user_id not in flood_data[chat_id]: flood_data[chat_id][user_id] = []
-        
+
         timestamps = flood_data[chat_id][user_id]
         window = antiflood['window']
         limit = antiflood['limit']
-        
+
         # Clean old timestamps
         timestamps = [t for t in timestamps if now - t < timedelta(seconds=window)]
         timestamps.append(now)
         flood_data[chat_id][user_id] = timestamps
-        
+
         if len(timestamps) > limit:
             action = antiflood['action']
             duration = antiflood['duration']
             until = now + timedelta(seconds=duration)
-            
+
             if action == "mute":
                 await context.bot.restrict_chat_member(chat_id, user_id, permissions={"can_send_messages": False}, until_date=until)
                 await update.message.reply_text(f"🔇 {update.effective_user.first_name} muted for flooding.")

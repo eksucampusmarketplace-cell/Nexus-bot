@@ -19,5 +19,7 @@ py-tgcalls>=2.1.0
 redis>=5.0.4
 aioredis>=2.0.1
 psutil>=5.9.8
+pytz>=2023.3
+emoji>=2.10.0
 # Note: py-tgcalls (formerly pytgcalls) requires ntgcalls binary dependency
 # On Render, Python 3.11+ is supported with py-tgcalls

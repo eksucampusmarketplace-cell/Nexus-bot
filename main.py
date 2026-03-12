@@ -273,6 +273,7 @@ from api.routes.music_auth import router as music_auth_router
 from api.routes.auth import router as auth_router
 from api.routes.admin import router as admin_router
 from api.routes.billing import router as billing_router
+from api.routes import automod as automod_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -293,6 +294,7 @@ fastapi_app.include_router(auth_router)
 fastapi_app.include_router(admin_router)
 fastapi_app.include_router(billing_router)
 fastapi_app.include_router(events.router)
+fastapi_app.include_router(automod_router.router)
 
 
 @fastapi_app.get("/", response_class=JSONResponse)

@@ -68,6 +68,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         antiflood_handler, antispam_handler, antilink_handler,
         message_handler, member_join_handler
     )
+    from bot.handlers.advanced_automod import handle_automod_command
     from bot.handlers.captcha import (
         new_member_handler, captcha_callback_handler
     )
@@ -194,6 +195,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("stats",   stats_handler))
     app.add_handler(CommandHandler("id",      id_handler))
     app.add_handler(CommandHandler("report",  report_handler))
+
+    # ── Advanced automod commands ───────────────────────────────────────
+    # These are also handled by prefix_handler (!, !!) in group 0
+    # But we also register specific commands here as fallback
+    app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_automod_command), group=2)
 
     # ── Music commands (groups only) ───────────────────────────────────────
     # OLD MUSIC SYSTEM - REPLACED BY NEW STREAMING SYSTEM

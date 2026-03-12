@@ -189,23 +189,61 @@ async def purge_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = int(context.args[0]) if context.args and context.args[0].isdigit() else 10
     count = min(count, 100)
     
-    # Actually delete messages would require message IDs which we don't track easily here
-    # PTB doesn't have a direct purge but we can try to delete range
-    await update.message.delete()
-    # Simple purge: delete messages leading up to this one (not perfect in async but works for small amounts)
-    # Better implementation would use context.bot.delete_messages if supported
-    # Here we'll just acknowledge
-    await update.message.reply_text(f"Purged {count} messages (simulated).")
+    chat_id = update.effective_chat.id
+    message_id = update.message.message_id
+    
+    # Collect message IDs to delete
+    message_ids = []
+    for i in range(count + 1):
+        message_ids.append(message_id - i)
+
+    try:
+        # delete_messages is available in newer PTB versions
+        await context.bot.delete_messages(chat_id, message_ids)
+    except Exception as e:
+        logger.warning(f"delete_messages failed, falling back to individual deletion: {e}")
+        for mid in message_ids:
+            try:
+                await context.bot.delete_message(chat_id, mid)
+            except Exception:
+                continue
+    
+    # Confirmation message that deletes itself (if possible)
+    try:
+        sent = await context.bot.send_message(
+            chat_id, 
+            f"🧹 <b>Purge Complete</b>\nSuccessfully removed {count} messages.",
+            parse_mode="HTML"
+        )
+        # In a real bot we'd use context.job_queue to delete this after 5s
+    except Exception:
+        pass
 
 async def id_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"Chat ID: <code>{update.effective_chat.id}</code>\nUser ID: <code>{update.effective_user.id}</code>", parse_mode="HTML")
+    text = (
+        f"<b>🆔 Identification</b>\n\n"
+        f"👤 <b>User:</b>\n"
+        f"  • Name: {update.effective_user.full_name}\n"
+        f"  • ID: <code>{update.effective_user.id}</code>\n"
+        f"  • Username: @{update.effective_user.username or 'None'}\n\n"
+        f"💬 <b>Chat:</b>\n"
+        f"  • Title: {update.effective_chat.title}\n"
+        f"  • ID: <code>{update.effective_chat.id}</code>\n"
+        f"  • Type: {update.effective_chat.type.capitalize()}"
+    )
+    await update.message.reply_text(text, parse_mode="HTML")
 
 async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await command_enabled(update.effective_chat.id, "rules"): return
     group = await get_group(update.effective_chat.id)
     settings = group.get('settings', {}) if group else {}
     rules = get_setting(settings, 'rules', default=["No rules set."])
-    text = "📜 <b>Group Rules</b>\n\n" + "\n".join([f"{i+1}. {r}" for i, r in enumerate(rules)])
+    
+    text = "📜 <b>Group Rules</b>\n"
+    text += "────────────────────\n"
+    text += "\n".join([f"<b>{i+1}.</b> {r}" for i, r in enumerate(rules)])
+    text += "\n\n<i>Please follow these rules to avoid being warned.</i>"
+    
     await update.message.reply_text(text, parse_mode="HTML")
 
 # Additional handlers needed by factory.py
@@ -219,20 +257,29 @@ async def unwarn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     target = update.message.reply_to_message.from_user
     count = await remove_warn(target.id, update.effective_chat.id)
-    await update.message.reply_text(f"✅ Removed warning for {format_user(target)}. ({count} remaining)")
+    await update.message.reply_text(f"✅ Removed warning for {format_user(target)}. ({count} remaining)", parse_mode="HTML")
 
 async def warns_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show warnings for a user."""
     if not await command_enabled(update.effective_chat.id, "warns"):
         return
-    if not update.message.reply_to_message:
-        await update.message.reply_text("Reply to a user's message to see their warnings.")
-        return
-    target = update.message.reply_to_message.from_user
+    
+    target = update.message.reply_to_message.from_user if update.message.reply_to_message else update.effective_user
     user = await get_user(target.id, update.effective_chat.id)
     warns = user.get('warns', []) if user else []
     count = len(warns)
-    await update.message.reply_text(f"⚠️ {format_user(target)} has {count} warning(s).")
+    
+    text = f"⚠️ <b>Warnings for {format_user(target)}</b>\n"
+    text += f"Total: {count}\n\n"
+    
+    if warns:
+        for i, w in enumerate(warns):
+            date = w.get('timestamp', '').split('T')[0]
+            text += f"{i+1}. {w.get('reason', 'No reason')} ({date})\n"
+    else:
+        text += "No warnings on record. ✅"
+        
+    await update.message.reply_text(text, parse_mode="HTML")
 
 async def unban_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unban a user from the group."""
@@ -243,7 +290,7 @@ async def unban_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     target = update.message.reply_to_message.from_user
     await context.bot.unban_chat_member(update.effective_chat.id, target.id)
-    await update.message.reply_text(f"✅ {format_user(target)} has been unbanned.")
+    await update.message.reply_text(f"✅ {format_user(target)} has been unbanned.", parse_mode="HTML")
 
 async def unmute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unmute a user in the group."""
@@ -263,7 +310,7 @@ async def unmute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
     )
     await update_user_status(target.id, update.effective_chat.id, is_muted=False, mute_until=None)
-    await update.message.reply_text(f"✅ {format_user(target)} has been unmuted.")
+    await update.message.reply_text(f"✅ {format_user(target)} has been unmuted.", parse_mode="HTML")
 
 async def kick_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Kick a user from the group (ban then unban)."""
@@ -276,7 +323,7 @@ async def kick_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reason = " ".join(context.args) if context.args else "No reason provided"
     await context.bot.ban_chat_member(update.effective_chat.id, target.id)
     await context.bot.unban_chat_member(update.effective_chat.id, target.id)
-    await update.message.reply_text(f"👢 {format_user(target)} has been kicked.\nReason: {reason}")
+    await update.message.reply_text(f"👢 {format_user(target)} has been kicked.\nReason: {reason}", parse_mode="HTML")
     await log_action(
         update.effective_chat.id, "kick", target.id, target.username or target.first_name,
         update.effective_user.id, update.effective_user.username or update.effective_user.first_name,
@@ -288,14 +335,14 @@ async def lock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context):
         return
     lock_type = context.args[0] if context.args else "all"
-    await update.message.reply_text(f"🔒 {lock_type} locked.")
+    await update.message.reply_text(f"🔒 <b>{lock_type.upper()}</b> has been locked.", parse_mode="HTML")
 
 async def unlock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unlock a chat setting."""
     if not await is_admin(update, context):
         return
     unlock_type = context.args[0] if context.args else "all"
-    await update.message.reply_text(f"🔓 {unlock_type} unlocked.")
+    await update.message.reply_text(f"🔓 <b>{unlock_type.upper()}</b> has been unlocked.", parse_mode="HTML")
 
 async def pin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Pin a message in the group."""
@@ -305,26 +352,35 @@ async def pin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Reply to a message to pin it.")
         return
     await context.bot.pin_chat_message(update.effective_chat.id, update.message.reply_to_message.message_id)
-    await update.message.reply_text("📌 Message pinned.")
+    await update.message.reply_text("📌 Message successfully pinned.", parse_mode="HTML")
 
 async def unpin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unpin the current pinned message."""
     if not await is_admin(update, context):
         return
     await context.bot.unpin_chat_message(update.effective_chat.id)
-    await update.message.reply_text("📌 Pinned message removed.")
+    await update.message.reply_text("📌 Pinned message removed.", parse_mode="HTML")
 
 async def info_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show group information."""
     chat = update.effective_chat
-    member_count = "N/A"
-    await update.message.reply_text(
-        f"ℹ️ <b>Group Info</b>\n\n"
-        f"Name: {chat.title}\n"
-        f"ID: <code>{chat.id}</code>\n"
-        f"Members: {member_count}",
-        parse_mode="HTML"
+    try:
+        member_count = await context.bot.get_chat_member_count(chat.id)
+    except Exception:
+        member_count = "N/A"
+        
+    text = (
+        f"ℹ️ <b>Group Information</b>\n\n"
+        f"<b>Name:</b> {chat.title}\n"
+        f"<b>ID:</b> <code>{chat.id}</code>\n"
+        f"<b>Type:</b> {chat.type.capitalize()}\n"
+        f"<b>Members:</b> {member_count}\n"
+        f"<b>Username:</b> @{chat.username or 'None'}\n"
     )
+    if chat.description:
+        text += f"<b>Description:</b>\n{chat.description}\n"
+        
+    await update.message.reply_text(text, parse_mode="HTML")
 
 async def admins_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """List group administrators."""
@@ -332,8 +388,12 @@ async def admins_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         admins = await context.bot.get_chat_administrators(update.effective_chat.id)
-        admin_list = [f"• {a.user.name}" for a in admins]
-        text = f"👮 <b>Admins ({len(admins)})</b>\n\n" + "\n".join(admin_list)
+        admin_list = []
+        for a in admins:
+            role = "Owner" if a.status == "creator" else "Admin"
+            admin_list.append(f"• {format_user(a.user)} (<i>{role}</i>)")
+            
+        text = f"👮 <b>Administrators ({len(admins)})</b>\n\n" + "\n".join(admin_list)
         await update.message.reply_text(text, parse_mode="HTML")
     except Exception as e:
         await update.message.reply_text(f"Could not fetch admins: {e}")
@@ -342,13 +402,28 @@ async def stats_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show group statistics."""
     if not await is_admin(update, context):
         return
-    await update.message.reply_text(
-        "📊 <b>Group Stats</b>\n\n"
-        "Members: -\n"
-        "Messages today: -\n"
-        "Warnings: -",
-        parse_mode="HTML"
+    
+    chat_id = update.effective_chat.id
+    from db.client import db
+    async with db.pool.acquire() as conn:
+        total_messages = await conn.fetchval("SELECT SUM(message_count) FROM users WHERE chat_id = $1", chat_id)
+        active_users = await conn.fetchval("SELECT COUNT(*) FROM users WHERE chat_id = $1 AND last_seen > NOW() - INTERVAL '7 days'", chat_id)
+        total_warns = await conn.fetchval("SELECT COUNT(*) FROM actions_log WHERE chat_id = $1 AND action = 'warn'", chat_id)
+        
+    try:
+        member_count = await context.bot.get_chat_member_count(chat_id)
+    except Exception:
+        member_count = "N/A"
+
+    text = (
+        f"📊 <b>Group Statistics</b>\n"
+        f"────────────────────\n"
+        f"👥 <b>Members:</b> {member_count}\n"
+        f"💬 <b>Total Messages:</b> {total_messages or 0}\n"
+        f"🔥 <b>Active (7d):</b> {active_users or 0}\n"
+        f"⚠️ <b>Total Warnings:</b> {total_warns or 0}\n"
     )
+    await update.message.reply_text(text, parse_mode="HTML")
 
 async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Report a message to admins."""

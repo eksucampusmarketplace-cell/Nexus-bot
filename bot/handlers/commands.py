@@ -12,6 +12,30 @@ from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+# Default settings for fallback
+DEFAULT_WARNINGS = {"threshold": 3, "action": "ban"}
+DEFAULT_SETTINGS = {
+    "warnings": DEFAULT_WARNINGS,
+    "rules": ["Be respectful", "No spam"]
+}
+
+def get_setting(settings: dict, *keys, default=None):
+    """Safely get nested settings value with fallback to defaults."""
+    value = settings
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            # Fall back to default settings
+            default_value = DEFAULT_SETTINGS
+            for k in keys:
+                if isinstance(default_value, dict) and k in default_value:
+                    default_value = default_value[k]
+                else:
+                    return default
+            return default_value
+    return value if value is not None else default
+
 def get_token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()[:10]
 
@@ -103,7 +127,9 @@ async def warn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     count = await add_warn(target.id, update.effective_chat.id, reason, update.effective_user.id)
     
     group = await get_group(update.effective_chat.id)
-    threshold = group['settings']['warnings']['threshold']
+    settings = group.get('settings', {}) if group else {}
+    warnings_settings = get_setting(settings, 'warnings')
+    threshold = warnings_settings['threshold']
     
     await update.message.reply_text(f"⚠️ {format_user(target)} has been warned. ({count}/{threshold})\nReason: {reason}", parse_mode="HTML")
     
@@ -114,7 +140,7 @@ async def warn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     if count >= threshold:
-        action = group['settings']['warnings']['action']
+        action = warnings_settings['action']
         if action == "ban":
             await context.bot.ban_chat_member(update.effective_chat.id, target.id)
             await update.message.reply_text(f"🚫 {format_user(target)} reached warning threshold and was banned.", parse_mode="HTML")
@@ -169,7 +195,8 @@ async def id_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await command_enabled(update.effective_chat.id, "rules"): return
     group = await get_group(update.effective_chat.id)
-    rules = group['settings']['rules'] if group else ["No rules set."]
+    settings = group.get('settings', {}) if group else {}
+    rules = get_setting(settings, 'rules', default=["No rules set."])
     text = "📜 <b>Group Rules</b>\n\n" + "\n".join([f"{i+1}. {r}" for i, r in enumerate(rules)])
     await update.message.reply_text(text, parse_mode="HTML")
 

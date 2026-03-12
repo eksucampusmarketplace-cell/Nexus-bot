@@ -10,6 +10,37 @@ logger = logging.getLogger(__name__)
 # Simple in-memory flood tracking
 flood_data = {} # {chat_id: {user_id: [timestamps]}}
 
+# Default automod settings (same as in db/ops/groups.py)
+DEFAULT_AUTOMOD = {
+    "antiflood": {"enabled": True, "limit": 5, "window": 10, "action": "mute", "duration": 600},
+    "antispam": {"enabled": True, "threshold": 3, "action": "warn"},
+    "antilink": {"enabled": False, "whitelist": ["github.com", "stackoverflow.com"]},
+    "captcha": {"enabled": True, "timeout": 120, "action": "kick"},
+    "antibot": {"enabled": True, "min_age_days": 7}
+}
+
+DEFAULT_SETTINGS = {
+    "automod": DEFAULT_AUTOMOD,
+    "welcome": {"enabled": True, "text": "👋 Welcome {first_name}!", "delete_after": 60}
+}
+
+def get_setting(settings: dict, *keys, default=None):
+    """Safely get nested settings value with fallback to defaults."""
+    value = settings
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            # Fall back to default settings
+            default_value = DEFAULT_SETTINGS
+            for k in keys:
+                if isinstance(default_value, dict) and k in default_value:
+                    default_value = default_value[k]
+                else:
+                    return default
+            return default_value
+    return value if value is not None else default
+
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or update.effective_chat.type == "private":
         return
@@ -27,15 +58,16 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await upsert_group(chat_id, update.effective_chat.title, "")
         return
 
-    automod = group['settings']['automod']
+    settings = group.get('settings', {})
     
     # 1. Anti-link
-    if automod['antilink']['enabled'] and update.message.text:
+    antilink = get_setting(settings, 'automod', 'antilink')
+    if antilink['enabled'] and update.message.text:
         import re
         links = re.findall(r'(https?://[^\s]+)', update.message.text)
         for link in links:
             whitelisted = False
-            for domain in automod['antilink']['whitelist']:
+            for domain in antilink['whitelist']:
                 if domain in link:
                     whitelisted = True
                     break
@@ -44,14 +76,15 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
     # 2. Anti-flood
-    if automod['antiflood']['enabled']:
+    antiflood = get_setting(settings, 'automod', 'antiflood')
+    if antiflood['enabled']:
         now = datetime.now()
         if chat_id not in flood_data: flood_data[chat_id] = {}
         if user_id not in flood_data[chat_id]: flood_data[chat_id][user_id] = []
         
         timestamps = flood_data[chat_id][user_id]
-        window = automod['antiflood']['window']
-        limit = automod['antiflood']['limit']
+        window = antiflood['window']
+        limit = antiflood['limit']
         
         # Clean old timestamps
         timestamps = [t for t in timestamps if now - t < timedelta(seconds=window)]
@@ -59,8 +92,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         flood_data[chat_id][user_id] = timestamps
         
         if len(timestamps) > limit:
-            action = automod['antiflood']['action']
-            duration = automod['antiflood']['duration']
+            action = antiflood['action']
+            duration = antiflood['duration']
             until = now + timedelta(seconds=duration)
             
             if action == "mute":
@@ -87,9 +120,10 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not group:
         return
     
-    automod = group['settings']['automod']
+    settings = group.get('settings', {})
+    antiflood = get_setting(settings, 'automod', 'antiflood')
     
-    if automod['antiflood']['enabled']:
+    if antiflood['enabled']:
         now = datetime.now()
         if chat_id not in flood_data:
             flood_data[chat_id] = {}
@@ -97,8 +131,8 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             flood_data[chat_id][user_id] = []
         
         timestamps = flood_data[chat_id][user_id]
-        window = automod['antiflood']['window']
-        limit = automod['antiflood']['limit']
+        window = antiflood['window']
+        limit = antiflood['limit']
         
         # Clean old timestamps
         timestamps = [t for t in timestamps if now - t < timedelta(seconds=window)]
@@ -106,8 +140,8 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         flood_data[chat_id][user_id] = timestamps
         
         if len(timestamps) > limit:
-            action = automod['antiflood']['action']
-            duration = automod['antiflood']['duration']
+            action = antiflood['action']
+            duration = antiflood['duration']
             until = now + timedelta(seconds=duration)
             
             if action == "mute":
@@ -145,14 +179,15 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not group:
         return
     
-    automod = group['settings']['automod']
+    settings = group.get('settings', {})
+    antilink = get_setting(settings, 'automod', 'antilink')
     
-    if automod['antilink']['enabled']:
+    if antilink['enabled']:
         import re
         links = re.findall(r'(https?://[^\s]+)', update.message.text)
         for link in links:
             whitelisted = False
-            for domain in automod['antilink']['whitelist']:
+            for domain in antilink['whitelist']:
                 if domain in link:
                     whitelisted = True
                     break
@@ -168,12 +203,13 @@ async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     group = await get_group(chat_id)
     if not group: return
     
-    settings = group['settings']
+    settings = group.get('settings', {})
     for member in update.message.new_chat_members:
         if member.is_bot: continue
         
         # Anti-bot
-        if settings['automod']['antibot']['enabled']:
+        antibot = get_setting(settings, 'automod', 'antibot')
+        if antibot['enabled']:
             # min_age_days check is hard via TG API directly without extra info
             # but we can check for username
             if not member.username:
@@ -181,16 +217,19 @@ async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 return
 
         # Captcha
-        if settings['automod']['captcha']['enabled']:
+        captcha = get_setting(settings, 'automod', 'captcha')
+        if captcha['enabled']:
             from bot.handlers.captcha import send_captcha
             await send_captcha(update, context, member)
         
         # Welcome message
-        elif settings['welcome']['enabled']:
-            text = settings['welcome']['text'].format(first_name=member.first_name, last_name=member.last_name or "", username=member.username or "")
-            msg = await update.message.reply_text(text)
-            if settings['welcome']['delete_after'] > 0:
-                context.job_queue.run_once(delete_msg, settings['welcome']['delete_after'], data=(chat_id, msg.message_id))
+        else:
+            welcome = get_setting(settings, 'welcome')
+            if welcome['enabled']:
+                text = welcome['text'].format(first_name=member.first_name, last_name=member.last_name or "", username=member.username or "")
+                msg = await update.message.reply_text(text)
+                if welcome['delete_after'] > 0:
+                    context.job_queue.run_once(delete_msg, welcome['delete_after'], data=(chat_id, msg.message_id))
 
 async def delete_msg(context: ContextTypes.DEFAULT_TYPE):
     chat_id, msg_id = context.job.data

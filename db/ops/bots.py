@@ -324,7 +324,7 @@ async def count_recent_clone_attempts(
             """
             SELECT COUNT(*) FROM clone_attempts
             WHERE user_id = $1
-            AND attempted_at > NOW() - ($2 || ' minutes')::INTERVAL
+            AND attempted_at > NOW() - INTERVAL '1 minute' * $2
             """,
             user_id, window_minutes
         )

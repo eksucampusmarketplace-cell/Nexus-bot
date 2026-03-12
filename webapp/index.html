@@ -595,8 +595,92 @@
             </div>
         );
 
+        // Privacy Policy Modal
+        const PrivacyPolicyModal = ({ isOpen, onClose }) => {
+            if (!isOpen) return null;
+            const policyText = `📜 Standard Bot Privacy Policy
+
+This privacy policy governs the relationship between Third-Party Service and User.
+
+1. Terms and Definitions
+• Telegram – Telegram Messenger Inc
+• Platform – The Telegram Bot Platform
+• Developer – The person or entity who operates the bot/mini app
+• Third-Party Service – The bot or mini app made available on Platform
+• User – The person accessing Third-Party Service via their Telegram account
+• Policy – This document
+
+2. General Provisions
+• This Policy applies to all third-party bots and mini apps on Platform by default
+• It governs the collection, storage, distribution, usage and protection of User information
+• Your continued use of this bot constitutes acceptance of this Policy
+
+3. Disclaimers
+• This bot is an independent third-party application, not maintained or affiliated with Telegram
+• This Policy may be amended at any time — your continued use means you accept the changes
+
+4. Collection of Personal Data
+• We may access limited information as described in Telegram's Privacy Policy
+• Additional data is collected only when you send messages, upload files, or choose to share information
+• Anonymous diagnostic data may be collected for service improvement
+
+5. Processing of Personal Data
+• We only collect data necessary for the bot's features to function
+• Your data is processed on the legal ground of legitimate interest (providing services)
+• We do not monetize user data for purposes outside this service
+
+6. Data Protection
+• We employ security measures to protect your data
+• User information is handled in compliance with applicable laws
+• We will never share your data with third parties unless required by law or explicitly authorized by you
+
+7. Your Rights
+You may:
+• Request a copy of all personal data we collected about you
+• Request deletion of your personal data (except where required by law)
+• Amend, restrict, or object to processing of your data
+• Withdraw consent at any time
+• Lodge a complaint with data protection authorities
+
+To exercise these rights, contact the bot developer.
+
+8. Changes to Privacy Policy
+We may update this Policy from time to time. Please check for updates.
+
+This is Telegram's Standard Bot Privacy Policy. The bot developer may have published a separate, custom privacy policy.`;
+
+            return (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '20px'
+                }} onClick={onClose}>
+                    <div style={{
+                        backgroundColor: 'var(--bg)', borderRadius: '12px', padding: '20px',
+                        maxWidth: '500px', maxHeight: '80vh', overflow: 'auto',
+                        border: '1px solid var(--card-border)'
+                    }} onClick={e => e.stopPropagation()}>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px'}}>
+                            <h2 style={{margin: 0, color: 'var(--accent)'}}>📜 Privacy Policy</h2>
+                            <button onClick={onClose} style={{
+                                background: 'none', border: 'none', color: 'var(--text)',
+                                fontSize: '24px', cursor: 'pointer', padding: '0', lineHeight: 1
+                            }}>✕</button>
+                        </div>
+                        <pre style={{
+                            whiteSpace: 'pre-wrap', wordWrap: 'break-word',
+                            fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.5',
+                            color: 'var(--text-dim)'
+                        }}>{policyText}</pre>
+                    </div>
+                </div>
+            );
+        };
+
         // Stranger/Onboarding Screen
         const StrangerScreen = ({ user, botInfo, onRefresh }) => {
+            const [showPrivacy, setShowPrivacy] = useState(false);
             const botUsername = botInfo?.username || 'NexusBot';
             const botFirstName = botInfo?.first_name || 'Nexus';
             const firstName = user?.first_name || 'there';
@@ -607,36 +691,42 @@
             };
 
             return (
-                <div className="onboarding-container">
-                    <div className="onboarding-logo">
-                        <div className="logo-icon">⚡</div>
-                        <h1>{botFirstName}</h1>
-                        <p>Intelligent Group Management</p>
-                    </div>
-                    <div className="onboarding-section">
-                        <p style={{fontSize: '16px', textAlign: 'center'}}>Hey <strong>{firstName}</strong>! 👋</p>
-                        <p style={{fontSize: '14px', color: 'var(--text-dim)', textAlign: 'center', marginTop: '10px'}}>
-                            You're not in any groups managed by {botFirstName} yet.
-                        </p>
-                    </div>
-                    <div className="onboarding-section">
-                        <h3>If you're a GROUP ADMIN:</h3>
-                        <div className="steps-box">
-                            <div className="step-item"><div className="step-number">1</div><div className="step-text">Add @{botUsername} to your group</div></div>
-                            <div className="step-item"><div className="step-number">2</div><div className="step-text">Make it an administrator</div></div>
-                            <div className="step-item"><div className="step-number">3</div><div className="step-text">Send /start in the group</div></div>
-                            <div className="step-item"><div className="step-number">4</div><div className="step-text">Come back here!</div></div>
+                <React.Fragment>
+                    <PrivacyPolicyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+                    <div className="onboarding-container">
+                        <div className="onboarding-logo">
+                            <div className="logo-icon">⚡</div>
+                            <h1>{botFirstName}</h1>
+                            <p>Intelligent Group Management</p>
+                        </div>
+                        <div className="onboarding-section">
+                            <p style={{fontSize: '16px', textAlign: 'center'}}>Hey <strong>{firstName}</strong>! 👋</p>
+                            <p style={{fontSize: '14px', color: 'var(--text-dim)', textAlign: 'center', marginTop: '10px'}}>
+                                You're not in any groups managed by {botFirstName} yet.
+                            </p>
+                        </div>
+                        <div className="onboarding-section">
+                            <h3>If you're a GROUP ADMIN:</h3>
+                            <div className="steps-box">
+                                <div className="step-item"><div className="step-number">1</div><div className="step-text">Add @{botUsername} to your group</div></div>
+                                <div className="step-item"><div className="step-number">2</div><div className="step-text">Make it an administrator</div></div>
+                                <div className="step-item"><div className="step-number">3</div><div className="step-text">Send /start in the group</div></div>
+                                <div className="step-item"><div className="step-number">4</div><div className="step-text">Come back here!</div></div>
+                            </div>
+                        </div>
+                        <button className="btn-full btn-primary" onClick={handleAddToGroup}>➕ Add {botFirstName} to My Group</button>
+                        <div className="onboarding-section" style={{marginTop: '30px'}}>
+                            <h3>If you're a GROUP MEMBER:</h3>
+                            <p style={{fontSize: '14px', color: 'var(--text-dim)', lineHeight: '1.6'}}>
+                                Ask your group admin to add {botFirstName}. This panel will show your stats, boost progress, and rankings.
+                            </p>
+                        </div>
+                        <button className="btn-full btn-secondary btn-refresh" onClick={onRefresh}>🔄 Refresh — I just joined a group</button>
+                        <div style={{marginTop: '20px', textAlign: 'center'}}>
+                            <button onClick={() => setShowPrivacy(true)} style={{background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline'}}>📜 Privacy Policy</button>
                         </div>
                     </div>
-                    <button className="btn-full btn-primary" onClick={handleAddToGroup}>➕ Add {botFirstName} to My Group</button>
-                    <div className="onboarding-section" style={{marginTop: '30px'}}>
-                        <h3>If you're a GROUP MEMBER:</h3>
-                        <p style={{fontSize: '14px', color: 'var(--text-dim)', lineHeight: '1.6'}}>
-                            Ask your group admin to add {botFirstName}. This panel will show your stats, boost progress, and rankings.
-                        </p>
-                    </div>
-                    <button className="btn-full btn-secondary btn-refresh" onClick={onRefresh}>🔄 Refresh — I just joined a group</button>
-                </div>
+                </React.Fragment>
             );
         };
 
@@ -863,6 +953,7 @@
         // Member App
         const MemberApp = ({ context, initData, onRefresh }) => {
             const [activeTab, setActiveTab] = useState('home');
+            const [showPrivacy, setShowPrivacy] = useState(false);
             const { user, memberGroups } = context;
 
             const renderContent = () => {
@@ -877,6 +968,7 @@
 
             return (
                 <React.Fragment>
+                    <PrivacyPolicyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
                     <div className="main-content">
                         <div className="header" style={{display: window.innerWidth > 768 ? 'none' : 'block'}}>
                             <h1>⚡ Nexus</h1>
@@ -896,6 +988,9 @@
                         </div>
                         <div className={`tab-item ${activeTab==='profile'?'active':''}`} onClick={() => setActiveTab('profile')}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profile</span>
+                        </div>
+                        <div className="tab-item" onClick={() => setShowPrivacy(true)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>Privacy</span>
                         </div>
                     </div>
                 </React.Fragment>
@@ -1105,6 +1200,7 @@
 
         const AdminApp = ({ context }) => {
             const { activeTab, setActiveTab, activeGroupTitle, activeGroupId, fetchModules, setActiveGroup } = useStore();
+            const [showPrivacy, setShowPrivacy] = useState(false);
             useEffect(() => {
                 const firstGroup = context.adminGroups?.[0] || context.modGroups?.[0];
                 if (firstGroup) { setActiveGroup(0, firstGroup.chat_id, firstGroup.title); fetchModules(firstGroup.chat_id); }
@@ -1121,12 +1217,14 @@
 
             return (
                 <React.Fragment>
+                    <PrivacyPolicyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
                     <div className="sidebar">
                         <div className="header"><h1>⚡ Nexus</h1><p>Admin Panel</p></div>
                         <nav style={{display:'flex', flexDirection:'column', gap:'10px', marginTop:'40px'}}>
                             <div onClick={() => setActiveTab('dashboard')} style={{padding:'10px', color: activeTab==='dashboard'?'var(--accent)':'#fff', cursor:'pointer'}}>Dashboard</div>
                             <div onClick={() => setActiveTab('modules')} style={{padding:'10px', color: activeTab==='modules'?'var(--accent)':'#fff', cursor:'pointer'}}>Modules</div>
                             <div onClick={() => setActiveTab('manage')} style={{padding:'10px', color: activeTab==='manage'?'var(--accent)':'#fff', cursor:'pointer'}}>Manage</div>
+                            <div onClick={() => setShowPrivacy(true)} style={{padding:'10px', color:'#fff', cursor:'pointer', marginTop:'auto'}}>📜 Privacy Policy</div>
                         </nav>
                     </div>
                     <div className="main-content">
@@ -1146,6 +1244,9 @@
                         </div>
                         <div className={`tab-item ${activeTab==='manage'?'active':''}`} onClick={() => setActiveTab('manage')}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span>Manage</span>
+                        </div>
+                        <div className="tab-item" onClick={() => setShowPrivacy(true)}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span>Privacy</span>
                         </div>
                     </div>
                 </React.Fragment>

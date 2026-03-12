@@ -506,7 +506,7 @@
       });
     }
 
-    function navigateToPage(pageId) {
+    async function navigateToPage(pageId) {
       // Update state
       store.setState({ activePage: pageId });
       getState().setActivePage?.(pageId);
@@ -528,7 +528,7 @@
       });
     }
 
-    function renderPage(pageId) {
+    async function renderPage(pageId) {
       const container = document.getElementById(`page-${pageId}`);
       if (!container) return;
 
@@ -537,7 +537,7 @@
           renderDashboard(container);
           break;
         case 'automod':
-          renderAutomodPage(container);
+          await renderAutomodPage(container);
           break;
         case 'members':
           renderMembers(container);
@@ -847,15 +847,19 @@
     }
 
     function renderSettings(container) {
-      container.innerHTML = Card({
+      container.innerHTML = '';
+      const card = Card({
         title: 'Theme & Appearance',
         children: '<div id="theme-picker-container"></div>'
       });
+      container.appendChild(card);
 
-      const pickerContainer = container.querySelector('#theme-picker-container');
-      ThemeEngine.renderPicker(pickerContainer, (color) => {
-        console.log('Accent changed:', color);
-      });
+      const pickerContainer = card.querySelector('#theme-picker-container');
+      if (pickerContainer) {
+        ThemeEngine.renderPicker(pickerContainer, (color) => {
+          console.log('Accent changed:', color);
+        });
+      }
     }
 
     async function renderLogs(container) {

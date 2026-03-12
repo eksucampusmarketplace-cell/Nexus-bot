@@ -11,7 +11,7 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, Toggle, Badge, EmptyState, showToast } from '../../lib/components.js';
+import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js';
 import { RULE_TEMPLATES, applyTemplate } from '../../lib/rule_templates.js';
 import { useStore } from '../../store/index.js';
 
@@ -127,29 +127,66 @@ const AUTOMOD_SECTIONS = [
  * Render the AutoMod configuration page
  * @param {HTMLElement} container - Container element to render into
  */
-export function renderAutomodPage(container) {
+export async function renderAutomodPage(container) {
   const chatId = store.getState().activeChatId;
-  const settings = store.getState().settings || {};
-  
+  const initData = window.Telegram?.WebApp?.initData || '';
+
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+
+  // Show loading state
+  container.innerHTML = `
+    <div style="display: flex; align-items: center; justify-content: center; padding: 40px;">
+      <div style="text-align: center; color: var(--text-muted);">
+        <div style="font-size: 24px; margin-bottom: 12px;">⏳</div>
+        <div style="font-size: var(--text-sm);">Loading settings...</div>
+      </div>
+    </div>
+  `;
+
+  let settings = store.getState().settings || {};
+
+  // Fetch settings from API if we have a chat ID
+  if (chatId) {
+    try {
+      const res = await fetch(`/api/groups/${chatId}`, {
+        headers: { 'x-init-data': initData }
+      });
+
+      if (res.ok) {
+        const group = await res.json();
+        settings = group.settings || {};
+        store.setSettings(settings);
+      }
+    } catch (error) {
+      console.error('[AutoMod] Failed to load settings:', error);
+    }
+  }
+
+  // Clear loading state
+  container.innerHTML = '';
 
   // Templates section
   const templatesCard = Card({
     title: 'Quick Templates',
     subtitle: 'Apply a preset configuration',
-    children: _renderTemplatesSection(),
   });
   container.appendChild(templatesCard);
+
+  // Render templates section DOM
+  const templatesContainer = templatesCard;
+  templatesContainer.appendChild(_renderTemplatesSection());
 
   // AutoMod sections
   AUTOMOD_SECTIONS.forEach(section => {
     const sectionCard = Card({
       title: `${section.icon} ${section.title}`,
       subtitle: section.description,
-      children: _renderSection(section, settings),
     });
     container.appendChild(sectionCard);
+
+    // Render section DOM
+    sectionCard.appendChild(_renderSection(section, settings));
   });
 }
 
@@ -159,72 +196,90 @@ export function renderAutomodPage(container) {
 function _renderTemplatesSection() {
   const initData = window.Telegram?.WebApp?.initData || '';
   const chatId = store.getState().activeChatId;
-  
-  const templatesHtml = RULE_TEMPLATES.map(template => `
-    <button 
-      class="template-use-btn" 
-      data-template="${template.id}"
-      style="
-        width: 100%;
-        padding: var(--sp-3);
-        background: var(--bg-input);
-        border: 1px solid var(--border);
-        border-radius: var(--r-lg);
-        margin-bottom: var(--sp-2);
-        cursor: pointer;
-        text-align: left;
-        transition: all var(--dur-fast);
-      "
-    >
+
+  const container = document.createElement('div');
+  container.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
+
+  RULE_TEMPLATES.forEach(template => {
+    const btn = document.createElement('button');
+    btn.className = 'template-use-btn';
+    btn.dataset.template = template.id;
+    btn.style.cssText = `
+      width: 100%;
+      padding: var(--sp-3);
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      margin-bottom: var(--sp-2);
+      cursor: pointer;
+      text-align: left;
+      transition: all var(--dur-fast);
+    `;
+
+    const templateSettings = RULE_TEMPLATES.reduce((acc, t) => ({ ...acc, [t.id]: t.settings }), {});
+
+    btn.onclick = async () => {
+      btn.disabled = true;
+      btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
+
+      try {
+        const res = await fetch(`/api/groups/${chatId}/settings/bulk`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-init-data': initData
+          },
+          body: JSON.stringify({
+            settings: templateSettings[template.id]
+          })
+        });
+
+        if (res.ok) {
+          btn.innerHTML = '<span style="color: var(--success);">✅ Applied!</span>';
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = `
+              <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
+                ${template.name}
+              </div>
+              <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
+                ${template.description}
+              </div>
+            `;
+          }, 2000);
+        } else {
+          throw new Error('Failed');
+        }
+      } catch (e) {
+        console.error('Failed to apply template:', e);
+        btn.innerHTML = '<span style="color: var(--danger);">❌ Failed</span>';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = `
+            <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
+              ${template.name}
+            </div>
+            <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
+              ${template.description}
+            </div>
+          `;
+        }, 2000);
+      }
+    };
+
+    btn.innerHTML = `
       <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
         ${template.name}
       </div>
       <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
         ${template.description}
       </div>
-    </button>
-  `).join('');
+    `;
 
-  return `
-    <div style="display: flex; flex-direction: column; gap: var(--sp-2);">
-      ${templatesHtml}
-    </div>
-    <script>
-      document.querySelectorAll('[data-template]').forEach(btn => {
-        btn.onclick = async () => {
-          const templateId = btn.dataset.template;
-          const chatId = '${chatId}';
-          const initData = '${initData}';
-          
-          btn.disabled = true;
-          btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
-          
-          try {
-            const res = await fetch('/api/groups/' + chatId + '/settings/bulk', {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-init-data': initData
-              },
-              body: JSON.stringify({ 
-                settings: ${JSON.stringify(RULE_TEMPLATES.reduce((acc, t) => ({ ...acc, [t.id]: t.settings }), {}))}[templateId] 
-              })
-            });
-            
-            if (res.ok) {
-              btn.innerHTML = '<span style="color: var(--success);">✅ Applied!</span>';
-              setTimeout(() => btn.disabled = false, 2000);
-            } else {
-              throw new Error('Failed');
-            }
-          } catch (e) {
-            btn.innerHTML = '<span style="color: var(--danger);">❌ Failed</span>';
-            setTimeout(() => btn.disabled = false, 2000);
-          }
-        };
-      });
-    </script>
-  `;
+    container.appendChild(btn);
+  });
+
+  return container;
 }
 
 /**
@@ -233,208 +288,231 @@ function _renderTemplatesSection() {
 function _renderSection(section, settings) {
   const initData = window.Telegram?.WebApp?.initData || '';
   const chatId = store.getState().activeChatId;
-  
-  let html = '<div style="display: flex; flex-direction: column; gap: var(--sp-2);">';
-  
+
+  const container = document.createElement('div');
+  container.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
+
   section.settings.forEach(setting => {
     const value = settings[setting.key] ?? setting.default ?? false;
-    
+
     if (setting.type === 'toggle') {
-      html += `
-        <div class="toggle-row" style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
-          <span style="font-size: var(--text-sm); color: var(--text-primary);">${setting.label}</span>
-          <label style="position: relative; display: inline-flex; width: 44px; height: 26px; cursor: pointer; flex-shrink: 0;">
-            <input 
-              type="checkbox" 
-              data-setting="${setting.key}"
-              ${value ? 'checked' : ''}
-              style="position: absolute; opacity: 0; width: 0; height: 0;"
-            >
-            <span class="toggle-track" style="
-              position: absolute; inset: 0;
-              border-radius: var(--r-full);
-              background: ${value ? 'var(--accent)' : 'var(--bg-overlay)'};
-              transition: background var(--dur-normal) var(--ease-out);
-            ">
-              <span class="toggle-dot" style="
-                position: absolute; top: 3px;
-                left: ${value ? '21px' : '3px'};
-                width: 20px; height: 20px;
-                border-radius: 50%;
-                background: white;
-                box-shadow: var(--shadow-sm);
-                transition: left var(--dur-normal) var(--ease-out);
-              "></span>
-            </span>
-          </label>
-        </div>
-      `;
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;';
+
+      const label = document.createElement('span');
+      label.textContent = setting.label;
+      label.style.cssText = 'font-size: var(--text-sm); color: var(--text-primary);';
+
+      const toggle = Toggle({
+        checked: value,
+        onChange: async (isChecked) => {
+          try {
+            // Get current settings from store
+            const currentSettings = store.getState().settings || {};
+
+            // Update with new value
+            const updatedSettings = {
+              ...currentSettings,
+              [setting.key]: isChecked
+            };
+
+            // Send full settings object to API
+            await fetch(`/api/groups/${chatId}/settings`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-init-data': initData
+              },
+              body: JSON.stringify(updatedSettings)
+            });
+
+            // Update store
+            store.updateSetting(setting.key, isChecked);
+            showToast('Setting saved', 'success');
+          } catch (e) {
+            console.error('Failed to save setting:', e);
+            showToast('Failed to save setting', 'error');
+          }
+        }
+      });
+
+      row.appendChild(label);
+      row.appendChild(toggle);
+      container.appendChild(row);
     } else if (setting.type === 'number') {
-      html += `
-        <div class="toggle-row" style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
-          <span style="font-size: var(--text-sm); color: var(--text-primary);">${setting.label}</span>
-          <input 
-            type="number" 
-            data-setting="${setting.key}"
-            value="${value || setting.default}"
-            min="${setting.min}"
-            max="${setting.max}"
-            class="number-input"
-            style="
-              width: 5rem;
-              background: var(--bg-input);
-              border-radius: var(--r-lg);
-              padding: var(--sp-2) var(--sp-3);
-              font-size: var(--text-sm);
-              color: var(--text-primary);
-              text-align: right;
-              border: 1px solid var(--border);
-            "
-          >
-        </div>
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;';
+
+      const label = document.createElement('span');
+      label.textContent = setting.label;
+      label.style.cssText = 'font-size: var(--text-sm); color: var(--text-primary);';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = value || setting.default;
+      input.min = setting.min;
+      input.max = setting.max;
+      input.style.cssText = `
+        width: 5rem;
+        background: var(--bg-input);
+        border-radius: var(--r-lg);
+        padding: var(--sp-2) var(--sp-3);
+        font-size: var(--text-sm);
+        color: var(--text-primary);
+        text-align: right;
+        border: 1px solid var(--border);
       `;
+      input.addEventListener('change', async () => {
+        const numValue = parseInt(input.value, 10);
+        try {
+          // Get current settings from store
+          const currentSettings = store.getState().settings || {};
+
+          // Update with new value
+          const updatedSettings = {
+            ...currentSettings,
+            [setting.key]: numValue
+          };
+
+          // Send full settings object to API
+          await fetch(`/api/groups/${chatId}/settings`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-init-data': initData
+            },
+            body: JSON.stringify(updatedSettings)
+          });
+
+          // Update store
+          store.updateSetting(setting.key, numValue);
+          showToast('Setting saved', 'success');
+        } catch (e) {
+          console.error('Failed to save setting:', e);
+          showToast('Failed to save setting', 'error');
+        }
+      });
+
+      row.appendChild(label);
+      row.appendChild(input);
+      container.appendChild(row);
     } else if (setting.type === 'select') {
-      const options = setting.options.map(opt => 
-        `<option value="${opt.value}" ${value === opt.value ? 'selected' : ''}>${opt.label}</option>`
-      ).join('');
-      
-      html += `
-        <div class="toggle-row" style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
-          <span style="font-size: var(--text-sm); color: var(--text-primary);">${setting.label}</span>
-          <select 
-            data-setting="${setting.key}"
-            class="input"
-            style="
-              width: auto;
-              min-width: 120px;
-              padding: var(--sp-2) var(--sp-3);
-              background: var(--bg-input);
-              border: 1px solid var(--border);
-              border-radius: var(--r-lg);
-              color: var(--text-primary);
-              font-size: var(--text-sm);
-            "
-          >
-            ${options}
-          </select>
-        </div>
+      const row = document.createElement('div');
+      row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;';
+
+      const label = document.createElement('span');
+      label.textContent = setting.label;
+      label.style.cssText = 'font-size: var(--text-sm); color: var(--text-primary);';
+
+      const select = document.createElement('select');
+      select.style.cssText = `
+        width: auto;
+        min-width: 120px;
+        padding: var(--sp-2) var(--sp-3);
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        color: var(--text-primary);
+        font-size: var(--text-sm);
       `;
+
+      setting.options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        if (value === opt.value) option.selected = true;
+        select.appendChild(option);
+      });
+
+      select.addEventListener('change', async () => {
+        try {
+          // Get current settings from store
+          const currentSettings = store.getState().settings || {};
+
+          // Update with new value
+          const updatedSettings = {
+            ...currentSettings,
+            [setting.key]: select.value
+          };
+
+          // Send full settings object to API
+          await fetch(`/api/groups/${chatId}/settings`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-init-data': initData
+            },
+            body: JSON.stringify(updatedSettings)
+          });
+
+          // Update store
+          store.updateSetting(setting.key, select.value);
+          showToast('Setting saved', 'success');
+        } catch (e) {
+          console.error('Failed to save setting:', e);
+          showToast('Failed to save setting', 'error');
+        }
+      });
+
+      row.appendChild(label);
+      row.appendChild(select);
+      container.appendChild(row);
     } else if (setting.type === 'text') {
-      html += `
-        <div style="padding: var(--sp-2) 0;">
-          <span style="font-size: var(--text-sm); color: var(--text-primary); display: block; margin-bottom: var(--sp-1);">${setting.label}</span>
-          <input 
-            type="text" 
-            data-setting="${setting.key}"
-            value="${value || ''}"
-            placeholder="${setting.placeholder || ''}"
-            class="input"
-            style="
-              width: 100%;
-              padding: var(--sp-2) var(--sp-3);
-              background: var(--bg-input);
-              border: 1px solid var(--border);
-              border-radius: var(--r-lg);
-              color: var(--text-primary);
-              font-size: var(--text-sm);
-            "
-          >
-        </div>
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'padding: var(--sp-2) 0;';
+
+      const label = document.createElement('span');
+      label.textContent = setting.label;
+      label.style.cssText = 'font-size: var(--text-sm); color: var(--text-primary); display: block; margin-bottom: var(--sp-1);';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = value || '';
+      input.placeholder = setting.placeholder || '';
+      input.style.cssText = `
+        width: 100%;
+        padding: var(--sp-2) var(--sp-3);
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        color: var(--text-primary);
+        font-size: var(--text-sm);
       `;
+      input.addEventListener('change', async () => {
+        try {
+          // Get current settings from store
+          const currentSettings = store.getState().settings || {};
+
+          // Update with new value
+          const updatedSettings = {
+            ...currentSettings,
+            [setting.key]: input.value
+          };
+
+          // Send full settings object to API
+          await fetch(`/api/groups/${chatId}/settings`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-init-data': initData
+            },
+            body: JSON.stringify(updatedSettings)
+          });
+
+          // Update store
+          store.updateSetting(setting.key, input.value);
+          showToast('Setting saved', 'success');
+        } catch (e) {
+          console.error('Failed to save setting:', e);
+          showToast('Failed to save setting', 'error');
+        }
+      });
+
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      container.appendChild(wrapper);
     }
   });
-  
-  html += '</div>';
-  
-  // Add event listeners script
-  html += `
-    <script>
-      (function() {
-        const chatId = '${chatId}';
-        const initData = '${initData}';
-        
-        // Handle toggles
-        document.querySelectorAll('[data-setting][type="checkbox"]').forEach(input => {
-          input.addEventListener('change', async function() {
-            const key = this.dataset.setting;
-            const value = this.checked;
-            
-            // Update toggle visual
-            const track = this.nextElementSibling;
-            const dot = track.querySelector('.toggle-dot');
-            track.style.background = value ? 'var(--accent)' : 'var(--bg-overlay)';
-            dot.style.left = value ? '21px' : '3px';
-            
-            // Save to server
-            try {
-              await fetch('/api/groups/' + chatId + '/settings/' + key, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-init-data': initData
-                },
-                body: JSON.stringify({ value: value })
-              });
-              
-              // Update store
-              const store = window.__store;
-              if (store) {
-                store.setState(s => ({ 
-                  settings: { ...s.settings, [key]: value } 
-                }));
-              }
-            } catch (e) {
-              console.error('Failed to save setting:', e);
-            }
-          });
-        });
-        
-        // Handle number inputs
-        document.querySelectorAll('[data-setting][type="number"]').forEach(input => {
-          input.addEventListener('change', async function() {
-            const key = this.dataset.setting;
-            const value = parseInt(this.value, 10);
-            
-            try {
-              await fetch('/api/groups/' + chatId + '/settings/' + key, {
-                method: 'PUT',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-init-data': initData
-                },
-                body: JSON.stringify({ value: value })
-              });
-            } catch (e) {
-              console.error('Failed to save setting:', e);
-            }
-          });
-        });
-        
-        // Handle selects
-        document.querySelectorAll('[data-setting]:not([type="checkbox"]):not([type="number"])').forEach(input => {
-          if (input.tagName === 'SELECT') {
-            input.addEventListener('change', async function() {
-              const key = this.dataset.setting;
-              const value = this.value;
-              
-              try {
-                await fetch('/api/groups/' + chatId + '/settings/' + key, {
-                  method: 'PUT',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'x-init-data': initData
-                  },
-                  body: JSON.stringify({ value: value })
-                });
-              } catch (e) {
-                console.error('Failed to save setting:', e);
-              }
-            });
-          }
-        });
-      })();
-    </script>
-  `;
-  
-  return html;
+
+  return container;
 }

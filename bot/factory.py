@@ -99,6 +99,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     )
     from bot.handlers.help import help_handler as nexus_help_handler, help_callback_handler
     from bot.utils.aliases import register_aliases
+    
+    # Import booster handlers
+    from bot.handlers.booster import register_handlers as register_booster_handlers
 
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(MessageHandler(filters.TEXT & (filters.Regex(r'^!') | filters.Regex(r'^!!')), prefix_handler), group=0)
@@ -253,6 +256,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         "/deletepost": delete_post_handler,
     }
     register_aliases(app, nexus_handlers)
+    
+    # ── Member Booster handlers ──────────────────────────────────────────────
+    register_booster_handlers(app)
+    logger.info(f"[FACTORY] Booster handlers registered")
 
     logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
     return app

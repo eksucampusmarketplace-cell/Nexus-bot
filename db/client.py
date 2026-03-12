@@ -166,6 +166,88 @@ class Database:
                     fail_reason TEXT,
                     token_hash TEXT
                 );
+
+                -- Member Booster tables
+                CREATE TABLE IF NOT EXISTS member_boost_records (
+                    id BIGSERIAL PRIMARY KEY,
+                    group_id BIGINT NOT NULL REFERENCES groups(chat_id),
+                    user_id BIGINT NOT NULL,
+                    username TEXT,
+                    first_name TEXT,
+                    invite_link TEXT UNIQUE,
+                    invite_link_name TEXT,
+                    invited_count INTEGER DEFAULT 0,
+                    required_count INTEGER DEFAULT 0,
+                    manual_credits INTEGER DEFAULT 0,
+                    is_unlocked BOOLEAN DEFAULT FALSE,
+                    is_restricted BOOLEAN DEFAULT FALSE,
+                    is_exempted BOOLEAN DEFAULT FALSE,
+                    exempted_by BIGINT,
+                    exemption_reason TEXT,
+                    boost_message_id INTEGER,
+                    join_source TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    unlocked_at TIMESTAMPTZ,
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(group_id, user_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS member_invite_events (
+                    id BIGSERIAL PRIMARY KEY,
+                    group_id BIGINT NOT NULL REFERENCES groups(chat_id),
+                    inviter_user_id BIGINT NOT NULL,
+                    invited_user_id BIGINT NOT NULL,
+                    invited_username TEXT,
+                    invited_first_name TEXT,
+                    invite_link TEXT,
+                    source TEXT DEFAULT 'link',
+                    joined_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(group_id, invited_user_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS manual_add_credits (
+                    id BIGSERIAL PRIMARY KEY,
+                    group_id BIGINT NOT NULL REFERENCES groups(chat_id),
+                    claimant_user_id BIGINT NOT NULL,
+                    claimant_username TEXT,
+                    claimed_count INTEGER DEFAULT 1,
+                    claimed_user_ids JSONB DEFAULT '[]',
+                    status TEXT DEFAULT 'pending',
+                    approved_count INTEGER DEFAULT 0,
+                    reviewed_by BIGINT,
+                    review_note TEXT,
+                    admin_message_id INTEGER,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    reviewed_at TIMESTAMPTZ
+                );
+
+                CREATE TABLE IF NOT EXISTS manual_adds_detected (
+                    id BIGSERIAL PRIMARY KEY,
+                    group_id BIGINT NOT NULL REFERENCES groups(chat_id),
+                    added_user_id BIGINT NOT NULL,
+                    added_username TEXT,
+                    added_first_name TEXT,
+                    added_by_user_id BIGINT,
+                    detected_at TIMESTAMPTZ DEFAULT NOW(),
+                    credited_to BIGINT,
+                    credit_id INTEGER REFERENCES manual_add_credits(id)
+                );
+
+                CREATE TABLE IF NOT EXISTS force_channel_records (
+                    id BIGSERIAL PRIMARY KEY,
+                    group_id BIGINT NOT NULL REFERENCES groups(chat_id),
+                    user_id BIGINT NOT NULL,
+                    username TEXT,
+                    channel_id BIGINT NOT NULL,
+                    is_verified BOOLEAN DEFAULT FALSE,
+                    is_restricted BOOLEAN DEFAULT FALSE,
+                    verified_at TIMESTAMPTZ,
+                    last_checked TIMESTAMPTZ,
+                    notified_at TIMESTAMPTZ,
+                    check_count INTEGER DEFAULT 0,
+                    notify_message_id INTEGER,
+                    UNIQUE(group_id, user_id)
+                );
             """)
             
             # Create indexes
@@ -174,6 +256,16 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_bots_status ON bots(status);
                 CREATE INDEX IF NOT EXISTS idx_bots_token_hash ON bots(token_hash);
                 CREATE INDEX IF NOT EXISTS idx_clone_attempts_user ON clone_attempts(user_id, attempted_at);
+                CREATE INDEX IF NOT EXISTS idx_boost_records_group ON member_boost_records(group_id);
+                CREATE INDEX IF NOT EXISTS idx_boost_records_user ON member_boost_records(user_id);
+                CREATE INDEX IF NOT EXISTS idx_invite_events_group ON member_invite_events(group_id);
+                CREATE INDEX IF NOT EXISTS idx_invite_events_inviter ON member_invite_events(inviter_user_id);
+                CREATE INDEX IF NOT EXISTS idx_manual_adds_group ON manual_adds_detected(group_id);
+                CREATE INDEX IF NOT EXISTS idx_manual_adds_detected_at ON manual_adds_detected(detected_at);
+                CREATE INDEX IF NOT EXISTS idx_manual_credits_group ON manual_add_credits(group_id);
+                CREATE INDEX IF NOT EXISTS idx_manual_credits_status ON manual_add_credits(status);
+                CREATE INDEX IF NOT EXISTS idx_force_channel_group ON force_channel_records(group_id);
+                CREATE INDEX IF NOT EXISTS idx_force_channel_user ON force_channel_records(user_id);
             """)
             logger.info("Database schema initialized")
 

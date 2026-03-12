@@ -219,6 +219,10 @@ function _renderTemplatesSection() {
     const templateSettings = RULE_TEMPLATES.reduce((acc, t) => ({ ...acc, [t.id]: t.settings }), {});
 
     btn.onclick = async () => {
+      if (!chatId) {
+        showToast('Please select a group first', 'warning');
+        return;
+      }
       btn.disabled = true;
       btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
 
@@ -306,6 +310,7 @@ function _renderSection(section, settings) {
       const toggle = Toggle({
         checked: value,
         onChange: async (isChecked) => {
+          if (!chatId) { showToast('Please select a group first', 'warning'); return; }
           try {
             // Get current settings from store
             const currentSettings = store.getState().settings || {};
@@ -363,6 +368,7 @@ function _renderSection(section, settings) {
         border: 1px solid var(--border);
       `;
       input.addEventListener('change', async () => {
+        if (!chatId) { showToast('Please select a group first', 'warning'); return; }
         const numValue = parseInt(input.value, 10);
         try {
           // Get current settings from store
@@ -425,6 +431,7 @@ function _renderSection(section, settings) {
       });
 
       select.addEventListener('change', async () => {
+        if (!chatId) { showToast('Please select a group first', 'warning'); return; }
         try {
           // Get current settings from store
           const currentSettings = store.getState().settings || {};
@@ -479,6 +486,7 @@ function _renderSection(section, settings) {
         font-size: var(--text-sm);
       `;
       input.addEventListener('change', async () => {
+        if (!chatId) { showToast('Please select a group first', 'warning'); return; }
         try {
           // Get current settings from store
           const currentSettings = store.getState().settings || {};

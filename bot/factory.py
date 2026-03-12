@@ -102,14 +102,24 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     
     # Import booster handlers
     from bot.handlers.booster import register_handlers as register_booster_handlers
+    
+    # Import new start_help and setmessage handlers (for all bots)
+    from bot.handlers.start_help import start_handler, help_handler
+    from bot.handlers.setmessage import setmessage_conversation
+    
+    # Import alerts utility for error handling
+    from bot.utils.alerts import alert_error
+    from config import settings
 
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(MessageHandler(filters.TEXT & (filters.Regex(r'^!') | filters.Regex(r'^!!')), prefix_handler), group=0)
 
     # ── Basic commands (all bots) ─────────────────────────────────────────
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", nexus_help_handler))
+    # Use the new start_help handlers for all bots
+    app.add_handler(start_handler)  # /start from start_help.py
+    app.add_handler(help_handler)   # /help from start_help.py
     app.add_handler(CommandHandler("panel", panel))
+    app.add_handler(setmessage_conversation)  # /setmessage for customizing messages
     
     # ── Nexus Greetings & Rules ──────────────────────────────────────────
     app.add_handler(CommandHandler("setwelcome",  set_welcome_handler,  filters=GROUP))
@@ -220,8 +230,43 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Keep old captcha handler if needed, but in separate groups or combined
     # app.add_handler(ChatMemberHandler(new_member_handler, ChatMemberHandler.CHAT_MEMBER))
     
-    # ── Global error handler ──────────────────────────────────────────────
-    app.add_error_handler(global_error_handler)
+    # ── Global error handler with alert ─────────────────────────────────────
+    async def global_error_handler_with_alert(update, context):
+        """Enhanced error handler that posts alerts to support group."""
+        import traceback
+        import logging
+        log = logging.getLogger(__name__)
+        error_str = "".join(traceback.format_exception(
+            type(context.error), context.error, context.error.__traceback__
+        ))
+        log.error(f"[ERROR] {error_str[:500]}")
+
+        # Try to get bot username for alert
+        try:
+            me = await context.bot.get_me()
+            chat_id = update.effective_chat.id if update and update.effective_chat else 0
+            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
+        except Exception:
+            pass
+
+        # Call original error handler
+        try:
+            await global_error_handler(update, context)
+        except Exception:
+            pass
+
+        # Try to notify user something went wrong
+        try:
+            if update and update.effective_message:
+                from bot.utils.messages import DEFAULTS
+                suffix = DEFAULTS.get("error_suffix", "").format(main_bot=settings.MAIN_BOT_USERNAME)
+                await update.effective_message.reply_text(
+                    f"❌ Something went wrong. {suffix}"
+                )
+        except Exception:
+            pass
+
+    app.add_error_handler(global_error_handler_with_alert)
     
     # ── Register all aliases ──────────────────────────────────────────────
     nexus_handlers = {

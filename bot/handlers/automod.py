@@ -121,6 +121,10 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     settings = group.get('settings') or {}
+    # Ensure automod settings exist with defaults
+    if 'automod' not in settings:
+        settings = dict(settings)
+        settings['automod'] = DEFAULT_AUTOMOD
     antiflood = get_setting(settings, 'automod', 'antiflood')
     
     if antiflood['enabled']:
@@ -180,6 +184,10 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     settings = group.get('settings') or {}
+    # Ensure automod settings exist with defaults
+    if 'automod' not in settings:
+        settings = dict(settings)
+        settings['automod'] = DEFAULT_AUTOMOD
     antilink = get_setting(settings, 'automod', 'antilink')
     
     if antilink['enabled']:

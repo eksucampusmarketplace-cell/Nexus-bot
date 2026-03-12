@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Nexus Bot Panel</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <style>
@@ -379,8 +379,10 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        try {
         const { useState, useEffect, useMemo, useRef, useSyncExternalStore } = React;
+        const { createRoot } = ReactDOM;
+
+        try {
 
         // Simple Zustand-like store implementation using React's useSyncExternalStore
         const createStore = function(createStateFn) {
@@ -1185,8 +1187,14 @@
             return <StrangerScreen user={userContext.user} botInfo={userContext.botInfo} onRefresh={initApp} />;
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        // Initialize React app
+        const rootContainer = document.getElementById('root');
+        if (rootContainer) {
+            const root = createRoot(rootContainer);
+            root.render(<App />);
+        } else {
+            console.error('Root container not found');
+        }
         } catch (e) {
             console.error('Failed to initialize React app:', e);
             document.getElementById('root').innerHTML = '<div style="padding: 20px; color: white; text-align: center;"><h2>Error loading app</h2><p>' + e.message + '</p></div>';

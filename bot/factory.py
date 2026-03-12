@@ -199,7 +199,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
 
     # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha:'))
+    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
 
     # ── Music callbacks (all bots) ─────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))

@@ -67,19 +67,24 @@ async def lifespan(app: FastAPI):
 
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
-    primary_app = create_application(primary_token, is_primary=True)
-    primary_app.bot_data["db_pool"] = pool
+    
+    try:
+        primary_app = create_application(primary_token, is_primary=True)
+        primary_app.bot_data["db_pool"] = pool
 
-    await primary_app.initialize()
-    await primary_app.start()
-    primary_me = await primary_app.bot.get_me()
+        await primary_app.initialize()
+        await primary_app.start()
+        primary_me = primary_app.bot.get_me()
 
-    primary_webhook = f"{settings.RENDER_EXTERNAL_URL}/webhook/{primary_me.id}"
-    await primary_app.bot.set_webhook(
-        url=primary_webhook,
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True
-    )
+        primary_webhook = f"{settings.RENDER_EXTERNAL_URL}/webhook/{primary_me.id}"
+        await primary_app.bot.set_webhook(
+            url=primary_webhook,
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True
+        )
+    except Exception as e:
+        logger.error(f"[STARTUP] ❌ Failed to initialize primary bot: {e}")
+        raise
 
     # Upsert primary bot record in DB
     existing_primary = await db_ops_bots.get_bot_by_token_hash(pool, hash_token(primary_token))

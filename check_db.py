@@ -12,7 +12,8 @@ async def check_schema():
         print("DATABASE_URL not set")
         return
     
-    conn = await asyncpg.connect(dsn)
+    # Note: statement_cache_size=0 is required for Supabase/pgbouncer compatibility
+    conn = await asyncpg.connect(dsn, statement_cache_size=0)
     try:
         print("Checking music_queues table...")
         columns = await conn.fetch("""

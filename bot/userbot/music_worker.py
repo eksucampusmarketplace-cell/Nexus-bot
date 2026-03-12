@@ -27,6 +27,9 @@ from dataclasses import dataclass, field
 from typing import Optional, Callable, Awaitable
 
 from pyrogram import Client
+
+log = logging.getLogger("music_worker")
+
 try:
     from pytgcalls import PyTGCalls
     from pytgcalls.types import Update as TGUpdate
@@ -50,8 +53,6 @@ except ImportError:
 import yt_dlp
 
 from config import settings
-
-log = logging.getLogger("music_worker")
 
 os.makedirs(settings.MUSIC_DOWNLOAD_DIR, exist_ok=True)
 

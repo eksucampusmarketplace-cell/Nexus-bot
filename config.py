@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     RENDER_EXTERNAL_URL: Optional[str] = None
     CLONE_ACCESS: str = "owner_only"  # owner_only | anyone
     SECRET_KEY: Optional[str] = None  # Fernet key for token encryption
+    SUPPORT_GROUP_URL: Optional[str] = None  # Optional support group link for the Mini App
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

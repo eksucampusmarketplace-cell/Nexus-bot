@@ -1332,3 +1332,994 @@
     </script>
 </body>
 </html>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { create } = zustand;
+
+        // ZUSTAND STORE
+        const useStore = create((set, get) => ({
+            userContext: { user: null, role: null, adminGroups: [], modGroups: [], memberGroups: [], botInfo: null, supportGroup: null, isLoading: true, error: null },
+            memberStats: {}, memberRankings: {}, memberInviteLinks: {},
+            activeBotId: null, activeGroupId: null, activeGroupTitle: "Loading Group...",
+            modules: {}, modulesLoading: {}, groupSettings: {}, groupStats: {},
+            activeTab: "dashboard", groupSelectorOpen: false,
+            boostConfig: {}, boostStats: {}, boostLoading: false,
+            channelConfig: {}, channelStats: {}, channelLoading: false,
+
+            setUserContext: (context) => set({ userContext: { ...get().userContext, ...context, isLoading: false, error: null } }),
+            setUserError: (err) => set(state => ({ userContext: { ...state.userContext, error: err, isLoading: false } })),
+
+            fetchUserContext: async (initData) => {
+                try {
+                    const resp = await fetch('/api/me', { headers: { 'X-Telegram-Init-Data': initData } });
+                    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                    const data = await resp.json();
+                    set({
+                        userContext: {
+                            user: data.user, role: data.role, adminGroups: data.admin_groups || [],
+                            modGroups: data.mod_groups || [], memberGroups: data.member_groups || [],
+                            botInfo: data.bot_info, supportGroup: data.support_group, isLoading: false, error: null
+                        }
+                    });
+                    return data;
+                } catch (err) {
+                    set(state => ({ userContext: { ...state.userContext, error: err.message, isLoading: false } }));
+                    throw err;
+                }
+            },
+
+            fetchMemberStats: async (chatId, initData) => {
+                try {
+                    const resp = await fetch(`/api/me/groups/${chatId}/stats`, { headers: { 'X-Telegram-Init-Data': initData } });
+                    const data = await resp.json();
+                    set(state => ({ memberStats: { ...state.memberStats, [chatId]: data } }));
+                } catch (err) { console.error('[STORE] Failed to fetch member stats:', err); }
+            },
+
+            fetchMemberRankings: async (chatId, type = 'boost', page = 1, initData) => {
+                try {
+                    const resp = await fetch(`/api/me/groups/${chatId}/rankings?type=${type}&page=${page}`, { headers: { 'X-Telegram-Init-Data': initData } });
+                    const data = await resp.json();
+                    set(state => ({ memberRankings: { ...state.memberRankings, [`${chatId}-${type}`]: data } }));
+                } catch (err) { console.error('[STORE] Failed to fetch rankings:', err); }
+            },
+
+            fetchMemberInviteLink: async (chatId, initData) => {
+                try {
+                    const resp = await fetch(`/api/me/groups/${chatId}/invitelink`, { headers: { 'X-Telegram-Init-Data': initData } });
+                    const data = await resp.json();
+                    set(state => ({ memberInviteLinks: { ...state.memberInviteLinks, [chatId]: data } }));
+                } catch (err) { console.error('[STORE] Failed to fetch invite link:', err); }
+            },
+
+            setActiveTab: (tab) => set({ activeTab: tab }),
+            setActiveGroup: (botId, groupId, title) => set({ activeBotId: botId, activeGroupId: groupId, activeGroupTitle: title }),
+
+            fetchModules: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/modules`);
+                    const data = await resp.json();
+                    set({ modules: data });
+                } catch (err) { console.error("Failed to fetch modules", err); }
+            },
+
+            toggleModule: async (chatId, moduleName, enabled) => {
+                set(state => ({ modulesLoading: { ...state.modulesLoading, [moduleName]: true } }));
+                const oldState = get().modules[moduleName];
+                set(state => ({ modules: { ...state.modules, [moduleName]: enabled } }));
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/modules/${moduleName}`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled })
+                    });
+                    if (!resp.ok) throw new Error("API call failed");
+                } catch (err) {
+                    set(state => ({ modules: { ...state.modules, [moduleName]: oldState } }));
+                    showToast(`Failed to toggle ${moduleName}`);
+                } finally {
+                    set(state => ({ modulesLoading: { ...state.modulesLoading, [moduleName]: false } }));
+                }
+            },
+
+            fetchAnalytics: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/analytics`);
+                    const data = await resp.json();
+                    set({ groupStats: data });
+                } catch (err) {}
+            },
+
+            fetchBoostConfig: async (chatId) => {
+                set({ boostLoading: true });
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/boost/config`);
+                    const data = await resp.json();
+                    set({ boostConfig: data });
+                } finally { set({ boostLoading: false }); }
+            },
+
+            saveBoostConfig: async (chatId, config) => {
+                set({ boostLoading: true });
+                try {
+                    await fetch(`/api/groups/${chatId}/boost/config`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config)
+                    });
+                    set({ boostConfig: config });
+                    showToast('✅ Boost settings saved');
+                } finally { set({ boostLoading: false }); }
+            },
+
+            fetchBoostStats: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/boost/stats`);
+                    const data = await resp.json();
+                    set({ boostStats: data });
+                } catch (err) {}
+            },
+
+            fetchChannelConfig: async (chatId) => {
+                set({ channelLoading: true });
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/channel-gate/config`);
+                    const data = await resp.json();
+                    set({ channelConfig: data });
+                } finally { set({ channelLoading: false }); }
+            },
+
+            saveChannelConfig: async (chatId, config) => {
+                set({ channelLoading: true });
+                try {
+                    await fetch(`/api/groups/${chatId}/channel-gate/config`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(config)
+                    });
+                    set({ channelConfig: config });
+                    showToast('✅ Channel settings saved');
+                } finally { set({ channelLoading: false }); }
+            },
+
+            fetchChannelStats: async (chatId) => {
+                try {
+                    const resp = await fetch(`/api/groups/${chatId}/channel-gate/stats`);
+                    const data = await resp.json();
+                    set({ channelStats: data });
+                } catch (err) {}
+            }
+        }));
+
+        function showToast(msg, isSuccess = false) {
+            const t = document.getElementById('toast');
+            t.innerText = msg; t.style.display = 'block';
+            if (isSuccess) t.classList.add('success'); else t.classList.remove('success');
+            setTimeout(() => { t.style.display = 'none'; t.classList.remove('success'); }, 3000);
+        }
+
+        // Loading Screen
+        const LoadingScreen = ({ subtext }) => (
+            <div className="loading-screen">
+                <div className="loading-logo">⚡</div>
+                <div className="loading-text">Loading your profile...</div>
+                <div className="spinner"></div>
+                {subtext && <div className="loading-subtext">{subtext}</div>}
+            </div>
+        );
+
+        // Error Screen
+        const ErrorScreen = ({ icon, title, message, onRetry }) => (
+            <div className="error-screen">
+                <div className="error-icon">{icon}</div>
+                <div className="error-title">{title}</div>
+                <div className="error-message">{message}</div>
+                {onRetry && <button className="error-action" onClick={onRetry}>🔄 Try Again</button>}
+            </div>
+        );
+
+        // Stranger/Onboarding Screen
+        const StrangerScreen = ({ user, botInfo, onRefresh }) => {
+            const botUsername = botInfo?.username || 'NexusBot';
+            const botFirstName = botInfo?.first_name || 'Nexus';
+            const firstName = user?.first_name || 'there';
+
+            const handleAddToGroup = () => {
+                const tg = window.Telegram?.WebApp;
+                if (tg) tg.openLink(`https://t.me/${botUsername}?startgroup=true`);
+            };
+
+            return (
+                <div className="onboarding-container">
+                    <div className="onboarding-logo">
+                        <div className="logo-icon">⚡</div>
+                        <h1>{botFirstName}</h1>
+                        <p>Intelligent Group Management</p>
+                    </div>
+                    <div className="onboarding-section">
+                        <p style={{fontSize: '16px', textAlign: 'center'}}>Hey <strong>{firstName}</strong>! 👋</p>
+                        <p style={{fontSize: '14px', color: 'var(--text-dim)', textAlign: 'center', marginTop: '10px'}}>
+                            You're not in any groups managed by {botFirstName} yet.
+                        </p>
+                    </div>
+                    <div className="onboarding-section">
+                        <h3>If you're a GROUP ADMIN:</h3>
+                        <div className="steps-box">
+                            <div className="step-item"><div className="step-number">1</div><div className="step-text">Add @{botUsername} to your group</div></div>
+                            <div className="step-item"><div className="step-number">2</div><div className="step-text">Make it an administrator</div></div>
+                            <div className="step-item"><div className="step-number">3</div><div className="step-text">Send /start in the group</div></div>
+                            <div className="step-item"><div className="step-number">4</div><div className="step-text">Come back here!</div></div>
+                        </div>
+                    </div>
+                    <button className="btn-full btn-primary" onClick={handleAddToGroup}>➕ Add {botFirstName} to My Group</button>
+                    <div className="onboarding-section" style={{marginTop: '30px'}}>
+                        <h3>If you're a GROUP MEMBER:</h3>
+                        <p style={{fontSize: '14px', color: 'var(--text-dim)', lineHeight: '1.6'}}>
+                            Ask your group admin to add {botFirstName}. This panel will show your stats, boost progress, and rankings.
+                        </p>
+                    </div>
+                    <div className="onboarding-section">
+                        <h3>What {botFirstName} does:</h3>
+                        <div className="features-grid">
+                            <div className="feature-item">🛡️ Advanced moderation</div>
+                            <div className="feature-item">⚡ Member boost system</div>
+                            <div className="feature-item">📢 Channel verification</div>
+                            <div className="feature-item">📊 Analytics & insights</div>
+                            <div className="feature-item">🤖 41+ modules</div>
+                            <div className="feature-item">🔒 Anti-spam protection</div>
+                        </div>
+                    </div>
+                    <button className="btn-full btn-secondary btn-refresh" onClick={onRefresh}>🔄 Refresh — I just joined a group</button>
+                </div>
+            );
+        };
+
+        // Member Group Card
+        const MemberGroupCard = ({ group, inviteLink, onShare, onCopy }) => {
+            let accentClass = 'card-accent-cyan';
+            if (group.boost_status?.enabled && !group.boost_status?.is_unlocked) accentClass = 'card-accent-amber';
+            if (group.channel_status?.enabled && !group.channel_status?.is_verified) accentClass = 'card-accent-amber';
+            if (group.warn_status?.count > 0) accentClass = 'card-accent-red';
+
+            const renderProgress = (current, required, style = 'blocks') => {
+                const filled = Math.min(Math.floor((current / required) * required), required);
+                const empty = required - filled;
+                if (style === 'dots') return '●'.repeat(filled) + '○'.repeat(empty);
+                if (style === 'emoji') return '🟩'.repeat(filled) + '⬜'.repeat(empty);
+                if (style === 'numbers') return `${current}/${required}`;
+                return '█'.repeat(filled) + '░'.repeat(empty);
+            };
+
+            const trustColor = (score) => score <= 30 ? 'red' : score <= 60 ? 'amber' : score <= 85 ? 'cyan' : 'green';
+
+            return (
+                <div className={`card member-group-card ${accentClass}`}>
+                    <div className="group-header">
+                        <div className="group-avatar">💬</div>
+                        <div className="group-info">
+                            <h3>{group.title}</h3>
+                            <span>{(group.member_count || 0).toLocaleString()} members</span>
+                        </div>
+                    </div>
+                    {group.boost_status?.enabled && (
+                        <div className="stat-row">
+                            <div className="stat-label"><span>⚡</span> Boost Progress</div>
+                            <div className="stat-value">
+                                {group.boost_status.is_unlocked ? (
+                                    <span style={{color: 'var(--success)'}}>✅ Complete!</span>
+                                ) : (
+                                    <span>{renderProgress(group.boost_status.current, group.boost_status.required, group.boost_status.progress_style)}</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {group.boost_status?.enabled && !group.boost_status.is_unlocked && (
+                        <div className="stat-row" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '8px'}}>
+                            <div style={{fontSize: '12px', color: 'var(--text-dim)'}}>
+                                {group.boost_status.required - group.boost_status.current} more invite needed
+                            </div>
+                            {inviteLink?.invite_link && (
+                                <div className="btn-group">
+                                    <span style={{fontSize: '12px', wordBreak: 'break-all'}}>{inviteLink.invite_link}</span>
+                                    <button className="btn-small btn-primary" onClick={onShare}>📤 Share</button>
+                                    <button className="btn-small btn-secondary" onClick={onCopy}>📋 Copy</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {group.channel_status?.enabled && (
+                        <div className="stat-row">
+                            <div className="stat-label"><span>📢</span> Channel</div>
+                            <div className="stat-value">
+                                {group.channel_status.is_verified ? (
+                                    <span style={{color: 'var(--success)'}}>✅ Verified</span>
+                                ) : (
+                                    <>
+                                        <span style={{color: 'var(--amber)'}}>⚠️ Not verified</span>
+                                        {group.channel_status.channel_invite && (
+                                            <button className="btn-small btn-primary" style={{marginLeft: '8px'}}
+                                                onClick={() => window.Telegram?.WebApp?.openLink(`https://${group.channel_status.channel_invite}`)}>
+                                                Join
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    <div className="stat-row">
+                        <div className="stat-label"><span>⚠️</span> Warnings</div>
+                        <div className="stat-value">{group.warn_status.count} / {group.warn_status.limit}</div>
+                    </div>
+                    <div className="stat-row">
+                        <div className="stat-label"><span>⭐</span> Trust Score</div>
+                        <div className="stat-value">
+                            <span className={`rank-badge ${trustColor(group.trust_score)}`}>{group.trust_score} / 100</span>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Member Home
+        const MemberHome = ({ memberGroups, initData }) => {
+            const { fetchMemberInviteLink, memberInviteLinks } = useStore.getState();
+
+            const handleShare = (link) => {
+                const tg = window.Telegram?.WebApp;
+                if (tg?.switchInlineQuery) tg.switchInlineQuery(link);
+                else { navigator.clipboard.writeText(link); showToast('📋 Link copied'); }
+            };
+
+            const handleCopy = (link) => { navigator.clipboard.writeText(link); showToast('📋 Link copied'); };
+
+            return (
+                <div>
+                    <h2 style={{marginBottom: '20px'}}>Your Groups ({memberGroups.length})</h2>
+                    {memberGroups.map(group => (
+                        <MemberGroupCard key={group.chat_id} group={group}
+                            inviteLink={memberInviteLinks[group.chat_id]}
+                            onShare={() => memberInviteLinks[group.chat_id]?.invite_link && handleShare(memberInviteLinks[group.chat_id].invite_link)}
+                            onCopy={() => memberInviteLinks[group.chat_id]?.invite_link && handleCopy(memberInviteLinks[group.chat_id].invite_link)}
+                        />
+                    ))}
+                </div>
+            );
+        };
+
+        // Member Stats
+        const MemberStats = ({ memberGroups, initData }) => {
+            const [selectedGroup, setSelectedGroup] = useState(memberGroups[0]?.chat_id);
+            const { fetchMemberStats, memberStats } = useStore.getState();
+
+            useEffect(() => { if (selectedGroup) fetchMemberStats(selectedGroup, initData); }, [selectedGroup]);
+
+            const stats = memberStats[selectedGroup];
+
+            return (
+                <div>
+                    <h2 style={{marginBottom: '20px'}}>📊 My Stats</h2>
+                    <div className="card" style={{marginBottom: '20px'}}>
+                        <select className="input-field" value={selectedGroup} onChange={(e) => setSelectedGroup(Number(e.target.value))}>
+                            {memberGroups.map(g => <option key={g.chat_id} value={g.chat_id}>{g.title}</option>)}
+                        </select>
+                    </div>
+                    {stats && (
+                        <>
+                            <div className="stats-grid">
+                                <div className="stat-card"><div className="value">{stats.invited_count}</div><div className="label">👥 Invited</div></div>
+                                <div className="stat-card"><div className="value">{stats.message_count}</div><div className="label">💬 Messages</div></div>
+                                <div className="stat-card"><div className="value">{stats.trust_score}</div><div className="label">⭐ Trust</div></div>
+                            </div>
+                            {stats.warn_count > 0 ? (
+                                <div className="card" style={{borderLeft: '4px solid var(--red)'}}>
+                                    <h4>⚠️ Warn History</h4>
+                                    {stats.warns.map((warn, i) => (
+                                        <div key={i} style={{padding: '8px 0', borderBottom: '1px solid var(--card-border)'}}>
+                                            <div style={{fontSize: '13px'}}>{warn.reason || 'No reason'}</div>
+                                            <div style={{fontSize: '11px', color: 'var(--text-dim)'}}>{new Date(warn.timestamp).toLocaleDateString()}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="card">
+                                    <h4>⚠️ My Warn History</h4>
+                                    <p style={{color: 'var(--success)'}}>No warnings — clean record ✅</p>
+                                </div>
+                            )}
+                            <div className="card">
+                                <h4>📅 Activity (last 7 days)</h4>
+                                <div style={{padding: '20px', textAlign: 'center', color: 'var(--text-dim)'}}>Activity tracking coming soon</div>
+                            </div>
+                        </>
+                    )}
+                </div>
+            );
+        };
+
+        // Member Rank
+        const MemberRank = ({ memberGroups, initData }) => {
+            const [selectedGroup, setSelectedGroup] = useState(memberGroups[0]?.chat_id);
+            const [rankType, setRankType] = useState('boost');
+            const { fetchMemberRankings, memberRankings } = useStore.getState();
+
+            useEffect(() => { if (selectedGroup) fetchMemberRankings(selectedGroup, rankType, 1, initData); }, [selectedGroup, rankType]);
+
+            const rankings = memberRankings[`${selectedGroup}-${rankType}`];
+
+            return (
+                <div>
+                    <h2 style={{marginBottom: '20px'}}>🏆 Leaderboard</h2>
+                    <div className="card" style={{marginBottom: '20px'}}>
+                        <select className="input-field" style={{marginBottom: '10px'}} value={selectedGroup} onChange={(e) => setSelectedGroup(Number(e.target.value))}>
+                            {memberGroups.map(g => <option key={g.chat_id} value={g.chat_id}>{g.title}</option>)}
+                        </select>
+                    </div>
+                    <div className="sub-tabs" style={{marginBottom: '20px'}}>
+                        <button className={`sub-tab ${rankType === 'boost' ? 'active' : ''}`} onClick={() => setRankType('boost')}>Boost Rank</button>
+                        <button className={`sub-tab ${rankType === 'trust' ? 'active' : ''}`} onClick={() => setRankType('trust')}>Trust Score</button>
+                        <button className={`sub-tab ${rankType === 'messages' ? 'active' : ''}`} onClick={() => setRankType('messages')}>Messages</button>
+                    </div>
+                    {rankings && (
+                        <div className="card">
+                            {rankings.leaderboard.map((entry) => (
+                                <div key={entry.user_id} className={`leaderboard-item ${entry.is_you ? 'you' : ''}`}>
+                                    <span className={`rank ${entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : entry.rank === 3 ? 'bronze' : ''}`}>{entry.rank}</span>
+                                    <span className="name">@{entry.username || entry.first_name || 'Unknown'} {entry.is_you && <span style={{marginLeft: '8px', color: 'var(--accent)'}}>(You)</span>}</span>
+                                    <span className="count">{entry.value}</span>
+                                </div>
+                            ))}
+                            {rankings.you.rank > 10 && (
+                                <>
+                                    <div style={{textAlign: 'center', padding: '10px', color: 'var(--text-dim)'}}>...</div>
+                                    <div className="leaderboard-item you">
+                                        <span className="rank">{rankings.you.rank}</span>
+                                        <span className="name">You</span>
+                                        <span className="count">{rankings.you.value}</span>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // Member Profile
+        const MemberProfile = ({ user, memberGroups, onRefresh }) => {
+            const handleCopy = (link) => { navigator.clipboard.writeText(link); showToast('📋 Link copied'); };
+
+            return (
+                <div>
+                    <h2 style={{marginBottom: '20px'}}>👤 Profile</h2>
+                    <div className="card" style={{textAlign: 'center', padding: '30px'}}>
+                        <div style={{width: '80px', height: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), var(--secondary))', margin: '0 auto 15px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px'}}>
+                            {user?.first_name?.[0] || '?'}
+                        </div>
+                        <h3 style={{margin: '0 0 5px'}}>{user?.first_name} {user?.last_name || ''}</h3>
+                        {user?.username && <p style={{margin: '0 0 5px', color: 'var(--accent)'}}>@{user.username}</p>}
+                        <p style={{margin: 0, fontSize: '12px', color: 'var(--text-dim)'}}>ID: {user?.id}</p>
+                    </div>
+                    <div className="card">
+                        <h4>🔗 My Invite Links</h4>
+                        {memberGroups.map(group => (
+                            <div key={group.chat_id} style={{padding: '12px 0', borderBottom: '1px solid var(--card-border)'}}>
+                                <div style={{fontWeight: 600, marginBottom: '5px'}}>{group.title}</div>
+                                {group.boost_status?.invite_link ? (
+                                    <div className="btn-group" style={{flexWrap: 'wrap'}}>
+                                        <span style={{fontSize: '12px', wordBreak: 'break-all'}}>{group.boost_status.invite_link}</span>
+                                        <button className="btn-small btn-secondary" onClick={() => handleCopy(group.boost_status.invite_link)}>📋 Copy</button>
+                                    </div>
+                                ) : <span style={{fontSize: '12px', color: 'var(--text-dim)'}}>No invite link yet</span>}
+                            </div>
+                        ))}
+                    </div>
+                    <button className="btn-full btn-secondary" onClick={onRefresh}>🔄 Refresh Data</button>
+                </div>
+            );
+        };
+
+        // Member App
+        const MemberApp = ({ context, initData, onRefresh }) => {
+            const [activeTab, setActiveTab] = useState('home');
+            const { user, memberGroups } = context;
+
+            useEffect(() => {
+                const { fetchMemberInviteLink } = useStore.getState();
+                memberGroups.forEach(group => { if (group.boost_status?.enabled) fetchMemberInviteLink(group.chat_id, initData); });
+            }, []);
+
+            const renderContent = () => {
+                switch(activeTab) {
+                    case 'home': return <MemberHome memberGroups={memberGroups} initData={initData} />;
+                    case 'stats': return <MemberStats memberGroups={memberGroups} initData={initData} />;
+                    case 'rank': return <MemberRank memberGroups={memberGroups} initData={initData} />;
+                    case 'profile': return <MemberProfile user={user} memberGroups={memberGroups} onRefresh={onRefresh} />;
+                    default: return <MemberHome memberGroups={memberGroups} initData={initData} />;
+                }
+            };
+
+            return (
+                <React.Fragment>
+                    <div className="main-content">
+                        <div className="header" style={{display: window.innerWidth > 768 ? 'none' : 'block'}}>
+                            <h1>⚡ Nexus</h1>
+                            <p>Hey, {user?.first_name || 'there'}! 👋</p>
+                        </div>
+                        {renderContent()}
+                    </div>
+                    <div className="tab-nav">
+                        <div className={`tab-item ${activeTab==='home'?'active':''}`} onClick={() => setActiveTab('home')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Home</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='stats'?'active':''}`} onClick={() => setActiveTab('stats')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg><span>Stats</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='rank'?'active':''}`} onClick={() => setActiveTab('rank')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/></svg><span>Rank</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='profile'?'active':''}`} onClick={() => setActiveTab('profile')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Profile</span>
+                        </div>
+                    </div>
+                </React.Fragment>
+            );
+        };
+
+        // Admin Components
+        const LoadingSpinner = () => <div className="loading-spinner"></div>;
+
+        const Toggle = ({ name, description, moduleName }) => {
+            const chatId = useStore(state => state.activeGroupId);
+            const enabled = useStore(state => state.modules[moduleName] || false);
+            const loading = useStore(state => state.modulesLoading[moduleName] || false);
+            const toggleModule = useStore(state => state.toggleModule);
+
+            return (
+                <div className="toggle-item">
+                    <div className="toggle-info">
+                        <h4>{name}</h4>
+                        <p>{description}</p>
+                    </div>
+                    <label className="switch">
+                        <input type="checkbox" checked={enabled} disabled={loading} onChange={(e) => toggleModule(chatId, moduleName, e.target.checked)} />
+                        <span className="slider"></span>
+                    </label>
+                </div>
+            );
+        };
+
+        const LineChart = ({ data }) => {
+            if (!data || data.length === 0) return <div>No data</div>;
+            const width = 400, height = 150, padding = 20;
+            const maxVal = Math.max(...data.map(d => d.messages), 10);
+            const points = data.map((d, i) => {
+                const x = (i / (data.length - 1)) * (width - 2 * padding) + padding;
+                const y = height - ((d.messages / maxVal) * (height - 2 * padding) + padding);
+                return `${x},${y}`;
+            }).join(' ');
+            const areaPath = `M ${padding},${height-padding} L ${points} L ${width-padding},${height-padding} Z`;
+
+            return (
+                <svg viewBox={`0 0 ${width} ${height}`}>
+                    <defs>
+                        <linearGradient id="grad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" style={{stopColor:'var(--accent)', stopOpacity:0.3}} />
+                            <stop offset="100%" style={{stopColor:'var(--accent)', stopOpacity:0}} />
+                        </linearGradient>
+                    </defs>
+                    <path d={areaPath} fill="url(#grad)" />
+                    <polyline fill="none" stroke="var(--accent)" strokeWidth="2" points={points} />
+                    {data.map((d, i) => {
+                        const x = (i / (data.length - 1)) * (width - 2 * padding) + padding;
+                        const y = height - ((d.messages / maxVal) * (height - 2 * padding) + padding);
+                        return <circle key={i} cx={x} cy={y} r="3" fill="var(--accent)" />;
+                    })}
+                </svg>
+            );
+        };
+
+        const Dashboard = () => {
+            const stats = useStore(state => state.groupStats);
+            const chatId = useStore(state => state.activeGroupId);
+            const fetchAnalytics = useStore(state => state.fetchAnalytics);
+            useEffect(() => { if (chatId) fetchAnalytics(chatId); }, [chatId]);
+            return (
+                <div>
+                    <div className="card">
+                        <h3>Message Activity</h3>
+                        <div className="chart-container"><LineChart data={stats.activity || []} /></div>
+                    </div>
+                    <div className="card">
+                        <h3>Member Growth</h3>
+                        <p>Total: {stats.growth ? stats.growth[stats.growth.length-1]?.total : '...'}</p>
+                    </div>
+                </div>
+            );
+        };
+
+        const Modules = () => {
+            const categories = {
+                "MODERATION": [
+                    { id: "warn_system", name: "Warn System", desc: "Track and limit user warnings" },
+                    { id: "auto_ban", name: "Auto Ban", desc: "Automatically ban malicious users" },
+                    { id: "timed_mute", name: "Timed Mute", desc: "Mute users for a set duration" },
+                    { id: "timed_ban", name: "Timed Ban", desc: "Ban users for a set duration" },
+                    { id: "silent_mode", name: "Silent Mode", desc: "Send mod logs privately" },
+                    { id: "require_reason", name: "Require Reason", desc: "Mandatory reason for mod actions" },
+                    { id: "reputation_system", name: "Reputation System", desc: "Community-driven trust" },
+                    { id: "trust_score", name: "Trust Score", desc: "Automated behavioral score" },
+                    { id: "ai_moderation", name: "AI Moderation", desc: "Intelligent message filtering" }
+                ],
+                "ANTI-SPAM": [
+                    { id: "antiflood", name: "Anti-Flood", desc: "Prevent rapid messaging" },
+                    { id: "antispam", name: "Anti-Spam", desc: "Block known spam patterns" },
+                    { id: "antilink", name: "Anti-Link", desc: "Control external link sharing" },
+                    { id: "anti_forward", name: "Anti-Forward", desc: "Block forwarded messages" },
+                    { id: "anti_rtl", name: "Anti-RTL", desc: "Block RTL script messages" },
+                    { id: "anti_sticker", name: "Anti-Sticker", desc: "Control sticker usage" },
+                    { id: "anti_media", name: "Anti-Media", desc: "Control media uploads" },
+                    { id: "anti_bot", name: "Anti-Bot", desc: "Filter automated accounts" }
+                ],
+                "GREETINGS": [
+                    { id: "welcome_message", name: "Welcome Message", desc: "Greet new members" },
+                    { id: "goodbye_message", name: "Goodbye Message", desc: "Bid farewell to members" },
+                    { id: "welcome_dm", name: "Welcome DM", desc: "Greet new members in private" },
+                    { id: "mute_on_join", name: "Mute on Join", desc: "Mute users until verified" },
+                    { id: "delete_old_welcome", name: "Delete Old Welcome", desc: "Keep group chat clean" },
+                    { id: "auto_delete_welcome", name: "Auto-Delete Welcome", desc: "Remove greetings after timer" }
+                ],
+                "SECURITY": [
+                    { id: "captcha", name: "Captcha", desc: "Verify new users are human" },
+                    { id: "anti_raid", name: "Anti-Raid", desc: "Protection during raid events" },
+                    { id: "global_ban_sync", name: "Global Ban Sync", desc: "Sync with Nexus global blacklist" },
+                    { id: "new_account_filter", name: "New Account Filter", desc: "Restrict fresh accounts" },
+                    { id: "suspicious_activity_alert", name: "Suspicious Activity", desc: "Alert on unusual patterns" }
+                ],
+                "CONTENT": [
+                    { id: "word_filter", name: "Word Filter", desc: "Filter prohibited words" },
+                    { id: "link_whitelist", name: "Link Whitelist", desc: "Allow specific domains" },
+                    { id: "media_whitelist", name: "Media Whitelist", desc: "Allow specific media types" },
+                    { id: "spoiler_filter", name: "Spoiler Filter", desc: "Filter unmasked spoilers" },
+                    { id: "translation_filter", name: "Translation Filter", desc: "Enforce specific languages" }
+                ],
+                "CHANNEL": [
+                    { id: "auto_post", name: "Auto Post", desc: "Mirror group activity to channel" },
+                    { id: "scheduled_posts", name: "Scheduled Posts", desc: "Manage future channel updates" },
+                    { id: "post_to_channel", name: "Post to Channel", desc: "Direct bot-to-channel posting" },
+                    { id: "channel_comments_mod", name: "Channel Comments", desc: "Moderate linked comments" },
+                    { id: "linked_channel_sync", name: "Linked Channel Sync", desc: "Sync group/channel admins" },
+                    { id: "post_approval", name: "Post Approval", desc: "Approve group msgs for channel" }
+                ],
+                "ANALYTICS": [
+                    { id: "activity_tracking", name: "Activity Tracking", desc: "Detailed group stats" },
+                    { id: "sentiment_analysis", name: "Sentiment Analysis", desc: "Track community mood" },
+                    { id: "growth_tracking", name: "Growth Tracking", desc: "Monitor member changes" },
+                    { id: "member_heatmap", name: "Member Heatmap", desc: "Peak activity visualization" }
+                ],
+                "UTILITIES": [
+                    { id: "rules_command", name: "Rules Command", desc: "Quick access to group rules" },
+                    { id: "afk_system", name: "AFK System", desc: "Manage away-from-keyboard status" },
+                    { id: "poll_manager", name: "Poll Manager", desc: "Enhanced poll creation" },
+                    { id: "notes_system", name: "Notes System", desc: "Save and retrieve group notes" },
+                    { id: "pin_manager", name: "Pin Manager", desc: "Advanced message pinning" }
+                ]
+            };
+
+            return (
+                <div>
+                    {Object.entries(categories).map(([cat, mods]) => (
+                        <div key={cat} className="card">
+                            <h3 style={{fontSize:'14px', color:'var(--accent)', marginBottom:'15px'}}>{cat}</h3>
+                            {mods.map(m => <Toggle key={m.id} name={m.name} description={m.desc} moduleName={m.id} />)}
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        const ChannelManager = () => (
+            <div className="card">
+                <h3>📢 Channel Manager</h3>
+                <p>Coming soon...</p>
+            </div>
+        );
+
+        const BoostConfig = () => {
+            const chatId = useStore(state => state.activeGroupId);
+            const config = useStore(state => state.boostConfig);
+            const stats = useStore(state => state.boostStats);
+            const loading = useStore(state => state.boostLoading);
+            const fetchBoostConfig = useStore(state => state.fetchBoostConfig);
+            const fetchBoostStats = useStore(state => state.fetchBoostStats);
+            const saveBoostConfig = useStore(state => state.saveBoostConfig);
+            const [localConfig, setLocalConfig] = useState({});
+
+            useEffect(() => { if (chatId) { fetchBoostConfig(chatId); fetchBoostStats(chatId); } }, [chatId]);
+            useEffect(() => { setLocalConfig(config); }, [config]);
+
+            const handleChange = (key, value) => setLocalConfig(prev => ({ ...prev, [key]: value }));
+            const handleSave = () => saveBoostConfig(chatId, localConfig);
+
+            if (!localConfig.force_add_enabled && !localConfig.force_add_required) {
+                return (
+                    <div>
+                        <div className="card" style={{textAlign: 'center', padding: '40px'}}>
+                            <h2>⚡ Set Up Member Booster</h2>
+                            <p style={{color: 'var(--text-dim)', marginBottom: '20px'}}>
+                                Grow your group organically by requiring new members to invite others before they can chat.
+                            </p>
+                            <button className="action-btn primary" onClick={() => {
+                                const newConfig = {...localConfig, force_add_enabled: true, force_add_required: 5};
+                                setLocalConfig(newConfig);
+                                saveBoostConfig(chatId, newConfig);
+                            }}>🚀 Quick Setup</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="card">
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <h3>⚡ Member Booster</h3>
+                                <p style={{color: 'var(--text-dim)', fontSize: '13px'}}>Require invites before members can chat</p>
+                            </div>
+                            <label className="switch">
+                                <input type="checkbox" checked={localConfig.force_add_enabled || false} onChange={(e) => handleChange('force_add_enabled', e.target.checked)} />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="card">
+                        <h4>📋 Invite Requirement</h4>
+                        <div style={{marginBottom: '15px'}}>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Invites required</label>
+                            <div className="stepper">
+                                <button onClick={() => handleChange('force_add_required', Math.max(1, (localConfig.force_add_required || 5) - 1))}>−</button>
+                                <span>{localConfig.force_add_required || 5}</span>
+                                <button onClick={() => handleChange('force_add_required', Math.min(100, (localConfig.force_add_required || 5) + 1))}>+</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Action on join</label>
+                            {[
+                                {value: 'mute', label: '🔇 Mute until complete'},
+                                {value: 'restrict_media', label: '🚫 Restrict media only'},
+                                {value: 'kick', label: '👢 Kick if zero after 1h'}
+                            ].map(opt => (
+                                <label key={opt.value} style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px', cursor:'pointer'}}>
+                                    <input type="radio" name="action" checked={localConfig.force_add_action === opt.value} onChange={() => handleChange('force_add_action', opt.value)} />
+                                    {opt.label}
+                                </label>
+                            ))}
+                        </div>
+                        <div style={{marginTop: '15px'}}>
+                            <label style={{display:'block', marginBottom:'8px', fontSize:'13px'}}>Progress bar style</label>
+                            <div className="style-picker">
+                                {['blocks', 'dots', 'emoji', 'numbers'].map(style => (
+                                    <div key={style} className={`style-option ${localConfig.force_add_progress_style === style ? 'selected' : ''}`} onClick={() => handleChange('force_add_progress_style', style)}>
+                                        {style === 'blocks' ? '████░░' : style === 'dots' ? '●●●○○' : style === 'emoji' ? '🟩🟩⬜' : '3/5'}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="stats-grid">
+                        <div className="stat-card"><div className="value">{stats.locked_count || 0}</div><div className="label">🔒 Locked</div></div>
+                        <div className="stat-card"><div className="value">{stats.unlocked_count || 0}</div><div className="label">✅ Unlocked</div></div>
+                        <div className="stat-card"><div className="value">{stats.exempted_count || 0}</div><div className="label">⭐ Exempted</div></div>
+                    </div>
+                    <button className="action-btn primary" style={{width:'100%', marginTop:'20px'}} onClick={handleSave} disabled={loading}>
+                        {loading ? <LoadingSpinner/> : '💾 Save Settings'}
+                    </button>
+                </div>
+            );
+        };
+
+        const ChannelGate = () => {
+            const chatId = useStore(state => state.activeGroupId);
+            const config = useStore(state => state.channelConfig);
+            const stats = useStore(state => state.channelStats);
+            const loading = useStore(state => state.channelLoading);
+            const fetchChannelConfig = useStore(state => state.fetchChannelConfig);
+            const fetchChannelStats = useStore(state => state.fetchChannelStats);
+            const saveChannelConfig = useStore(state => state.saveChannelConfig);
+            const [localConfig, setLocalConfig] = useState({});
+            const [channelInput, setChannelInput] = useState('');
+
+            useEffect(() => { if (chatId) { fetchChannelConfig(chatId); fetchChannelStats(chatId); } }, [chatId]);
+            useEffect(() => { setLocalConfig(config); setChannelInput(config.force_channel_username || ''); }, [config]);
+
+            const handleChange = (key, value) => setLocalConfig(prev => ({ ...prev, [key]: value }));
+            const handleSave = () => saveChannelConfig(chatId, localConfig);
+            const handleLinkChannel = () => {
+                if (!channelInput) return;
+                const newConfig = { ...localConfig, force_channel_enabled: true, force_channel_username: channelInput.startsWith('@') ? channelInput.slice(1) : channelInput };
+                setLocalConfig(newConfig);
+                saveChannelConfig(chatId, newConfig);
+            };
+
+            if (!localConfig.force_channel_enabled && !localConfig.force_channel_id) {
+                return (
+                    <div>
+                        <div className="card">
+                            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                                <div>
+                                    <h3>📢 Force Join Channel</h3>
+                                    <p style={{color: 'var(--text-dim)', fontSize:'13px'}}>Require channel membership to chat</p>
+                                </div>
+                                <label className="switch">
+                                    <input type="checkbox" checked={localConfig.force_channel_enabled || false} onChange={(e) => handleChange('force_channel_enabled', e.target.checked)} />
+                                    <span className="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <div className="card" style={{textAlign:'center', padding:'40px'}}>
+                            <h3>Link a Channel</h3>
+                            <input className="input-field" placeholder="@channel" value={channelInput} onChange={(e) => setChannelInput(e.target.value)} style={{marginBottom:'15px'}} />
+                            <button className="action-btn primary" onClick={handleLinkChannel}>🔗 Link Channel</button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <div className="card">
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <div>
+                                <h3>📢 Force Join Channel</h3>
+                                <p style={{color: 'var(--text-dim)', fontSize: '13px'}}>Require channel membership to chat</p>
+                            </div>
+                            <label className="switch">
+                                <input type="checkbox" checked={localConfig.force_channel_enabled || false} onChange={(e) => handleChange('force_channel_enabled', e.target.checked)} />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div className="channel-card">
+                        <div className="channel-name">@{localConfig.force_channel_username || 'Not set'}</div>
+                        <div className="channel-id">ID: {localConfig.force_channel_id || '—'}</div>
+                    </div>
+                    <div className="stats-grid">
+                        <div className="stat-card"><div className="value">{stats.pending_count || 0}</div><div className="label">⏳ Pending</div></div>
+                        <div className="stat-card"><div className="value">{stats.verified_count || 0}</div><div className="label">✅ Verified</div></div>
+                        <div className="stat-card"><div className="value">{stats.avg_verify_seconds || 0}s</div><div className="label">📊 Avg Time</div></div>
+                    </div>
+                    <button className="action-btn primary" style={{width:'100%', marginTop:'20px'}} onClick={handleSave} disabled={loading}>
+                        {loading ? <LoadingSpinner/> : '💾 Save Settings'}
+                    </button>
+                </div>
+            );
+        };
+
+        const Manage = () => {
+            const [activeSubTab, setActiveSubTab] = useState("welcome");
+            const [text, setText] = useState("");
+            const chatId = useStore(state => state.activeGroupId);
+            const saveConfig = async () => {
+                await fetch(`/api/groups/${chatId}/text-config`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ [activeSubTab]: text }) });
+                showToast("Saved!", true);
+            };
+
+            return (
+                <div>
+                    <div className="sub-tabs">
+                        <button className={`sub-tab ${activeSubTab==='welcome'?'active':''}`} onClick={() => setActiveSubTab("welcome")}>Welcome</button>
+                        <button className={`sub-tab ${activeSubTab==='goodbye'?'active':''}`} onClick={() => setActiveSubTab("goodbye")}>Goodbye</button>
+                        <button className={`sub-tab ${activeSubTab==='rules'?'active':''}`} onClick={() => setActiveSubTab("rules")}>Rules</button>
+                        <button className={`sub-tab ${activeSubTab==='boost'?'active':''}`} onClick={() => setActiveSubTab("boost")}>⚡ Boost</button>
+                        <button className={`sub-tab ${activeSubTab==='channel'?'active':''}`} onClick={() => setActiveSubTab("channel")}>📢 Channel</button>
+                    </div>
+                    {activeSubTab === 'boost' && <BoostConfig />}
+                    {activeSubTab === 'channel' && <ChannelGate />}
+                    {activeSubTab !== 'boost' && activeSubTab !== 'channel' && (
+                        <div className="card">
+                            <h4>Edit {activeSubTab}</h4>
+                            <textarea style={{width:'100%', height:'150px', background:'rgba(0,0,0,0.2)', border:'1px solid var(--card-border)', borderRadius:'8px', color:'#fff', padding:'10px'}} value={text} onChange={(e) => setText(e.target.value)} />
+                            <div style={{marginTop:'10px', display:'flex', flexWrap:'wrap', gap:'5px'}}>
+                                {['{first}', '{fullname}', '{username}', '{mention}', '{chatname}'].map(v => <span key={v} onClick={() => setText(text + v)} style={{fontSize:'10px', background:'var(--card-border)', padding:'2px 5px', borderRadius:'3px', cursor:'pointer'}}>{v}</span>)}
+                            </div>
+                            <button onClick={saveConfig} style={{marginTop:'20px', width:'100%', padding:'12px', background:'var(--accent)', border:'none', borderRadius:'8px', fontWeight:'bold'}}>Save Changes</button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const AdminApp = ({ context }) => {
+            const { activeTab, setActiveTab, activeGroupTitle, activeGroupId, fetchModules } = useStore();
+            useEffect(() => {
+                const firstGroup = context.admin_groups?.[0];
+                if (firstGroup) { useStore.getState().setActiveGroup(0, firstGroup.chat_id, firstGroup.title); fetchModules(firstGroup.chat_id); }
+            }, []);
+
+            const renderContent = () => {
+                switch(activeTab) {
+                    case 'dashboard': return <Dashboard />;
+                    case 'modules': return <Modules />;
+                    case 'manage': return <Manage />;
+                    case 'channel': return <ChannelManager />;
+                    default: return <Dashboard />;
+                }
+            };
+
+            return (
+                <React.Fragment>
+                    <div className="sidebar">
+                        <div className="header"><h1>⚡ Nexus</h1><p>Intelligent Group Management</p></div>
+                        <nav style={{display:'flex', flexDirection:'column', gap:'10px', marginTop:'40px'}}>
+                            <div onClick={() => setActiveTab('dashboard')} style={{padding:'10px', color: activeTab==='dashboard'?'var(--accent)':'#fff', cursor:'pointer'}}>Dashboard</div>
+                            <div onClick={() => setActiveTab('modules')} style={{padding:'10px', color: activeTab==='modules'?'var(--accent)':'#fff', cursor:'pointer'}}>Modules</div>
+                            <div onClick={() => setActiveTab('manage')} style={{padding:'10px', color: activeTab==='manage'?'var(--accent)':'#fff', cursor:'pointer'}}>Manage</div>
+                            <div onClick={() => setActiveTab('channel')} style={{padding:'10px', color: activeTab==='channel'?'var(--accent)':'#fff', cursor:'pointer'}}>Channel</div>
+                        </nav>
+                    </div>
+                    <div className="main-content">
+                        <div className="header" style={{display: window.innerWidth > 768 ? 'none' : 'block'}}><h1>⚡ Nexus</h1><p>Intelligent Group Management</p></div>
+                        <div className="card" style={{padding:'12px 20px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <span style={{fontSize:'14px', fontWeight:'600'}}>{activeGroupTitle}</span>
+                            <span style={{fontSize:'12px', color:'var(--accent)'}}>ID: {activeGroupId}</span>
+                        </div>
+                        {renderContent()}
+                    </div>
+                    <div className="tab-nav">
+                        <div className={`tab-item ${activeTab==='dashboard'?'active':''}`} onClick={() => setActiveTab('dashboard')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Dashboard</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='modules'?'active':''}`} onClick={() => setActiveTab('modules')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span>Modules</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='manage'?'active':''}`} onClick={() => setActiveTab('manage')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg><span>Manage</span>
+                        </div>
+                        <div className={`tab-item ${activeTab==='channel'?'active':''}`} onClick={() => setActiveTab('channel')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg><span>Channel</span>
+                        </div>
+                    </div>
+                </React.Fragment>
+            );
+        };
+
+        // Main App Router
+        const App = () => {
+            const [initData, setInitData] = useState('');
+            const [skipAuth, setSkipAuth] = useState(false);
+            const { userContext, fetchUserContext } = useStore();
+            const [slowLoading, setSlowLoading] = useState(false);
+
+            useEffect(() => { initApp(); }, []);
+            useEffect(() => {
+                if (userContext.isLoading) {
+                    const timer = setTimeout(() => setSlowLoading(true), 3000);
+                    return () => clearTimeout(timer);
+                } else setSlowLoading(false);
+            }, [userContext.isLoading]);
+
+            const initApp = async () => {
+                const tg = window.Telegram?.WebApp;
+                const data = tg?.initData || '';
+                const skip = window.location.search.includes('skip_auth') || !data;
+                setInitData(data); setSkipAuth(skip);
+                if (tg) { tg.expand(); tg.setHeaderColor('#070b14'); }
+                if (!data && !skip) return;
+                try { await fetchUserContext(data); } catch (err) {}
+            };
+
+            if (userContext.isLoading) return <LoadingScreen subtext={slowLoading ? "Taking longer than usual... Check your connection." : null} />;
+            if (userContext.error) return <ErrorScreen icon="⚠️" title="Something went wrong" message={userContext.error} onRetry={initApp} />;
+            if (!initData && !skipAuth) return <ErrorScreen icon="🔒" title="Open in Telegram" message="This app must be opened through the Nexus bot in Telegram." />;
+
+            const role = userContext.role;
+            switch (role) {
+                case 'owner':
+                case 'admin': return <AdminApp context={userContext} />;
+                case 'member': return <MemberApp context={userContext} initData={initData} onRefresh={initApp} />;
+                case 'stranger':
+                default: return <StrangerScreen user={userContext.user} botInfo={userContext.botInfo} onRefresh={initApp} />;
+            }
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

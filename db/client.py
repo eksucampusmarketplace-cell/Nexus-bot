@@ -187,10 +187,40 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_clone_bot_groups_chat   ON clone_bot_groups(chat_id);
                 CREATE INDEX IF NOT EXISTS idx_clone_bot_groups_active ON clone_bot_groups(bot_id, is_active);
 
+                -- Ensure columns exist in groups table
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS member_count INTEGER DEFAULT 0;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS bot_token_hash TEXT;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS modules JSONB DEFAULT '{}'::jsonb;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS text_config JSONB DEFAULT '{}'::jsonb;
+
+                -- Ensure columns exist in users table
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS trust_score INTEGER DEFAULT 50;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS message_count INTEGER DEFAULT 0;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS warns JSONB DEFAULT '[]'::jsonb;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT FALSE;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+
+                -- Ensure columns exist in member_boost_records table
+                ALTER TABLE member_boost_records ADD COLUMN IF NOT EXISTS invited_count INTEGER DEFAULT 0;
+                ALTER TABLE member_boost_records ADD COLUMN IF NOT EXISTS manual_credits INTEGER DEFAULT 0;
+                ALTER TABLE member_boost_records ADD COLUMN IF NOT EXISTS is_unlocked BOOLEAN DEFAULT FALSE;
+                ALTER TABLE member_boost_records ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE;
+                ALTER TABLE member_boost_records ADD COLUMN IF NOT EXISTS is_exempted BOOLEAN DEFAULT FALSE;
+
+                -- Ensure columns exist in force_channel_records table
+                ALTER TABLE force_channel_records ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
+                ALTER TABLE force_channel_records ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE;
+
+                -- Ensure columns exist in actions_log table
+                ALTER TABLE actions_log ADD COLUMN IF NOT EXISTS bot_token_hash TEXT;
+
                 -- Ensure columns exist in bots table for existing installations
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS group_limit INT DEFAULT 1 CHECK (group_limit BETWEEN 1 AND 20);
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS group_access_policy TEXT DEFAULT 'blocked' CHECK (group_access_policy IN ('open','approval','blocked'));
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS bot_add_notifications BOOLEAN DEFAULT FALSE;
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT FALSE;
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS token_hash TEXT;
 
                 -- Rate limiting table
                 CREATE TABLE IF NOT EXISTS clone_attempts (

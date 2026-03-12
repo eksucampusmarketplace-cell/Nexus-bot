@@ -32,6 +32,8 @@ from db.ops.clone_groups import (
     get_active_group_count, get_clone_config, register_group,
     mark_group_left, get_group_entry
 )
+from db.ops.groups import upsert_group
+import hashlib
 
 log = logging.getLogger("group_lifecycle")
 
@@ -116,6 +118,13 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 is_owner_group=True,
                 access_status="active"
             )
+            # Also register in main groups table
+            token_hash = hashlib.sha256(context.bot.token.encode()).hexdigest()[:10]
+            try:
+                member_count = await chat.get_member_count()
+            except Exception:
+                member_count = 0
+            await upsert_group(chat.id, chat.title, token_hash, member_count=member_count)
             log.info(f"[LIFECYCLE] Owner group registered | bot={bot_id} chat={chat.id}")
 
             # Send setup DM to owner
@@ -145,6 +154,13 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 is_owner_group=False,
                 access_status="active"
             )
+            # Also register in main groups table
+            token_hash = hashlib.sha256(context.bot.token.encode()).hexdigest()[:10]
+            try:
+                member_count = await chat.get_member_count()
+            except Exception:
+                member_count = 0
+            await upsert_group(chat.id, chat.title, token_hash, member_count=member_count)
             # Onboard the stranger
             await _send_stranger_onboard_dm(context, actor, chat, policy="open")
             # Notify owner if enabled

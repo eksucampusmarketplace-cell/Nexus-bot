@@ -1,6 +1,6 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ChatMemberHandler
-from db.ops.captcha import add_captcha_pending, get_captcha_pending, remove_captcha_pending
+from db.ops.captcha import create_challenge, get_challenge_by_id, get_pending_challenge, mark_challenge_passed, log_member_event
 from datetime import datetime, timedelta
 import logging
 
@@ -86,6 +86,7 @@ async def delete_msg_job(context: ContextTypes.DEFAULT_TYPE):
 async def send_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE, member):
     chat_id = update.effective_chat.id
     user_id = member.id
+    db = context.bot_data.get("db")
     
     keyboard = [[InlineKeyboardButton("✅ I'm human", callback_data=f"captcha_verify_{user_id}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -94,21 +95,29 @@ async def send_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE, membe
     msg = await update.message.reply_text(text, reply_markup=reply_markup)
     
     expires_at = datetime.now() + timedelta(seconds=120)
-    await add_captcha_pending(user_id, chat_id, msg.message_id, expires_at)
+    # Use create_challenge instead of add_captcha_pending
+    import uuid
+    challenge_id = str(uuid.uuid4())[:12]
+    await create_challenge(
+        db, chat_id=chat_id, user_id=user_id,
+        challenge_id=challenge_id, mode="button", answer="verified",
+        message_id=msg.message_id, expires_at=expires_at
+    )
     
     # Schedule kick if not verified
-    context.job_queue.run_once(captcha_timeout, 120, data={"chat_id": chat_id, "user_id": user_id})
+    context.job_queue.run_once(captcha_timeout, 120, data={"chat_id": chat_id, "user_id": user_id, "challenge_id": challenge_id})
 
 async def captcha_timeout(context: ContextTypes.DEFAULT_TYPE):
     data = context.job.data
-    pending = await get_captcha_pending(data['user_id'], data['chat_id'])
-    if pending:
+    db = context.bot_data.get("db")
+    pending = await get_pending_challenge(db, data['chat_id'], data['user_id'])
+    if pending and not pending.get('passed', False):
         try:
             await context.bot.unban_chat_member(data['chat_id'], data['user_id'])
             await context.bot.delete_message(data['chat_id'], pending['message_id'])
+            await log_member_event(db, data['chat_id'], data['user_id'], "captcha_fail", {"reason": "timeout"})
         except:
             pass
-        await remove_captcha_pending(data['user_id'], data['chat_id'])
 
 async def captcha_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -122,13 +131,15 @@ async def captcha_callback_handler(update: Update, context: ContextTypes.DEFAULT
         return
     
     chat_id = update.effective_chat.id
-    pending = await get_captcha_pending(user_id, chat_id)
-    if pending:
+    db = context.bot_data.get("db")
+    pending = await get_pending_challenge(db, chat_id, user_id)
+    if pending and not pending.get('passed', False):
         await query.answer("Verified! Welcome.")
         try:
             await context.bot.delete_message(chat_id, pending['message_id'])
+            await mark_challenge_passed(db, pending['challenge_id'])
+            await log_member_event(db, chat_id, user_id, "captcha_pass")
         except:
             pass
-        await remove_captcha_pending(user_id, chat_id)
     else:
         await query.answer("Session expired or already verified.")

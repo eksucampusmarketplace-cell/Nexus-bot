@@ -18,7 +18,7 @@ from db.ops.music import (
 from db.ops import music_new as db_music_new
 from db.ops.channels import link_channel, unlink_channel, get_linked_channel, get_channel_posts
 from db.ops.modules import get_modules, set_module
-from db.ops.captcha import add_captcha_pending, get_captcha_pending, remove_captcha_pending
+from db.ops.captcha import create_challenge, get_challenge_by_id, get_pending_challenge, mark_challenge_passed, increment_attempts, log_member_event
 from db.ops.booster import (
     get_boost_config, save_boost_config, get_boost_stats,
     get_boost_record, create_boost_record, update_invite_count,

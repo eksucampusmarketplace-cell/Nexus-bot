@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     MAIN_BOT_USERNAME: str = "NexusBot"  # Username for support redirects
     SUPPORT_GROUP_ID: int = 0  # Internal alerts group (0 = disabled)
     DOCS_URL: Optional[str] = None  # Documentation link for help messages
+<<<<<<< HEAD
     MINI_APP_URL: Optional[str] = None  # Base URL for the Mini App
+=======
+    MINI_APP_URL: Optional[str] = None  # Base URL for the Mini App (if not set, defaults to RENDER_EXTERNAL_URL/webapp)
+>>>>>>> origin/main
     
     # ── Alert Settings ────────────────────────────────────────────────────────
     ALERT_ON_ERRORS: bool = True  # Post errors to support group
@@ -95,5 +99,17 @@ class Settings(BaseSettings):
         if not self.RENDER_EXTERNAL_URL:
             return f"http://localhost:{self.PORT}"
         return self.RENDER_EXTERNAL_URL.rstrip("/")
+<<<<<<< HEAD
+=======
+    
+    @property
+    def mini_app_url(self) -> Optional[str]:
+        """Get Mini App URL - uses MINI_APP_URL if set, otherwise constructs from RENDER_EXTERNAL_URL."""
+        if self.MINI_APP_URL:
+            return self.MINI_APP_URL
+        if self.RENDER_EXTERNAL_URL:
+            return f"{self.RENDER_EXTERNAL_URL.rstrip('/')}/webapp"
+        return None
+>>>>>>> origin/main
 
 settings = Settings()

@@ -273,10 +273,26 @@ async def health():
 
 @fastapi_app.get("/webapp", response_class=HTMLResponse)
 async def serve_webapp():
+<<<<<<< HEAD
     with open("webapp/index.html", "r") as f:
         return f.read()
 
 
+=======
+    """Serve the Mini App HTML."""
+    import os
+    webapp_path = os.path.join(os.path.dirname(__file__), "webapp", "index.html")
+    with open(webapp_path, "r") as f:
+        return f.read()
+
+
+@fastapi_app.get("/miniapp", response_class=HTMLResponse)
+async def serve_miniapp():
+    """Alias for /webapp - Mini App entry point."""
+    return await serve_webapp()
+
+
+>>>>>>> origin/main
 @fastapi_app.post("/webhook/{bot_id}")
 async def webhook(bot_id: int, request: Request):
     """

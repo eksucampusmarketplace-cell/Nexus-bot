@@ -71,6 +71,98 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(f"👢 {update.effective_user.first_name} kicked for flooding.")
             return
 
+
+# Anti-flood handler (for priority group 1)
+async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for anti-flood checks - registered at priority group 1."""
+    if not update.effective_chat or update.effective_chat.type == "private":
+        return
+    if not update.message:
+        return
+    
+    chat_id = update.effective_chat.id
+    user_id = update.effective_user.id
+    
+    group = await get_group(chat_id)
+    if not group:
+        return
+    
+    automod = group['settings']['automod']
+    
+    if automod['antiflood']['enabled']:
+        now = datetime.now()
+        if chat_id not in flood_data:
+            flood_data[chat_id] = {}
+        if user_id not in flood_data[chat_id]:
+            flood_data[chat_id][user_id] = []
+        
+        timestamps = flood_data[chat_id][user_id]
+        window = automod['antiflood']['window']
+        limit = automod['antiflood']['limit']
+        
+        # Clean old timestamps
+        timestamps = [t for t in timestamps if now - t < timedelta(seconds=window)]
+        timestamps.append(now)
+        flood_data[chat_id][user_id] = timestamps
+        
+        if len(timestamps) > limit:
+            action = automod['antiflood']['action']
+            duration = automod['antiflood']['duration']
+            until = now + timedelta(seconds=duration)
+            
+            if action == "mute":
+                await context.bot.restrict_chat_member(chat_id, user_id, permissions={"can_send_messages": False}, until_date=until)
+            elif action == "kick":
+                await context.bot.unban_chat_member(chat_id, user_id)
+            elif action == "ban":
+                await context.bot.ban_chat_member(chat_id, user_id)
+
+
+# Anti-spam handler (for priority group 2)
+async def antispam_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for anti-spam checks - registered at priority group 2."""
+    if not update.effective_chat or update.effective_chat.type == "private":
+        return
+    if not update.message or not update.message.text:
+        return
+    
+    # Simple spam detection - check for repeated messages
+    # This is a placeholder - real implementation would check against spam databases
+    pass
+
+
+# Anti-link handler (for priority group 3)
+async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler for anti-link checks - registered at priority group 3."""
+    if not update.effective_chat or update.effective_chat.type == "private":
+        return
+    if not update.message or not update.message.text:
+        return
+    
+    chat_id = update.effective_chat.id
+    
+    group = await get_group(chat_id)
+    if not group:
+        return
+    
+    automod = group['settings']['automod']
+    
+    if automod['antilink']['enabled']:
+        import re
+        links = re.findall(r'(https?://[^\s]+)', update.message.text)
+        for link in links:
+            whitelisted = False
+            for domain in automod['antilink']['whitelist']:
+                if domain in link:
+                    whitelisted = True
+                    break
+            if not whitelisted:
+                try:
+                    await update.message.delete()
+                except:
+                    pass
+                return
+
 async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     group = await get_group(chat_id)

@@ -4,6 +4,7 @@ import sys
 import asyncio
 import time
 import httpx
+import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -67,23 +68,55 @@ async def lifespan(app: FastAPI):
 
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
-    
+
+    # Validate token format before attempting to initialize
+    token_pattern = r'^\d{8,10}:[\w-]{35}$'
+    if not re.match(token_pattern, primary_token):
+        logger.error(
+            f"[STARTUP] ❌ Invalid PRIMARY_BOT_TOKEN format. "
+            f"Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz (bot ID: 8-10 digits, token: 35 chars). "
+            f"Please check your environment variables."
+        )
+        raise ValueError("Invalid bot token format. Bot tokens should be in format: BOT_ID:TOKEN")
+
     try:
         primary_app = create_application(primary_token, is_primary=True)
         primary_app.bot_data["db_pool"] = pool
 
+        logger.info("[STARTUP] Initializing primary bot...")
         await primary_app.initialize()
+        logger.info("[STARTUP] Starting primary bot...")
         await primary_app.start()
-        primary_me = primary_app.bot.get_me()
+
+        # Brief pause to ensure bot is fully ready
+        await asyncio.sleep(0.5)
+
+        # Verify bot is properly initialized - use async get_me() if available
+        logger.info("[STARTUP] Fetching bot information from Telegram...")
+        try:
+            primary_me = await primary_app.bot.get_me()
+        except AttributeError:
+            # Fall back to sync method
+            primary_me = primary_app.bot.get_me()
+
+        if not primary_me or primary_me.id == 0:
+            raise ValueError(
+                f"Bot initialization failed: get_me() returned invalid bot object (id={getattr(primary_me, 'id', 'None') if primary_me else 'None'}). "
+                f"This usually means the bot token is invalid or the bot cannot connect to Telegram."
+            )
+
+        logger.info(f"[STARTUP] Primary bot ready: @{primary_me.username} (id={primary_me.id})")
 
         primary_webhook = f"{settings.RENDER_EXTERNAL_URL}/webhook/{primary_me.id}"
+        logger.info(f"[STARTUP] Setting webhook: {primary_webhook}")
         await primary_app.bot.set_webhook(
             url=primary_webhook,
             allowed_updates=Update.ALL_TYPES,
             drop_pending_updates=True
         )
+        logger.info("[STARTUP] Webhook configured successfully")
     except Exception as e:
-        logger.error(f"[STARTUP] ❌ Failed to initialize primary bot: {e}")
+        logger.error(f"[STARTUP] ❌ Failed to initialize primary bot: {e}", exc_info=True)
         raise
 
     # Upsert primary bot record in DB
@@ -120,7 +153,7 @@ async def lifespan(app: FastAPI):
         try:
             token = decrypt_token(clone["token_encrypted"])
 
-            # Verify token still valid
+            # Verify token still valid via Telegram API
             async with httpx.AsyncClient(timeout=8.0) as client:
                 me_resp = await client.get(f"https://api.telegram.org/bot{token}/getMe")
                 me_data = me_resp.json()
@@ -132,6 +165,21 @@ async def lifespan(app: FastAPI):
             clone_app.bot_data["db_pool"] = pool
             await clone_app.initialize()
             await clone_app.start()
+
+            # Brief pause to ensure bot is fully ready
+            await asyncio.sleep(0.3)
+
+            # Verify bot ID matches what's in the database
+            try:
+                clone_me = await clone_app.bot.get_me()
+            except AttributeError:
+                clone_me = clone_app.bot.get_me()
+
+            if not clone_me or clone_me.id != clone["bot_id"]:
+                raise ValueError(
+                    f"Clone bot ID mismatch: expected {clone['bot_id']}, got {getattr(clone_me, 'id', 'None')}. "
+                    f"This usually means the token has changed or the bot is different."
+                )
 
             # Re-register webhook (Render URL may differ from last deploy)
             wh_url = f"{settings.RENDER_EXTERNAL_URL}/webhook/{clone['bot_id']}"
@@ -217,6 +265,15 @@ async def webhook(bot_id: int, request: Request):
     """
     import httpx
     start_ms = time.monotonic() * 1000
+
+    # Validate bot_id - reject obviously invalid IDs like 0
+    if bot_id == 0:
+        logger.error(
+            f"[WEBHOOK] Received webhook for invalid bot_id=0. "
+            f"This usually means the bot token is invalid or webhook was misconfigured. "
+            f"Please check PRIMARY_BOT_TOKEN environment variable and ensure webhook is set correctly."
+        )
+        return {"ok": True, "note": "invalid_bot_id_zero"}
 
     ptb_app = registry_get(bot_id)
 

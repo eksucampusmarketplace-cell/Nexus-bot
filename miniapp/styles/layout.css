@@ -12,7 +12,6 @@ html, body {
   color: var(--text-primary);
   background: var(--bg-base);
   -webkit-font-smoothing: antialiased;
-  overflow: hidden;
 }
 
 /* ── App shell ───────────────────────────────────────── */

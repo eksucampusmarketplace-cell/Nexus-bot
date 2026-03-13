@@ -52,6 +52,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await get_message(
             key="start_private",
             group_id=None,
+            bot_id=context.bot.id,
             variables={
                 "first_name": user.first_name,
                 "clone_name": bot_username,
@@ -86,6 +87,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         dm_msg = await get_message(
             key="start_group_dm",
             group_id=chat.id,
+            bot_id=context.bot.id,
             variables={
                 "first_name": user.first_name,
                 "clone_name": bot_username,
@@ -133,27 +135,16 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not miniapp_url and chat.type != "private":
         miniapp_url = await get_group_miniapp_url(db_pool, chat.id)
 
-    help_text = f"""⚡ <b>Nexus Bot Commands</b>
-
-<b>📱 Open the Mini App for full command documentation</b>
-All commands are listed with detailed descriptions and usage examples.
-Configure all features deeply through the visual interface.
-
-{f'<a href="{miniapp_url}">🚀 Open Commands Panel</a>' if miniapp_url else ''}
-
-<b>🛡️ Quick Reference:</b>
-
-<b>Moderation:</b> /warn, /ban, /mute, /kick, /purge, /pin, /unpin
-<b>Security:</b> !antispam, !antiflood, !antilink, !captcha, /slowmode
-<b>Messages:</b> /setwelcome, /setgoodbye, /setrules, /setflood
-<b>Music:</b> /play, /skip, /queue, /volume, /loop
-<b>Pins:</b> /pin, /unpin, /unpinall, /repin, /editpin
-<b>Fun:</b> /afk, /poll, /dice, /coin, /8ball, /roll, /joke
-<b>Utilities:</b> /panel, /stats, /info, /admins, /rules, /id
-
-<b>💡 Tip:</b> Use /panel to open the full management interface where you can configure all features with easy-to-use controls.
-
-⚡ Powered by {settings.BOT_DISPLAY_NAME}"""
+    help_text = await get_message(
+        key="help",
+        group_id=chat.id if chat.type != "private" else None,
+        bot_id=context.bot.id,
+        variables={
+            "clone_name": bot_username,
+            "miniapp_url": miniapp_url or "#",
+        },
+        db=db_pool
+    )
 
     await update.message.reply_text(
         text=help_text,

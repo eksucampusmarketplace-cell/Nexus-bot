@@ -357,39 +357,72 @@ async def update_group_setting(pool, chat_id: int, key: str, value):
 
 
 async def bulk_update_group_settings(pool, chat_id: int, settings: dict):
-    """Bulk update multiple settings."""
+    """Bulk update multiple settings, handling both columns and JSONB."""
     import json
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT settings FROM groups WHERE chat_id=$1",
-            chat_id
-        )
-        if not row or not row["settings"]:
-            current = {}
-        elif isinstance(row["settings"], str):
-            try:
-                current = json.loads(row["settings"])
-            except:
-                current = {}
+    
+    # List of known individual columns in 'groups' table
+    INDIVIDUAL_COLUMNS = {
+        "antiraid_enabled", "antiraid_mode", "antiraid_threshold",
+        "antiraid_duration_mins", "auto_antiraid_enabled",
+        "auto_antiraid_threshold", "captcha_enabled", "captcha_mode",
+        "captcha_timeout_mins", "captcha_kick_on_timeout",
+        "self_destruct_enabled", "self_destruct_minutes", "lock_admins",
+        "unofficial_tg_lock", "bot_inviter_ban", "duplicate_limit",
+        "duplicate_window_mins", "min_words", "max_words", "min_lines",
+        "max_lines", "min_chars", "max_chars", "necessary_words_active",
+        "regex_active",
+        "group_password", "password_kick_on_fail", "password_attempts",
+        "password_timeout_mins",
+        "log_channel_id", "log_include_preview", "log_include_userid",
+        "inline_mode_enabled",
+    }
+
+    column_updates = {}
+    jsonb_updates = {}
+    
+    for k, v in settings.items():
+        if k in INDIVIDUAL_COLUMNS:
+            column_updates[k] = v
         else:
-            current = dict(row["settings"]) or {}
-
-        # Merge settings
-        def deep_merge(base, new):
-            result = dict(base) if base else {}
-            for k, v in new.items():
-                if k in result and isinstance(result[k], dict) and isinstance(v, dict):
-                    result[k] = deep_merge(result[k], v)
+            jsonb_updates[k] = v
+            
+    async with pool.acquire() as conn:
+        # Update columns
+        if column_updates:
+            set_clause = ", ".join([f"{k} = ${i+2}" for i, k in enumerate(column_updates.keys())])
+            await conn.execute(
+                f"UPDATE groups SET {set_clause} WHERE chat_id = $1",
+                chat_id, *column_updates.values()
+            )
+            
+        # Update JSONB
+        if jsonb_updates:
+            row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id=$1", chat_id)
+            current = {}
+            if row and row["settings"]:
+                if isinstance(row["settings"], str):
+                    try:
+                        current = json.loads(row["settings"])
+                    except:
+                        current = {}
                 else:
-                    result[k] = v
-            return result
-
-        current = deep_merge(current, settings)
-
-        await conn.execute(
-            "UPDATE groups SET settings = $1::jsonb WHERE chat_id=$2",
-            json.dumps(current), chat_id
-        )
+                    current = dict(row["settings"])
+            
+            # Merge
+            def deep_merge(base, new):
+                result = dict(base) if base else {}
+                for k, v in new.items():
+                    if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+                        result[k] = deep_merge(result[k], v)
+                    else:
+                        result[k] = v
+                return result
+            
+            current = deep_merge(current, jsonb_updates)
+            await conn.execute(
+                "UPDATE groups SET settings = $1::jsonb WHERE chat_id=$2",
+                json.dumps(current), chat_id
+            )
 
 
 # ── Timed Locks ──────────────────────────────────────────────────────────

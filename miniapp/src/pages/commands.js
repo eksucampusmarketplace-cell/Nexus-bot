@@ -207,6 +207,7 @@ const COMMAND_CATEGORIES = [
  */
 export function renderCommandsPage(container) {
   const chatId = store.getState().activeChatId;
+  const settings = store.getState().settings || {};
 
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
@@ -218,6 +219,27 @@ export function renderCommandsPage(container) {
       description: 'Choose a group to see available commands'
     }));
     return;
+  }
+
+  // Define dynamic booster category based on activation toggle
+  const boosterEnabled = settings.booster_enabled === true;
+  const activeCategories = [...COMMAND_CATEGORIES];
+  
+  if (boosterEnabled) {
+    activeCategories.push({
+      id: 'booster',
+      title: '🚀 Booster',
+      description: 'Channel and member booster commands',
+      icon: '🚀',
+      commands: [
+        { cmd: '/booststats', args: '', desc: 'Show boost requirements and progress' },
+        { cmd: '/myboost', args: '', desc: 'Check your personal boost status' },
+        { cmd: '/grantboost', args: '<user_id>', desc: 'Manually grant access to a user' },
+        { cmd: '/revokeboost', args: '<user_id>', desc: 'Revoke manually granted access' },
+        { cmd: '/setboost', args: '<count>', desc: 'Set required invite count' },
+        { cmd: '/resetboost', args: '<user_id>', desc: 'Reset boost record for a user' },
+      ]
+    });
   }
 
   // Header with description
@@ -268,26 +290,26 @@ export function renderCommandsPage(container) {
   contentContainer.id = 'commands-content';
   container.appendChild(contentContainer);
 
-  // Render all categories initially
-  renderCategories(contentContainer, COMMAND_CATEGORIES);
+  // Render all active categories initially
+  renderCategories(contentContainer, activeCategories);
 
   // Add search functionality
   const searchInput = searchContainer.querySelector('#cmd-search');
   searchInput.addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase();
     if (query) {
-      const filtered = filterCommands(query);
-      renderSearchResults(contentContainer, filtered, query);
+      const filtered = filterCommands(query, activeCategories);
+      renderSearchResults(contentContainer, filtered, query, activeCategories);
     } else {
-      renderCategories(contentContainer, COMMAND_CATEGORIES);
+      renderCategories(contentContainer, activeCategories);
     }
   });
 }
 
-function filterCommands(query) {
+function filterCommands(query, categories) {
   const results = [];
   
-  COMMAND_CATEGORIES.forEach(cat => {
+  categories.forEach(cat => {
     const matchingCmds = cat.commands.filter(cmd => 
       cmd.cmd.toLowerCase().includes(query) ||
       cmd.desc.toLowerCase().includes(query) ||
@@ -341,7 +363,7 @@ function renderCategories(container, categories) {
   });
 }
 
-function renderSearchResults(container, results, query) {
+function renderSearchResults(container, results, query, categories) {
   container.innerHTML = '';
   
   if (results.length === 0) {

@@ -318,7 +318,7 @@ fastapi_app.add_middleware(
 )
 
 # Routes
-from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats, events
+from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats, events, bots_messages
 from api.routes.boost import router as boost_router
 from api.routes.channel_gate import router as channel_gate_router
 from api.routes.messages import router as messages_router
@@ -334,6 +334,7 @@ fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
 fastapi_app.include_router(debug.router)
 fastapi_app.include_router(bots.router)
+fastapi_app.include_router(bots_messages.router)
 fastapi_app.include_router(music.router)
 fastapi_app.include_router(modules.router)
 fastapi_app.include_router(analytics.router)

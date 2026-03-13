@@ -51,27 +51,14 @@ async def bulk_update_settings(chat_id: int, request: Request):
     body = await request.json()
     settings = body.get("settings", {})
     
-    async with db.pool.acquire() as conn:
-        # Get current settings
-        row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
-        if not row:
-            raise HTTPException(status_code=404, detail="Group not found")
-        
-        # Merge with new settings
-        current = json.loads(row['settings']) if row['settings'] else {}
-        merged = { **current, **settings }
-        
-        # Update
-        await conn.execute(
-            "UPDATE groups SET settings = $1 WHERE chat_id = $2",
-            json.dumps(merged), chat_id
-        )
+    from db.ops.automod import bulk_update_group_settings
+    await bulk_update_group_settings(db.pool, chat_id, settings)
     
     # Publish SSE event
     from api.routes.events import EventBus
     await EventBus.publish(chat_id, "settings_change", {"settings": settings})
     
-    return {"status": "ok", "settings": merged}
+    return {"status": "ok"}
 
 @router.get("/{chat_id}/logs")
 async def group_logs(chat_id: int, user: dict = Depends(get_current_user)):

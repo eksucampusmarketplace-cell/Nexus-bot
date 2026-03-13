@@ -393,6 +393,9 @@ async def unpin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def info_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show group information."""
     chat = update.effective_chat
+    if not chat:
+        return
+
     try:
         member_count = await context.bot.get_chat_member_count(chat.id)
     except Exception:
@@ -400,14 +403,21 @@ async def info_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     text = (
         f"ℹ️ <b>Group Information</b>\n\n"
-        f"<b>Name:</b> {chat.title}\n"
+        f"<b>Name:</b> {chat.title or chat.first_name}\n"
         f"<b>ID:</b> <code>{chat.id}</code>\n"
         f"<b>Type:</b> {chat.type.capitalize()}\n"
         f"<b>Members:</b> {member_count}\n"
         f"<b>Username:</b> @{chat.username or 'None'}\n"
     )
-    if chat.description:
-        text += f"<b>Description:</b>\n{chat.description}\n"
+    
+    try:
+        # Full chat info is needed for the description attribute in PTB v21.3+
+        full_chat = await context.bot.get_chat(chat.id)
+        description = getattr(full_chat, 'description', None)
+        if description:
+            text += f"<b>Description:</b>\n{description}\n"
+    except Exception:
+        pass
         
     await update.message.reply_text(text, parse_mode="HTML")
 

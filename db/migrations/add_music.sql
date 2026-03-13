@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS music_userbots (
     tg_username     TEXT,
     tg_name         TEXT,
     is_active       BOOLEAN DEFAULT TRUE,
+    risk_fee        INT DEFAULT 0,         -- Monthly fee in Stars
+    is_banned       BOOLEAN DEFAULT FALSE, -- Banned from using service
+    ban_reason      TEXT,
     added_at        TIMESTAMPTZ DEFAULT NOW(),
     last_used_at    TIMESTAMPTZ,
     UNIQUE (owner_bot_id, tg_user_id)
@@ -59,6 +62,7 @@ CREATE TABLE IF NOT EXISTS music_settings (
     -- 'admins' = only admins can /play
     dj_role_id      BIGINT,                -- optional: specific role that can /play
     announce_tracks BOOLEAN DEFAULT TRUE,  -- post now-playing card on each track
+    userbot_id      BIGINT REFERENCES music_userbots(id) ON DELETE SET NULL,
     PRIMARY KEY (chat_id, bot_id)
 );
 

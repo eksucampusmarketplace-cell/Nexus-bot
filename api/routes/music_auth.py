@@ -63,17 +63,16 @@ def _get_db():
     return db.pool
 
 
-def _verify_bot_owner(bot_id: int, user: dict):
+async def _verify_bot_owner(bot_id: int, user: dict):
     """Verify that the user owns the bot"""
     from db.ops.bots import get_bot_by_id
-    import asyncio
     
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
     
     # Get bot and verify ownership
-    bot = asyncio.get_event_loop().run_until_complete(get_bot_by_id(pool, bot_id))
+    bot = await get_bot_by_id(pool, bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
     
@@ -91,7 +90,7 @@ async def start_phone_auth_endpoint(
     Start phone authentication for music userbot.
     Returns: { ok: true, requires_otp: true }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -123,7 +122,7 @@ async def verify_otp_endpoint(
     Verify OTP code for phone authentication.
     Returns: { ok: true } or { ok: false, requires_2fa: true }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -176,7 +175,7 @@ async def verify_2fa_endpoint(
     Verify 2FA password for phone authentication.
     Returns: { ok: true, tg_name, tg_username }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -202,7 +201,7 @@ async def start_qr_auth_endpoint(
     Generate QR code for music userbot authentication.
     Returns: { ok: true, qr_image_base64: "..." }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -236,7 +235,7 @@ async def check_qr_status_endpoint(
     Check QR code scan status (polling endpoint).
     Returns: { ok: true, scanned: true/false, ... }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -264,7 +263,7 @@ async def session_string_auth_endpoint(
     Authenticate using a Pyrogram session string.
     Returns: { ok: true, tg_name, tg_username }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -306,7 +305,7 @@ async def get_music_userbots(
     Get all music userbot accounts for a bot.
     Returns: { ok: true, userbots: [{ id, tg_name, tg_username, risk_fee, is_banned, added_at, ... }] }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -342,7 +341,7 @@ async def get_music_userbot(
     Get music userbot information for a bot (legacy single userbot endpoint).
     Returns: { ok: true, userbot: { ... } } or { ok: true, userbot: null }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -381,7 +380,7 @@ async def update_userbot_risk_fee(
     Update risk fee for a specific userbot.
     Returns: { ok: true }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -406,7 +405,7 @@ async def ban_userbot_endpoint(
     Ban a userbot for risk fee non-payment.
     Returns: { ok: true }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -431,7 +430,7 @@ async def unban_userbot_endpoint(
     Unban a userbot.
     Returns: { ok: true }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -454,7 +453,7 @@ async def delete_music_userbot(
     Delete a specific music userbot.
     Returns: { ok: true }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -489,7 +488,7 @@ async def delete_all_music_userbots(
     Delete all music userbots for a bot.
     Returns: { ok: true }
     """
-    _verify_bot_owner(bot_id, user)
+    await _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")

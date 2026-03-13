@@ -18,6 +18,8 @@ export const useStore = createStore((set, get) => ({
   // ── User & Auth ─────────────────────────────────────────
   initData: '',
   userContext: null,
+  bot_info: null,
+  groups: [],
   
   // ── Active Group ───────────────────────────────────────────
   activeChatId: null,

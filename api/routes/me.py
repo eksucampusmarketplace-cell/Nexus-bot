@@ -59,30 +59,41 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         logger.error("[ME] No bots registered")
         raise HTTPException(status_code=503, detail="Bot service unavailable")
 
-    # Use primary bot for status checks
+    # Use the bot that validated the user
+    validated_bot_token = user.get("validated_bot_token")
     bot_app = None
-    for bid, app in bots.items():
-        bot_app = app
-        break
+    
+    if validated_bot_token:
+        for bid, app in bots.items():
+            if app.bot.token == validated_bot_token:
+                bot_app = app
+                break
+    
+    # Fallback to primary bot if no match found (shouldn't happen with correct auth)
+    if not bot_app:
+        for bid, app in bots.items():
+            if app.bot_data.get("is_primary"):
+                bot_app = app
+                break
+        if not bot_app:
+            for bid, app in bots.items():
+                bot_app = app
+                break
 
     if not bot_app:
         raise HTTPException(status_code=503, detail="Bot service unavailable")
 
+    import hashlib
+    token_hash = hashlib.sha256(bot_app.bot.token.encode()).hexdigest()[:10]
+
     async with db.pool.acquire() as conn:
         # Find all groups where this user appears in any of our tables
-        # Check member_boost_records (user is a member)
-        member_group_ids = await conn.fetch("""
-            SELECT DISTINCT group_id FROM member_boost_records WHERE user_id = $1
-            UNION
-            SELECT DISTINCT group_id FROM force_channel_records WHERE user_id = $1
-            UNION
-            SELECT DISTINCT chat_id as group_id FROM users WHERE user_id = $1
-        """, user_id)
-
-        member_group_ids = [row['group_id'] for row in member_group_ids]
-
-        # Get all groups from DB to check admin status
-        all_groups = await conn.fetch("SELECT chat_id, title, member_count, settings FROM groups")
+        # Filter groups by the current bot
+        all_groups = await conn.fetch("""
+            SELECT chat_id, title, member_count, settings 
+            FROM groups 
+            WHERE bot_token_hash = $1
+        """, token_hash)
 
     # Check Telegram status for each group
     admin_groups = []

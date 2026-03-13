@@ -92,12 +92,32 @@ async def sse_events(request: Request, chat_id: int, token: str = ""):
     # Validate token
     from api.auth import validate_init_data
     if not settings.SKIP_AUTH:
-        user_id = validate_init_data(token, settings.PRIMARY_BOT_TOKEN)
-        if not user_id:
+        user_data = None
+        # Try primary bot first
+        try:
+            user_data = validate_init_data(token, settings.PRIMARY_BOT_TOKEN)
+        except Exception:
+            # Try clones
+            from bot.registry import get_all
+            registered_bots = get_all()
+            for bot_id, bot_app in registered_bots.items():
+                try:
+                    bot_token = bot_app.bot.token
+                    if bot_token == settings.PRIMARY_BOT_TOKEN:
+                        continue
+                    user_data = validate_init_data(token, bot_token)
+                    if user_data:
+                        break
+                except Exception:
+                    continue
+        
+        if not user_data:
             return StreamingResponse(
                 iter([f"event: error\ndata: {json.dumps({'error':'unauthorized'})}\n\n"]),
                 media_type="text/event-stream"
             )
+        
+        user_id = user_data["user"].get("id")
 
     queue = EventBus.subscribe(chat_id)
     log.info(f"[SSE] Connection opened | chat={chat_id}")

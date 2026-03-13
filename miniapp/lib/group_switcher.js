@@ -35,6 +35,11 @@ export class GroupSwitcher {
       ...(data.admin_groups || []),
       ...(data.mod_groups   || []),
     ];
+    this._store.setState({ 
+      groups: this._groups,
+      bot_info: data.bot_info,
+      userContext: data.user
+    });
     const saved = sessionStorage.getItem('active_group');
     this._active = this._groups.find(g => g.chat_id == saved)
                 || this._groups[0]

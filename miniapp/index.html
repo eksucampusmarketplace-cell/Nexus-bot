@@ -821,6 +821,7 @@
         const list = document.createElement('div');
         list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2)';
         Object.entries(messages).forEach(([key, data]) => {
+          const canEdit = data.canEdit !== false;
           const item = document.createElement('div');
           item.style.cssText = `padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border:1px solid ${data.isCustom ? 'var(--accent)' : 'var(--border)'}`;
           item.innerHTML = `
@@ -830,8 +831,38 @@
             </div>
             <div style="font-size:var(--text-sm);margin-bottom:12px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${data.body}</div>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-secondary" style="padding:4px 8px;font-size:12px" onclick="window.editMsg('${apiUrl}','${key}', \`${data.body.replace(/`/g,'\\`').replace(/\$/g,'\\$')}\`)">Edit</button>
-              ${data.isCustom ? `<button class="btn btn-danger" style="padding:4px 8px;font-size:12px;background:none;color:var(--danger);border:1px solid var(--danger)" onclick="window.resetMsg('${apiUrl}','${key}')">Reset</button>` : ''}
+              ${canEdit ? `<button class="btn btn-secondary" style="padding:4px 8px;font-size:12px" onclick="window.editMsg('${apiUrl}','${key}', \`${data.body.replace(/`/g,'\\`').replace(/\$/g,'\\
+
+    window.editMsg = async (url, key, current) => {
+      const n = prompt(`Edit ${key}:`, current);
+      if (n && n !== current) {
+        try { await apiFetch(`${url}/${key}`, { method: 'PUT', body: JSON.stringify({ body: n }) }); showToast('Saved', 'success'); renderPage('settings'); }
+        catch (e) { showToast('Error', 'error'); }
+      }
+    };
+
+    window.resetMsg = async (url, key) => {
+      if (confirm('Reset to default?')) {
+        try { await apiFetch(`${url}/${key}`, { method: 'DELETE' }); showToast('Reset', 'success'); renderPage('settings'); }
+        catch (e) { showToast('Error', 'error'); }
+      }
+    };
+
+    async function renderLogs(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      container.innerHTML = '';
+      if (!chatId) return;
+      try {
+        const logs = await apiFetch(`/api/groups/${chatId}/logs`);
+        container.appendChild(Card({ title: 'Recent Logs', children: logs.length > 0 ? logs.slice(0, 20).map(l => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">${getActionEmoji(l.action)} <b>${formatAction(l.action)}</b> by ${l.by_username || 'System'} <span style="float:right;color:var(--text-muted);font-size:11px">${formatTime(l.timestamp)}</span></div>`).join('') : EmptyState({ icon: '📋', title: 'No logs' }) }));
+      } catch (e) {}
+    }
+  </script>
+</body>
+</html>
+)}\`)">Edit</button>` : '<span style="font-size:11px;color:var(--text-muted)">Bot owner only</span>'}
+              ${data.isCustom && canEdit ? `<button class="btn btn-danger" style="padding:4px 8px;font-size:12px;background:none;color:var(--danger);border:1px solid var(--danger)" onclick="window.resetMsg('${apiUrl}','${key}')">Reset</button>` : ''}
             </div>
           `;
           list.appendChild(item);

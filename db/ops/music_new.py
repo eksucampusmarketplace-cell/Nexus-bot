@@ -110,25 +110,105 @@ async def get_music_userbots(
     async with pool.acquire() as conn:
         if active_only:
             rows = await conn.fetch(
-                "SELECT * FROM music_userbots WHERE owner_bot_id=$1 AND is_active=TRUE",
+                "SELECT * FROM music_userbots WHERE owner_bot_id=$1 AND is_active=TRUE ORDER BY added_at DESC",
                 owner_bot_id
             )
         else:
             rows = await conn.fetch(
-                "SELECT * FROM music_userbots WHERE owner_bot_id=$1",
+                "SELECT * FROM music_userbots WHERE owner_bot_id=$1 ORDER BY added_at DESC",
                 owner_bot_id
             )
         return [dict(row) for row in rows]
 
 
-async def delete_music_userbot(pool: asyncpg.Pool, owner_bot_id: int):
-    """Delete all userbot accounts for a bot owner"""
+async def get_music_userbot_by_id(
+    pool: asyncpg.Pool,
+    owner_bot_id: int,
+    userbot_id: int
+) -> Optional[Dict]:
+    """Get a specific userbot by ID"""
     async with pool.acquire() as conn:
-        result = await conn.execute(
-            "DELETE FROM music_userbots WHERE owner_bot_id=$1",
-            owner_bot_id
+        row = await conn.fetchrow(
+            "SELECT * FROM music_userbots WHERE owner_bot_id=$1 AND id=$2",
+            owner_bot_id, userbot_id
         )
-        logger.info(f"[MUSIC_DB] Deleted userbots | owner={owner_bot_id}")
+        return dict(row) if row else None
+
+
+async def update_userbot_risk_fee(
+    pool: asyncpg.Pool,
+    owner_bot_id: int,
+    userbot_id: int,
+    risk_fee: int
+) -> Dict:
+    """Update risk fee for a userbot"""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE music_userbots
+            SET risk_fee=$1
+            WHERE owner_bot_id=$2 AND id=$3
+            RETURNING *
+            """,
+            risk_fee, owner_bot_id, userbot_id
+        )
+        return dict(row) if row else None
+
+
+async def ban_userbot(
+    pool: asyncpg.Pool,
+    owner_bot_id: int,
+    userbot_id: int,
+    ban_reason: str = None
+) -> Dict:
+    """Ban a userbot (for risk fee non-payment)"""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE music_userbots
+            SET is_banned=TRUE, ban_reason=$1, is_active=FALSE
+            WHERE owner_bot_id=$2 AND id=$3
+            RETURNING *
+            """,
+            ban_reason, owner_bot_id, userbot_id
+        )
+        return dict(row) if row else None
+
+
+async def unban_userbot(
+    pool: asyncpg.Pool,
+    owner_bot_id: int,
+    userbot_id: int
+) -> Dict:
+    """Unban a userbot"""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE music_userbots
+            SET is_banned=FALSE, ban_reason=NULL, is_active=TRUE
+            WHERE owner_bot_id=$2 AND id=$3
+            RETURNING *
+            """,
+            owner_bot_id, userbot_id
+        )
+        return dict(row) if row else None
+
+
+async def delete_music_userbot(pool: asyncpg.Pool, owner_bot_id: int, userbot_id: int = None):
+    """Delete userbot account(s) for a bot owner. If userbot_id is provided, delete that specific one."""
+    async with pool.acquire() as conn:
+        if userbot_id:
+            result = await conn.execute(
+                "DELETE FROM music_userbots WHERE owner_bot_id=$1 AND id=$2",
+                owner_bot_id, userbot_id
+            )
+            logger.info(f"[MUSIC_DB] Deleted userbot | owner={owner_bot_id} id={userbot_id}")
+        else:
+            result = await conn.execute(
+                "DELETE FROM music_userbots WHERE owner_bot_id=$1",
+                owner_bot_id
+            )
+            logger.info(f"[MUSIC_DB] Deleted all userbots | owner={owner_bot_id}")
 
 
 async def get_owner_clones(pool: asyncpg.Pool, owner_user_id: int) -> List[Dict]:

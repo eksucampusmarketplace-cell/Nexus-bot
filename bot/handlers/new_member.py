@@ -97,6 +97,12 @@ async def handle_chat_member_update(
             )
             return
 
+        # Group password challenge
+        if settings.get("group_password"):
+            from bot.handlers.password import send_password_challenge
+            await send_password_challenge(context.bot, chat.id, user, settings, db)
+            return
+
         # Welcome message (if no CAPTCHA)
         await _send_welcome(context.bot, chat.id, user, settings, db)
 

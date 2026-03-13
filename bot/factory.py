@@ -385,6 +385,44 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(h)
     logger.info(f"[FACTORY] Admin tools handlers registered")
 
+    # ── Pin management handlers ───────────────────────────────────────────
+    from bot.handlers.pins import (
+        cmd_pin, cmd_unpin, cmd_unpinall, cmd_repin,
+        cmd_editpin, cmd_delpin
+    )
+    app.add_handler(CommandHandler("pinmsg",    cmd_pin,      filters=GROUP))
+    app.add_handler(CommandHandler("unpinmsg",  cmd_unpin,    filters=GROUP))
+    app.add_handler(CommandHandler("unpinall",  cmd_unpinall, filters=GROUP))
+    app.add_handler(CommandHandler("repin",     cmd_repin,    filters=GROUP))
+    app.add_handler(CommandHandler("editpin",   cmd_editpin,  filters=GROUP))
+    app.add_handler(CommandHandler("delpin",    cmd_delpin,   filters=GROUP))
+    logger.info(f"[FACTORY] Pin handlers registered")
+
+    # ── Password management handlers ──────────────────────────────────────
+    from bot.handlers.password import cmd_setpassword, cmd_clearpassword, handle_password_dm
+    app.add_handler(CommandHandler("setpassword",   cmd_setpassword,   filters=GROUP))
+    app.add_handler(CommandHandler("clearpassword", cmd_clearpassword, filters=GROUP))
+    app.add_handler(MessageHandler(PRIVATE & filters.TEXT & ~filters.COMMAND, handle_password_dm))
+    logger.info(f"[FACTORY] Password handlers registered")
+
+    # ── Copy settings handler ─────────────────────────────────────────────
+    from bot.handlers.copy_settings import cmd_copy_settings
+    app.add_handler(CommandHandler("copysettings", cmd_copy_settings, filters=GROUP))
+    logger.info(f"[FACTORY] Copy settings handler registered")
+
+    # ── Public command handlers ───────────────────────────────────────────
+    from bot.handlers.public import (
+        cmd_time, cmd_kickme,
+        cmd_adminlist, cmd_invitelink, cmd_groupinfo
+    )
+    app.add_handler(CommandHandler("time",       cmd_time,       filters=GROUP))
+    app.add_handler(CommandHandler("kickme",     cmd_kickme,     filters=GROUP))
+    app.add_handler(CommandHandler("adminlist",  cmd_adminlist,  filters=GROUP))
+    app.add_handler(CommandHandler("staff",      cmd_adminlist,  filters=GROUP))
+    app.add_handler(CommandHandler("invitelink", cmd_invitelink, filters=GROUP))
+    app.add_handler(CommandHandler("groupinfo",  cmd_groupinfo,  filters=GROUP))
+    logger.info(f"[FACTORY] Public command handlers registered")
+
     logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
     return app
 

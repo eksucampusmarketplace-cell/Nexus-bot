@@ -304,7 +304,9 @@ async def update_group_setting(pool, chat_id: int, key: str, value):
         "unofficial_tg_lock", "bot_inviter_ban", "duplicate_limit",
         "duplicate_window_mins", "min_words", "max_words", "min_lines",
         "max_lines", "min_chars", "max_chars", "necessary_words_active",
-        "regex_active"
+        "regex_active",
+        "group_password", "password_kick_on_fail", "password_attempts",
+        "password_timeout_mins",
     }
 
     async with pool.acquire() as conn:

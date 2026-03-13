@@ -364,6 +364,7 @@
       <div id="page-music" class="page"></div>
       <div id="page-commands" class="page"></div>
       <div id="page-modules" class="page"></div>
+      <div id="page-analytics" class="page"></div>
       <div id="page-settings" class="page"></div>
       <div id="page-logs" class="page"></div>
     </div>
@@ -405,6 +406,7 @@
     import { renderCommandsPage } from './src/pages/commands.js';
     import { renderMusicPage } from './src/pages/music.js';
     import { renderBotsPage } from './src/pages/bots.js';
+    import { renderAnalyticsPage } from './src/pages/analytics.js';
 
     // Initialize theme
     ThemeEngine.init();
@@ -478,6 +480,7 @@
         { id: 'members', label: 'Members', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
         { id: 'music', label: 'Music', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },
         { id: 'modules', label: 'Modules', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
+        { id: 'analytics', label: 'Analytics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' },
         { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>' },
         { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
       ];
@@ -544,6 +547,9 @@
         case 'modules':
           renderModules(container);
           break;
+        case 'analytics':
+          await renderAnalyticsPage(container);
+          break;
         case 'settings':
           await renderSettings(container);
           break;
@@ -581,6 +587,9 @@
             </button>
             <button onclick="document.querySelector('[data-page=\\'modules\\']').click()" class="btn btn-secondary">
               📦 Manage Modules
+            </button>
+            <button onclick="document.querySelector('[data-page=\\'analytics\\']').click()" class="btn btn-secondary">
+              📊 Analytics
             </button>
           </div>
         </div>

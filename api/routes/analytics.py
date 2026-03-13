@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from api.auth import get_current_user
 from db.client import db
 from datetime import datetime, timedelta
@@ -152,3 +152,48 @@ async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)
                 })
 
     return heatmap
+
+
+@router.get("/{chat_id}/member-stats")
+async def member_stats(
+    chat_id: int,
+    limit: int = Query(10, ge=1, le=50),
+    user: dict = Depends(get_current_user),
+):
+    """Return top members by message count along with trust score stats."""
+    async with db.pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT user_id, username, first_name,
+                      message_count, trust_score,
+                      COALESCE(report_count, 0) AS report_count,
+                      COALESCE(array_length(CASE
+                          WHEN warns::text = '[]' OR warns IS NULL THEN ARRAY[]::text[]
+                          ELSE ARRAY(SELECT jsonb_array_elements_text(warns))
+                      END, 1), 0) AS warn_count
+               FROM users
+               WHERE chat_id = $1 AND message_count > 0
+               ORDER BY message_count DESC
+               LIMIT $2""",
+            chat_id, limit
+        )
+
+        total_members = await conn.fetchval(
+            "SELECT COUNT(*) FROM users WHERE chat_id = $1", chat_id
+        ) or 0
+
+        avg_trust = await conn.fetchval(
+            "SELECT AVG(trust_score) FROM users WHERE chat_id = $1", chat_id
+        ) or 50.0
+
+        low_trust_count = await conn.fetchval(
+            "SELECT COUNT(*) FROM users WHERE chat_id = $1 AND trust_score <= 30", chat_id
+        ) or 0
+
+    return {
+        "top_members": [dict(r) for r in rows],
+        "summary": {
+            "total_tracked": total_members,
+            "avg_trust_score": round(float(avg_trust), 1),
+            "low_trust_count": low_trust_count,
+        },
+    }

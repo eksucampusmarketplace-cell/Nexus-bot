@@ -150,6 +150,19 @@ async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         }
     )
 
+async def _refresh_trust_score(context, chat_id: int, user_id: int):
+    """Recalculate trust score after a moderation action (fire-and-forget helper)."""
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    if not db_pool:
+        return
+    try:
+        from bot.utils.trust_score import calculate_trust_score, apply_trust_consequences
+        score = await calculate_trust_score(user_id, chat_id, db_pool)
+        await apply_trust_consequences(user_id, chat_id, score, context)
+    except Exception as _e:
+        logger.debug(f"[COMMANDS] Trust score refresh failed: {_e}")
+
+
 async def warn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context) or not await command_enabled(update.effective_chat.id, "warn"):
         return
@@ -176,6 +189,8 @@ async def warn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reason, get_token_hash(context.bot.token)
     )
 
+    await _refresh_trust_score(context, update.effective_chat.id, target.id)
+
     if count >= threshold:
         action = warnings_settings['action']
         if action == "ban":
@@ -198,6 +213,7 @@ async def ban_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.ban_chat_member(update.effective_chat.id, target.id)
     await update.message.reply_text(f"🚫 {format_user(target)} has been banned.\nReason: {reason}", parse_mode="HTML")
     await log_action(update.effective_chat.id, "ban", target.id, target.username, update.effective_user.id, update.effective_user.username, reason, get_token_hash(context.bot.token))
+    await _refresh_trust_score(context, update.effective_chat.id, target.id)
 
 async def mute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context) or not await command_enabled(update.effective_chat.id, "mute"):
@@ -211,6 +227,7 @@ async def mute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.restrict_chat_member(update.effective_chat.id, target.id, permissions={"can_send_messages": False}, until_date=until)
     await update.message.reply_text(f"🔇 {format_user(target)} has been muted for {duration_str}.", parse_mode="HTML")
     await update_user_status(target.id, update.effective_chat.id, is_muted=True, mute_until=until)
+    await _refresh_trust_score(context, update.effective_chat.id, target.id)
 
 async def purge_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context) or not await command_enabled(update.effective_chat.id, "purge"):

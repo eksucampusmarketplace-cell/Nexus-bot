@@ -64,6 +64,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         stats_handler, id_handler, report_handler,
         start, help_handler, panel
     )
+    from bot.handlers.report import report_handlers as full_report_handlers
     from bot.handlers.automod import (
         antiflood_handler, antispam_handler, antilink_handler,
         message_handler, member_join_handler
@@ -213,6 +214,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("stats",   stats_handler))
     app.add_handler(CommandHandler("id",      id_handler))
     app.add_handler(CommandHandler("report",  report_handler))
+
+    # ── Full report system (replaces stub report_handler for new commands) ──
+    for h in full_report_handlers:
+        app.add_handler(h)
 
     # ── Advanced automod commands ───────────────────────────────────────
     # These are also handled by prefix_handler (!, !!) in group 0

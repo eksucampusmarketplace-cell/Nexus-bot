@@ -123,6 +123,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.admin_tools import admin_tool_handlers
 
     # Import alerts utility for error handling
+    from bot.handlers.broadcast_track import track_pm_handler
     from bot.utils.alerts import alert_error
     from config import settings
 
@@ -139,6 +140,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # Store DB pool for later use
     # This will be set by main.py before calling setup_music_worker
+
+    # ── PM Tracking ────────────────────────────────────────────────────────
+    app.add_handler(MessageHandler(filters.ChatType.PRIVATE, track_pm_handler), group=-1)
 
     # Music commands handler for new streaming system
     for h in new_music_handlers:

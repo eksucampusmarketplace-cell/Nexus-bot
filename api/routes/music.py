@@ -8,6 +8,8 @@ from pydantic import BaseModel
 import logging
 import json
 
+from api.auth import get_current_user
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/music", tags=["music"])
@@ -29,6 +31,7 @@ class MusicQueue(BaseModel):
     volume: int = 100
     repeat_mode: str = "none"
     shuffle_mode: bool = False
+    play_mode: str = "all"
 
 
 class MusicCommand(BaseModel):
@@ -53,26 +56,97 @@ class MusicSettings(BaseModel):
     volume: int = 100
     repeat_mode: str = "none"
     shuffle_mode: bool = False
+    play_mode: str = "all"
+    announce_tracks: bool = True
+
+
+async def _get_bot_id_from_user(user: dict) -> int:
+    """Extract bot_id from user's validated bot token"""
+    import hashlib
+    from db.client import db
+    import db.ops.bots as db_ops_bots
+
+    bot_token = user.get("validated_bot_token")
+    if not bot_token or not db.pool:
+        return 0  # Default to shared pool
+
+    # Get bot by token hash
+    token_hash = hashlib.sha256(bot_token.encode()).hexdigest()
+    bot = await db_ops_bots.get_bot_by_token_hash(db.pool, token_hash)
+    if bot:
+        return bot.get("bot_id", 0)
+    return 0
 
 
 @router.get("/{chat_id}/queue", response_model=MusicQueue)
-async def get_music_queue(chat_id: int):
+async def get_music_queue(chat_id: int, user: dict = Depends(get_current_user)):
     """Get the current music queue and settings for a group"""
-    from bot.utils.music_helpers import get_queue
+    from db.client import db
+    import db.ops.music_new as db_music
 
-    # Try to get from database (will be called by bot context in real implementation)
-    # For API-only calls, we need pool access
-    # This is a simplified version - in production, inject pool via dependency
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
 
-    # Return mock data for now - real implementation needs DB pool
-    return MusicQueue(
-        current=None,
-        queue=[],
-        is_playing=False,
-        volume=100,
-        repeat_mode="none",
-        shuffle_mode=False
-    )
+    try:
+        # Get the bot_id for this user's active bot context
+        bot_id = await _get_bot_id_from_user(user)
+
+        # Get session state (current track, volume, etc.)
+        session = await db_music.get_session_state(db.pool, chat_id, bot_id)
+
+        # Get queue entries
+        queue_entries = await db_music.get_queue_entries(db.pool, chat_id, bot_id, played=False)
+
+        # Get music settings
+        music_settings = await db_music.get_music_settings(db.pool, chat_id, bot_id)
+
+        # Build current track if session exists
+        current = None
+        if session and session.get("current_track"):
+            # Find the current track in queue entries
+            current_track_id = session.get("current_track")
+            for entry in queue_entries:
+                if entry.get("id") == current_track_id:
+                    current = Track(
+                        type=entry.get("source", "unknown"),
+                        title=entry.get("title", "Unknown"),
+                        performer=entry.get("requested_by_name", "Unknown"),
+                        duration=entry.get("duration", 0)
+                    )
+                    break
+
+        # Build queue list
+        queue = [
+            Track(
+                type=entry.get("source", "unknown"),
+                title=entry.get("title", "Unknown"),
+                performer=entry.get("requested_by_name", "Unknown"),
+                duration=entry.get("duration", 0)
+            )
+            for entry in queue_entries
+        ]
+
+        return MusicQueue(
+            current=current,
+            queue=queue,
+            is_playing=session.get("is_playing", False) if session else False,
+            volume=session.get("volume", 100) if session else 100,
+            repeat_mode="one" if (session and session.get("is_looping")) else "none",
+            shuffle_mode=False,  # TODO: add shuffle support
+            play_mode=music_settings.get("play_mode", "all") if music_settings else "all"
+        )
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Error fetching queue: {e}")
+        # Return default values on error
+        return MusicQueue(
+            current=None,
+            queue=[],
+            is_playing=False,
+            volume=100,
+            repeat_mode="none",
+            shuffle_mode=False,
+            play_mode="all"
+        )
 
 
 @router.get("/{chat_id}/playlists")
@@ -111,15 +185,74 @@ async def play_playlist(chat_id: int, playlist_name: str):
 
 
 @router.get("/{chat_id}/settings", response_model=MusicSettings)
-async def get_music_settings(chat_id: int):
+async def get_music_settings(chat_id: int, user: dict = Depends(get_current_user)):
     """Get music settings for a group"""
-    return MusicSettings()
+    from db.client import db
+    import db.ops.music_new as db_music
+
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        # Get the bot_id for this user's active bot context
+        bot_id = await _get_bot_id_from_user(user)
+
+        # Get music settings from database
+        music_settings = await db_music.get_music_settings(db.pool, chat_id, bot_id)
+
+        if music_settings:
+            return MusicSettings(
+                volume=music_settings.get("volume", 100),
+                repeat_mode="one" if music_settings.get("is_looping") else "none",
+                shuffle_mode=music_settings.get("shuffle_mode", False),
+                play_mode=music_settings.get("play_mode", "all"),
+                announce_tracks=music_settings.get("announce_tracks", True)
+            )
+        else:
+            # Return default settings
+            return MusicSettings()
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Error fetching settings: {e}")
+        return MusicSettings()
 
 
 @router.put("/{chat_id}/settings", response_model=MusicSettings)
-async def update_music_settings(chat_id: int, settings: MusicSettings):
+async def update_music_settings(chat_id: int, settings: MusicSettings, user: dict = Depends(get_current_user)):
     """Update music settings for a group"""
-    return settings
+    from db.client import db
+    import db.ops.music_new as db_music
+
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        # Get the bot_id for this user's active bot context
+        bot_id = await _get_bot_id_from_user(user)
+
+        # Upsert music settings
+        await db_music.upsert_music_settings(
+            db.pool,
+            chat_id=chat_id,
+            bot_id=bot_id,
+            play_mode=settings.play_mode,
+            announce_tracks=settings.announce_tracks
+        )
+
+        # Update session state for volume and loop if needed
+        session = await db_music.get_session_state(db.pool, chat_id, bot_id)
+        if session:
+            await db_music.update_session_state(
+                db.pool,
+                chat_id=chat_id,
+                bot_id=bot_id,
+                volume=settings.volume,
+                is_looping=(settings.repeat_mode != "none")
+            )
+
+        return settings
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Error updating settings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{chat_id}/history")
@@ -154,30 +287,52 @@ async def health_check():
 
 
 @router.post("/{chat_id}/command")
-async def send_music_command(chat_id: int, command: MusicCommand):
+async def send_music_command(chat_id: int, command: MusicCommand, user: dict = Depends(get_current_user)):
     """Send a control command to the music player"""
     from bot.registry import get_all
-    
+    from db.client import db
+    import db.ops.music_new as db_music
+
+    # Handle musicmode command (update play_mode setting)
+    if command.command == 'musicmode':
+        if not db.pool:
+            raise HTTPException(status_code=503, detail="Database not available")
+
+        try:
+            bot_id = await _get_bot_id_from_user(user)
+
+            play_mode = command.value if command.value in ['all', 'admins'] else 'all'
+            await db_music.upsert_music_settings(
+                db.pool,
+                chat_id=chat_id,
+                bot_id=bot_id,
+                play_mode=play_mode
+            )
+            return {"status": "ok", "command": command.command, "result": {"play_mode": play_mode}}
+        except Exception as e:
+            logger.error(f"[MUSIC_API] Error updating musicmode: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
     # Get bot app for this group
     bots = get_all()
     bot_app = None
     for bid, app in bots.items():
         bot_app = app
         break
-    
+
     if not bot_app:
         raise HTTPException(status_code=503, detail="Bot service unavailable")
-    
+
     # Command mapping
-    valid_commands = ['play', 'pause', 'resume', 'skip', 'stop', 'loop', 'shuffle', 'volume']
+    valid_commands = ['play', 'pause', 'resume', 'skip', 'stop', 'loop', 'shuffle', 'volume', 'musicmode']
     if command.command not in valid_commands:
         raise HTTPException(status_code=400, detail=f"Invalid command. Valid: {valid_commands}")
-    
+
     # Get music worker
     worker = bot_app.bot_data.get("music_worker")
     if not worker:
         return {"status": "no_worker", "message": "Music worker not configured"}
-    
+
     # Execute command
     result = None
     try:
@@ -195,7 +350,7 @@ async def send_music_command(chat_id: int, command: MusicCommand):
             result = await worker.set_volume(chat_id, int(command.value))
         else:
             result = {"ok": True, "message": "Command queued"}
-        
+
         return {"status": "ok", "command": command.command, "result": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

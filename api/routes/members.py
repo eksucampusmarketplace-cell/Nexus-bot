@@ -246,13 +246,276 @@ async def unapprove_member(chat_id: int, user_id: int):
     return {"ok": True}
 
 
+@router.post("/members/{user_id}/mute")
+async def mute_member(chat_id: int, user_id: int, request: Request):
+    """Mute a member (restrict from sending messages)."""
+    body = await request.json()
+    duration = body.get("duration", 3600)  # Default 1 hour
+    
+    try:
+        # Get bot app for this group
+        from bot.registry import get_all
+        bots = get_all()
+        bot_app = None
+        for bid, app in bots.items():
+            bot_app = app
+            break
+        
+        if not bot_app:
+            raise HTTPException(status_code=503, detail="Bot service unavailable")
+        
+        from telegram import ChatPermissions
+        await bot_app.bot.restrict_chat_member(
+            chat_id, user_id, ChatPermissions(can_send_messages=False)
+        )
+        
+        # Update database
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO users (chat_id, user_id, is_muted, updated_at)
+                   VALUES ($1, $2, TRUE, NOW())
+                   ON CONFLICT (chat_id, user_id) 
+                   DO UPDATE SET is_muted = TRUE, updated_at = NOW()""",
+                chat_id, user_id
+            )
+            
+            # Log the action
+            await conn.execute(
+                """INSERT INTO actions_log 
+                   (chat_id, action, target_user_id, by_user_id, reason, timestamp)
+                   VALUES ($1, 'mute', $2, $3, $4, NOW())""",
+                chat_id, user_id, request.state.user_id, f"Muted for {duration}s via Mini App"
+            )
+        
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[Members] Error muting member {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to mute member")
+
+
+@router.post("/members/{user_id}/kick")
+async def kick_member(chat_id: int, user_id: int, request: Request):
+    """Kick a member from the group."""
+    try:
+        # Get bot app for this group
+        from bot.registry import get_all
+        bots = get_all()
+        bot_app = None
+        for bid, app in bots.items():
+            bot_app = app
+            break
+        
+        if not bot_app:
+            raise HTTPException(status_code=503, detail="Bot service unavailable")
+        
+        await bot_app.bot.ban_chat_member(chat_id, user_id)
+        await bot_app.bot.unban_chat_member(chat_id, user_id)
+        
+        # Log the action
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO actions_log 
+                   (chat_id, action, target_user_id, by_user_id, reason, timestamp)
+                   VALUES ($1, 'kick', $2, $3, 'Kicked via Mini App', NOW())""",
+                chat_id, user_id, request.state.user_id
+            )
+        
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[Members] Error kicking member {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to kick member")
+
+
+@router.post("/members/{user_id}/ban")
+async def ban_member(chat_id: int, user_id: int, request: Request):
+    """Ban a member from the group."""
+    try:
+        # Get bot app for this group
+        from bot.registry import get_all
+        bots = get_all()
+        bot_app = None
+        for bid, app in bots.items():
+            bot_app = app
+            break
+        
+        if not bot_app:
+            raise HTTPException(status_code=503, detail="Bot service unavailable")
+        
+        await bot_app.bot.ban_chat_member(chat_id, user_id)
+        
+        # Update database
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO users (chat_id, user_id, is_banned, updated_at)
+                   VALUES ($1, $2, TRUE, NOW())
+                   ON CONFLICT (chat_id, user_id) 
+                   DO UPDATE SET is_banned = TRUE, updated_at = NOW()""",
+                chat_id, user_id
+            )
+            
+            # Log the action
+            await conn.execute(
+                """INSERT INTO actions_log 
+                   (chat_id, action, target_user_id, by_user_id, reason, timestamp)
+                   VALUES ($1, 'ban', $2, $3, 'Banned via Mini App', NOW())""",
+                chat_id, user_id, request.state.user_id
+            )
+        
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[Members] Error banning member {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to ban member")
+
+
+@router.post("/members/{user_id}/unban")
+async def unban_member(chat_id: int, user_id: int, request: Request):
+    """Unban a member from the group."""
+    try:
+        # Get bot app for this group
+        from bot.registry import get_all
+        bots = get_all()
+        bot_app = None
+        for bid, app in bots.items():
+            bot_app = app
+            break
+        
+        if not bot_app:
+            raise HTTPException(status_code=503, detail="Bot service unavailable")
+        
+        await bot_app.bot.unban_chat_member(chat_id, user_id)
+        
+        # Update database
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE users SET is_banned = FALSE, updated_at = NOW()
+                   WHERE chat_id = $1 AND user_id = $2""",
+                chat_id, user_id
+            )
+            
+            # Log the action
+            await conn.execute(
+                """INSERT INTO actions_log 
+                   (chat_id, action, target_user_id, by_user_id, reason, timestamp)
+                   VALUES ($1, 'unban', $2, $3, 'Unbanned via Mini App', NOW())""",
+                chat_id, user_id, request.state.user_id
+            )
+        
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[Members] Error unbanning member {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to unban member")
+
+
+@router.post("/members/{user_id}/unmute")
+async def unmute_member(chat_id: int, user_id: int, request: Request):
+    """Unmute a member (restore permissions)."""
+    try:
+        # Get bot app for this group
+        from bot.registry import get_all
+        bots = get_all()
+        bot_app = None
+        for bid, app in bots.items():
+            bot_app = app
+            break
+        
+        if not bot_app:
+            raise HTTPException(status_code=503, detail="Bot service unavailable")
+        
+        from telegram import ChatPermissions
+        await bot_app.bot.restrict_chat_member(
+            chat_id, user_id,
+            ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+                can_change_info=False,
+                can_invite_users=True,
+                can_pin_messages=False
+            )
+        )
+        
+        # Update database
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE users SET is_muted = FALSE, updated_at = NOW()
+                   WHERE chat_id = $1 AND user_id = $2""",
+                chat_id, user_id
+            )
+            
+            # Log the action
+            await conn.execute(
+                """INSERT INTO actions_log 
+                   (chat_id, action, target_user_id, by_user_id, reason, timestamp)
+                   VALUES ($1, 'unmute', $2, $3, 'Unmuted via Mini App', NOW())""",
+                chat_id, user_id, request.state.user_id
+            )
+        
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[Members] Error unmuting member {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to unmute member")
+
+
+@router.post("/members/{user_id}/warn")
+async def warn_member(chat_id: int, user_id: int, request: Request):
+    """Add a warning to a member."""
+    body = await request.json()
+    reason = body.get("reason", "Warned via Mini App")
+    
+    try:
+        # Get current warns for the user
+        async with db.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT warns FROM users WHERE chat_id = $1 AND user_id = $2",
+                chat_id, user_id
+            )
+            
+            warns = []
+            if row and row['warns']:
+                if isinstance(row['warns'], str):
+                    warns = json.loads(row['warns'])
+                else:
+                    warns = row['warns']
+            
+            # Add new warning
+            warns.append({
+                "reason": reason,
+                "timestamp": "now()",
+                "by": request.state.user_id
+            })
+            
+            # Update user record
+            await conn.execute(
+                """INSERT INTO users (chat_id, user_id, warns, updated_at)
+                   VALUES ($1, $2, $3, NOW())
+                   ON CONFLICT (chat_id, user_id) 
+                   DO UPDATE SET warns = $3, updated_at = NOW()""",
+                chat_id, user_id, json.dumps(warns)
+            )
+            
+            # Log the action
+            await conn.execute(
+                """INSERT INTO actions_log 
+                   (chat_id, action, target_user_id, by_user_id, reason, timestamp)
+                   VALUES ($1, 'warn', $2, $3, $4, NOW())""",
+                chat_id, user_id, reason, request.state.user_id
+            )
+        
+        return {"ok": True, "warn_count": len(warns)}
+    except Exception as e:
+        logger.error(f"[Members] Error warning member {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to warn member")
+
+
 @router.post("/members/bulk")
 async def bulk_action(chat_id: int, request: Request):
     body    = await request.json()
     user_ids = body.get("user_ids", [])
     action  = body.get("action")
 
-    if not user_ids or action not in ("ban", "mute", "approve", "kick", "unapprove", "warn"):
+    if not user_ids or action not in ("ban", "mute", "unmute", "approve", "kick", "unapprove", "warn"):
         raise HTTPException(status_code=400, detail="Invalid request")
 
     results = {"ok": [], "failed": []}
@@ -281,13 +544,84 @@ async def bulk_action(chat_id: int, request: Request):
                         "DELETE FROM approved_members WHERE chat_id=$1 AND user_id=$2",
                         chat_id, uid
                     )
+                elif action == "warn":
+                    # Get current warns
+                    row = await conn.fetchrow(
+                        "SELECT warns FROM users WHERE chat_id = $1 AND user_id = $2",
+                        chat_id, uid
+                    )
+                    warns = []
+                    if row and row['warns']:
+                        if isinstance(row['warns'], str):
+                            warns = json.loads(row['warns'])
+                        else:
+                            warns = row['warns']
+                    
+                    warns.append({
+                        "reason": "Warned via bulk action",
+                        "timestamp": "now()",
+                        "by": request.state.user_id
+                    })
+                    
+                    await conn.execute(
+                        """INSERT INTO users (chat_id, user_id, warns, updated_at)
+                           VALUES ($1, $2, $3, NOW())
+                           ON CONFLICT (chat_id, user_id) 
+                           DO UPDATE SET warns = $3, updated_at = NOW()""",
+                        chat_id, uid, json.dumps(warns)
+                    )
+                    
+                    # Log the action
+                    await conn.execute(
+                        """INSERT INTO actions_log 
+                           (chat_id, action, target_user_id, by_user_id, reason, timestamp)
+                           VALUES ($1, 'warn', $2, $3, 'Bulk warn action', NOW())""",
+                        chat_id, uid, request.state.user_id
+                    )
                 elif bot_app:
                     if action == "ban":
                         await bot_app.bot.ban_chat_member(chat_id, uid)
+                        # Update database
+                        await conn.execute(
+                            """INSERT INTO users (chat_id, user_id, is_banned, updated_at)
+                               VALUES ($1, $2, TRUE, NOW())
+                               ON CONFLICT (chat_id, user_id) 
+                               DO UPDATE SET is_banned = TRUE, updated_at = NOW()""",
+                            chat_id, uid
+                        )
                     elif action == "mute":
                         from telegram import ChatPermissions
                         await bot_app.bot.restrict_chat_member(
                             chat_id, uid, ChatPermissions(can_send_messages=False)
+                        )
+                        # Update database
+                        await conn.execute(
+                            """INSERT INTO users (chat_id, user_id, is_muted, updated_at)
+                               VALUES ($1, $2, TRUE, NOW())
+                               ON CONFLICT (chat_id, user_id) 
+                               DO UPDATE SET is_muted = TRUE, updated_at = NOW()""",
+                            chat_id, uid
+                        )
+                    elif action == "unmute":
+                        from telegram import ChatPermissions
+                        await bot_app.bot.restrict_chat_member(
+                            chat_id, uid,
+                            ChatPermissions(
+                                can_send_messages=True,
+                                can_send_media_messages=True,
+                                can_send_polls=True,
+                                can_send_other_messages=True,
+                                can_add_web_page_previews=True,
+                                can_change_info=False,
+                                can_invite_users=True,
+                                can_pin_messages=False
+                            )
+                        )
+                        # Update database
+                        await conn.execute(
+                            """UPDATE users SET is_muted = FALSE, updated_at = NOW()
+                               WHERE chat_id = $1 AND user_id = $2""",
+                            chat_id, uid
                         )
                     elif action == "kick":
                         await bot_app.bot.ban_chat_member(chat_id, uid)

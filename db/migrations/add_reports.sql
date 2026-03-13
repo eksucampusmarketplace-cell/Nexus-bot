@@ -21,12 +21,5 @@ CREATE INDEX IF NOT EXISTS idx_reports_reporter  ON reports (reporter_id);
 CREATE INDEX IF NOT EXISTS idx_reports_reported  ON reports (reported_id);
 
 -- Add report_count convenience column to users so the analytics API can read it
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'users' AND column_name = 'report_count'
-    ) THEN
-        ALTER TABLE users ADD COLUMN report_count INT NOT NULL DEFAULT 0;
-    END IF;
-END $$;
+-- Note: This will fail if column already exists, but migration is tracked so it won't re-run
+ALTER TABLE users ADD COLUMN IF NOT EXISTS report_count INT NOT NULL DEFAULT 0;

@@ -11,6 +11,7 @@
 
 import { Card, EmptyState, showToast } from '../../lib/components.js';
 import { useStore } from '../../store/index.js';
+import { apiFetch } from '../../lib/api.js';
 
 const store = useStore;
 
@@ -48,15 +49,7 @@ export function renderMusicPage(container) {
 
 async function fetchMusicData(chatId, initData, container) {
   try {
-    const res = await fetch(`/api/music/${chatId}/queue`, {
-      headers: { 'x-init-data': initData }
-    });
-
-    if (!res.ok) {
-      throw new Error('Failed to load music data');
-    }
-
-    const data = await res.json();
+    const data = await apiFetch(`/api/music/${chatId}/queue`);
     renderMusicInterface(container, data, chatId, initData);
   } catch (error) {
     console.error('[Music] Error loading data:', error);
@@ -344,20 +337,11 @@ async function sendMusicCommand(chatId, action, initData, value = null) {
 
     const cmd = commandMap[action] || action;
 
-    const res = await fetch(`/api/music/${chatId}/command`, {
+    await apiFetch(`/api/music/${chatId}/command`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-init-data': initData
-      },
-      body: JSON.stringify({ command: cmd, value })
+      body: JSON.stringify({ command: cmd, value }),
     });
-
-    if (res.ok) {
-      showToast('Command sent!', 'success');
-    } else {
-      showToast('Failed to send command', 'error');
-    }
+    showToast('Command sent!', 'success');
   } catch (e) {
     console.error('Music command failed:', e);
     showToast('Command failed', 'error');
@@ -366,20 +350,11 @@ async function sendMusicCommand(chatId, action, initData, value = null) {
 
 async function updateMusicSettings(chatId, settings, initData) {
   try {
-    const res = await fetch(`/api/music/${chatId}/settings`, {
+    await apiFetch(`/api/music/${chatId}/settings`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-init-data': initData
-      },
-      body: JSON.stringify(settings)
+      body: JSON.stringify(settings),
     });
-
-    if (res.ok) {
-      showToast('Settings updated!', 'success');
-    } else {
-      showToast('Failed to update settings', 'error');
-    }
+    showToast('Settings updated!', 'success');
   } catch (e) {
     console.error('Settings update failed:', e);
     showToast('Update failed', 'error');

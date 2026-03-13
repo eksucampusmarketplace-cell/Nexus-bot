@@ -16,6 +16,7 @@
 
 import { Card, EmptyState, showToast } from '../../lib/components.js';
 import { useStore } from '../../store/index.js';
+import { apiFetch } from '../../lib/api.js';
 
 const store = useStore;
 
@@ -174,12 +175,7 @@ export async function renderGreetingsPage(container) {
 
   let textConfig = {};
   try {
-    const res = await fetch(`/api/groups/${chatId}/text-config`, {
-      headers: { 'x-init-data': initData }
-    });
-    if (res.ok) {
-      textConfig = await res.json();
-    }
+    textConfig = await apiFetch(`/api/groups/${chatId}/text-config`) || {};
   } catch (e) {
     console.warn('[Greetings] Could not load text config:', e);
   }
@@ -460,22 +456,11 @@ function _makeBtn(text, bg, color, border = false) {
 
 async function _saveKey(chatId, initData, key, value) {
   const body = {};
-  if (value === '' || value === null) {
-    body[key] = null;
-  } else {
-    body[key] = value;
-  }
-  const res = await fetch(`/api/groups/${chatId}/text-config`, {
+  body[key] = (value === '' || value === null) ? null : value;
+  await apiFetch(`/api/groups/${chatId}/text-config`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-init-data': initData,
-    },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`);
-  }
 }
 
 function _markCustomized(header, isCustomized) {

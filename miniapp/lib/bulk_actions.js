@@ -14,6 +14,7 @@
  */
 
 import { showToast } from './components.js';
+import { apiFetch } from './api.js';
 
 export class BulkActionManager {
   constructor(store) {
@@ -106,15 +107,10 @@ export class BulkActionManager {
     const chatId = this._store.getState().activeChatId;
 
     try {
-      const res = await fetch(`/api/groups/${chatId}/members/bulk`, {
-        method:  'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-init-data': window.Telegram?.WebApp?.initData || '',
-        },
+      const data = await apiFetch(`/api/groups/${chatId}/members/bulk`, {
+        method: 'POST',
         body: JSON.stringify({ action, user_ids: ids }),
       });
-      const data = await res.json();
       showToast(`${action} applied to ${ids.length} members`, 'success');
       this._callbacks[action]?.(ids, data);
     } catch (e) {

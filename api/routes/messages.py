@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from api.auth import get_current_user
 from db.ops.groups import get_custom_messages, get_custom_message, set_custom_message, delete_custom_message
-from db.ops.groups import get_group_info
 from bot.utils.messages import DEFAULTS
 
 router = APIRouter(prefix="/api/groups/{chat_id}/messages")

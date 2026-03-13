@@ -12,6 +12,7 @@ Implements the complete boost system including:
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes, ChatMemberHandler,
@@ -1295,7 +1296,3 @@ def register_handlers(app):
     register_aliases(app, booster_aliases)
     
     logger.info("[BOOSTER] All handlers registered")
-
-
-# Import Optional for type hints
-from typing import Optional

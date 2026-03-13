@@ -8,6 +8,7 @@ import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from telegram import Update
@@ -353,6 +354,13 @@ async def lifespan(app: FastAPI):
     logger.info("[SHUTDOWN] Complete")
 
 fastapi_app = FastAPI(title="Nexus Bot API", lifespan=lifespan)
+
+# Add GZip compression for responses > 1KB to reduce bandwidth
+fastapi_app.add_middleware(
+    GZipMiddleware,
+    minimum_size=1024,  # Only compress responses larger than 1KB
+    compresslevel=6,    # Good balance between speed and compression
+)
 
 fastapi_app.add_middleware(
     CORSMiddleware,

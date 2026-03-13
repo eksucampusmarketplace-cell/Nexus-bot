@@ -61,10 +61,17 @@ class EventBus:
 
     @classmethod
     async def publish(cls, chat_id: int, event_type: str, data: dict):
-        if chat_id not in cls._connections:
+        if chat_id not in cls._connections or not cls._connections[chat_id]:
             return
-        payload = json.dumps({"type": event_type, "data": data,
-                               "ts": datetime.now(timezone.utc).isoformat()})
+        # Minimize payload size - only include essential fields
+        minimal_data = {}
+        for key, value in data.items():
+            # Skip large fields and internal fields
+            if key not in ('_internal', 'full_user_data', 'message_text', 'raw_update'):
+                minimal_data[key] = value
+        
+        payload = json.dumps({"type": event_type, "data": minimal_data,
+                               "ts": datetime.now(timezone.utc).isoformat()}, separators=(',', ':'))
         dead = []
         for q in cls._connections[chat_id]:
             try:

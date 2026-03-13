@@ -1,9 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from api.auth import get_current_user
 from db.client import db
 from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/groups")
+
+
+def _compact_date(date_str: str) -> str:
+    """Convert YYYY-MM-DD to MMDD to save bandwidth."""
+    if date_str and len(date_str) >= 10:
+        return date_str[5:7] + date_str[8:10]  # MM-DD -> MMDD
+    return date_str
+
+
+def _minify_response(data: dict) -> dict:
+    """Remove null values and empty arrays to reduce payload size."""
+    if isinstance(data, dict):
+        return {k: _minify_response(v) for k, v in data.items() 
+                if v is not None and v != [] and v != {}}
+    if isinstance(data, list):
+        return [_minify_response(item) for item in data]
+    return data
 
 @router.get("/{chat_id}/analytics")
 async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
@@ -113,11 +131,17 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
         if not modules:
             modules = [{"name": "no_activity", "actions": 0}]
 
-    return {
-        "activity": activity,
-        "growth": growth,
+    # Minify and compact response to reduce bandwidth
+    response_data = _minify_response({
+        "activity": [{"d": _compact_date(a["date"]), "m": a["messages"]} for a in activity],
+        "growth": [{"d": _compact_date(g["date"]), "j": g["joins"], "l": g["leaves"]} for g in growth],
         "modules": modules
-    }
+    })
+    
+    return JSONResponse(
+        content=response_data,
+        headers={"Content-Encoding": "identity"}  # Allow gzip if configured
+    )
 
 @router.get("/{chat_id}/analytics/heatmap")
 async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)):
@@ -160,7 +184,10 @@ async def member_stats(
     limit: int = Query(10, ge=1, le=50),
     user: dict = Depends(get_current_user),
 ):
-    """Return top members by message count along with trust score stats."""
+    """Return top members by message count along with trust score stats.
+    
+    Optimized for bandwidth: returns compact field names and excludes nulls.
+    """
     async with db.pool.acquire() as conn:
         rows = await conn.fetch(
             """SELECT user_id, username, first_name,
@@ -189,11 +216,26 @@ async def member_stats(
             "SELECT COUNT(*) FROM users WHERE chat_id = $1 AND trust_score <= 30", chat_id
         ) or 0
 
-    return {
-        "top_members": [dict(r) for r in rows],
-        "summary": {
-            "total_tracked": total_members,
-            "avg_trust_score": round(float(avg_trust), 1),
-            "low_trust_count": low_trust_count,
+    # Compact field names to reduce payload size
+    compact_members = []
+    for r in rows:
+        member = {
+            "id": r["user_id"],
+            "u": r["username"],
+            "n": r["first_name"],
+            "mc": r["message_count"],
+            "ts": r["trust_score"],
+            "rc": r["report_count"],
+            "wc": r["warn_count"],
+        }
+        # Remove null values
+        compact_members.append({k: v for k, v in member.items() if v is not None})
+
+    return JSONResponse(content={
+        "tm": compact_members,  # top_members
+        "s": {  # summary
+            "tt": total_members,  # total_tracked
+            "at": round(float(avg_trust), 1),  # avg_trust
+            "lt": low_trust_count,  # low_trust_count
         },
-    }
+    })

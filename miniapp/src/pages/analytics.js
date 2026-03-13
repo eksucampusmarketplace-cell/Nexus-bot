@@ -64,12 +64,15 @@ export async function renderAnalyticsPage(container) {
 
   container.innerHTML = '';
 
-  const { activity = [], growth = [], modules: modActions = [] } = analytics || {};
+  // Support both compact API format (d/m/j/l) and legacy format (date/messages/joins/leaves)
+  const activity = analytics?.activity || analytics?.a || [];
+  const growth = analytics?.growth || analytics?.g || [];
+  const modActions = analytics?.modules || analytics?.mo || [];
 
-  const totalMessages = activity.reduce((s, d) => s + (d.messages || 0), 0);
-  const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.messages || 0) : 0;
-  const totalJoins    = growth.reduce((s, d) => s + (d.joins || 0), 0);
-  const totalLeaves   = growth.reduce((s, d) => s + (d.leaves || 0), 0);
+  const totalMessages = activity.reduce((s, d) => s + (d.m || d.messages || 0), 0);
+  const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.m || activity[activity.length - 1]?.messages || 0) : 0;
+  const totalJoins    = growth.reduce((s, d) => s + (d.j || d.joins || 0), 0);
+  const totalLeaves   = growth.reduce((s, d) => s + (d.l || d.leaves || 0), 0);
   const openReports   = reports?.count || 0;
 
   const summaryGrid = document.createElement('div');
@@ -88,8 +91,10 @@ export async function renderAnalyticsPage(container) {
   container.appendChild(_buildGrowthChart(growth));
   container.appendChild(_buildModActionsCard(modActions));
 
-  if (memberStats && Array.isArray(memberStats.top_members)) {
-    container.appendChild(_buildLeaderboard(memberStats.top_members));
+  // Support both compact API format (tm) and legacy format (top_members)
+  const topMembers = memberStats?.tm || memberStats?.top_members;
+  if (topMembers && Array.isArray(topMembers)) {
+    container.appendChild(_buildLeaderboard(topMembers));
   }
 
   container.appendChild(await _buildReportsInbox(chatId, reports?.reports || []));
@@ -118,7 +123,9 @@ function _buildActivityChart(activity) {
   `;
 
   last14.forEach(day => {
-    const pct = (day.messages || 0) / maxVal;
+    const messageCount = day.m || day.messages || 0;
+    const dateStr = day.d || day.date;
+    const pct = messageCount / maxVal;
     const col = document.createElement('div');
     col.style.cssText = `
       flex: 1;
@@ -138,11 +145,14 @@ function _buildActivityChart(activity) {
       opacity: ${0.4 + pct * 0.6};
       transition: opacity 0.2s;
     `;
-    bar.title = `${day.date}: ${day.messages || 0} messages`;
+    bar.title = `${dateStr}: ${messageCount} messages`;
 
     const label = document.createElement('div');
-    const d = new Date(day.date);
-    label.textContent = DAY_LABELS[d.getDay()].slice(0, 1);
+    // Parse compact date format (MMDD) or full date
+    const d = dateStr?.length === 4 
+      ? new Date(`${new Date().getFullYear()}-${dateStr.slice(0, 2)}-${dateStr.slice(2, 4)}`)
+      : new Date(dateStr);
+    label.textContent = DAY_LABELS[d.getDay() || 0].slice(0, 1);
     label.style.cssText = 'font-size: 9px; color: var(--text-muted); writing-mode: horizontal-tb;';
 
     col.appendChild(bar);
@@ -193,14 +203,21 @@ function _buildGrowthChart(growth) {
   `;
   const tbody = document.createElement('tbody');
   last14.forEach(day => {
-    const net = (day.joins || 0) - (day.leaves || 0);
+    const joins = day.j || day.joins || 0;
+    const leaves = day.l || day.leaves || 0;
+    const dateStr = day.d || day.date;
+    const net = joins - leaves;
     const netColor = net > 0 ? '#4ade80' : net < 0 ? '#f87171' : 'var(--text-muted)';
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--border)';
+    // Format date: MMDD -> MM-DD or show full date
+    const formattedDate = dateStr?.length === 4 
+      ? `${dateStr.slice(0, 2)}-${dateStr.slice(2, 4)}`
+      : dateStr?.slice(5) || '?';
     tr.innerHTML = `
-      <td style="padding:5px 4px;">${day.date?.slice(5) || '?'}</td>
-      <td style="text-align:right;padding:5px 4px;color:#4ade80;">${day.joins || 0}</td>
-      <td style="text-align:right;padding:5px 4px;color:#f87171;">${day.leaves || 0}</td>
+      <td style="padding:5px 4px;">${formattedDate}</td>
+      <td style="text-align:right;padding:5px 4px;color:#4ade80;">${joins}</td>
+      <td style="text-align:right;padding:5px 4px;color:#f87171;">${leaves}</td>
       <td style="text-align:right;padding:5px 4px;color:${netColor};font-weight:600;">${net > 0 ? '+' : ''}${net}</td>
     `;
     tbody.appendChild(tr);
@@ -276,9 +293,11 @@ function _buildLeaderboard(topMembers) {
   list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-top:var(--sp-2);';
 
   topMembers.slice(0, 10).forEach((m, i) => {
-    const name = m.first_name || m.username || `User ${m.user_id}`;
-    const messages = m.message_count || 0;
-    const trust = m.trust_score || 50;
+    // Support both compact API format (n/u/mc/ts) and legacy format (first_name/username/message_count/trust_score)
+    const name = m.n || m.first_name || m.u || m.username || `User ${m.id || m.user_id}`;
+    const username = m.u || m.username;
+    const messages = m.mc || m.message_count || 0;
+    const trust = m.ts || m.trust_score || 50;
     const trustColor = trust >= 86 ? '#4ade80' : trust >= 31 ? 'var(--text-muted)' : '#f87171';
 
     const row = document.createElement('div');
@@ -294,7 +313,7 @@ function _buildLeaderboard(topMembers) {
       <div style="flex:1;min-width:0;">
         <div style="font-size:var(--text-sm);font-weight:500;color:var(--text-primary);
                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${name}${m.username ? ` <span style="color:var(--text-muted);font-weight:400;">@${m.username}</span>` : ''}
+          ${name}${username ? ` <span style="color:var(--text-muted);font-weight:400;">@${username}</span>` : ''}
         </div>
         <div style="font-size:var(--text-xs);color:var(--text-muted);">${messages.toLocaleString()} messages</div>
       </div>

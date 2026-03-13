@@ -410,6 +410,33 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("copysettings", cmd_copy_settings, filters=GROUP))
     logger.info(f"[FACTORY] Copy settings handler registered")
 
+    # ── Log channel handlers ──────────────────────────────────────────────
+    from bot.handlers.log_channel import (
+        cmd_setlog, cmd_unsetlog, cmd_logchannel
+    )
+    app.add_handler(CommandHandler("setlog",      cmd_setlog,      filters=GROUP))
+    app.add_handler(CommandHandler("unsetlog",    cmd_unsetlog,    filters=GROUP))
+    app.add_handler(CommandHandler("logchannel",  cmd_logchannel,  filters=GROUP))
+    logger.info(f"[FACTORY] Log channel handlers registered")
+
+    # ── Import / Export / Reset handlers ─────────────────────────────────
+    from bot.handlers.import_export import (
+        cmd_export, cmd_import, cmd_reset, handle_reset_callback
+    )
+    app.add_handler(CommandHandler("export", cmd_export, filters=GROUP))
+    app.add_handler(CommandHandler("import", cmd_import, filters=GROUP))
+    app.add_handler(CommandHandler("reset",  cmd_reset,  filters=GROUP))
+    app.add_handler(CallbackQueryHandler(
+        handle_reset_callback, pattern=r"^reset_(confirm:|cancel)"
+    ))
+    logger.info(f"[FACTORY] Import/Export handlers registered")
+
+    # ── Inline query handler ──────────────────────────────────────────────
+    from telegram.ext import InlineQueryHandler
+    from bot.handlers.inline_mode import handle_inline_query
+    app.add_handler(InlineQueryHandler(handle_inline_query))
+    logger.info(f"[FACTORY] Inline query handler registered")
+
     # ── Public command handlers ───────────────────────────────────────────
     from bot.handlers.public import (
         cmd_time, cmd_kickme,

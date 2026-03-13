@@ -112,6 +112,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.debug(f"[STARTUP] Scheduling migration info: {e}")
 
+    # Run log channel migration
+    try:
+        log_migration_path = os.path.join(os.path.dirname(__file__), "db", "migrations", "add_log_channel.sql")
+        if os.path.exists(log_migration_path):
+            with open(log_migration_path, 'r') as f:
+                log_migration_sql = f.read()
+            await pool.execute(log_migration_sql)
+            logger.info("[STARTUP] ✅ Log channel tables migrated")
+    except Exception as e:
+        logger.debug(f"[STARTUP] Log channel migration info: {e}")
+
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
 
@@ -307,6 +318,7 @@ from api.routes.admin import router as admin_router
 from api.routes.billing import router as billing_router
 from api.routes import automod as automod_router
 from api.routes.scheduler import router as scheduler_router
+from api.routes.log_channel import router as log_channel_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -329,6 +341,7 @@ fastapi_app.include_router(billing_router)
 fastapi_app.include_router(events.router)
 fastapi_app.include_router(automod_router.router)
 fastapi_app.include_router(scheduler_router)
+fastapi_app.include_router(log_channel_router)
 
 # Serve miniapp static files
 miniapp_dir = os.path.join(os.path.dirname(__file__), "miniapp")

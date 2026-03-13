@@ -51,6 +51,7 @@ from bot.automod.detectors import (
     is_in_time_window
 )
 from api.routes.events import push_event
+from bot.logging.log_channel import log_event
 
 log = logging.getLogger("automod")
 
@@ -282,6 +283,9 @@ async def _enforce(
     result: AutomodResult, duration_hours: int
 ):
     """Delete message, apply penalty, send admonition."""
+    db     = context.bot_data.get("db")
+    bot    = context.bot
+
     try:
         await msg.delete()
         result.deleted = True
@@ -291,7 +295,7 @@ async def _enforce(
     penalty = result.penalty
     if penalty in ("silence", "kick", "ban"):
         await apply_penalty(
-            context.bot, chat.id, user.id,
+            bot, chat.id, user.id,
             PenaltyType(penalty), duration_hours
         )
         result.actioned = True
@@ -303,6 +307,26 @@ async def _enforce(
     # Auto-warn counting
     if settings.get("auto_warning_enabled"):
         await _record_warning(context, chat.id, user.id, settings)
+
+    # Log event
+    event_type = result.penalty if result.penalty in ("ban", "mute", "kick") else "delete"
+    preview    = (msg.text or "")[:200] if result.deleted else ""
+    await log_event(
+        bot        = bot,
+        db         = db,
+        chat_id    = chat.id,
+        event_type = event_type,
+        target     = user,
+        details    = {
+            "rule_key": result.rule_key,
+            "reason":   result.reason,
+            "penalty":  result.penalty,
+            "duration": duration_hours,
+            "message_preview": preview,
+        },
+        chat_title = chat.title or "",
+        bot_id     = bot.id,
+    )
 
     log.info(
         f"[AUTOMOD] Enforced | chat={chat.id} user={user.id} "

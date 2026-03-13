@@ -18,6 +18,7 @@ from db.ops.antiraid import (
     increment_session_joins, log_member_event
 )
 from api.routes.events import push_event
+from bot.logging.log_channel import log_event
 
 log = logging.getLogger("antiraid")
 
@@ -91,6 +92,13 @@ async def _trigger_raid(
     ends_at  = (
         datetime.now(timezone.utc) + timedelta(minutes=duration)
         if duration > 0 else None
+    )
+    # Log raid start
+    await log_event(
+        bot=bot, db=db, chat_id=chat_id,
+        event_type="antiraid_start",
+        details={"join_count": join_count, "mode": settings.get("antiraid_mode")},
+        bot_id=bot.id,
     )
 
     session_id = await create_antiraid_session(
@@ -177,7 +185,6 @@ async def _handle_raid_join(bot, chat_id, user, session, settings, db):
 
 async def _auto_end_raid(bot, chat_id, session_id, delay_seconds, db):
     await asyncio.sleep(delay_seconds)
-    # Check if session is still active before ending
     session = await db.fetchrow("SELECT is_active FROM antiraid_sessions WHERE id = $1", session_id)
     if session and session['is_active']:
         await end_antiraid_session(db, session_id)
@@ -189,6 +196,12 @@ async def _auto_end_raid(bot, chat_id, session_id, delay_seconds, db):
             )
         except TelegramError:
             pass
+        await log_event(
+            bot=bot, db=db, chat_id=chat_id,
+            event_type="antiraid_end",
+            details={"session_id": session_id},
+            bot_id=bot.id,
+        )
 
 
 async def manual_toggle_raid(

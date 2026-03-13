@@ -26,6 +26,7 @@ from telegram.ext import ContextTypes
 
 from db.ops.automod import get_group_settings
 from db.ops.reports import save_report
+from bot.logging.log_channel import log_event
 
 log = logging.getLogger("public_cmd")
 
@@ -161,6 +162,14 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"[PUBLIC_CMD] Admin notify failed | {e}")
 
+    await log_event(
+        bot=context.bot, db=db, chat_id=chat.id,
+        event_type="report",
+        actor=user,
+        details={"report_id": report_id, "reason": reason},
+        chat_title=chat.title or "",
+        bot_id=context.bot.id,
+    )
     log.info(
         f"[PUBLIC_CMD] Report | chat={chat.id} "
         f"reporter={user.id} reported={reported_user.id if reported_user else None}"

@@ -18,6 +18,7 @@ from db.ops.captcha import (
     create_challenge, get_challenge_by_id, get_pending_challenge,
     mark_challenge_passed, increment_attempts, log_member_event
 )
+from bot.logging.log_channel import log_event as _log_event
 
 log = logging.getLogger("captcha")
 
@@ -200,6 +201,13 @@ async def _pass_captcha(bot, chat_id, user_id, challenge, db):
     except TelegramError:
         pass
 
+    await _log_event(
+        bot=bot, db=db, chat_id=chat_id,
+        event_type="captcha_pass",
+        details={"challenge_id": challenge.get("challenge_id")},
+        bot_id=bot.id,
+    )
+
     log.info(f"[CAPTCHA] Passed | chat={chat_id} user={user_id}")
 
 
@@ -218,6 +226,13 @@ async def _fail_captcha(bot, chat_id, user_id, challenge, db, reason=""):
 
     await log_member_event(db, chat_id, user_id, "captcha_fail",
                            {"reason": reason})
+
+    await _log_event(
+        bot=bot, db=db, chat_id=chat_id,
+        event_type="captcha_fail",
+        details={"reason": reason, "challenge_id": challenge.get("challenge_id")},
+        bot_id=bot.id,
+    )
 
     log.info(f"[CAPTCHA] Failed + kicked | chat={chat_id} user={user_id}")
 

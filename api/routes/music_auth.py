@@ -5,9 +5,9 @@ Used by Mini App to add/manage userbot accounts for music streaming
 
 import logging
 import base64
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 from bot.userbot.music_auth import (
     MusicAuthSession, start_phone_auth, complete_phone_auth,
@@ -16,6 +16,7 @@ from bot.userbot.music_auth import (
 import db.ops.music_new as db_music
 from bot.utils.crypto import decrypt_token
 from config import settings
+from api.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -46,21 +47,51 @@ class QRStatusResponse(BaseModel):
     tg_username: Optional[str] = None
 
 
+class UpdateRiskFeeRequest(BaseModel):
+    userbot_id: int
+    risk_fee: int
+
+
+class BanUserbotRequest(BaseModel):
+    userbot_id: int
+    ban_reason: Optional[str] = None
+
+
 def _get_db():
     """Get database pool"""
     from db.client import db
     return db.pool
 
 
+def _verify_bot_owner(bot_id: int, user: dict):
+    """Verify that the user owns the bot"""
+    from db.ops.bots import get_bot_by_id
+    import asyncio
+    
+    pool = _get_db()
+    if not pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    # Get bot and verify ownership
+    bot = asyncio.get_event_loop().run_until_complete(get_bot_by_id(pool, bot_id))
+    if not bot:
+        raise HTTPException(status_code=404, detail="Bot not found")
+    
+    if bot["owner_user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+
 @router.post("/bots/{bot_id}/music/auth/start-phone")
 async def start_phone_auth_endpoint(
     bot_id: int,
-    request: StartPhoneRequest
+    request: StartPhoneRequest,
+    user: dict = Depends(get_current_user)
 ):
     """
     Start phone authentication for music userbot.
     Returns: { ok: true, requires_otp: true }
     """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -85,12 +116,14 @@ async def start_phone_auth_endpoint(
 @router.post("/bots/{bot_id}/music/auth/verify-otp")
 async def verify_otp_endpoint(
     bot_id: int,
-    request: VerifyOTPRequest
+    request: VerifyOTPRequest,
+    user: dict = Depends(get_current_user)
 ):
     """
     Verify OTP code for phone authentication.
     Returns: { ok: true } or { ok: false, requires_2fa: true }
     """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -136,12 +169,14 @@ async def verify_otp_endpoint(
 @router.post("/bots/{bot_id}/music/auth/verify-2fa")
 async def verify_2fa_endpoint(
     bot_id: int,
-    request: Verify2FARequest
+    request: Verify2FARequest,
+    user: dict = Depends(get_current_user)
 ):
     """
     Verify 2FA password for phone authentication.
     Returns: { ok: true, tg_name, tg_username }
     """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -160,12 +195,14 @@ async def verify_2fa_endpoint(
 
 @router.post("/bots/{bot_id}/music/auth/start-qr")
 async def start_qr_auth_endpoint(
-    bot_id: int
+    bot_id: int,
+    user: dict = Depends(get_current_user)
 ):
     """
     Generate QR code for music userbot authentication.
     Returns: { ok: true, qr_image_base64: "..." }
     """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -192,12 +229,14 @@ async def start_qr_auth_endpoint(
 
 @router.get("/bots/{bot_id}/music/auth/qr-status")
 async def check_qr_status_endpoint(
-    bot_id: int
+    bot_id: int,
+    user: dict = Depends(get_current_user)
 ):
     """
     Check QR code scan status (polling endpoint).
     Returns: { ok: true, scanned: true/false, ... }
     """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -218,12 +257,14 @@ async def check_qr_status_endpoint(
 @router.post("/bots/{bot_id}/music/auth/session-string")
 async def session_string_auth_endpoint(
     bot_id: int,
-    request: SessionStringRequest
+    request: SessionStringRequest,
+    user: dict = Depends(get_current_user)
 ):
     """
     Authenticate using a Pyrogram session string.
     Returns: { ok: true, tg_name, tg_username }
     """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -256,14 +297,52 @@ async def session_string_auth_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/bots/{bot_id}/music/userbot")
-async def get_music_userbot(
-    bot_id: int
+@router.get("/bots/{bot_id}/music/userbots")
+async def get_music_userbots(
+    bot_id: int,
+    user: dict = Depends(get_current_user)
 ):
     """
-    Get music userbot information for a bot.
+    Get all music userbot accounts for a bot.
+    Returns: { ok: true, userbots: [{ id, tg_name, tg_username, risk_fee, is_banned, added_at, ... }] }
+    """
+    _verify_bot_owner(bot_id, user)
+    pool = _get_db()
+    if not pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        userbots = await db_music.get_music_userbots(pool, bot_id, active_only=False)
+
+        return {
+            "ok": True,
+            "userbots": [{
+                "id": ub["id"],
+                "tg_name": ub["tg_name"],
+                "tg_username": ub["tg_username"],
+                "risk_fee": ub.get("risk_fee", 0),
+                "is_banned": ub.get("is_banned", False),
+                "ban_reason": ub.get("ban_reason"),
+                "is_active": ub["is_active"],
+                "added_at": ub["added_at"].isoformat() if ub["added_at"] else None,
+                "last_used_at": ub["last_used_at"].isoformat() if ub.get("last_used_at") else None,
+            } for ub in userbots]
+        }
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Get userbots failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/bots/{bot_id}/music/userbot")
+async def get_music_userbot(
+    bot_id: int,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Get music userbot information for a bot (legacy single userbot endpoint).
     Returns: { ok: true, userbot: { ... } } or { ok: true, userbot: null }
     """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -281,6 +360,7 @@ async def get_music_userbot(
         return {
             "ok": True,
             "userbot": {
+                "id": ub["id"],
                 "tg_name": ub["tg_name"],
                 "tg_username": ub["tg_username"],
                 "added_at": ub["added_at"].isoformat() if ub["added_at"] else None,
@@ -291,14 +371,125 @@ async def get_music_userbot(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/bots/{bot_id}/music/userbot")
-async def delete_music_userbot(
-    bot_id: int
+@router.put("/bots/{bot_id}/music/userbot/risk-fee")
+async def update_userbot_risk_fee(
+    bot_id: int,
+    request: UpdateRiskFeeRequest,
+    user: dict = Depends(get_current_user)
 ):
     """
-    Delete music userbot for a bot.
+    Update risk fee for a specific userbot.
     Returns: { ok: true }
     """
+    _verify_bot_owner(bot_id, user)
+    pool = _get_db()
+    if not pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        await db_music.update_userbot_risk_fee(
+            pool, bot_id, request.userbot_id, request.risk_fee
+        )
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Update risk fee failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/bots/{bot_id}/music/userbot/ban")
+async def ban_userbot_endpoint(
+    bot_id: int,
+    request: BanUserbotRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Ban a userbot for risk fee non-payment.
+    Returns: { ok: true }
+    """
+    _verify_bot_owner(bot_id, user)
+    pool = _get_db()
+    if not pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        await db_music.ban_userbot(
+            pool, bot_id, request.userbot_id, request.ban_reason
+        )
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Ban userbot failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/bots/{bot_id}/music/userbot/unban")
+async def unban_userbot_endpoint(
+    bot_id: int,
+    request: BanUserbotRequest,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Unban a userbot.
+    Returns: { ok: true }
+    """
+    _verify_bot_owner(bot_id, user)
+    pool = _get_db()
+    if not pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        await db_music.unban_userbot(pool, bot_id, request.userbot_id)
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Unban userbot failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/bots/{bot_id}/music/userbot/{userbot_id}")
+async def delete_music_userbot(
+    bot_id: int,
+    userbot_id: int,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Delete a specific music userbot.
+    Returns: { ok: true }
+    """
+    _verify_bot_owner(bot_id, user)
+    pool = _get_db()
+    if not pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    try:
+        await db_music.delete_music_userbot(pool, bot_id, userbot_id)
+
+        # Stop the music worker if running
+        from bot.registry import get
+        clone_app = get(bot_id)
+        if clone_app and clone_app.bot_data.get("music_worker"):
+            worker = clone_app.bot_data["music_worker"]
+            try:
+                await worker.calls.stop()
+                await worker.client.stop()
+            except Exception as e:
+                logger.warning(f"[MUSIC_API] Failed to stop worker: {e}")
+            clone_app.bot_data["music_worker"] = None
+
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[MUSIC_API] Delete userbot failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/bots/{bot_id}/music/userbot")
+async def delete_all_music_userbots(
+    bot_id: int,
+    user: dict = Depends(get_current_user)
+):
+    """
+    Delete all music userbots for a bot.
+    Returns: { ok: true }
+    """
+    _verify_bot_owner(bot_id, user)
     pool = _get_db()
     if not pool:
         raise HTTPException(status_code=503, detail="Database not available")
@@ -320,7 +511,7 @@ async def delete_music_userbot(
 
         return {"ok": True}
     except Exception as e:
-        logger.error(f"[MUSIC_API] Delete userbot failed: {e}")
+        logger.error(f"[MUSIC_API] Delete userbots failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

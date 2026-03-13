@@ -2,7 +2,7 @@
  * miniapp/src/pages/music.js
  *
  * Music player control page for the Mini App.
- * Shows current queue, playback controls, and music settings.
+ * Shows current queue, playback controls, music settings, and userbot management.
  *
  * Dependencies:
  *   - lib/components.js (Card, Toggle, EmptyState, Button, showToast)
@@ -51,6 +51,9 @@ async function fetchMusicData(chatId, initData, container) {
   try {
     const data = await apiFetch(`/api/music/${chatId}/queue`);
     renderMusicInterface(container, data, chatId, initData);
+    
+    // Also load userbots section (async, don't wait)
+    renderUserbotsSection(container, chatId);
   } catch (error) {
     console.error('[Music] Error loading data:', error);
     container.innerHTML = '';
@@ -424,3 +427,235 @@ function escapeHtml(text) {
   div.textContent = text;
   return div.innerHTML;
 }
+
+// ── Userbot Management Section ─────────────────────────────────────────────
+
+async function renderUserbotsSection(container, chatId) {
+  const state = store.getState();
+  const userContext = state.userContext;
+  const activeBotId = userContext?.bot_info?.id;
+  
+  if (!activeBotId) {
+    return; // No bot associated with this user
+  }
+
+  // Userbot section
+  const userbotsCard = Card({
+    title: '🎭 Userbot Sessions',
+    subtitle: 'Manage music streaming accounts',
+    children: '<div id="userbots-container"></div>'
+  });
+  container.appendChild(userbotsCard);
+  
+  const userbotsContainer = userbotsCard.querySelector('#userbots-container');
+  
+  // Check if user owns this bot
+  const isBotOwner = userContext?.role === 'owner' || userContext?.is_bot_owner;
+  
+  if (!isBotOwner) {
+    userbotsContainer.innerHTML = `
+      <div style="text-align: center; padding: var(--sp-4); color: var(--text-muted);">
+        🔒 Only bot owners can manage userbot sessions
+      </div>
+    `;
+    return;
+  }
+
+  // Load userbots
+  try {
+    const response = await apiFetch(`/api/bots/${activeBotId}/music/userbots`);
+    renderUserbotsList(userbotsContainer, response.userbots || [], activeBotId);
+  } catch (e) {
+    userbotsContainer.innerHTML = `
+      <div style="text-align: center; padding: var(--sp-4); color: var(--text-muted);">
+        Failed to load userbots
+      </div>
+    `;
+  }
+}
+
+function renderUserbotsList(container, userbots, botId) {
+  if (userbots.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: var(--sp-4);">
+        <div style="font-size: 32px; margin-bottom: var(--sp-2);">👤</div>
+        <div style="color: var(--text-muted); margin-bottom: var(--sp-3);">No userbots added yet</div>
+        <button class="btn btn-primary" onclick="window.openUserbotGenerator(${botId})">
+          ➕ Add Userbot
+        </button>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `
+    <div style="display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-3);">
+      ${userbots.map(ub => `
+        <div style="
+          padding: var(--sp-3);
+          background: var(--bg-input);
+          border-radius: var(--r-lg);
+          border: 1px solid ${ub.is_banned ? 'var(--danger)' : 'var(--border)'};
+        ">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: var(--fw-medium);">
+                ${escapeHtml(ub.tg_name || 'Unknown')}
+                ${ub.is_banned ? '<span style="color: var(--danger); font-size: 12px;"> (BANNED)</span>' : ''}
+              </div>
+              <div style="font-size: var(--text-xs); color: var(--text-muted);">
+                @${escapeHtml(ub.tg_username || 'no username')}
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: var(--text-xs); color: var(--text-muted);">Risk Fee</div>
+              <div style="font-weight: var(--fw-semibold); color: var(--accent);">${ub.risk_fee || 0} ⭐</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: var(--sp-2); margin-top: var(--sp-2);">
+            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
+              onclick="window.editRiskFee(${botId}, ${ub.id}, ${ub.risk_fee || 0})">
+              💰 Set Fee
+            </button>
+            ${ub.is_banned ? `
+              <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
+                onclick="window.unbanUserbot(${botId}, ${ub.id})">
+                ✅ Unban
+              </button>
+            ` : `
+              <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px; background: none; color: var(--danger); border: 1px solid var(--danger);" 
+                onclick="window.banUserbot(${botId}, ${ub.id})">
+                🚫 Ban
+              </button>
+            `}
+            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
+              onclick="window.deleteUserbot(${botId}, ${ub.id})">
+              🗑️
+            </button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+    <button class="btn btn-primary" style="width: 100%;" onclick="window.openUserbotGenerator(${botId})">
+      ➕ Add Another Userbot
+    </button>
+  `;
+
+  container.innerHTML = html;
+}
+
+// Global functions for userbot management
+window.openUserbotGenerator = async function(botId) {
+  const method = prompt('Choose auth method:\n1. Phone + OTP\n2. Session String\n\nEnter 1 or 2:', '1');
+  
+  if (method === '1') {
+    // Phone auth flow
+    const phone = prompt('Enter phone number (with country code, e.g. +1234567890):');
+    if (!phone) return;
+    
+    try {
+      const result = await apiFetch(`/api/bots/${botId}/music/auth/start-phone`, {
+        method: 'POST',
+        body: JSON.stringify({ phone })
+      });
+      
+      if (result.ok && result.requires_otp) {
+        const code = prompt('Enter the OTP code sent to your phone:');
+        if (!code) return;
+        
+        const verifyResult = await apiFetch(`/api/bots/${botId}/music/auth/verify-otp`, {
+          method: 'POST',
+          body: JSON.stringify({ code, phone_hash: result.phone_hash })
+        });
+        
+        if (verifyResult.ok) {
+          alert('✅ Userbot added successfully!');
+          renderMusicPage(document.getElementById('page-music'));
+        } else {
+          alert('❌ Failed: ' + (verifyResult.detail || 'Unknown error'));
+        }
+      }
+    } catch (e) {
+      alert('❌ Error: ' + e.message);
+    }
+  } else if (method === '2') {
+    // Session string flow
+    const sessionString = prompt('Enter Pyrogram session string:');
+    if (!sessionString) return;
+    
+    try {
+      const result = await apiFetch(`/api/bots/${botId}/music/auth/session-string`, {
+        method: 'POST',
+        body: JSON.stringify({ session_string: sessionString })
+      });
+      
+      if (result.ok) {
+        alert('✅ Userbot added successfully!');
+        renderMusicPage(document.getElementById('page-music'));
+      } else {
+        alert('❌ Failed: ' + (result.detail || 'Unknown error'));
+      }
+    } catch (e) {
+      alert('❌ Error: ' + e.message);
+    }
+  }
+};
+
+window.editRiskFee = async function(botId, userbotId, currentFee) {
+  const newFee = prompt('Enter risk fee amount (in Stars):', currentFee.toString());
+  if (newFee === null) return;
+  
+  try {
+    await apiFetch(`/api/bots/${botId}/music/userbot/risk-fee`, {
+      method: 'PUT',
+      body: JSON.stringify({ userbot_id: userbotId, risk_fee: parseInt(newFee) || 0 })
+    });
+    showToast('Risk fee updated!', 'success');
+    renderMusicPage(document.getElementById('page-music'));
+  } catch (e) {
+    showToast('Failed to update risk fee', 'error');
+  }
+};
+
+window.banUserbot = async function(botId, userbotId) {
+  const reason = prompt('Enter ban reason (optional):', 'Risk fee not paid');
+  if (reason === null) return;
+  
+  try {
+    await apiFetch(`/api/bots/${botId}/music/userbot/ban`, {
+      method: 'POST',
+      body: JSON.stringify({ userbot_id: userbotId, ban_reason: reason || 'Risk fee not paid' })
+    });
+    showToast('Userbot banned!', 'success');
+    renderMusicPage(document.getElementById('page-music'));
+  } catch (e) {
+    showToast('Failed to ban userbot', 'error');
+  }
+};
+
+window.unbanUserbot = async function(botId, userbotId) {
+  try {
+    await apiFetch(`/api/bots/${botId}/music/userbot/unban`, {
+      method: 'POST',
+      body: JSON.stringify({ userbot_id: userbotId })
+    });
+    showToast('Userbot unbanned!', 'success');
+    renderMusicPage(document.getElementById('page-music'));
+  } catch (e) {
+    showToast('Failed to unban userbot', 'error');
+  }
+};
+
+window.deleteUserbot = async function(botId, userbotId) {
+  if (!confirm('Are you sure you want to delete this userbot?')) return;
+  
+  try {
+    await apiFetch(`/api/bots/${botId}/music/userbot/${userbotId}`, {
+      method: 'DELETE'
+    });
+    showToast('Userbot deleted!', 'success');
+    renderMusicPage(document.getElementById('page-music'));
+  } catch (e) {
+    showToast('Failed to delete userbot', 'error');
+  }
+};

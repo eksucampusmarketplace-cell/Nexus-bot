@@ -412,7 +412,7 @@
     import { GroupSwitcher } from './lib/group_switcher.js';
     import { NotificationCenter } from './lib/notifications.js';
     import { SSEClient } from './lib/sse.js';
-    import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow } from './lib/components.js';
+    import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow, showToast } from './lib/components.js';
     import { useStore } from './store/index.js';
     import { renderAutomodPage } from './src/pages/automod.js';
     import { renderCommandsPage } from './src/pages/commands.js';
@@ -763,6 +763,15 @@
         // Render member list
         renderMemberList(container, members);
 
+        // Create bulk action bar (initially hidden)
+        createBulkActionBar(container, chatId, initData);
+
+        // Subscribe to selection changes to show/hide action bar
+        useStore.subscribe((state) => {
+          const selectedCount = state.selectedMembers.size;
+          updateBulkActionBar(selectedCount);
+        });
+
       } catch (error) {
         console.error('[Members] Error loading members:', error);
         container.innerHTML = '';
@@ -771,6 +780,193 @@
           title: 'Failed to load members',
           description: 'Please try refreshing the page'
         }));
+      }
+    }
+
+    let bulkActionBar = null;
+
+    function createBulkActionBar(container, chatId, initData) {
+      // Remove existing bar if any
+      if (bulkActionBar) {
+        bulkActionBar.remove();
+      }
+
+      bulkActionBar = document.createElement('div');
+      bulkActionBar.id = 'bulk-action-bar';
+      bulkActionBar.style.cssText = `
+        position: fixed;
+        bottom: calc(var(--bottomnav-h) + 16px);
+        left: 50%;
+        transform: translateX(-50%) translateY(100px);
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--r-xl);
+        padding: var(--sp-3) var(--sp-4);
+        display: flex;
+        align-items: center;
+        gap: var(--sp-3);
+        box-shadow: var(--shadow-lg);
+        z-index: 100;
+        transition: transform var(--dur-normal) var(--ease-out);
+        max-width: calc(100vw - 32px);
+        flex-wrap: wrap;
+        justify-content: center;
+      `;
+
+      // Selection count
+      const countLabel = document.createElement('span');
+      countLabel.id = 'bulk-action-count';
+      countLabel.style.cssText = `
+        font-size: var(--text-sm);
+        font-weight: var(--fw-semibold);
+        color: var(--text-primary);
+        margin-right: var(--sp-2);
+      `;
+      countLabel.textContent = '0 selected';
+      bulkActionBar.appendChild(countLabel);
+
+      // Action buttons
+      const actions = [
+        { id: 'warn', label: 'Warn', icon: '⚠️', color: 'var(--warning)' },
+        { id: 'mute', label: 'Mute', icon: '🔇', color: 'var(--accent)' },
+        { id: 'kick', label: 'Kick', icon: '👢', color: 'var(--danger)' },
+        { id: 'ban', label: 'Ban', icon: '🚫', color: 'var(--danger)' },
+      ];
+
+      actions.forEach(action => {
+        const btn = document.createElement('button');
+        btn.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: var(--sp-1);
+          padding: var(--sp-2) var(--sp-3);
+          background: ${action.color}22;
+          color: ${action.color};
+          border: 1px solid ${action.color}44;
+          border-radius: var(--r-lg);
+          font-size: var(--text-sm);
+          font-weight: var(--fw-medium);
+          cursor: pointer;
+          transition: all var(--dur-fast);
+        `;
+        btn.innerHTML = `${action.icon} ${action.label}`;
+        btn.onmouseenter = () => {
+          btn.style.background = action.color + '33';
+          btn.style.transform = 'translateY(-1px)';
+        };
+        btn.onmouseleave = () => {
+          btn.style.background = action.color + '22';
+          btn.style.transform = 'translateY(0)';
+        };
+        btn.onclick = () => executeBulkAction(action.id, chatId, initData);
+        bulkActionBar.appendChild(btn);
+      });
+
+      // Clear selection button
+      const clearBtn = document.createElement('button');
+      clearBtn.style.cssText = `
+        padding: var(--sp-2) var(--sp-3);
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+        border-radius: var(--r-lg);
+        font-size: var(--text-sm);
+        cursor: pointer;
+        transition: all var(--dur-fast);
+      `;
+      clearBtn.textContent = 'Clear';
+      clearBtn.onmouseenter = () => {
+        clearBtn.style.background = 'var(--bg-hover)';
+        clearBtn.style.color = 'var(--text-primary)';
+      };
+      clearBtn.onmouseleave = () => {
+        clearBtn.style.background = 'transparent';
+        clearBtn.style.color = 'var(--text-muted)';
+      };
+      clearBtn.onclick = () => {
+        getState().clearMemberSelection();
+        // Uncheck all checkboxes
+        container.querySelectorAll('.member-checkbox').forEach(cb => cb.checked = false);
+      };
+      bulkActionBar.appendChild(clearBtn);
+
+      container.appendChild(bulkActionBar);
+    }
+
+    function updateBulkActionBar(selectedCount) {
+      if (!bulkActionBar) return;
+
+      const countLabel = bulkActionBar.querySelector('#bulk-action-count');
+      if (countLabel) {
+        countLabel.textContent = `${selectedCount} selected`;
+      }
+
+      if (selectedCount > 0) {
+        bulkActionBar.style.transform = 'translateX(-50%) translateY(0)';
+      } else {
+        bulkActionBar.style.transform = 'translateX(-50%) translateY(100px)';
+      }
+    }
+
+    async function executeBulkAction(action, chatId, initData) {
+      const state = getState();
+      const selectedIds = Array.from(state.selectedMembers);
+
+      if (selectedIds.length === 0) return;
+
+      // Show confirmation for destructive actions
+      if (action === 'ban' || action === 'kick') {
+        const confirmed = confirm(`Are you sure you want to ${action} ${selectedIds.length} member(s)?`);
+        if (!confirmed) return;
+      }
+
+      // Show loading toast
+      showToast(`Executing ${action}...`, 'info');
+
+      try {
+        // Use bulk action endpoint
+        const endpoint = `/api/groups/${chatId}/members/bulk`;
+        const body = {
+          action: action,
+          user_ids: selectedIds
+        };
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-init-data': initData
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+          throw new Error('Bulk action failed');
+        }
+
+        const result = await response.json();
+        const succeeded = result.ok?.length || 0;
+        const failed = result.failed?.length || 0;
+
+        if (failed === 0) {
+          showToast(`${action} applied to ${succeeded} member(s)`, 'success');
+        } else {
+          showToast(`${succeeded} succeeded, ${failed} failed`, 'warning');
+        }
+
+        // Clear selection and refresh member list
+        state.clearMemberSelection();
+        document.querySelectorAll('.member-checkbox').forEach(cb => cb.checked = false);
+
+        // Refresh the members list
+        const membersContainer = document.getElementById('page-members');
+        if (membersContainer) {
+          renderMembers(membersContainer);
+        }
+
+      } catch (error) {
+        console.error(`[Members] Error executing ${action}:`, error);
+        showToast(`Failed to execute ${action}`, 'error');
       }
     }
 

@@ -9,8 +9,28 @@ router = APIRouter(prefix="/api/groups")
 
 @router.get("")
 async def list_groups(user: dict = Depends(get_current_user)):
-    groups = await get_user_managed_groups(user['id'])
-    return groups
+    bot_token = user.get("validated_bot_token")
+    if not bot_token:
+        # Fallback to all groups if no bot context (unlikely with get_current_user)
+        return await get_user_managed_groups(user['id'])
+    
+    import hashlib
+    token_hash = hashlib.sha256(bot_token.encode()).hexdigest()[:10]
+    
+    async with db.pool.acquire() as conn:
+        rows = await conn.fetch("SELECT * FROM groups WHERE bot_token_hash = $1", token_hash)
+        res = []
+        for row in rows:
+            d = dict(row)
+            if isinstance(d.get('settings'), str):
+                try:
+                    d['settings'] = json.loads(d['settings'])
+                except Exception:
+                    d['settings'] = {}
+            elif not d.get('settings'):
+                d['settings'] = {}
+            res.append(d)
+        return res
 
 @router.get("/{chat_id}")
 async def group_details(chat_id: int, user: dict = Depends(get_current_user)):

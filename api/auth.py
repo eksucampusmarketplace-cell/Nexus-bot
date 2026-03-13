@@ -65,7 +65,9 @@ async def get_current_user(request: Request):
 
     try:
         data = validate_init_data(init_data, settings.PRIMARY_BOT_TOKEN)
-        return data["user"]
+        user = data["user"]
+        user["validated_bot_token"] = settings.PRIMARY_BOT_TOKEN
+        return user
     except Exception as e:
         # If primary bot token fails, try all registered clone bots
         from bot.registry import get_all
@@ -78,7 +80,9 @@ async def get_current_user(request: Request):
                 if bot_token == settings.PRIMARY_BOT_TOKEN:
                     continue
                 data = validate_init_data(init_data, bot_token)
-                return data["user"]
+                user = data["user"]
+                user["validated_bot_token"] = bot_token
+                return user
             except Exception:
                 continue
         

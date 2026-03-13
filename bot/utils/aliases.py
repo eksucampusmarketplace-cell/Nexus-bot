@@ -64,6 +64,11 @@ ALIASES = {
     "/sc":         "/captcha",
     "/antiraid":   "/raidmode",
 
+    # Admin requests
+    "/areq":       "/admin_requests",
+    "/areq_stats": "/admin_req_stats",
+    "/set_areq":   "/set_admin_requests",
+
     # Utilities
     "/afk":        "/setafk",
     "/pinner":     "/pin",

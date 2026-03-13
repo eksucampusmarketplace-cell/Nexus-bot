@@ -144,6 +144,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.debug(f"[STARTUP] Reports migration info: {e}")
 
+    # Run webhooks migration
+    try:
+        webhooks_migration_path = os.path.join(os.path.dirname(__file__), "db", "migrations", "add_webhooks.sql")
+        if os.path.exists(webhooks_migration_path):
+            with open(webhooks_migration_path, 'r') as f:
+                webhooks_migration_sql = f.read()
+            await pool.execute(webhooks_migration_sql)
+            logger.info("[STARTUP] ✅ Webhooks tables migrated")
+    except Exception as e:
+        logger.debug(f"[STARTUP] Webhooks migration info: {e}")
+
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
 
@@ -341,6 +352,7 @@ from api.routes.billing import router as billing_router
 from api.routes import automod as automod_router
 from api.routes.scheduler import router as scheduler_router
 from api.routes.log_channel import router as log_channel_router
+from api.routes.webhooks import router as webhooks_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -366,6 +378,7 @@ fastapi_app.include_router(automod_router.router)
 fastapi_app.include_router(scheduler_router)
 fastapi_app.include_router(log_channel_router)
 fastapi_app.include_router(reports_router)
+fastapi_app.include_router(webhooks_router)
 
 # Serve miniapp static files
 miniapp_dir = os.path.join(os.path.dirname(__file__), "miniapp")

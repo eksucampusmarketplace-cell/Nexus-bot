@@ -4,6 +4,7 @@ from telegram.ext import ContextTypes
 from bot.utils.permissions import is_admin, command_enabled
 from bot.utils.parse_duration import parse_duration
 from bot.utils.format import format_user
+from bot.utils.webhook_dispatcher import notify_warn, notify_ban, notify_mute, notify_kick
 from db.ops.groups import get_group, upsert_group
 from db.ops.users import add_warn, remove_warn, update_user_status, get_user
 from db.ops.logs import log_action
@@ -189,6 +190,18 @@ async def warn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reason, get_token_hash(context.bot.token)
     )
 
+    # Notify webhooks
+    await notify_warn(
+        chat_id=update.effective_chat.id,
+        user_id=target.id,
+        admin_id=update.effective_user.id,
+        admin_name=update.effective_user.username or update.effective_user.first_name,
+        warn_count=count,
+        max_warns=threshold,
+        reason=reason,
+        chat_title=update.effective_chat.title
+    )
+
     await _refresh_trust_score(context, update.effective_chat.id, target.id)
 
     if count >= threshold:
@@ -213,6 +226,17 @@ async def ban_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.ban_chat_member(update.effective_chat.id, target.id)
     await update.message.reply_text(f"🚫 {format_user(target)} has been banned.\nReason: {reason}", parse_mode="HTML")
     await log_action(update.effective_chat.id, "ban", target.id, target.username, update.effective_user.id, update.effective_user.username, reason, get_token_hash(context.bot.token))
+    
+    # Notify webhooks
+    await notify_ban(
+        chat_id=update.effective_chat.id,
+        user_id=target.id,
+        admin_id=update.effective_user.id,
+        admin_name=update.effective_user.username or update.effective_user.first_name,
+        reason=reason,
+        chat_title=update.effective_chat.title
+    )
+    
     await _refresh_trust_score(context, update.effective_chat.id, target.id)
 
 async def mute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -227,6 +251,18 @@ async def mute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.restrict_chat_member(update.effective_chat.id, target.id, permissions={"can_send_messages": False}, until_date=until)
     await update.message.reply_text(f"🔇 {format_user(target)} has been muted for {duration_str}.", parse_mode="HTML")
     await update_user_status(target.id, update.effective_chat.id, is_muted=True, mute_until=until)
+    
+    # Notify webhooks
+    await notify_mute(
+        chat_id=update.effective_chat.id,
+        user_id=target.id,
+        admin_id=update.effective_user.id,
+        admin_name=update.effective_user.username or update.effective_user.first_name,
+        duration=duration,
+        reason=duration_str,
+        chat_title=update.effective_chat.title
+    )
+    
     await _refresh_trust_score(context, update.effective_chat.id, target.id)
 
 async def purge_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -374,6 +410,15 @@ async def kick_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         update.effective_chat.id, "kick", target.id, target.username or target.first_name,
         update.effective_user.id, update.effective_user.username or update.effective_user.first_name,
         reason, get_token_hash(context.bot.token)
+    )
+    # Notify webhooks
+    await notify_kick(
+        chat_id=update.effective_chat.id,
+        user_id=target.id,
+        admin_id=update.effective_user.id,
+        admin_name=update.effective_user.username or update.effective_user.first_name,
+        reason=reason,
+        chat_title=update.effective_chat.title
     )
 
 async def lock_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

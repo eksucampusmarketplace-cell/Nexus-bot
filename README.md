@@ -120,6 +120,32 @@ Nexus includes a powerful music player for groups with advanced features! Use th
 - `/sync` - Sync music to all clone bots
 - `/music_settings` - Open the music settings panel
 
+## 🔗 Webhook Integrations
+
+Nexus can send real-time events to external services via webhooks!
+
+**Supported Events:**
+- `member_join` - New member joins
+- `member_leave` - Member leaves
+- `ban` / `unban` - Member banned/unbanned
+- `mute` / `unmute` - Member muted/unmuted  
+- `warn` - Warning issued
+- `kick` - Member kicked
+- `automod_trigger` - AutoMod takes action
+- `report_created` - New report submitted
+- `settings_change` - Settings modified
+
+**Use Cases:**
+- **Discord Notifications** - Send moderation alerts to Discord channels
+- **Zapier/Make.com** - Trigger automated workflows
+- **Custom Dashboards** - Build your own admin panels
+- **Logging Services** - Centralized audit trails
+- **Analytics** - Track group activity in real-time
+
+**Mini App:** Go to Integrations tab → Add Webhook → configure URL and events
+
+**Security:** Webhooks support HMAC-SHA256 signatures for verification via the `X-Webhook-Signature` header.
+
 ## 📢 Channel Management
 
 Nexus can manage your Telegram channels!

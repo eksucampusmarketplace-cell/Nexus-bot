@@ -93,18 +93,13 @@ export const RULE_TEMPLATES = [
 ];
 
 
-export async function applyTemplate(chatId, templateId, initData) {
+export async function applyTemplate(chatId, templateId) {
   const template = RULE_TEMPLATES.find(t => t.id === templateId);
   if (!template) throw new Error('Template not found');
 
-  const res = await fetch(`/api/groups/${chatId}/settings/bulk`, {
-    method:  'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-init-data':  initData || '',
-    },
+  const { apiFetch } = await import('./api.js');
+  return apiFetch(`/api/groups/${chatId}/settings/bulk`, {
+    method: 'PUT',
     body: JSON.stringify({ settings: template.settings }),
   });
-  if (!res.ok) throw new Error('Failed to apply template');
-  return res.json();
 }

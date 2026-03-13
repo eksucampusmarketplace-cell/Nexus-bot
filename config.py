@@ -118,9 +118,19 @@ class Settings(BaseSettings):
     def mini_app_url(self) -> Optional[str]:
         """Get Mini App URL - uses MINI_APP_URL if set, otherwise constructs from RENDER_EXTERNAL_URL."""
         if self.MINI_APP_URL:
-            return self.MINI_APP_URL
-        if self.RENDER_EXTERNAL_URL:
-            return f"{self.RENDER_EXTERNAL_URL.rstrip('/')}/miniapp"
-        return None
+            base = self.MINI_APP_URL
+        elif self.RENDER_EXTERNAL_URL:
+            base = f"{self.RENDER_EXTERNAL_URL.rstrip('/')}/miniapp"
+        else:
+            return None
+        return self._append_version(base)
+
+    def _append_version(self, url: str) -> str:
+        """Append a cache-busting version param using RENDER_GIT_COMMIT or a static marker."""
+        import os as _os
+        commit = _os.environ.get("RENDER_GIT_COMMIT", "")
+        version = commit[:8] if commit else "1"
+        separator = "&" if "?" in url else "?"
+        return f"{url}{separator}v={version}"
 
 settings = Settings()

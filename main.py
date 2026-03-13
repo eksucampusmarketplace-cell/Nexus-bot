@@ -47,6 +47,16 @@ async def lifespan(app: FastAPI):
 
     pool = db.pool
 
+    # Run all pending migrations before anything else
+    try:
+        from db.migrate import run_migrations
+        logger.info("[STARTUP] Running database migrations...")
+        await run_migrations(pool)
+        logger.info("[STARTUP] ✅ Migrations complete")
+    except Exception as e:
+        logger.critical(f"[STARTUP] ❌ Migration failed — cannot start: {e}")
+        raise
+
     # Initialize Redis for music service
     try:
         import redis.asyncio as aioredis
@@ -373,8 +383,36 @@ async def serve_webapp():
 
 @fastapi_app.get("/miniapp", response_class=HTMLResponse)
 async def serve_miniapp():
-    """New Vanilla JS Mini App entry point."""
+    """New Vanilla JS Mini App entry point — served with no-cache headers."""
+    html_path = os.path.join(os.path.dirname(__file__), "miniapp", "index.html")
+    if os.path.exists(html_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            html_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma":        "no-cache",
+                "Expires":       "0",
+            }
+        )
     return RedirectResponse(url="/miniapp/")
+
+
+@fastapi_app.get("/miniapp/", response_class=HTMLResponse)
+async def serve_miniapp_index():
+    """Serve miniapp index.html with no-cache headers (trailing slash)."""
+    html_path = os.path.join(os.path.dirname(__file__), "miniapp", "index.html")
+    if os.path.exists(html_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            html_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma":        "no-cache",
+                "Expires":       "0",
+            }
+        )
+    return HTMLResponse("<h1>Mini App not found</h1>", status_code=404)
 
 
 @fastapi_app.get("/miniapp-react", response_class=HTMLResponse)

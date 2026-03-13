@@ -14,6 +14,7 @@
 import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js';
 import { RULE_TEMPLATES, applyTemplate } from '../../lib/rule_templates.js';
 import { useStore } from '../../store/index.js';
+import { apiFetch } from '../../lib/api.js';
 
 const store = useStore;
 
@@ -129,10 +130,18 @@ const AUTOMOD_SECTIONS = [
  */
 export async function renderAutomodPage(container) {
   const chatId = store.getState().activeChatId;
-  const initData = window.Telegram?.WebApp?.initData || '';
 
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+
+  if (!chatId) {
+    container.appendChild(EmptyState({
+      icon: '👆',
+      title: 'Select a group',
+      description: 'Choose a group from the top to configure AutoMod'
+    }));
+    return;
+  }
 
   // Show loading state
   container.innerHTML = `
@@ -146,21 +155,12 @@ export async function renderAutomodPage(container) {
 
   let settings = store.getState().settings || {};
 
-  // Fetch settings from API if we have a chat ID
-  if (chatId) {
-    try {
-      const res = await fetch(`/api/groups/${chatId}`, {
-        headers: { 'x-init-data': initData }
-      });
-
-      if (res.ok) {
-        const group = await res.json();
-        settings = group.settings || {};
-        store.setSettings(settings);
-      }
-    } catch (error) {
-      console.error('[AutoMod] Failed to load settings:', error);
-    }
+  try {
+    const group = await apiFetch(`/api/groups/${chatId}`);
+    settings = group.settings || {};
+    store.getState().setSettings(settings);
+  } catch (error) {
+    console.error('[AutoMod] Failed to load settings:', error);
   }
 
   // Clear loading state
@@ -194,7 +194,6 @@ export async function renderAutomodPage(container) {
  * Render templates section
  */
 function _renderTemplatesSection() {
-  const initData = window.Telegram?.WebApp?.initData || '';
   const chatId = store.getState().activeChatId;
 
   const container = document.createElement('div');
@@ -223,33 +222,23 @@ function _renderTemplatesSection() {
       btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
 
       try {
-        const res = await fetch(`/api/groups/${chatId}/settings/bulk`, {
+        await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-init-data': initData
-          },
-          body: JSON.stringify({
-            settings: templateSettings[template.id]
-          })
+          body: JSON.stringify({ settings: templateSettings[template.id] }),
         });
 
-        if (res.ok) {
-          btn.innerHTML = '<span style="color: var(--success);">✅ Applied!</span>';
-          setTimeout(() => {
-            btn.disabled = false;
-            btn.innerHTML = `
-              <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
-                ${template.name}
-              </div>
-              <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
-                ${template.description}
-              </div>
-            `;
-          }, 2000);
-        } else {
-          throw new Error('Failed');
-        }
+        btn.innerHTML = '<span style="color: var(--success);">✅ Applied!</span>';
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = `
+            <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
+              ${template.name}
+            </div>
+            <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
+              ${template.description}
+            </div>
+          `;
+        }, 2000);
       } catch (e) {
         console.error('Failed to apply template:', e);
         btn.innerHTML = '<span style="color: var(--danger);">❌ Failed</span>';
@@ -286,11 +275,26 @@ function _renderTemplatesSection() {
  * Render a single automod section
  */
 function _renderSection(section, settings) {
-  const initData = window.Telegram?.WebApp?.initData || '';
   const chatId = store.getState().activeChatId;
 
   const container = document.createElement('div');
   container.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
+
+  const _saveSetting = async (key, val) => {
+    try {
+      const currentSettings = store.getState().settings || {};
+      const updatedSettings = { ...currentSettings, [key]: val };
+      await apiFetch(`/api/groups/${chatId}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify(updatedSettings),
+      });
+      store.getState().updateSetting(key, val);
+      showToast('Setting saved', 'success');
+    } catch (e) {
+      console.error('Failed to save setting:', e);
+      showToast('Failed to save setting', 'error');
+    }
+  };
 
   section.settings.forEach(setting => {
     const value = settings[setting.key] ?? setting.default ?? false;
@@ -306,33 +310,7 @@ function _renderSection(section, settings) {
       const toggle = Toggle({
         checked: value,
         onChange: async (isChecked) => {
-          try {
-            // Get current settings from store
-            const currentSettings = store.getState().settings || {};
-
-            // Update with new value
-            const updatedSettings = {
-              ...currentSettings,
-              [setting.key]: isChecked
-            };
-
-            // Send full settings object to API
-            await fetch(`/api/groups/${chatId}/settings`, {
-              method: 'PUT',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-init-data': initData
-              },
-              body: JSON.stringify(updatedSettings)
-            });
-
-            // Update store
-            store.updateSetting(setting.key, isChecked);
-            showToast('Setting saved', 'success');
-          } catch (e) {
-            console.error('Failed to save setting:', e);
-            showToast('Failed to save setting', 'error');
-          }
+          await _saveSetting(setting.key, isChecked);
         }
       });
 
@@ -363,34 +341,7 @@ function _renderSection(section, settings) {
         border: 1px solid var(--border);
       `;
       input.addEventListener('change', async () => {
-        const numValue = parseInt(input.value, 10);
-        try {
-          // Get current settings from store
-          const currentSettings = store.getState().settings || {};
-
-          // Update with new value
-          const updatedSettings = {
-            ...currentSettings,
-            [setting.key]: numValue
-          };
-
-          // Send full settings object to API
-          await fetch(`/api/groups/${chatId}/settings`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-init-data': initData
-            },
-            body: JSON.stringify(updatedSettings)
-          });
-
-          // Update store
-          store.updateSetting(setting.key, numValue);
-          showToast('Setting saved', 'success');
-        } catch (e) {
-          console.error('Failed to save setting:', e);
-          showToast('Failed to save setting', 'error');
-        }
+        await _saveSetting(setting.key, parseInt(input.value, 10));
       });
 
       row.appendChild(label);
@@ -425,33 +376,7 @@ function _renderSection(section, settings) {
       });
 
       select.addEventListener('change', async () => {
-        try {
-          // Get current settings from store
-          const currentSettings = store.getState().settings || {};
-
-          // Update with new value
-          const updatedSettings = {
-            ...currentSettings,
-            [setting.key]: select.value
-          };
-
-          // Send full settings object to API
-          await fetch(`/api/groups/${chatId}/settings`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-init-data': initData
-            },
-            body: JSON.stringify(updatedSettings)
-          });
-
-          // Update store
-          store.updateSetting(setting.key, select.value);
-          showToast('Setting saved', 'success');
-        } catch (e) {
-          console.error('Failed to save setting:', e);
-          showToast('Failed to save setting', 'error');
-        }
+        await _saveSetting(setting.key, select.value);
       });
 
       row.appendChild(label);
@@ -479,33 +404,7 @@ function _renderSection(section, settings) {
         font-size: var(--text-sm);
       `;
       input.addEventListener('change', async () => {
-        try {
-          // Get current settings from store
-          const currentSettings = store.getState().settings || {};
-
-          // Update with new value
-          const updatedSettings = {
-            ...currentSettings,
-            [setting.key]: input.value
-          };
-
-          // Send full settings object to API
-          await fetch(`/api/groups/${chatId}/settings`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-init-data': initData
-            },
-            body: JSON.stringify(updatedSettings)
-          });
-
-          // Update store
-          store.updateSetting(setting.key, input.value);
-          showToast('Setting saved', 'success');
-        } catch (e) {
-          console.error('Failed to save setting:', e);
-          showToast('Failed to save setting', 'error');
-        }
+        await _saveSetting(setting.key, input.value);
       });
 
       wrapper.appendChild(label);

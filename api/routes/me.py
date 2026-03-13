@@ -173,9 +173,13 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         logger.warning(f"[ME] Failed to get bot info: {e}")
         bot_info = {"username": "NexusBot", "first_name": "Nexus", "id": 0}
 
+    all_managed_groups = admin_groups + mod_groups
+
     response = {
         "user": user_obj,
+        "user_id": user_id,
         "role": role,
+        "groups": all_managed_groups,
         "admin_groups": admin_groups,
         "mod_groups": mod_groups,
         "member_groups": member_groups,

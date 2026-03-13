@@ -34,6 +34,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 
+import asyncpg
 import pytz
 from croniter import croniter
 
@@ -78,6 +79,13 @@ class NexusScheduler:
         while True:
             try:
                 await self._process_due_messages()
+            except asyncpg.UndefinedTableError as e:
+                log.warning(
+                    f"[SCHEDULER] scheduled_messages table missing — "
+                    f"run migrations: {e}"
+                )
+                await asyncio.sleep(300)
+                continue
             except Exception as e:
                 log.error(f"[SCHEDULER] Message loop error: {e}")
             await asyncio.sleep(60)
@@ -173,6 +181,17 @@ class NexusScheduler:
         while True:
             try:
                 await self._check_silent_times()
+            except asyncpg.UndefinedTableError as e:
+                log.warning(
+                    f"[SCHEDULER] Silent time table missing — "
+                    f"run migrations: {e}"
+                )
+                await asyncio.sleep(300)
+                continue
+            except asyncpg.UndefinedColumnError as e:
+                log.warning(f"[SCHEDULER] Column missing — run migrations: {e}")
+                await asyncio.sleep(300)
+                continue
             except Exception as e:
                 log.error(f"[SCHEDULER] Silent time loop error: {e}")
             await asyncio.sleep(60)

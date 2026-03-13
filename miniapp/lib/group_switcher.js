@@ -13,6 +13,7 @@
  */
 
 import { showToast } from './components.js';
+import { apiFetch } from './api.js';
 
 export class GroupSwitcher {
   constructor(containerEl, store) {
@@ -24,10 +25,12 @@ export class GroupSwitcher {
   }
 
   async init() {
-    const res = await fetch('/api/me', {
-      headers: { 'x-init-data': window.Telegram?.WebApp?.initData || '' }
-    });
-    const data = await res.json();
+    let data = {};
+    try {
+      data = await apiFetch('/api/me');
+    } catch (e) {
+      console.error('[GroupSwitcher] Failed to load /api/me:', e.message);
+    }
     this._groups = [
       ...(data.admin_groups || []),
       ...(data.mod_groups   || []),

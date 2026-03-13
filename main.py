@@ -315,6 +315,29 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[STARTUP] ⚠️ NexusScheduler failed to start: {e}")
 
+    # Start broadcast worker
+    try:
+        from bot.utils.broadcast_engine import BroadcastEngine
+        import bot.utils.broadcast_engine
+        b_engine = BroadcastEngine(pool)
+        bot.utils.broadcast_engine.broadcast_engine = b_engine
+        
+        async def broadcast_worker():
+            from db.ops.broadcast import get_pending_broadcast_tasks
+            while True:
+                try:
+                    tasks = await get_pending_broadcast_tasks(pool)
+                    for t in tasks:
+                        await b_engine.start_broadcast(t['id'])
+                except Exception as e:
+                    logger.error(f"[STARTUP] Broadcast worker error: {e}")
+                await asyncio.sleep(30)
+        
+        asyncio.create_task(broadcast_worker())
+        logger.info("[STARTUP] ✅ Broadcast worker started")
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ Broadcast worker failed to start: {e}")
+
     yield
 
     # Shutdown
@@ -340,7 +363,7 @@ fastapi_app.add_middleware(
 )
 
 # Routes
-from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats, events, bots_messages
+from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats, events, bots_messages, broadcast
 from api.routes.reports import router as reports_router
 from api.routes.boost import router as boost_router
 from api.routes.channel_gate import router as channel_gate_router
@@ -374,6 +397,7 @@ fastapi_app.include_router(auth_router)
 fastapi_app.include_router(admin_router)
 fastapi_app.include_router(billing_router)
 fastapi_app.include_router(events.router)
+fastapi_app.include_router(broadcast.router)
 fastapi_app.include_router(automod_router.router)
 fastapi_app.include_router(scheduler_router)
 fastapi_app.include_router(log_channel_router)

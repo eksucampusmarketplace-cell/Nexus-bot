@@ -296,7 +296,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"✅ *Token verified\!*\n\n"
         f"🤖 @{cloned_username}\n"
         f"📛 {cloned_name}\n\n"
-        f"How many groups should this bot work in? (1–5)\n"
+        f"How many groups should this bot work in? \(1–5\)\n"
         f"Default: 1",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup([[

@@ -59,9 +59,13 @@ async def run_migrations(pool):
                 with open(filepath, "r") as f:
                     sql = f.read()
 
+                def _strip_comments(s):
+                    lines = [l for l in s.splitlines() if not l.strip().startswith("--")]
+                    return "\n".join(lines).strip()
+
                 statements = [
-                    s.strip() for s in sql.split(";")
-                    if s.strip() and not s.strip().startswith("--")
+                    _strip_comments(s) for s in sql.split(";")
+                    if _strip_comments(s)
                 ]
                 for stmt in statements:
                     await conn.execute(stmt)

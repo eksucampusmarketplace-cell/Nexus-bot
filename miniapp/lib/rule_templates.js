@@ -13,10 +13,9 @@ export const RULE_TEMPLATES = [
     description: 'Allow media, memes, voice. Block links and spam.',
     settings: {
       lock_link: true, lock_website: true,
-      lock_forward_channel: true,
-      max_messages: 10, max_messages_window: 60,
-      antiflood: 8, antiflood_action: 'mute',
-      warn_max: 3, warn_action: 'mute_1h',
+      lock_channel: true,
+      antiflood: true, antiflood_limit: 8, antiflood_action: 'mute',
+      warn_enabled: true, warn_max: 3, warn_action: 'mute_1h',
     },
   },
   {
@@ -26,10 +25,9 @@ export const RULE_TEMPLATES = [
     settings: {
       lock_sticker: true, lock_gif: true,
       lock_voice: false, lock_file: false,
-      max_messages: 5, max_messages_window: 60,
-      antiflood: 5, antiflood_action: 'mute',
+      antiflood: true, antiflood_limit: 5, antiflood_action: 'mute',
       min_words: 3,
-      warn_max: 2, warn_action: 'ban_24h',
+      warn_enabled: true, warn_max: 2, warn_action: 'ban_24h',
     },
   },
   {
@@ -40,10 +38,10 @@ export const RULE_TEMPLATES = [
       lock_link: true, lock_username: true,
       lock_unofficial_tg: true, lock_userbots: true,
       lock_bot: true, lock_bot_inviter: true,
-      max_duplicates: 1, max_duplicates_window: 60,
-      antiflood: 6, antiflood_action: 'ban',
-      warn_max: 2, warn_action: 'ban_permanent',
-      required_captcha: true,
+      duplicate_limit: 1,
+      antiflood: true, antiflood_limit: 6, antiflood_action: 'ban',
+      warn_enabled: true, warn_max: 2, warn_action: 'ban_permanent',
+      captcha_enabled: true,
     },
   },
   {
@@ -53,10 +51,9 @@ export const RULE_TEMPLATES = [
     settings: {
       lock_link: false, lock_unofficial_tg: true,
       lock_userbots: true, lock_bot: true,
-      antiflood: 10, antiflood_action: 'mute',
-      warn_max: 5, warn_action: 'mute_12h',
+      antiflood: true, antiflood_limit: 10, antiflood_action: 'mute',
+      warn_enabled: true, warn_max: 5, warn_action: 'mute_12h',
       welcome: true, rules: true,
-      delete_join_leave: true,
     },
   },
   {
@@ -68,7 +65,6 @@ export const RULE_TEMPLATES = [
       lock_video: true, lock_sticker: true,
       lock_file: true, lock_voice: true,
       lock_gif: true, lock_forward: true,
-      lock_group: true,
     },
   },
   {
@@ -84,10 +80,9 @@ export const RULE_TEMPLATES = [
       lock_unofficial_tg: true, lock_userbots: true,
       lock_bot: true, lock_bot_inviter: true,
       lock_porn: true, lock_hashtag: true,
-      antiflood: 5, antiflood_action: 'ban',
-      max_messages: 3, max_messages_window: 60,
-      warn_max: 1, warn_action: 'ban_permanent',
-      required_captcha: true,
+      antiflood: true, antiflood_limit: 5, antiflood_action: 'ban',
+      warn_enabled: true, warn_max: 1, warn_action: 'ban_permanent',
+      captcha_enabled: true,
     },
   },
 ];

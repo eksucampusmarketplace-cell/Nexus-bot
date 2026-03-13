@@ -54,13 +54,18 @@ DEFAULTS = {
     ),
 
     # /help
-    # Variables: {clone_name}, {main_bot}
+    # Variables: {clone_name}, {main_bot}, {miniapp_url}
     "help": (
-        "📚 <b>Need help with {clone_name}?</b>\n\n"
-        "All support is handled through the main {bot_name} channels.\n"
-        "Tap the buttons below to reach us — we're happy to help!\n\n"
-        "You can also check the documentation for guides, command lists, "
-        "and setup tutorials."
+        "⚡ <b>{clone_name} Commands</b>\n\n"
+        "<b>📱 Open the Mini App for full command documentation</b>\n"
+        "All commands are listed with detailed descriptions and usage examples.\n"
+        "Configure all features deeply through the visual interface.\n\n"
+        "<a href=\"{miniapp_url}\">🚀 Open Commands Panel</a>\n\n"
+        "<b>🛡️ Quick Reference:</b>\n\n"
+        "<b>Moderation:</b> /warn, /ban, /mute, /kick, /purge, /pin\n"
+        "<b>Security:</b> !antispam, !antiflood, !antilink, !captcha\n"
+        "<b>Music:</b> /play, /skip, /queue, /volume, /loop\n\n"
+        "<b>💡 Tip:</b> Use /panel to open the full management interface."
     ),
 
     # Shown when a member is muted
@@ -133,31 +138,34 @@ async def get_message(
     key: str,
     group_id: int | None,
     variables: dict,
-    db=None
+    db=None,
+    bot_id: int | None = None
 ) -> str:
     """
     Returns the final message string for a given key.
 
     Steps:
-    1. If group_id and db provided: check DB for custom message override
-    2. Fall back to DEFAULTS[key] if no custom message
-    3. Format with provided variables
-    4. ALWAYS append POWERED_BY_FOOTER (cannot be bypassed)
+    1. If group_id and db provided: check DB for group-specific override
+    2. If bot_id and db provided: check DB for bot-wide override
+    3. Fall back to DEFAULTS[key] if no custom message
+    4. Format with provided variables
+    5. ALWAYS append POWERED_BY_FOOTER (cannot be bypassed)
 
     Args:
         key:       Message key (e.g. "start_private", "help")
         group_id:  The group this message is for (None = global/no group)
         variables: Dict of {placeholder: value} for formatting
         db:        AsyncPG connection/pool (optional, skips DB lookup if None)
+        bot_id:    The bot ID for bot-wide customization
 
-    Logs: [MESSAGES] key={key} group={group_id} custom={bool}
+    Logs: [MESSAGES] key={key} group={group_id} bot={bot_id} custom={bool}
     """
     import logging
     log = logging.getLogger("messages")
 
     custom_body = None
 
-    # Try to load custom message from DB
+    # 1. Try group-specific override
     if db and group_id:
         try:
             row = await db.fetchrow(
@@ -168,12 +176,25 @@ async def get_message(
             if row:
                 custom_body = row["body"]
         except Exception as e:
-            log.warning(f"[MESSAGES] DB lookup failed | key={key} error={e}")
+            log.warning(f"[MESSAGES] Group DB lookup failed | key={key} error={e}")
+
+    # 2. Try bot-wide override if no group override found
+    if not custom_body and db and bot_id:
+        try:
+            row = await db.fetchrow(
+                "SELECT body FROM bot_custom_messages "
+                "WHERE bot_id=$1 AND message_key=$2",
+                bot_id, key
+            )
+            if row:
+                custom_body = row["body"]
+        except Exception as e:
+            log.warning(f"[MESSAGES] Bot DB lookup failed | key={key} error={e}")
 
     body = custom_body if custom_body else DEFAULTS.get(key, "")
     is_custom = bool(custom_body)
 
-    log.debug(f"[MESSAGES] key={key} group={group_id} custom={is_custom}")
+    log.debug(f"[MESSAGES] key={key} group={group_id} bot={bot_id} custom={is_custom}")
 
     # Inject standard variables always available
     variables.setdefault("main_bot", settings.MAIN_BOT_USERNAME)

@@ -28,6 +28,7 @@ export class GroupSwitcher {
     let data = {};
     try {
       data = await apiFetch('/api/me');
+      this._store.setState({ userContext: data });
     } catch (e) {
       console.error('[GroupSwitcher] Failed to load /api/me:', e.message);
     }

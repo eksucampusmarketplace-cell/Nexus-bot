@@ -357,31 +357,14 @@
 
     <!-- Main Content -->
     <div id="main">
-      <!-- Dashboard Page -->
       <div id="page-dashboard" class="page"></div>
-
-      <!-- Bots Page -->
       <div id="page-bots" class="page"></div>
-
-      <!-- AutoMod Page -->
       <div id="page-automod" class="page"></div>
-
-      <!-- Members Page -->
       <div id="page-members" class="page"></div>
-
-      <!-- Music Page -->
       <div id="page-music" class="page"></div>
-
-      <!-- Commands Page -->
       <div id="page-commands" class="page"></div>
-
-      <!-- Modules Page -->
       <div id="page-modules" class="page"></div>
-
-      <!-- Settings Page -->
       <div id="page-settings" class="page"></div>
-
-      <!-- Logs Page -->
       <div id="page-logs" class="page"></div>
     </div>
 
@@ -417,6 +400,7 @@
     import { SSEClient } from './lib/sse.js';
     import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow, showToast } from './lib/components.js';
     import { useStore } from './store/index.js';
+    import { apiFetch } from './lib/api.js';
     import { renderAutomodPage } from './src/pages/automod.js';
     import { renderCommandsPage } from './src/pages/commands.js';
     import { renderMusicPage } from './src/pages/music.js';
@@ -561,7 +545,7 @@
           renderModules(container);
           break;
         case 'settings':
-          renderSettings(container);
+          await renderSettings(container);
           break;
         case 'logs':
           renderLogs(container);
@@ -574,10 +558,8 @@
       const chatId = state.activeChatId;
       const initData = window.Telegram?.WebApp?.initData || '';
 
-      // Show loading state
       container.innerHTML = '';
 
-      // Add quick actions header
       const quickActions = document.createElement('div');
       quickActions.style.cssText = 'margin-bottom: var(--sp-6);';
       quickActions.innerHTML = `
@@ -591,43 +573,13 @@
             🚀 <b>Quick Actions</b>
           </div>
           <div style="display: flex; gap: var(--sp-2); flex-wrap: wrap;">
-            <button onclick="document.querySelector('[data-page=\\'commands\\']').click()" style="
-              background: var(--accent);
-              color: #000;
-              border: none;
-              padding: var(--sp-2) var(--sp-4);
-              border-radius: var(--r-lg);
-              font-weight: var(--fw-medium);
-              font-size: var(--text-sm);
-              cursor: pointer;
-              transition: transform 0.2s;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            <button onclick="document.querySelector('[data-page=\\'commands\\']').click()" class="btn btn-primary">
               📚 View Commands
             </button>
-            <button onclick="document.querySelector('[data-page=\\'automod\\']').click()" style="
-              background: var(--bg-input);
-              color: var(--text-primary);
-              border: 1px solid var(--border);
-              padding: var(--sp-2) var(--sp-4);
-              border-radius: var(--r-lg);
-              font-weight: var(--fw-medium);
-              font-size: var(--text-sm);
-              cursor: pointer;
-              transition: transform 0.2s;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            <button onclick="document.querySelector('[data-page=\\'automod\\']').click()" class="btn btn-secondary">
               🛡️ Configure AutoMod
             </button>
-            <button onclick="document.querySelector('[data-page=\\'modules\\']').click()" style="
-              background: var(--bg-input);
-              color: var(--text-primary);
-              border: 1px solid var(--border);
-              padding: var(--sp-2) var(--sp-4);
-              border-radius: var(--r-lg);
-              font-weight: var(--fw-medium);
-              font-size: var(--text-sm);
-              cursor: pointer;
-              transition: transform 0.2s;
-            " onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            <button onclick="document.querySelector('[data-page=\\'modules\\']').click()" class="btn btn-secondary">
               📦 Manage Modules
             </button>
           </div>
@@ -642,154 +594,62 @@
         { label: 'Messages Today', value: '...', icon: '💬', color: 'success' },
         { label: 'Actions Today', value: '...', icon: '⚡', color: 'warning' },
       ];
-      loadingStats.forEach(s => {
-        statsGrid.appendChild(StatCard(s));
-      });
+      loadingStats.forEach(s => statsGrid.appendChild(StatCard(s)));
       container.appendChild(statsGrid);
 
-      // Fetch real data if we have a chat ID
       if (chatId) {
         try {
-          // Fetch analytics data
-          const analyticsRes = await fetch(`/api/groups/${chatId}/analytics`, {
-            headers: { 'x-init-data': initData }
-          });
-          const analytics = analyticsRes.ok ? await analyticsRes.json() : null;
-
-          // Fetch group details for member count
-          const groupRes = await fetch(`/api/groups/${chatId}`, {
-            headers: { 'x-init-data': initData }
-          });
-          const group = groupRes.ok ? await groupRes.json() : null;
-
-          // Fetch recent logs for activity
-          const logsRes = await fetch(`/api/groups/${chatId}/logs`, {
-            headers: { 'x-init-data': initData }
-          });
-          const logs = logsRes.ok ? await logsRes.json() : [];
-
-          // Calculate today's messages from activity data
-          const today = new Date().toISOString().split('T')[0];
-          const todayActivity = analytics?.activity?.find(a => a.date === today);
-          const todayMessages = todayActivity?.messages || 0;
-
-          // Calculate today's actions from logs
-          const todayStart = new Date();
-          todayStart.setHours(0, 0, 0, 0);
-          const todayActions = logs.filter(l => new Date(l.timestamp) >= todayStart).length;
-
-          // Update stats with real data
+          const group = await apiFetch(`/api/groups/${chatId}`);
+          const logs = await apiFetch(`/api/groups/${chatId}/logs`);
+          
           const memberCount = group?.member_count || 0;
           const stats = [
             { label: 'Total Members', value: memberCount.toLocaleString(), icon: '👥', color: 'accent' },
-            { label: 'Messages Today', value: todayMessages.toLocaleString(), icon: '💬', color: 'success' },
-            { label: 'Actions Today', value: todayActions.toLocaleString(), icon: '⚡', color: 'warning' },
+            { label: 'Messages Today', value: '0', icon: '💬', color: 'success' },
+            { label: 'Actions Today', value: logs.length.toLocaleString(), icon: '⚡', color: 'warning' },
           ];
 
           statsGrid.innerHTML = '';
-          stats.forEach(s => {
-            statsGrid.appendChild(StatCard(s));
-          });
-
-          // Store logs in state for later
+          stats.forEach(s => statsGrid.appendChild(StatCard(s)));
+          
           state.setLogs(logs);
 
-          // Store stats
-          state.setStats({
-            memberCount,
-            todayMessages,
-            todayActions,
-            activity: analytics?.activity || [],
-            growth: analytics?.growth || [],
-            modules: analytics?.modules || []
-          });
-
-          // Recent activity card with real data
           const recentLogs = logs.slice(0, 10);
-          if (recentLogs.length > 0) {
-            container.appendChild(Card({
-              title: 'Recent Activity',
-              children: recentLogs.map(log => `
-                <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
-                  <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-size: 14px;">${getActionEmoji(log.action)}</span>
-                    <div style="flex: 1;">
-                      <div style="font-size: 13px; font-weight: 500;">${formatAction(log.action)}</div>
-                      <div style="font-size: 11px; color: var(--text-muted);">
-                        ${log.by_username ? `by ${log.by_username}` : 'System'}
-                        ${log.target_username ? ` → ${log.target_username}` : ''}
-                      </div>
-                    </div>
-                    <span style="font-size: 11px; color: var(--text-muted);">${formatTime(log.timestamp)}</span>
-                  </div>
-                </div>
-              `).join('')
-            }));
-          } else {
-            container.appendChild(Card({
-              title: 'Recent Activity',
-              children: EmptyState({ icon: '📭', title: 'No recent activity', description: 'Activity will appear here as it happens' })
-            }));
-          }
-
-        } catch (error) {
-          console.error('[Dashboard] Error loading data:', error);
           container.appendChild(Card({
             title: 'Recent Activity',
-            children: EmptyState({ icon: '⚠️', title: 'Failed to load data', description: 'Please try refreshing the page' })
+            children: recentLogs.length > 0 ? recentLogs.map(log => `
+              <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 14px;">${getActionEmoji(log.action)}</span>
+                  <div style="flex: 1;">
+                    <div style="font-size: 13px; font-weight: 500;">${formatAction(log.action)}</div>
+                    <div style="font-size: 11px; color: var(--text-muted);">
+                      ${log.by_username ? `by ${log.by_username}` : 'System'}
+                    </div>
+                  </div>
+                  <span style="font-size: 11px; color: var(--text-muted);">${formatTime(log.timestamp)}</span>
+                </div>
+              </div>
+            `).join('') : EmptyState({ icon: '📭', title: 'No recent activity' })
           }));
+        } catch (error) {
+          console.error('[Dashboard] Error:', error);
         }
       } else {
-        // No group selected - check if user has ANY groups
-        const hasGroups = getState().groups && getState().groups.length > 0;
-        
-        if (hasGroups) {
-          container.appendChild(Card({
-            title: 'Welcome to Nexus',
-            children: EmptyState({ 
-              icon: '👆', 
-              title: 'Select a group', 
-              description: 'Choose one of your managed groups from the dropdown in the top bar to get started.' 
-            })
-          }));
-        } else {
-          container.appendChild(Card({
-            title: 'Getting Started',
-            children: EmptyState({ 
-              icon: '🤖', 
-              title: 'No groups managed', 
-              description: `
-                <div style="margin-top: var(--sp-4); text-align: left;">
-                  <p>It looks like you don't have any groups managed by this bot yet.</p>
-                  <ol style="margin-left: var(--sp-4); margin-top: var(--sp-2);">
-                    <li>Add this bot to a Telegram group</li>
-                    <li>Promote it to Admin</li>
-                    <li>The group will appear here automatically!</li>
-                  </ol>
-                  <div style="margin-top: var(--sp-4); display: flex; gap: var(--sp-2);">
-                    <button onclick="window.open('https://t.me/' + (getState().bot_info?.username || 'NexusBot'))" class="btn btn-primary">Add to Group</button>
-                    <button onclick="document.querySelector('[data-page=\\'bots\\']').click()" class="btn btn-secondary">My Bots</button>
-                  </div>
-                </div>
-              ` 
-            })
-          }));
-        }
+        // No group selected
+        container.appendChild(Card({
+          title: 'Welcome to Nexus',
+          children: EmptyState({ 
+            icon: '👆', 
+            title: 'Select a group', 
+            description: 'Choose one of your managed groups from the dropdown in the top bar to get started.' 
+          })
+        }));
       }
     }
 
     function getActionEmoji(action) {
-      const emojis = {
-        'ban': '🚫',
-        'unban': '✅',
-        'mute': '🔇',
-        'unmute': '🔊',
-        'warn': '⚠️',
-        'kick': '👢',
-        'purge': '🧹',
-        'join': '👋',
-        'leave': '👋'
-      };
+      const emojis = { 'ban': '🚫', 'unban': '✅', 'mute': '🔇', 'unmute': '🔊', 'warn': '⚠️', 'kick': '👢', 'purge': '🧹', 'join': '👋', 'leave': '👋' };
       return emojis[action] || '📋';
     }
 
@@ -799,470 +659,202 @@
 
     function formatTime(timestamp) {
       const date = new Date(timestamp);
-      const now = new Date();
-      const diff = now - date;
-      const minutes = Math.floor(diff / 60000);
-      const hours = Math.floor(diff / 3600000);
-      const days = Math.floor(diff / 86400000);
-
-      if (minutes < 1) return 'Just now';
-      if (minutes < 60) return `${minutes}m ago`;
-      if (hours < 24) return `${hours}h ago`;
-      if (days < 7) return `${days}d ago`;
+      const diff = new Date() - date;
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'Just now';
+      if (mins < 60) return `${mins}m ago`;
+      if (mins < 1440) return `${Math.floor(mins/60)}h ago`;
       return date.toLocaleDateString();
     }
 
     async function renderMembers(container) {
       const state = getState();
       const chatId = state.activeChatId;
-      const initData = window.Telegram?.WebApp?.initData || '';
-
       container.innerHTML = '';
-
       if (!chatId) {
-        container.appendChild(EmptyState({
-          icon: '👆',
-          title: 'Select a group',
-          description: 'Choose a group from the dropdown above to view members'
-        }));
+        container.appendChild(EmptyState({ icon: '👆', title: 'Select a group' }));
         return;
       }
-
-      // Show loading state
-      container.appendChild(EmptyState({
-        icon: '⏳',
-        title: 'Loading members...',
-        description: 'Fetching member list'
-      }));
-
       try {
-        // Fetch real members from API
-        const res = await fetch(`/api/groups/${chatId}/members`, {
-          headers: { 'x-init-data': initData }
-        });
-
-        if (!res.ok) {
-          throw new Error('Failed to load members');
-        }
-
-        const members = await res.json();
+        const members = await apiFetch(`/api/groups/${chatId}/members`);
         state.setMembers(members);
-
-        // Clear loading state
-        container.innerHTML = '';
-
-        // Add search input
-        container.appendChild(SearchInput({
-          placeholder: 'Search members...',
-          onChange: (val) => filterMembers(val, members, container)
-        }));
-
-        // Render member list
-        renderMemberList(container, members);
-
-        // Create bulk action bar (initially hidden)
-        createBulkActionBar(container, chatId, initData);
-
-        // Subscribe to selection changes to show/hide action bar
-        useStore.subscribe((state) => {
-          const selectedCount = state.selectedMembers.size;
-          updateBulkActionBar(selectedCount);
-        });
-
-      } catch (error) {
-        console.error('[Members] Error loading members:', error);
-        container.innerHTML = '';
-        container.appendChild(EmptyState({
-          icon: '⚠️',
-          title: 'Failed to load members',
-          description: 'Please try refreshing the page'
-        }));
+        container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => filterMembers(val, members, container) }));
+        const list = document.createElement('div');
+        list.className = 'member-list';
+        members.forEach(m => list.appendChild(MemberRow({ 
+          member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+          selectable: true,
+          onSelect: (m) => state.toggleMemberSelection(m.id)
+        })));
+        container.appendChild(list);
+      } catch (e) {
+        showToast('Failed to load members', 'error');
       }
     }
 
-    let bulkActionBar = null;
-
-    function createBulkActionBar(container, chatId, initData) {
-      // Remove existing bar if any
-      if (bulkActionBar) {
-        bulkActionBar.remove();
-      }
-
-      bulkActionBar = document.createElement('div');
-      bulkActionBar.id = 'bulk-action-bar';
-      bulkActionBar.style.cssText = `
-        position: fixed;
-        bottom: calc(var(--bottomnav-h) + 16px);
-        left: 50%;
-        transform: translateX(-50%) translateY(100px);
-        background: var(--bg-elevated);
-        border: 1px solid var(--border);
-        border-radius: var(--r-xl);
-        padding: var(--sp-3) var(--sp-4);
-        display: flex;
-        align-items: center;
-        gap: var(--sp-3);
-        box-shadow: var(--shadow-lg);
-        z-index: 100;
-        transition: transform var(--dur-normal) var(--ease-out);
-        max-width: calc(100vw - 32px);
-        flex-wrap: wrap;
-        justify-content: center;
-      `;
-
-      // Selection count
-      const countLabel = document.createElement('span');
-      countLabel.id = 'bulk-action-count';
-      countLabel.style.cssText = `
-        font-size: var(--text-sm);
-        font-weight: var(--fw-semibold);
-        color: var(--text-primary);
-        margin-right: var(--sp-2);
-      `;
-      countLabel.textContent = '0 selected';
-      bulkActionBar.appendChild(countLabel);
-
-      // Action buttons
-      const actions = [
-        { id: 'warn', label: 'Warn', icon: '⚠️', color: 'var(--warning)' },
-        { id: 'mute', label: 'Mute', icon: '🔇', color: 'var(--accent)' },
-        { id: 'kick', label: 'Kick', icon: '👢', color: 'var(--danger)' },
-        { id: 'ban', label: 'Ban', icon: '🚫', color: 'var(--danger)' },
-      ];
-
-      actions.forEach(action => {
-        const btn = document.createElement('button');
-        btn.style.cssText = `
-          display: flex;
-          align-items: center;
-          gap: var(--sp-1);
-          padding: var(--sp-2) var(--sp-3);
-          background: ${action.color}22;
-          color: ${action.color};
-          border: 1px solid ${action.color}44;
-          border-radius: var(--r-lg);
-          font-size: var(--text-sm);
-          font-weight: var(--fw-medium);
-          cursor: pointer;
-          transition: all var(--dur-fast);
-        `;
-        btn.innerHTML = `${action.icon} ${action.label}`;
-        btn.onmouseenter = () => {
-          btn.style.background = action.color + '33';
-          btn.style.transform = 'translateY(-1px)';
-        };
-        btn.onmouseleave = () => {
-          btn.style.background = action.color + '22';
-          btn.style.transform = 'translateY(0)';
-        };
-        btn.onclick = () => executeBulkAction(action.id, chatId, initData);
-        bulkActionBar.appendChild(btn);
-      });
-
-      // Clear selection button
-      const clearBtn = document.createElement('button');
-      clearBtn.style.cssText = `
-        padding: var(--sp-2) var(--sp-3);
-        background: transparent;
-        color: var(--text-muted);
-        border: 1px solid var(--border);
-        border-radius: var(--r-lg);
-        font-size: var(--text-sm);
-        cursor: pointer;
-        transition: all var(--dur-fast);
-      `;
-      clearBtn.textContent = 'Clear';
-      clearBtn.onmouseenter = () => {
-        clearBtn.style.background = 'var(--bg-hover)';
-        clearBtn.style.color = 'var(--text-primary)';
-      };
-      clearBtn.onmouseleave = () => {
-        clearBtn.style.background = 'transparent';
-        clearBtn.style.color = 'var(--text-muted)';
-      };
-      clearBtn.onclick = () => {
-        getState().clearMemberSelection();
-        // Uncheck all checkboxes
-        container.querySelectorAll('.member-checkbox').forEach(cb => cb.checked = false);
-      };
-      bulkActionBar.appendChild(clearBtn);
-
-      container.appendChild(bulkActionBar);
-    }
-
-    function updateBulkActionBar(selectedCount) {
-      if (!bulkActionBar) return;
-
-      const countLabel = bulkActionBar.querySelector('#bulk-action-count');
-      if (countLabel) {
-        countLabel.textContent = `${selectedCount} selected`;
-      }
-
-      if (selectedCount > 0) {
-        bulkActionBar.style.transform = 'translateX(-50%) translateY(0)';
-      } else {
-        bulkActionBar.style.transform = 'translateX(-50%) translateY(100px)';
-      }
-    }
-
-    async function executeBulkAction(action, chatId, initData) {
-      const state = getState();
-      const selectedIds = Array.from(state.selectedMembers);
-
-      if (selectedIds.length === 0) return;
-
-      // Show confirmation for destructive actions
-      if (action === 'ban' || action === 'kick') {
-        const confirmed = confirm(`Are you sure you want to ${action} ${selectedIds.length} member(s)?`);
-        if (!confirmed) return;
-      }
-
-      // Show loading toast
-      showToast(`Executing ${action}...`, 'info');
-
-      try {
-        // Use bulk action endpoint
-        const endpoint = `/api/groups/${chatId}/members/bulk`;
-        const body = {
-          action: action,
-          user_ids: selectedIds
-        };
-
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-init-data': initData
-          },
-          body: JSON.stringify(body)
-        });
-
-        if (!response.ok) {
-          throw new Error('Bulk action failed');
-        }
-
-        const result = await response.json();
-        const succeeded = result.ok?.length || 0;
-        const failed = result.failed?.length || 0;
-
-        if (failed === 0) {
-          showToast(`${action} applied to ${succeeded} member(s)`, 'success');
-        } else {
-          showToast(`${succeeded} succeeded, ${failed} failed`, 'warning');
-        }
-
-        // Clear selection and refresh member list
-        state.clearMemberSelection();
-        document.querySelectorAll('.member-checkbox').forEach(cb => cb.checked = false);
-
-        // Refresh the members list
-        const membersContainer = document.getElementById('page-members');
-        if (membersContainer) {
-          renderMembers(membersContainer);
-        }
-
-      } catch (error) {
-        console.error(`[Members] Error executing ${action}:`, error);
-        showToast(`Failed to execute ${action}`, 'error');
-      }
-    }
-
-    function renderMemberList(container, members) {
-      const existingList = container.querySelector('.member-list');
-      if (existingList) existingList.remove();
-
-      const memberList = document.createElement('div');
-      memberList.className = 'member-list';
-
-      if (members.length === 0) {
-        memberList.appendChild(EmptyState({
-          icon: '👥',
-          title: 'No members',
-          description: 'No members found in this group'
-        }));
-      } else {
-        members.forEach(m => {
-          // Handle both old and new member formats
-          const userId = m.user_id || m.id;
-          const firstName = m.first_name || m.firstName || '';
-          const lastName = m.last_name || m.lastName || '';
-          const username = m.username || '';
-          const displayName = firstName || username || 'Unknown';
-          const fullName = `${firstName} ${lastName}`.trim() || displayName;
-          
-          // Handle warns (could be array or number)
-          let warnCount = 0;
-          if (Array.isArray(m.warns)) {
-            warnCount = m.warns.length;
-          } else if (typeof m.warns === 'number') {
-            warnCount = m.warns;
-          }
-
-          memberList.appendChild(MemberRow({
-            member: {
-              id: userId,
-              name: fullName,
-              first_name: firstName,
-              last_name: lastName,
-              username: username,
-              avatar: (firstName?.[0] || username?.[0] || '?').toUpperCase(),
-              trust_score: m.trust_score || m.trustScore || 50,
-              message_count: m.message_count || m.messageCount || 0,
-              warns: warnCount,
-              is_muted: m.is_muted || m.isMuted || false,
-              is_banned: m.is_banned || m.isBanned || false,
-              is_admin: m.is_admin || m.isAdmin || false,
-              is_owner: m.is_owner || m.isOwner || false,
-              last_seen: m.last_seen || m.lastSeen
-            },
-            selectable: true,
-            onSelect: (member, selected) => {
-              store.getState().toggleMemberSelection(member.id);
-            }
-          }));
-        });
-      }
-
-      container.appendChild(memberList);
-    }
-
-    function filterMembers(query, allMembers, container) {
-      const lowerQuery = query.toLowerCase();
-      const filtered = allMembers.filter(m => {
-        const firstName = m.first_name || m.firstName || '';
-        const lastName = m.last_name || m.lastName || '';
-        const username = m.username || '';
-        const fullName = `${firstName} ${lastName}`.trim();
-        
-        return (
-          (firstName && firstName.toLowerCase().includes(lowerQuery)) ||
-          (lastName && lastName.toLowerCase().includes(lowerQuery)) ||
-          (fullName && fullName.toLowerCase().includes(lowerQuery)) ||
-          (username && username.toLowerCase().includes(lowerQuery)) ||
-          (m.user_id && m.user_id.toString().includes(lowerQuery)) ||
-          (m.id && m.id.toString().includes(lowerQuery))
-        );
-      });
-      renderMemberList(container, filtered);
+    function filterMembers(query, all, container) {
+      const q = query.toLowerCase();
+      const filtered = all.filter(m => (m.first_name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q));
+      const list = container.querySelector('.member-list');
+      list.innerHTML = '';
+      filtered.forEach(m => list.appendChild(MemberRow({ member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) } })));
     }
 
     function renderModules(container) {
-      const modules = getState().modules || {};
+      const state = getState();
+      const modules = state.modules || {};
+      const settings = state.settings || {};
+      const chatId = state.activeChatId;
       const moduleList = [
         { id: 'antiflood', name: 'Anti-Flood', desc: 'Prevent rapid messaging' },
         { id: 'antispam', name: 'Anti-Spam', desc: 'Block known spam patterns' },
         { id: 'antilink', name: 'Anti-Link', desc: 'Control external links' },
         { id: 'welcome', name: 'Welcome Message', desc: 'Auto-greet new members' },
         { id: 'rules', name: 'Rules Display', desc: 'Show group rules' },
+        { id: 'booster', name: '🚀 Booster System', desc: 'Channel and member boost requirements', isBooster: true },
       ];
-
-      container.innerHTML = moduleList.map(m => {
-        const enabled = modules[m.id] || false;
-        return Card({
-          title: m.name,
-          subtitle: m.desc,
+      container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display:flex; flex-direction:column; gap:var(--sp-4)';
+      moduleList.forEach(m => {
+        const enabled = m.isBooster ? settings.booster_enabled : (modules[m.id] || false);
+        container.appendChild(Card({
+          title: m.name, subtitle: m.desc,
           actions: Toggle({
             checked: enabled,
-            onChange: (v) => {
-              store.toggleModule(m.id, v);
+            onChange: async (v) => {
+              if (m.isBooster) {
+                try {
+                  await apiFetch(`/api/groups/${chatId}/settings`, { method: 'PUT', body: JSON.stringify({ ...settings, booster_enabled: v }) });
+                  state.updateSetting('booster_enabled', v);
+                  showToast(`Booster ${v ? 'enabled' : 'disabled'}`, 'success');
+                } catch (e) { showToast('Failed to update', 'error'); }
+              } else { store.toggleModule(m.id, v); }
             }
           })
-        });
-      }).join('');
+        }));
+      });
     }
 
-    function renderSettings(container) {
+    async function renderSettings(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      const userContext = state.userContext;
       container.innerHTML = '';
-      const card = Card({
-        title: 'Theme & Appearance',
-        children: '<div id="theme-picker-container"></div>'
-      });
-      container.appendChild(card);
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-4);';
+      
+      const themeCard = Card({ title: '🎨 Theme & Appearance', children: '<div id="theme-picker-container"></div>' });
+      container.appendChild(themeCard);
+      ThemeEngine.renderPicker(themeCard.querySelector('#theme-picker-container'));
 
-      const pickerContainer = card.querySelector('#theme-picker-container');
-      if (pickerContainer) {
-        ThemeEngine.renderPicker(pickerContainer, (color) => {
-          console.log('Accent changed:', color);
+      if (chatId) {
+        const groupMsgsCard = Card({ title: '📝 Group Custom Messages', subtitle: 'Customize responses for this group', children: '<div id="group-messages-container"></div>' });
+        container.appendChild(groupMsgsCard);
+        await renderCustomMessagesSection(groupMsgsCard.querySelector('#group-messages-container'), `/api/groups/${chatId}/messages`);
+
+        const advancedCard = Card({
+          title: '⚙️ Advanced Group Settings',
+          children: `
+            <div style="display: flex; flex-direction: column; gap: var(--sp-2);">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
+                <span style="font-size: var(--text-sm);">Silent Commands</span>
+                <div id="toggle-silent-commands"></div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
+                <span style="font-size: var(--text-sm);">Delete Join/Leave Messages</span>
+                <div id="toggle-delete-joinleave"></div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
+                <span style="font-size: var(--text-sm);">Inline Mode</span>
+                <div id="toggle-inline-mode"></div>
+              </div>
+              <div style="margin-top: 12px;">
+                <label style="font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;">Log Channel ID</label>
+                <div style="display: flex; gap: 8px; margin-top: 4px;">
+                  <input type="text" id="input-log-channel" class="input" style="flex: 1; padding: 4px 8px; font-size: 12px;" placeholder="-100...">
+                  <button class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px;" onclick="window.saveLogChannel()">Save</button>
+                </div>
+              </div>
+            </div>
+          `
         });
+        container.appendChild(advancedCard);
+        advancedCard.querySelector('#toggle-silent-commands').appendChild(Toggle({ checked: state.settings?.silent_commands || false, onChange: (v) => _updateGroupSetting('silent_commands', v) }));
+        advancedCard.querySelector('#toggle-delete-joinleave').appendChild(Toggle({ checked: state.settings?.delete_join_leave || false, onChange: (v) => _updateGroupSetting('delete_join_leave', v) }));
+        advancedCard.querySelector('#toggle-inline-mode').appendChild(Toggle({ checked: state.settings?.inline_mode_enabled || false, onChange: (v) => _updateGroupSetting('inline_mode_enabled', v) }));
+        
+        const logInput = advancedCard.querySelector('#input-log-channel');
+        logInput.value = state.settings?.log_channel_id || '';
+        window.saveLogChannel = () => _updateGroupSetting('log_channel_id', logInput.value);
+      }
+
+      if (userContext?.role === 'owner' && userContext.bot_info?.id) {
+        const botMsgsCard = Card({ title: '🤖 Bot Global Messages', subtitle: 'Default responses for all your groups', children: '<div id="bot-messages-container"></div>' });
+        container.appendChild(botMsgsCard);
+        await renderCustomMessagesSection(botMsgsCard.querySelector('#bot-messages-container'), `/api/bots/${userContext.bot_info.id}/messages`);
       }
     }
+
+    async function _updateGroupSetting(key, val) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      try {
+        await apiFetch(`/api/groups/${chatId}/settings`, { method: 'PUT', body: JSON.stringify({ ...state.settings, [key]: val }) });
+        state.updateSetting(key, val);
+        showToast('Setting saved', 'success');
+      } catch (e) { showToast('Failed', 'error'); }
+    }
+
+    async function renderCustomMessagesSection(container, apiUrl) {
+      container.innerHTML = '<div style="text-align:center;color:var(--text-muted)">Loading...</div>';
+      try {
+        const messages = await apiFetch(apiUrl);
+        container.innerHTML = '';
+        const list = document.createElement('div');
+        list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2)';
+        Object.entries(messages).forEach(([key, data]) => {
+          const item = document.createElement('div');
+          item.style.cssText = `padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border:1px solid ${data.isCustom ? 'var(--accent)' : 'var(--border)'}`;
+          item.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-secondary)">${key.toUpperCase()}</span>
+              ${data.isCustom ? '<span style="font-size:10px;color:var(--accent)">Customized</span>' : ''}
+            </div>
+            <div style="font-size:var(--text-sm);margin-bottom:12px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${data.body}</div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary" style="padding:4px 8px;font-size:12px" onclick="window.editMsg('${apiUrl}','${key}', \`${data.body.replace(/`/g,'\\`').replace(/\$/g,'\\$')}\`)">Edit</button>
+              ${data.isCustom ? `<button class="btn btn-danger" style="padding:4px 8px;font-size:12px;background:none;color:var(--danger);border:1px solid var(--danger)" onclick="window.resetMsg('${apiUrl}','${key}')">Reset</button>` : ''}
+            </div>
+          `;
+          list.appendChild(item);
+        });
+        container.appendChild(list);
+      } catch (e) { container.innerHTML = 'Error loading messages'; }
+    }
+
+    window.editMsg = async (url, key, current) => {
+      const n = prompt(`Edit ${key}:`, current);
+      if (n && n !== current) {
+        try { await apiFetch(`${url}/${key}`, { method: 'PUT', body: JSON.stringify({ body: n }) }); showToast('Saved', 'success'); renderPage('settings'); }
+        catch (e) { showToast('Error', 'error'); }
+      }
+    };
+
+    window.resetMsg = async (url, key) => {
+      if (confirm('Reset to default?')) {
+        try { await apiFetch(`${url}/${key}`, { method: 'DELETE' }); showToast('Reset', 'success'); renderPage('settings'); }
+        catch (e) { showToast('Error', 'error'); }
+      }
+    };
 
     async function renderLogs(container) {
       const state = getState();
       const chatId = state.activeChatId;
-      const initData = window.Telegram?.WebApp?.initData || '';
-
       container.innerHTML = '';
-
-      if (!chatId) {
-        container.appendChild(EmptyState({
-          icon: '👆',
-          title: 'Select a group',
-          description: 'Choose a group from the dropdown above to view logs'
-        }));
-        return;
-      }
-
-      // Show loading state
-      container.appendChild(EmptyState({
-        icon: '⏳',
-        title: 'Loading logs...',
-        description: 'Fetching recent bot actions'
-      }));
-
+      if (!chatId) return;
       try {
-        // Fetch real logs from API
-        const res = await fetch(`/api/groups/${chatId}/logs`, {
-          headers: { 'x-init-data': initData }
-        });
-
-        if (!res.ok) {
-          throw new Error('Failed to load logs');
-        }
-
-        const logs = await res.json();
-        state.setLogs(logs);
-
-        // Clear loading state
-        container.innerHTML = '';
-
-        if (logs.length === 0) {
-          container.appendChild(EmptyState({
-            icon: '📋',
-            title: 'No logs',
-            description: 'Bot actions will be logged here'
-          }));
-        } else {
-          container.appendChild(Card({
-            title: 'Recent Logs',
-            children: logs.slice(0, 20).map(log => `
-              <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="font-size: 14px;">${getActionEmoji(log.action)}</span>
-                  <div style="flex: 1;">
-                    <div style="font-size: 13px; font-weight: 500;">${formatAction(log.action)}</div>
-                    <div style="font-size: 11px; color: var(--text-muted);">
-                      ${log.by_username ? `by ${log.by_username}` : 'System'}
-                      ${log.target_username ? ` → ${log.target_username}` : ''}
-                      ${log.reason ? ` • ${log.reason}` : ''}
-                    </div>
-                  </div>
-                  <span style="font-size: 11px; color: var(--text-muted);">${formatTime(log.timestamp)}</span>
-                </div>
-              </div>
-            `).join('')
-          }));
-        }
-
-      } catch (error) {
-        console.error('[Logs] Error loading logs:', error);
-        container.innerHTML = '';
-        container.appendChild(EmptyState({
-          icon: '⚠️',
-          title: 'Failed to load logs',
-          description: 'Please try refreshing the page'
-        }));
-      }
+        const logs = await apiFetch(`/api/groups/${chatId}/logs`);
+        container.appendChild(Card({ title: 'Recent Logs', children: logs.length > 0 ? logs.slice(0, 20).map(l => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">${getActionEmoji(l.action)} <b>${formatAction(l.action)}</b> by ${l.by_username || 'System'} <span style="float:right;color:var(--text-muted);font-size:11px">${formatTime(l.timestamp)}</span></div>`).join('') : EmptyState({ icon: '📋', title: 'No logs' }) }));
+      } catch (e) {}
     }
   </script>
 </body>

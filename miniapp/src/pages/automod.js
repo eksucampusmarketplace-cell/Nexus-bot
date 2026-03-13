@@ -40,6 +40,22 @@ const AUTOMOD_SECTIONS = [
     ],
   },
   {
+    id: 'antiraid',
+    title: 'Anti-Raid',
+    description: 'Protect group from organized raids',
+    icon: '🛡️',
+    settings: [
+      { key: 'antiraid_enabled', label: 'Enable Anti-Raid', type: 'toggle' },
+      { key: 'antiraid_mode', label: 'Mode', type: 'select', options: [
+        { value: 'restrict', label: 'Restrict new members' },
+        { value: 'kick', label: 'Kick new members' },
+        { value: 'lock', label: 'Lock group' },
+      ], default: 'restrict' },
+      { key: 'antiraid_threshold', label: 'Join threshold (per min)', type: 'number', min: 3, max: 50, default: 10 },
+      { key: 'auto_antiraid_enabled', label: 'Auto-activate Anti-Raid', type: 'toggle' },
+    ],
+  },
+  {
     id: 'antispam',
     title: 'Anti-Spam',
     description: 'Block known spam patterns and bots',
@@ -49,6 +65,7 @@ const AUTOMOD_SECTIONS = [
       { key: 'lock_username', label: 'Block spam usernames', type: 'toggle' },
       { key: 'lock_bot', label: 'Block bot invites', type: 'toggle' },
       { key: 'lock_bot_inviter', label: 'Block bots from adding users', type: 'toggle' },
+      { key: 'duplicate_limit', label: 'Max duplicate messages', type: 'number', min: 1, max: 10, default: 2 },
     ],
   },
   {
@@ -71,11 +88,29 @@ const AUTOMOD_SECTIONS = [
     icon: '🔐',
     settings: [
       { key: 'captcha_enabled', label: 'Enable Captcha', type: 'toggle' },
-      { key: 'captcha_timeout', label: 'Timeout (seconds)', type: 'number', min: 30, max: 300, default: 60 },
-      { key: 'captcha_action', label: 'On failure', type: 'select', options: [
-        { value: 'kick', label: 'Kick' },
-        { value: 'ban', label: 'Ban' },
-      ], default: 'kick' },
+      { key: 'captcha_timeout_mins', label: 'Timeout (minutes)', type: 'number', min: 1, max: 10, default: 2 },
+      { key: 'captcha_mode', label: 'Captcha Type', type: 'select', options: [
+        { value: 'button', label: 'Click Button' },
+        { value: 'math', label: 'Math Problem' },
+        { value: 'text', label: 'Text Input' },
+      ], default: 'button' },
+      { key: 'captcha_kick_on_timeout', label: 'Kick on timeout', type: 'toggle', default: true },
+    ],
+  },
+  {
+    id: 'advanced_content',
+    title: 'Advanced Content',
+    description: 'Strict message length and content rules',
+    icon: '📏',
+    settings: [
+      { key: 'min_words', label: 'Min words', type: 'number', min: 0, max: 50, default: 0 },
+      { key: 'max_words', label: 'Max words', type: 'number', min: 0, max: 1000, default: 0 },
+      { key: 'min_chars', label: 'Min characters', type: 'number', min: 0, max: 500, default: 0 },
+      { key: 'max_chars', label: 'Max characters', type: 'number', min: 0, max: 4000, default: 0 },
+      { key: 'min_lines', label: 'Min lines', type: 'number', min: 0, max: 20, default: 0 },
+      { key: 'max_lines', label: 'Max lines', type: 'number', min: 0, max: 100, default: 0 },
+      { key: 'regex_active', label: 'Enable Regex Filters', type: 'toggle' },
+      { key: 'necessary_words_active', label: 'Enable Required Words', type: 'toggle' },
     ],
   },
   {

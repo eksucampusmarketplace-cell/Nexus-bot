@@ -133,6 +133,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.debug(f"[STARTUP] Log channel migration info: {e}")
 
+    # Run reports migration
+    try:
+        reports_migration_path = os.path.join(os.path.dirname(__file__), "db", "migrations", "add_reports.sql")
+        if os.path.exists(reports_migration_path):
+            with open(reports_migration_path, 'r') as f:
+                reports_migration_sql = f.read()
+            await pool.execute(reports_migration_sql)
+            logger.info("[STARTUP] ✅ Reports tables migrated")
+    except Exception as e:
+        logger.debug(f"[STARTUP] Reports migration info: {e}")
+
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
 
@@ -319,6 +330,7 @@ fastapi_app.add_middleware(
 
 # Routes
 from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats, events, bots_messages
+from api.routes.reports import router as reports_router
 from api.routes.boost import router as boost_router
 from api.routes.channel_gate import router as channel_gate_router
 from api.routes.messages import router as messages_router
@@ -353,6 +365,7 @@ fastapi_app.include_router(events.router)
 fastapi_app.include_router(automod_router.router)
 fastapi_app.include_router(scheduler_router)
 fastapi_app.include_router(log_channel_router)
+fastapi_app.include_router(reports_router)
 
 # Serve miniapp static files
 miniapp_dir = os.path.join(os.path.dirname(__file__), "miniapp")

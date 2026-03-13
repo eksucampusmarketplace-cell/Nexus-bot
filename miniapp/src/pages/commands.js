@@ -34,6 +34,10 @@ const COMMAND_CATEGORIES = [
       { cmd: '/kick', args: '<reason>', desc: 'Kick a user from group' },
       { cmd: '/purge', args: '<count>', desc: 'Delete recent messages (max 100)' },
       { cmd: '/kickme', args: '', desc: 'Kick yourself from the group' },
+      { cmd: '/report', args: '[reason]', desc: 'Report a message to admins (reply to message)' },
+      { cmd: '/reports', args: '', desc: '(Admin) List all open reports' },
+      { cmd: '/resolve', args: '<id> [note]', desc: '(Admin) Mark a report as resolved' },
+      { cmd: '/dismiss', args: '<id> [note]', desc: '(Admin) Dismiss a report' },
     ]
   },
   {

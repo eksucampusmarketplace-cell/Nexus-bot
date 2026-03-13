@@ -47,10 +47,20 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
 
     # Track stats
     await upsert_user(user_id, chat_id, update.effective_user.username, update.effective_user.first_name)
     await increment_message_count(user_id, chat_id)
+
+    # ── Trust Score: recalculate on every message ─────────────────────
+    if db_pool:
+        try:
+            from bot.utils.trust_score import calculate_trust_score, apply_trust_consequences
+            score = await calculate_trust_score(user_id, chat_id, db_pool)
+            await apply_trust_consequences(user_id, chat_id, score, context)
+        except Exception as _te:
+            logger.debug(f"[AUTOMOD] Trust score update failed: {_te}")
 
     group = await get_group(chat_id)
     if not group:

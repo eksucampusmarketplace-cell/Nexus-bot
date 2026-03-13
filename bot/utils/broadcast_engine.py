@@ -4,7 +4,7 @@ import time
 from datetime import datetime, timezone
 from typing import List, Optional
 from telegram import Bot
-from telegram.error import FloodWait, Forbidden, RetryAfter, TelegramError
+from telegram.error import Forbidden, RetryAfter, TelegramError
 from db.ops.broadcast import update_broadcast_progress, get_broadcast_targets
 from bot.registry import get as registry_get
 
@@ -84,8 +84,8 @@ class BroadcastEngine:
                 
                 sent += 1
                 await update_broadcast_progress(self.pool, task_id, sent_inc=1)
-            except FloodWait as e:
-                logger.warning(f"[BROADCAST] FloodWait: {e.retry_after}s")
+            except RetryAfter as e:
+                logger.warning(f"[BROADCAST] RetryAfter: {e.retry_after}s")
                 await asyncio.sleep(e.retry_after)
                 # Retry once? For now just skip and mark as failed if it fails again
                 try:

@@ -92,7 +92,7 @@ async def sse_events(request: Request, chat_id: int, token: str = ""):
     # Validate token
     from api.auth import validate_init_data
     if not settings.SKIP_AUTH:
-        user_id = validate_init_data(token)
+        user_id = validate_init_data(token, settings.PRIMARY_BOT_TOKEN)
         if not user_id:
             return StreamingResponse(
                 iter([f"event: error\ndata: {json.dumps({'error':'unauthorized'})}\n\n"]),

@@ -328,9 +328,9 @@ async def on_limit_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         "Who can add this bot to groups?\n\n"
-        "🔒 *Only me*: Only you can add this bot.\n"
-        "✅ *Anyone \(open\)*: Anyone can add it. They can use it but won't have owner\-level control.\n"
-        "🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group.",
+        "🔒 *Only me*: Only you can add this bot\.\n"
+        "✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\.\n"
+        "🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔒 Only me", callback_data="clone:policy:blocked")],

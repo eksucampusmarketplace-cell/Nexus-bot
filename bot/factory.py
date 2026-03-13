@@ -65,6 +65,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         start, help_handler, panel
     )
     from bot.handlers.report import report_handlers as full_report_handlers
+    from bot.handlers.admin_request import (
+        handle_admin_mention,
+        admin_request_command_handlers,
+        admin_request_callback
+    )
     from bot.handlers.automod import (
         antiflood_handler, antispam_handler, antilink_handler,
         message_handler, member_join_handler
@@ -223,6 +228,12 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     for h in full_report_handlers:
         app.add_handler(h)
 
+    # ── Admin request system (@admins mentions) ──────────────────────────
+    for h in admin_request_command_handlers:
+        app.add_handler(h)
+    # Message handler for @admins mentions (run before automod)
+    app.add_handler(MessageHandler(GROUP & filters.TEXT, handle_admin_mention), group=-1)
+
     # ── Advanced automod commands ───────────────────────────────────────
     # These are also handled by prefix_handler (!, !!) in group 0
     # But we also register specific commands here as fallback
@@ -275,11 +286,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── Help callbacks (all bots) ─────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
 
-    # ── Captcha callbacks (all bots) ──────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(handle_captcha_callback, pattern=r'^captcha:'))
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r'^captcha_verify_'))
-
-    # ── CAPTCHA message handler (before automod) ──────────────────────────
+    # ── Admin request callbacks (all bots) ────────────────────────────────
+    app.add_handler(CallbackQueryHandler(admin_request_callback, pattern=r'^admin_req:(responding|close):\d+$'))
     app.add_handler(MessageHandler(GROUP & filters.TEXT & ~filters.COMMAND, handle_captcha_message), group=0)
 
     # ── Music callbacks (all bots) ─────────────────────────────────────────

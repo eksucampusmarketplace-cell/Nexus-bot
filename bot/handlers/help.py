@@ -78,6 +78,12 @@ HELP_CATEGORIES = {
         "/admins - List admins",
         "/report - Report a message",
         "/privacy - View privacy policy",
+    ],
+    "📢 Admin Requests": [
+        "@admins - Mention to request admin help",
+        "/admin_requests - View open requests (admin)",
+        "/admin_req_stats - Request statistics (admin)",
+        "/set_admin_requests - Configure @admins (admin)",
     ]
 }
 
@@ -111,7 +117,8 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("👋 Greetings", callback_data="help_greet"), InlineKeyboardButton("🔒 Security", callback_data="help_sec")],
         [InlineKeyboardButton("📢 Channel", callback_data="help_chan"), InlineKeyboardButton("📊 Analytics", callback_data="help_ana")],
         [InlineKeyboardButton("📝 Content", callback_data="help_cont"), InlineKeyboardButton("🎮 Fun", callback_data="help_fun")],
-        [InlineKeyboardButton("🔧 Utilities", callback_data="help_util"), InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")]
+        [InlineKeyboardButton("🔧 Utilities", callback_data="help_util"), InlineKeyboardButton("📢 Admin Requests", callback_data="help_areq")],
+        [InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")]
     ]
 
     # Filter out empty rows
@@ -165,6 +172,7 @@ async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         "help_cont": "📝 Content",
         "help_fun": "🎮 Fun",
         "help_util": "🔧 Utilities",
+        "help_areq": "📢 Admin Requests",
     }
     
     cat = cat_map.get(query.data)

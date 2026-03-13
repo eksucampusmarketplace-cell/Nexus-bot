@@ -32,6 +32,12 @@ async def handle_chat_member_update(
 
     # ── Member joined ──────────────────────────────────────────────────────
     if new_status == "member" and old_status in ("left", "kicked", "restricted"):
+        # Track the member in our database
+        try:
+            from db.ops.users import upsert_user
+            await upsert_user(user.id, chat.id, user.username, user.first_name)
+        except Exception as e:
+            log.debug(f"Failed to upsert user on join: {e}")
         # Note: sometimes old_status is restricted if they were muted/restricted by bot before and left/rejoined
         
         get_settings = context.bot_data.get("get_settings")

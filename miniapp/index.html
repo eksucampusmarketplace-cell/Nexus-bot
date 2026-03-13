@@ -789,18 +789,38 @@
         }));
       } else {
         members.forEach(m => {
+          // Handle both old and new member formats
+          const userId = m.user_id || m.id;
+          const firstName = m.first_name || m.firstName || '';
+          const lastName = m.last_name || m.lastName || '';
+          const username = m.username || '';
+          const displayName = firstName || username || 'Unknown';
+          const fullName = `${firstName} ${lastName}`.trim() || displayName;
+          
+          // Handle warns (could be array or number)
+          let warnCount = 0;
+          if (Array.isArray(m.warns)) {
+            warnCount = m.warns.length;
+          } else if (typeof m.warns === 'number') {
+            warnCount = m.warns;
+          }
+
           memberList.appendChild(MemberRow({
             member: {
-              id: m.user_id,
-              name: m.first_name || m.username || 'Unknown',
-              username: m.username,
-              avatar: m.first_name?.[0]?.toUpperCase() || '?',
-              trust_score: m.trust_score,
-              message_count: m.message_count,
-              warns: Array.isArray(m.warns) ? m.warns.length : 0,
-              is_muted: m.is_muted,
-              is_banned: m.is_banned,
-              last_seen: m.last_seen
+              id: userId,
+              name: fullName,
+              first_name: firstName,
+              last_name: lastName,
+              username: username,
+              avatar: (firstName?.[0] || username?.[0] || '?').toUpperCase(),
+              trust_score: m.trust_score || m.trustScore || 50,
+              message_count: m.message_count || m.messageCount || 0,
+              warns: warnCount,
+              is_muted: m.is_muted || m.isMuted || false,
+              is_banned: m.is_banned || m.isBanned || false,
+              is_admin: m.is_admin || m.isAdmin || false,
+              is_owner: m.is_owner || m.isOwner || false,
+              last_seen: m.last_seen || m.lastSeen
             },
             selectable: true,
             onSelect: (member, selected) => {
@@ -815,10 +835,21 @@
 
     function filterMembers(query, allMembers, container) {
       const lowerQuery = query.toLowerCase();
-      const filtered = allMembers.filter(m =>
-        (m.first_name && m.first_name.toLowerCase().includes(lowerQuery)) ||
-        (m.username && m.username.toLowerCase().includes(lowerQuery))
-      );
+      const filtered = allMembers.filter(m => {
+        const firstName = m.first_name || m.firstName || '';
+        const lastName = m.last_name || m.lastName || '';
+        const username = m.username || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        
+        return (
+          (firstName && firstName.toLowerCase().includes(lowerQuery)) ||
+          (lastName && lastName.toLowerCase().includes(lowerQuery)) ||
+          (fullName && fullName.toLowerCase().includes(lowerQuery)) ||
+          (username && username.toLowerCase().includes(lowerQuery)) ||
+          (m.user_id && m.user_id.toString().includes(lowerQuery)) ||
+          (m.id && m.id.toString().includes(lowerQuery))
+        );
+      });
       renderMemberList(container, filtered);
     }
 

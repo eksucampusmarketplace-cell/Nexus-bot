@@ -383,19 +383,27 @@ export function MemberRow({ member, actions = [], selectable = false, onSelect }
 
   const info = document.createElement('div');
   info.style.cssText = 'flex:1;min-width:0';
+  
+  // Build badges HTML
+  const badges = [];
+  if (member.is_owner) badges.push(Badge('Owner', 'accent').outerHTML);
+  else if (member.is_admin) badges.push(Badge('Admin', 'info').outerHTML);
+  if (member.warns > 0) badges.push(Badge(`${member.warns} warns`, 'warning').outerHTML);
+  if (member.is_muted) badges.push(Badge('Muted', 'danger').outerHTML);
+  if (member.is_banned) badges.push(Badge('Banned', 'danger').outerHTML);
+  if (member.is_approved) badges.push(Badge('Approved', 'success').outerHTML);
+  
   info.innerHTML = `
     <div style="font-weight:var(--fw-medium);font-size:var(--text-sm);
                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
       ${member.name || `${member.first_name||''} ${member.last_name||''}`.trim()}
     </div>
-    <div style="font-size:var(--text-xs);color:var(--text-muted)">
+    <div style="font-size:var(--text-xs);color:var(--text-muted);display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap">
       ${member.username ? `@${member.username}` : `ID: ${member.id}`}
+      ${badges.join('')}
     </div>
   `;
   row.appendChild(info);
-
-  if (member.warns > 0) row.appendChild(Badge(`${member.warns} warns`, 'warning'));
-  if (member.is_approved) row.appendChild(Badge('approved', 'success'));
 
   if (actions.length) {
     const btns = document.createElement('div');

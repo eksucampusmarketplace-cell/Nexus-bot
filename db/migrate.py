@@ -16,9 +16,10 @@ Logs prefix: [MIGRATE]
 """
 
 import asyncio
+import glob
 import logging
 import os
-import glob
+import re
 
 log = logging.getLogger("migrate")
 
@@ -28,6 +29,69 @@ CREATE TABLE IF NOT EXISTS migrations_log (
     applied_at  TIMESTAMPTZ DEFAULT NOW()
 );
 """
+
+
+def split_sql_statements(sql: str) -> list:
+    """
+    Split SQL into individual statements, handling:
+    - JSON/JSONB values with semicolons inside
+    - Multiple ADD COLUMN in single ALTER TABLE
+    - Comments
+    - Arrays and other complex values
+    """
+    # Remove comments
+    lines = []
+    for line in sql.splitlines():
+        # Remove -- comments but preserve line for statement tracking
+        if '--' in line:
+            line = line[:line.index('--')]
+        lines.append(line)
+    sql = '\n'.join(lines)
+    
+    statements = []
+    current_stmt = []
+    brace_level = 0
+    in_single_quote = False
+    in_double_quote = False
+    
+    i = 0
+    while i < len(sql):
+        char = sql[i]
+        
+        # Track quote states (for string literals)
+        if char == "'" and not in_double_quote:
+            if in_single_quote and i + 1 < len(sql) and sql[i + 1] == "'":
+                # Escaped single quote
+                current_stmt.append(char)
+                current_stmt.append(sql[i + 1])
+                i += 2
+                continue
+            in_single_quote = not in_single_quote
+        elif char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+        # Track brace level for JSON/arrays (but not inside quotes)
+        elif char in '{' and not in_single_quote and not in_double_quote:
+            brace_level += 1
+        elif char in '}' and not in_single_quote and not in_double_quote:
+            brace_level -= 1
+        
+        current_stmt.append(char)
+        
+        # Statement terminator - only at top level (not inside braces or quotes)
+        if char == ';' and brace_level == 0 and not in_single_quote and not in_double_quote:
+            stmt = ''.join(current_stmt).strip()
+            if stmt:
+                statements.append(stmt)
+            current_stmt = []
+        
+        i += 1
+    
+    # Add any remaining statement
+    stmt = ''.join(current_stmt).strip()
+    if stmt:
+        statements.append(stmt)
+    
+    return [s for s in statements if s]
 
 
 async def run_migrations(pool):
@@ -59,16 +123,11 @@ async def run_migrations(pool):
                 with open(filepath, "r") as f:
                     sql = f.read()
 
-                def _strip_comments(s):
-                    lines = [l for l in s.splitlines() if not l.strip().startswith("--")]
-                    return "\n".join(lines).strip()
-
-                statements = [
-                    _strip_comments(s) for s in sql.split(";")
-                    if _strip_comments(s)
-                ]
+                # Use proper SQL splitting that handles JSON/arrays
+                statements = split_sql_statements(sql)
                 for stmt in statements:
-                    await conn.execute(stmt)
+                    if stmt.strip():
+                        await conn.execute(stmt)
 
                 await conn.execute(
                     "INSERT INTO migrations_log (filename) VALUES ($1)",

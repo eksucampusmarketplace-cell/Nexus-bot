@@ -415,6 +415,15 @@ if os.path.exists(webapp_dir):
     fastapi_app.mount("/webapp", StaticFiles(directory=webapp_dir, html=True), name="webapp")
 
 
+@fastapi_app.get("/favicon.ico")
+async def serve_favicon():
+    """Serve favicon - redirect to miniapp icon if available."""
+    favicon_path = os.path.join(os.path.dirname(__file__), "miniapp", "favicon.ico")
+    if os.path.exists(favicon_path):
+        return RedirectResponse(url="/miniapp/favicon.ico")
+    return Response(status_code=204)  # No content
+
+
 @fastapi_app.get("/", response_class=JSONResponse)
 async def health():
     db_status = "connected" if (db.pool) else "disconnected"

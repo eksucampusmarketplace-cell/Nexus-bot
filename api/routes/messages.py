@@ -34,7 +34,7 @@ async def _get_user_group_role(chat_id: int, user_id: int, bot) -> str:
         return 'none'
 
 
-def _check_message_edit_permission(chat_id: int, user: dict, key: str, bot=None):
+async def _check_message_edit_permission(chat_id: int, user: dict, key: str, bot=None):
     """
     Check if user can edit a message key.
     - Bot owner can edit any message
@@ -55,14 +55,7 @@ def _check_message_edit_permission(chat_id: int, user: dict, key: str, bot=None)
     # For group-level editing, check if user is group owner or admin
     # If we have bot available, check Telegram status
     if bot:
-        import asyncio
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        role = loop.run_until_complete(_get_user_group_role(chat_id, user_id, bot))
+        role = await _get_user_group_role(chat_id, user_id, bot)
         if role in ('owner', 'admin'):
             return True
     
@@ -95,7 +88,7 @@ async def list_messages(chat_id: int, user: dict = Depends(get_current_user)):
     result = {}
     for key in DEFAULTS:
         body = custom_messages.get(key)
-        can_edit = _check_message_edit_permission(chat_id, user, key, bot)
+        can_edit = await _check_message_edit_permission(chat_id, user, key, bot)
         result[key] = {
             "body": body if body else DEFAULTS[key],
             "isCustom": key in custom_messages,
@@ -125,7 +118,7 @@ async def get_message(chat_id: int, key: str, user: dict = Depends(get_current_u
         if not bot and bots:
             bot = list(bots.values())[0].bot
     
-    can_edit = _check_message_edit_permission(chat_id, user, key, bot)
+    can_edit = await _check_message_edit_permission(chat_id, user, key, bot)
     
     return {
         "key": key,
@@ -159,7 +152,7 @@ async def update_message(
             bot = list(bots.values())[0].bot
     
     # Check permission
-    if not _check_message_edit_permission(chat_id, user, key, bot):
+    if not await _check_message_edit_permission(chat_id, user, key, bot):
         raise HTTPException(
             status_code=403, 
             detail=f"You don't have permission to edit this message. Only bot owners can edit /start and /help messages."
@@ -207,7 +200,7 @@ async def reset_message(chat_id: int, key: str, user: dict = Depends(get_current
             bot = list(bots.values())[0].bot
     
     # Check permission
-    if not _check_message_edit_permission(chat_id, user, key, bot):
+    if not await _check_message_edit_permission(chat_id, user, key, bot):
         raise HTTPException(
             status_code=403, 
             detail=f"You don't have permission to reset this message."

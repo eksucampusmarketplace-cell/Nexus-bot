@@ -13,15 +13,14 @@ VALID_MESSAGE_KEYS = set(DEFAULTS.keys())
 MAX_BODY_LENGTH = 1000
 
 
-def _check_bot_owner(bot_id: int, user: dict):
+async def _check_bot_owner(bot_id: int, user: dict):
     """Check if user owns the bot"""
-    import asyncio
     from db.client import db
     
     if not db.pool:
         raise HTTPException(status_code=503, detail="Database not available")
     
-    bot = asyncio.get_event_loop().run_until_complete(get_bot_by_id(db.pool, bot_id))
+    bot = await get_bot_by_id(db.pool, bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
     
@@ -34,7 +33,7 @@ def _check_bot_owner(bot_id: int, user: dict):
 @router.get("")
 async def list_bot_messages(bot_id: int, user: dict = Depends(get_current_user)):
     """Get all custom messages for a bot."""
-    _check_bot_owner(bot_id, user)
+    await _check_bot_owner(bot_id, user)
     custom_messages = await get_bot_custom_messages(bot_id)
     
     result = {}
@@ -55,7 +54,7 @@ async def update_bot_message(
     user: dict = Depends(get_current_user)
 ):
     """Update a custom message for a bot."""
-    _check_bot_owner(bot_id, user)
+    await _check_bot_owner(bot_id, user)
     
     if key not in VALID_MESSAGE_KEYS:
         raise HTTPException(status_code=400, detail=f"Unknown message key: {key}")
@@ -84,7 +83,7 @@ async def update_bot_message(
 @router.delete("/{key}")
 async def reset_bot_message(bot_id: int, key: str, user: dict = Depends(get_current_user)):
     """Reset a bot message to default."""
-    _check_bot_owner(bot_id, user)
+    await _check_bot_owner(bot_id, user)
     
     if key not in VALID_MESSAGE_KEYS:
         raise HTTPException(status_code=400, detail=f"Unknown message key: {key}")

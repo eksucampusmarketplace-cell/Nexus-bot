@@ -2,20 +2,187 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from api.auth import get_current_user
 from db.client import db
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/groups/{chat_id}")
 
+
+async def _fetch_admins_from_telegram(chat_id: int) -> list:
+    """Fetch admin list from Telegram to get accurate member data."""
+    from bot.registry import get_all
+    bots = get_all()
+    if not bots:
+        return []
+
+    bot_app = None
+    for bid, app in bots.items():
+        bot_app = app
+        break
+
+    if not bot_app:
+        return []
+
+    try:
+        admins = await bot_app.bot.get_chat_administrators(chat_id)
+        return [
+            {
+                "user_id": admin.user.id,
+                "username": admin.user.username,
+                "first_name": admin.user.first_name,
+                "last_name": admin.user.last_name,
+                "is_admin": True,
+                "is_owner": admin.status == "creator",
+                "status": "creator" if admin.status == "creator" else "administrator"
+            }
+            for admin in admins
+        ]
+    except Exception as e:
+        logger.warning(f"[Members] Failed to fetch admins from Telegram for chat {chat_id}: {e}")
+        return []
+
+
 @router.get("/members")
 async def list_members(chat_id: int, user: dict = Depends(get_current_user)):
+    """
+    Get members list for a group.
+    Combines data from multiple sources: users table, boost records, and Telegram API.
+    """
+    members_map = {}
+
+    # 1. Get users from the users table (users who have sent messages)
     async with db.pool.acquire() as conn:
-        rows = await conn.fetch("SELECT * FROM users WHERE chat_id = $1 ORDER BY last_seen DESC LIMIT 100", chat_id)
-        res = []
-        for r in rows:
+        user_rows = await conn.fetch(
+            "SELECT * FROM users WHERE chat_id = $1 ORDER BY last_seen DESC LIMIT 100",
+            chat_id
+        )
+        for r in user_rows:
             d = dict(r)
-            if isinstance(d['warns'], str):
+            if isinstance(d.get('warns'), str):
                 d['warns'] = json.loads(d['warns'])
-            res.append(d)
-        return res
+            members_map[d['user_id']] = {
+                "user_id": d['user_id'],
+                "username": d.get('username'),
+                "first_name": d.get('first_name'),
+                "warns": d.get('warns', []),
+                "is_muted": d.get('is_muted', False),
+                "is_banned": d.get('is_banned', False),
+                "message_count": d.get('message_count', 0),
+                "trust_score": d.get('trust_score', 50),
+                "last_seen": d.get('last_seen'),
+                "join_date": d.get('join_date'),
+                "source": "activity"
+            }
+
+    # 2. Get members from member_boost_records (tracked via invite system)
+    async with db.pool.acquire() as conn:
+        boost_rows = await conn.fetch(
+            "SELECT user_id, username, first_name, invited_count, is_unlocked, is_restricted, created_at "
+            "FROM member_boost_records WHERE group_id = $1",
+            chat_id
+        )
+        for r in boost_rows:
+            user_id = r['user_id']
+            if user_id in members_map:
+                # Merge with existing data
+                members_map[user_id]['boost_data'] = {
+                    "invited_count": r.get('invited_count', 0),
+                    "is_unlocked": r.get('is_unlocked', True),
+                    "is_restricted": r.get('is_restricted', False)
+                }
+                # Update username/first_name if missing
+                if not members_map[user_id].get('username') and r.get('username'):
+                    members_map[user_id]['username'] = r['username']
+                if not members_map[user_id].get('first_name') and r.get('first_name'):
+                    members_map[user_id]['first_name'] = r['first_name']
+            else:
+                members_map[user_id] = {
+                    "user_id": user_id,
+                    "username": r.get('username'),
+                    "first_name": r.get('first_name'),
+                    "warns": [],
+                    "is_muted": False,
+                    "is_banned": False,
+                    "message_count": 0,
+                    "trust_score": 50,
+                    "last_seen": r.get('created_at'),
+                    "join_date": r.get('created_at'),
+                    "boost_data": {
+                        "invited_count": r.get('invited_count', 0),
+                        "is_unlocked": r.get('is_unlocked', True),
+                        "is_restricted": r.get('is_restricted', False)
+                    },
+                    "source": "boost"
+                }
+
+    # 3. Get members from force_channel_records (tracked via channel gate)
+    async with db.pool.acquire() as conn:
+        channel_rows = await conn.fetch(
+            "SELECT user_id, username, is_verified, is_restricted, last_checked "
+            "FROM force_channel_records WHERE group_id = $1",
+            chat_id
+        )
+        for r in channel_rows:
+            user_id = r['user_id']
+            if user_id in members_map:
+                members_map[user_id]['channel_data'] = {
+                    "is_verified": r.get('is_verified', False),
+                    "is_restricted": r.get('is_restricted', False)
+                }
+                if not members_map[user_id].get('username') and r.get('username'):
+                    members_map[user_id]['username'] = r['username']
+            else:
+                members_map[user_id] = {
+                    "user_id": user_id,
+                    "username": r.get('username'),
+                    "first_name": None,
+                    "warns": [],
+                    "is_muted": False,
+                    "is_banned": False,
+                    "message_count": 0,
+                    "trust_score": 50,
+                    "last_seen": r.get('last_checked'),
+                    "channel_data": {
+                        "is_verified": r.get('is_verified', False),
+                        "is_restricted": r.get('is_restricted', False)
+                    },
+                    "source": "channel_gate"
+                }
+
+    # 4. Get admin data from Telegram to enrich member info
+    admins = await _fetch_admins_from_telegram(chat_id)
+    for admin in admins:
+        user_id = admin['user_id']
+        if user_id in members_map:
+            members_map[user_id]['is_admin'] = True
+            members_map[user_id]['is_owner'] = admin.get('is_owner', False)
+            members_map[user_id]['status'] = admin.get('status')
+            if not members_map[user_id].get('username') and admin.get('username'):
+                members_map[user_id]['username'] = admin['username']
+            if not members_map[user_id].get('first_name') and admin.get('first_name'):
+                members_map[user_id]['first_name'] = admin['first_name']
+        else:
+            members_map[user_id] = {
+                "user_id": user_id,
+                "username": admin.get('username'),
+                "first_name": admin.get('first_name'),
+                "warns": [],
+                "is_muted": False,
+                "is_banned": False,
+                "message_count": 0,
+                "trust_score": 100,  # Admins have high trust
+                "is_admin": True,
+                "is_owner": admin.get('is_owner', False),
+                "status": admin.get('status'),
+                "source": "telegram_admin"
+            }
+
+    # Convert map to list and sort by last_seen (most recent first)
+    members_list = list(members_map.values())
+    members_list.sort(key=lambda x: x.get('last_seen') or '1970-01-01', reverse=True)
+
+    return members_list
 
 
 @router.get("/members/events")

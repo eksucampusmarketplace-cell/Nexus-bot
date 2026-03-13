@@ -80,6 +80,11 @@ async def _verify_bot_owner(bot_id: int, user: dict):
         raise HTTPException(status_code=403, detail="Not authorized")
 
 
+# Global store for in-progress auth sessions
+# user_id -> MusicAuthSession
+_auth_sessions = {}
+
+
 @router.post("/bots/{bot_id}/music/auth/start-phone")
 async def start_phone_auth_endpoint(
     bot_id: int,
@@ -102,6 +107,7 @@ async def start_phone_auth_endpoint(
         if not result.ok:
             raise HTTPException(status_code=400, detail=result.error)
 
+        _auth_sessions[user["id"]] = auth
         return {
             "ok": True,
             "requires_otp": True,
@@ -128,10 +134,10 @@ async def verify_otp_endpoint(
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        # In a real implementation, you'd store the auth session somewhere
-        # For now, we'll create a new one (simplified)
-        auth = MusicAuthSession(bot_id)
-        auth.phone_hash = request.phone_hash
+        auth = _auth_sessions.get(user["id"])
+        if not auth or auth.owner_bot_id != bot_id:
+            raise HTTPException(status_code=400, detail="Session expired. Please start over.")
+
         result = await complete_phone_auth(auth, request.code)
 
         if result.error == "2FA_REQUIRED":
@@ -150,9 +156,11 @@ async def verify_otp_endpoint(
             tg_user_id=result.tg_user_id,
             tg_name=result.tg_name,
             tg_username=result.tg_username,
-            encrypted_session=result.session_string
+            encrypted_session=result.session_string,
+            phone=auth.phone
         )
 
+        del _auth_sessions[user["id"]]
         return {
             "ok": True,
             "tg_name": result.tg_name,
@@ -181,10 +189,32 @@ async def verify_2fa_endpoint(
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        # Simplified - in production, you'd retrieve the stored auth session
-        auth = MusicAuthSession(bot_id)
-        # This is a placeholder - real implementation needs session storage
-        raise HTTPException(status_code=400, detail="Session expired. Please start over.")
+        auth = _auth_sessions.get(user["id"])
+        if not auth or auth.owner_bot_id != bot_id:
+            raise HTTPException(status_code=400, detail="Session expired. Please start over.")
+
+        result = await complete_phone_auth(auth, "", password=request.password)
+
+        if not result.ok:
+            raise HTTPException(status_code=400, detail=result.error)
+
+        # Save to DB
+        await db_music.save_music_userbot(
+            pool,
+            owner_bot_id=bot_id,
+            tg_user_id=result.tg_user_id,
+            tg_name=result.tg_name,
+            tg_username=result.tg_username,
+            encrypted_session=result.session_string,
+            phone=auth.phone
+        )
+
+        del _auth_sessions[user["id"]]
+        return {
+            "ok": True,
+            "tg_name": result.tg_name,
+            "tg_username": result.tg_username,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -217,6 +247,7 @@ async def start_qr_auth_endpoint(
         img_bytes = bytes.fromhex(result.session_string)
         img_b64 = base64.b64encode(img_bytes).decode()
 
+        _auth_sessions[user["id"]] = auth
         return {
             "ok": True,
             "qr_image_base64": img_b64,
@@ -241,16 +272,52 @@ async def check_qr_status_endpoint(
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        # In production, you'd retrieve the stored auth session
-        # This is a simplified version
+        auth = _auth_sessions.get(user["id"])
+        if not auth or auth.owner_bot_id != bot_id or auth.method != "qr":
+            return {
+                "ok": False,
+                "error": "Session not found",
+            }
+
+        # Non-blocking check
+        result = await check_qr_auth(auth, timeout=1)
+
+        if result.ok:
+            # Save to DB
+            await db_music.save_music_userbot(
+                pool,
+                owner_bot_id=bot_id,
+                tg_user_id=result.tg_user_id,
+                tg_name=result.tg_name,
+                tg_username=result.tg_username,
+                encrypted_session=result.session_string
+            )
+            del _auth_sessions[user["id"]]
+            return {
+                "ok": True,
+                "scanned": True,
+                "tg_name": result.tg_name,
+                "tg_username": result.tg_username,
+            }
+        
+        if result.error == "QR expired. Try again.":
+             del _auth_sessions[user["id"]]
+             return {
+                 "ok": False,
+                 "error": "QR Expired",
+             }
+
         return {
             "ok": True,
             "scanned": False,
-            "error": "Session not found",
         }
     except Exception as e:
-        logger.error(f"[MUSIC_API] QR status check failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.debug(f"[MUSIC_API] QR status check: {e}")
+        return {
+            "ok": True,
+            "scanned": False,
+        }
+
 
 
 @router.post("/bots/{bot_id}/music/auth/session-string")

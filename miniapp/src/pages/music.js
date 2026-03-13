@@ -9,7 +9,7 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, EmptyState, showToast } from '../../lib/components.js';
+import { Card, EmptyState, showToast, Modal, TabBar, Spinner, Avatar, Badge } from '../../lib/components.js';
 import { useStore } from '../../store/index.js';
 import { apiFetch } from '../../lib/api.js';
 
@@ -83,6 +83,7 @@ function renderMusicInterface(container, data, chatId, initData) {
     const secs = data.current.duration % 60;
     const duration = `${mins}:${secs.toString().padStart(2, '0')}`;
     const sourceEmoji = getSourceEmoji(data.current.type);
+    const ubText = data.userbot_id ? `<span style="color: var(--accent); margin-left: 8px;">🎭 Userbot ID: ${data.userbot_id}</span>` : '';
 
     nowPlayingCard.innerHTML = `
       <div style="
@@ -116,7 +117,7 @@ function renderMusicInterface(container, data, chatId, initData) {
             ${data.current.performer ? escapeHtml(data.current.performer) : 'Unknown Artist'}
           </div>
           <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px;">
-            ${sourceEmoji} • ⏱ ${duration} • 🔊 ${data.volume}%
+            ${sourceEmoji} • ⏱ ${duration} • 🔊 ${data.volume}% ${ubText}
           </div>
         </div>
       </div>
@@ -475,6 +476,8 @@ async function renderUserbotsSection(container, chatId) {
 }
 
 function renderUserbotsList(container, userbots, botId) {
+  const activeChatId = store.getState().activeChatId;
+  
   if (userbots.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: var(--sp-4);">
@@ -488,117 +491,347 @@ function renderUserbotsList(container, userbots, botId) {
     return;
   }
 
-  let html = `
-    <div style="display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-3);">
-      ${userbots.map(ub => `
-        <div style="
-          padding: var(--sp-3);
-          background: var(--bg-input);
-          border-radius: var(--r-lg);
-          border: 1px solid ${ub.is_banned ? 'var(--danger)' : 'var(--border)'};
-        ">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-              <div style="font-weight: var(--fw-medium);">
-                ${escapeHtml(ub.tg_name || 'Unknown')}
-                ${ub.is_banned ? '<span style="color: var(--danger); font-size: 12px;"> (BANNED)</span>' : ''}
-              </div>
-              <div style="font-size: var(--text-xs); color: var(--text-muted);">
-                @${escapeHtml(ub.tg_username || 'no username')}
-              </div>
-            </div>
-            <div style="text-align: right;">
-              <div style="font-size: var(--text-xs); color: var(--text-muted);">Risk Fee</div>
-              <div style="font-weight: var(--fw-semibold); color: var(--accent);">${ub.risk_fee || 0} ⭐</div>
-            </div>
-          </div>
-          <div style="display: flex; gap: var(--sp-2); margin-top: var(--sp-2);">
-            <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
-              onclick="window.editRiskFee(${botId}, ${ub.id}, ${ub.risk_fee || 0})">
-              💰 Set Fee
-            </button>
-            ${ub.is_banned ? `
-              <button class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" 
-                onclick="window.unbanUserbot(${botId}, ${ub.id})">
-                ✅ Unban
-              </button>
-            ` : `
-              <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px; background: none; color: var(--danger); border: 1px solid var(--danger);" 
-                onclick="window.banUserbot(${botId}, ${ub.id})">
-                🚫 Ban
-              </button>
-            `}
-            <button class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" 
-              onclick="window.deleteUserbot(${botId}, ${ub.id})">
-              🗑️
-            </button>
-          </div>
-        </div>
-      `).join('')}
-    </div>
-    <button class="btn btn-primary" style="width: 100%;" onclick="window.openUserbotGenerator(${botId})">
-      ➕ Add Another Userbot
-    </button>
-  `;
+  container.innerHTML = '';
+  
+  const list = document.createElement('div');
+  list.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-3);';
+  
+  userbots.forEach(ub => {
+    const item = document.createElement('div');
+    item.style.cssText = `
+      padding: var(--sp-3);
+      background: var(--bg-input);
+      border-radius: var(--r-lg);
+      border: 1px solid ${ub.is_banned ? 'var(--danger)' : 'var(--border)'};
+      display: flex;
+      flex-direction: column;
+      gap: var(--sp-2);
+    `;
 
-  container.innerHTML = html;
+    const top = document.createElement('div');
+    top.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
+    
+    const info = document.createElement('div');
+    info.style.cssText = 'display: flex; align-items: center; gap: var(--sp-2);';
+    info.appendChild(Avatar({ name: ub.tg_name, size: 32 }));
+    
+    const nameWrap = document.createElement('div');
+    nameWrap.innerHTML = `
+      <div style="font-weight: var(--fw-medium); font-size: var(--text-sm);">
+        ${escapeHtml(ub.tg_name || 'Unknown')}
+      </div>
+      <div style="font-size: var(--text-xs); color: var(--text-muted);">
+        ${ub.tg_username ? `@${escapeHtml(ub.tg_username)}` : 'No username'}
+      </div>
+    `;
+    info.appendChild(nameWrap);
+    
+    const stats = document.createElement('div');
+    stats.style.textAlign = 'right';
+    stats.innerHTML = `
+      <div style="font-size: var(--text-xs); color: var(--text-muted);">Fee</div>
+      <div style="font-weight: var(--fw-semibold); color: var(--accent); font-size: var(--text-sm);">${ub.risk_fee || 0} ⭐</div>
+    `;
+    
+    top.appendChild(info);
+    top.appendChild(stats);
+    item.appendChild(top);
+
+    if (ub.is_banned) {
+      const banInfo = document.createElement('div');
+      banInfo.style.cssText = 'font-size: var(--text-xs); color: var(--danger); background: var(--danger-dim); padding: var(--sp-1) var(--sp-2); border-radius: var(--r-sm);';
+      banInfo.textContent = `🚫 Banned: ${ub.ban_reason || 'No reason'}`;
+      item.appendChild(banInfo);
+    }
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display: flex; gap: var(--sp-2); flex-wrap: wrap;';
+    
+    // Assign to group button
+    const assignBtn = document.createElement('button');
+    assignBtn.className = 'btn btn-secondary';
+    assignBtn.style.cssText = 'padding: 4px 8px; font-size: 11px; flex: 1;';
+    assignBtn.textContent = '📍 Use for this Group';
+    assignBtn.onclick = () => window.assignUserbot(botId, activeChatId, ub.id);
+    actions.appendChild(assignBtn);
+
+    const feeBtn = document.createElement('button');
+    feeBtn.className = 'btn btn-secondary';
+    feeBtn.style.cssText = 'padding: 4px 8px; font-size: 11px;';
+    feeBtn.textContent = '💰 Fee';
+    feeBtn.onclick = () => window.editRiskFee(botId, ub.id, ub.risk_fee || 0);
+    actions.appendChild(feeBtn);
+
+    if (ub.is_banned) {
+      const unbanBtn = document.createElement('button');
+      unbanBtn.className = 'btn btn-secondary';
+      unbanBtn.style.cssText = 'padding: 4px 8px; font-size: 11px;';
+      unbanBtn.textContent = '✅ Unban';
+      unbanBtn.onclick = () => window.unbanUserbot(botId, ub.id);
+      actions.appendChild(unbanBtn);
+    } else {
+      const banBtn = document.createElement('button');
+      banBtn.className = 'btn btn-secondary';
+      banBtn.style.cssText = 'padding: 4px 8px; font-size: 11px; color: var(--danger);';
+      banBtn.textContent = '🚫 Ban';
+      banBtn.onclick = () => window.banUserbot(botId, ub.id);
+      actions.appendChild(banBtn);
+    }
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-secondary';
+    delBtn.style.cssText = 'padding: 4px 8px; font-size: 11px; color: var(--danger);';
+    delBtn.textContent = '🗑️';
+    delBtn.onclick = () => window.deleteUserbot(botId, ub.id);
+    actions.appendChild(delBtn);
+
+    item.appendChild(actions);
+    list.appendChild(item);
+  });
+  
+  container.appendChild(list);
+
+  const addMoreBtn = document.createElement('button');
+  addMoreBtn.className = 'btn btn-primary';
+  addMoreBtn.style.width = '100%';
+  addMoreBtn.textContent = '➕ Add Another Userbot';
+  addMoreBtn.onclick = () => window.openUserbotGenerator(botId);
+  container.appendChild(addMoreBtn);
 }
+
+window.assignUserbot = async function(botId, chatId, userbotId) {
+  try {
+    await apiFetch(`/api/music/${chatId}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify({ userbot_id: userbotId }),
+    });
+    showToast('Userbot assigned to this group!', 'success');
+  } catch (e) {
+    showToast('Failed to assign userbot', 'error');
+  }
+};
 
 // Global functions for userbot management
 window.openUserbotGenerator = async function(botId) {
-  const method = prompt('Choose auth method:\n1. Phone + OTP\n2. Session String\n\nEnter 1 or 2:', '1');
+  const content = document.createElement('div');
+  content.id = 'auth-modal-content';
   
-  if (method === '1') {
-    // Phone auth flow
-    const phone = prompt('Enter phone number (with country code, e.g. +1234567890):');
-    if (!phone) return;
+  let currentTab = 'qr';
+  let pollingInterval = null;
+
+  const renderTab = (tabId) => {
+    currentTab = tabId;
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      pollingInterval = null;
+    }
     
+    const container = content.querySelector('#tab-container');
+    container.innerHTML = '';
+    
+    if (tabId === 'qr') {
+      renderQRTab(container);
+    } else if (tabId === 'phone') {
+      renderPhoneTab(container);
+    } else if (tabId === 'session') {
+      renderSessionTab(container);
+    }
+  };
+
+  const renderQRTab = async (container) => {
+    container.innerHTML = `
+      <div style="text-align: center; padding: var(--sp-4);">
+        <div id="qr-loading">${Spinner({ size: 40 }).outerHTML}</div>
+        <div id="qr-display" style="display: none; margin-top: var(--sp-4);">
+          <img id="qr-image" style="width: 200px; height: 200px; border-radius: var(--r-lg); margin-bottom: var(--sp-4);">
+          <div style="font-size: var(--text-sm); color: var(--text-muted);">
+            Scan this QR code with your Telegram app:<br>
+            <b>Settings > Devices > Link Desktop Device</b>
+          </div>
+        </div>
+      </div>
+    `;
+
     try {
-      const result = await apiFetch(`/api/bots/${botId}/music/auth/start-phone`, {
-        method: 'POST',
-        body: JSON.stringify({ phone })
-      });
-      
-      if (result.ok && result.requires_otp) {
-        const code = prompt('Enter the OTP code sent to your phone:');
-        if (!code) return;
+      const res = await apiFetch(`/api/bots/${botId}/music/auth/start-qr`, { method: 'POST' });
+      if (res.ok) {
+        container.querySelector('#qr-loading').style.display = 'none';
+        const display = container.querySelector('#qr-display');
+        display.style.display = 'block';
+        container.querySelector('#qr-image').src = `data:image/png;base64,${res.qr_image_base64}`;
         
-        const verifyResult = await apiFetch(`/api/bots/${botId}/music/auth/verify-otp`, {
-          method: 'POST',
-          body: JSON.stringify({ code, phone_hash: result.phone_hash })
+        // Start polling
+        pollingInterval = setInterval(async () => {
+          try {
+            const status = await apiFetch(`/api/bots/${botId}/music/auth/qr-status`);
+            if (status.ok && status.scanned) {
+              clearInterval(pollingInterval);
+              showToast(`✅ Added ${status.tg_name}!`, 'success');
+              modal.close();
+              renderMusicPage(document.getElementById('page-music'));
+            } else if (status.error === 'QR Expired') {
+              clearInterval(pollingInterval);
+              renderQRTab(container); // Refresh
+            }
+          } catch (e) {
+            console.error('QR polling failed:', e);
+          }
+        }, 3000);
+      }
+    } catch (e) {
+      container.innerHTML = `<div style="color: var(--danger); text-align: center;">Failed to start QR auth: ${e.message}</div>`;
+    }
+  };
+
+  const renderPhoneTab = (container) => {
+    container.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: var(--sp-3); padding-top: var(--sp-2);">
+        <div style="font-size: var(--text-sm); color: var(--text-muted);">
+          Enter your phone number with country code.
+        </div>
+        <input type="text" id="phone-input" placeholder="+1234567890" style="
+          padding: var(--sp-3); background: var(--bg-input); border: 1px solid var(--border);
+          border-radius: var(--r-lg); color: var(--text-primary);
+        ">
+        <button id="send-otp-btn" class="btn btn-primary">Send Code</button>
+        <div id="otp-section" style="display: none; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-2);">
+          <div style="height: 1px; background: var(--border); margin: var(--sp-2) 0;"></div>
+          <div style="font-size: var(--text-sm); color: var(--text-muted);">
+            Enter the code sent to your Telegram account.
+          </div>
+          <input type="text" id="otp-input" placeholder="12345" style="
+            padding: var(--sp-3); background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: var(--r-lg); color: var(--text-primary);
+          ">
+          <button id="verify-otp-btn" class="btn btn-primary">Verify Code</button>
+        </div>
+        <div id="2fa-section" style="display: none; flex-direction: column; gap: var(--sp-3); margin-top: var(--sp-2);">
+          <div style="font-size: var(--text-sm); color: var(--text-muted);">
+            Your account has 2nd-step verification enabled.
+          </div>
+          <input type="password" id="2fa-input" placeholder="Password" style="
+            padding: var(--sp-3); background: var(--bg-input); border: 1px solid var(--border);
+            border-radius: var(--r-lg); color: var(--text-primary);
+          ">
+          <button id="verify-2fa-btn" class="btn btn-primary">Login</button>
+        </div>
+      </div>
+    `;
+
+    const phoneInput = container.querySelector('#phone-input');
+    const otpInput = container.querySelector('#otp-input');
+    const passInput = container.querySelector('#2fa-input');
+    
+    container.querySelector('#send-otp-btn').onclick = async () => {
+      const phone = phoneInput.value.trim();
+      if (!phone) return showToast('Enter phone number', 'warning');
+      
+      try {
+        const res = await apiFetch(`/api/bots/${botId}/music/auth/start-phone`, {
+          method: 'POST', body: JSON.stringify({ phone })
         });
-        
-        if (verifyResult.ok) {
-          alert('✅ Userbot added successfully!');
-          renderMusicPage(document.getElementById('page-music'));
-        } else {
-          alert('❌ Failed: ' + (verifyResult.detail || 'Unknown error'));
+        if (res.ok) {
+          container.querySelector('#otp-section').style.display = 'flex';
+          container.querySelector('#send-otp-btn').style.display = 'none';
+          phoneInput.disabled = true;
+          showToast('Code sent!', 'success');
         }
-      }
-    } catch (e) {
-      alert('❌ Error: ' + e.message);
-    }
-  } else if (method === '2') {
-    // Session string flow
-    const sessionString = prompt('Enter Pyrogram session string:');
-    if (!sessionString) return;
-    
-    try {
-      const result = await apiFetch(`/api/bots/${botId}/music/auth/session-string`, {
-        method: 'POST',
-        body: JSON.stringify({ session_string: sessionString })
-      });
+      } catch (e) { showToast(e.message, 'error'); }
+    };
+
+    container.querySelector('#verify-otp-btn').onclick = async () => {
+      const code = otpInput.value.trim();
+      if (!code) return showToast('Enter code', 'warning');
       
-      if (result.ok) {
-        alert('✅ Userbot added successfully!');
-        renderMusicPage(document.getElementById('page-music'));
-      } else {
-        alert('❌ Failed: ' + (result.detail || 'Unknown error'));
-      }
-    } catch (e) {
-      alert('❌ Error: ' + e.message);
+      try {
+        const res = await apiFetch(`/api/bots/${botId}/music/auth/verify-otp`, {
+          method: 'POST', body: JSON.stringify({ code })
+        });
+        if (res.requires_2fa) {
+          container.querySelector('#otp-section').style.display = 'none';
+          container.querySelector('#2fa-section').style.display = 'flex';
+        } else if (res.ok) {
+          showToast(`✅ Added ${res.tg_name}!`, 'success');
+          modal.close();
+          renderMusicPage(document.getElementById('page-music'));
+        }
+      } catch (e) { showToast(e.message, 'error'); }
+    };
+
+    container.querySelector('#verify-2fa-btn').onclick = async () => {
+      const password = passInput.value.trim();
+      if (!password) return showToast('Enter password', 'warning');
+      
+      try {
+        const res = await apiFetch(`/api/bots/${botId}/music/auth/verify-2fa`, {
+          method: 'POST', body: JSON.stringify({ password })
+        });
+        if (res.ok) {
+          showToast(`✅ Added ${res.tg_name}!`, 'success');
+          modal.close();
+          renderMusicPage(document.getElementById('page-music'));
+        }
+      } catch (e) { showToast(e.message, 'error'); }
+    };
+  };
+
+  const renderSessionTab = (container) => {
+    container.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: var(--sp-3); padding-top: var(--sp-2);">
+        <div style="font-size: var(--text-sm); color: var(--text-muted);">
+          Paste a Pyrogram session string.
+        </div>
+        <textarea id="session-input" rows="4" placeholder="Paste string here..." style="
+          padding: var(--sp-3); background: var(--bg-input); border: 1px solid var(--border);
+          border-radius: var(--r-lg); color: var(--text-primary); font-family: monospace; font-size: 12px;
+          resize: none;
+        "></textarea>
+        <button id="save-session-btn" class="btn btn-primary">Add Userbot</button>
+      </div>
+    `;
+    
+    container.querySelector('#save-session-btn').onclick = async () => {
+      const str = container.querySelector('#session-input').value.trim();
+      if (!str) return showToast('Paste session string', 'warning');
+      
+      try {
+        const res = await apiFetch(`/api/bots/${botId}/music/auth/session-string`, {
+          method: 'POST', body: JSON.stringify({ session_string: str })
+        });
+        if (res.ok) {
+          showToast(`✅ Added ${res.tg_name}!`, 'success');
+          modal.close();
+          renderMusicPage(document.getElementById('page-music'));
+        }
+      } catch (e) { showToast(e.message, 'error'); }
+    };
+  };
+
+  content.innerHTML = `
+    <div id="tabs-placeholder"></div>
+    <div id="tab-container" style="min-height: 280px;"></div>
+  `;
+  
+  const modal = Modal({
+    title: '🎭 Add Music Userbot',
+    content: content,
+    onClose: () => {
+      if (pollingInterval) clearInterval(pollingInterval);
     }
-  }
+  });
+
+  const tabBar = TabBar({
+    tabs: [
+      { id: 'qr', label: '📱 QR Code' },
+      { id: 'phone', label: '📞 Phone' },
+      { id: 'session', label: '📄 String' }
+    ],
+    active: currentTab,
+    onChange: renderTab
+  });
+  
+  content.querySelector('#tabs-placeholder').appendChild(tabBar);
+  renderTab(currentTab);
 };
 
 window.editRiskFee = async function(botId, userbotId, currentFee) {

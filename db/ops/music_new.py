@@ -246,21 +246,23 @@ async def upsert_music_settings(
     bot_id: int,
     play_mode: str = "all",
     announce_tracks: bool = True,
-    dj_role_id: Optional[int] = None
+    dj_role_id: Optional[int] = None,
+    userbot_id: Optional[int] = None
 ) -> Dict:
     """Create or update music settings for a chat"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO music_settings (chat_id, bot_id, play_mode, announce_tracks, dj_role_id)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO music_settings (chat_id, bot_id, play_mode, announce_tracks, dj_role_id, userbot_id)
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (chat_id, bot_id) DO UPDATE
             SET play_mode=EXCLUDED.play_mode,
                 announce_tracks=EXCLUDED.announce_tracks,
-                dj_role_id=EXCLUDED.dj_role_id
+                dj_role_id=EXCLUDED.dj_role_id,
+                userbot_id=EXCLUDED.userbot_id
             RETURNING *
             """,
-            chat_id, bot_id, play_mode, announce_tracks, dj_role_id
+            chat_id, bot_id, play_mode, announce_tracks, dj_role_id, userbot_id
         )
         return dict(row)
 

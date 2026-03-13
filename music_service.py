@@ -53,9 +53,11 @@ class MusicService:
         self.redis:    aioredis.Redis         = None
         self.db                               = None
         self.clients:  dict[int, Client]      = {}
-        # bot_id → Pyrogram client
+        # userbot_id → Pyrogram client
         self.calls:    dict[int, PyTGCalls]   = {}
-        # bot_id → PyTGCalls instance
+        # userbot_id → PyTGCalls instance
+        self.bot_clients: dict[int, list[int]] = {}
+        # bot_id → list of userbot_ids
         self.sessions: dict[tuple, dict]      = {}
         # (chat_id, bot_id) → session state dict
         self._running  = False
@@ -94,37 +96,47 @@ class MusicService:
     async def _load_clients(self):
         """Load all active userbot sessions from DB, start Pyrogram + PyTGCalls."""
         rows = await self.db.fetch(
-            "SELECT owner_bot_id, session_string, tg_name FROM music_userbots "
-            "WHERE is_active=TRUE"
+            "SELECT id, owner_bot_id, session_string, tg_name FROM music_userbots "
+            "WHERE is_active=TRUE AND is_banned=FALSE"
         )
         from bot.utils.crypto import decrypt_token
 
         for row in rows:
+            ub_id = row["id"]
             bot_id = row["owner_bot_id"]
             try:
                 raw = decrypt_token(row["session_string"])
                 client = Client(
-                    name=f"music_{bot_id}",
+                    name=f"music_{ub_id}",
                     api_id=settings.PYROGRAM_API_ID,
                     api_hash=settings.PYROGRAM_API_HASH,
                     session_string=raw,
                     in_memory=True
                 )
                 await client.start()
-                self.clients[bot_id] = client
+                self.clients[ub_id] = client
 
                 calls = PyTGCalls(client)
 
                 @calls.on_stream_end()
-                async def _on_end(_, update, b=bot_id):
-                    await self._handle_stream_end(update.chat_id, b)
+                async def _on_end(_, update, u=ub_id):
+                    # Find session for this chat and userbot
+                    chat_id = update.chat_id
+                    for (cid, bid), sess in list(self.sessions.items()):
+                        if cid == chat_id and sess.get("userbot_id") == u:
+                            await self._handle_stream_end(cid, bid)
+                            break
 
                 await calls.start()
-                self.calls[bot_id] = calls
+                self.calls[ub_id] = calls
 
-                log.info(f"[MUSIC_SVC] Client loaded | bot={bot_id} name={row['tg_name']}")
+                if bot_id not in self.bot_clients:
+                    self.bot_clients[bot_id] = []
+                self.bot_clients[bot_id].append(ub_id)
+
+                log.info(f"[MUSIC_SVC] Client loaded | ub={ub_id} bot={bot_id} name={row['tg_name']}")
             except Exception as e:
-                log.error(f"[MUSIC_SVC] Client load failed | bot={bot_id} error={e}")
+                log.error(f"[MUSIC_SVC] Client load failed | ub={ub_id} error={e}")
 
 
     def _check_ytdlp_version(self):
@@ -161,13 +173,12 @@ class MusicService:
             try:
                 # Build list of all queue keys to listen on
                 keys = []
-                for bot_id in self.clients:
-                    # We don't know all chat_ids upfront
-                    # Use a global dispatch queue per bot_id
+                for bot_id in self.bot_clients:
                     keys.append(f"music:dispatch:{bot_id}")
 
                 # Also listen on global queue (main bot's own music)
-                keys.append("music:dispatch:0")
+                if 0 not in self.bot_clients:
+                    keys.append("music:dispatch:0")
 
                 if not keys:
                     await asyncio.sleep(1)
@@ -231,6 +242,33 @@ class MusicService:
             )
 
 
+    async def _get_userbot_for_chat(self, chat_id: int, bot_id: int) -> int:
+        """Find best userbot to use for this chat."""
+        # 1. Check DB for assigned userbot
+        row = await self.db.fetchrow(
+            "SELECT userbot_id FROM music_settings WHERE chat_id=$1 AND bot_id=$2",
+            chat_id, bot_id
+        )
+        if row and row["userbot_id"] and row["userbot_id"] in self.clients:
+            return row["userbot_id"]
+
+        # 2. Check if a userbot is already active in this chat
+        key = (chat_id, bot_id)
+        if key in self.sessions and self.sessions[key].get("userbot_id"):
+            return self.sessions[key]["userbot_id"]
+
+        # 3. Pick any available userbot for this bot_id
+        ub_ids = self.bot_clients.get(bot_id, [])
+        if not ub_ids and bot_id != 0:
+             # Fallback to shared pool (bot_id 0)
+             ub_ids = self.bot_clients.get(0, [])
+
+        if ub_ids:
+            return ub_ids[0]
+
+        return 0
+
+
     async def _play(self, job: dict) -> dict:
         """Download and stream a track."""
         chat_id  = job["chat_id"]
@@ -243,6 +281,11 @@ class MusicService:
         if not track:
             return {"ok": False, "error": "Could not load track. URL may be unsupported or unavailable."}
 
+        # Select userbot
+        userbot_id = await self._get_userbot_for_chat(chat_id, bot_id)
+        if not userbot_id:
+            return {"ok": False, "error": "No music userbots available. Please add one in the Mini App."}
+
         key = (chat_id, bot_id)
         if key not in self.sessions:
             self.sessions[key] = {
@@ -254,9 +297,11 @@ class MusicService:
                 "volume":     100,
                 "np_message_id": None,
                 "idle_task":  None,
+                "userbot_id": userbot_id,
             }
 
         sess = self.sessions[key]
+        sess["userbot_id"] = userbot_id # ensure it's set
         track["requested_by"]      = job.get("requested_by")
         track["requested_by_name"] = job.get("requested_by_name")
 
@@ -400,9 +445,10 @@ class MusicService:
             sess["idle_task"].cancel()
             sess["idle_task"] = None
 
-        calls  = self.calls.get(bot_id)
+        ub_id = sess.get("userbot_id")
+        calls = self.calls.get(ub_id)
         if not calls:
-            return {"ok": False, "error": "No music client available for this bot."}
+            return {"ok": False, "error": "No music client available for this session."}
 
         try:
             try:
@@ -477,10 +523,13 @@ class MusicService:
 
 
     async def _pause(self, chat_id, bot_id) -> dict:
-        calls = self.calls.get(bot_id)
         sess  = self.sessions.get((chat_id, bot_id))
         if not sess or not sess["is_playing"]:
             return {"ok": False, "error": "Nothing playing"}
+        ub_id = sess.get("userbot_id")
+        calls = self.calls.get(ub_id)
+        if not calls:
+            return {"ok": False, "error": "No music client available"}
         try:
             await calls.pause_stream(chat_id)
             sess["is_playing"] = False
@@ -492,10 +541,13 @@ class MusicService:
 
 
     async def _resume(self, chat_id, bot_id) -> dict:
-        calls = self.calls.get(bot_id)
         sess  = self.sessions.get((chat_id, bot_id))
         if not sess or not sess["is_paused"]:
             return {"ok": False, "error": "Nothing paused"}
+        ub_id = sess.get("userbot_id")
+        calls = self.calls.get(ub_id)
+        if not calls:
+            return {"ok": False, "error": "No music client available"}
         try:
             await calls.resume_stream(chat_id)
             sess["is_playing"] = True
@@ -526,10 +578,13 @@ class MusicService:
 
     async def _set_volume(self, chat_id, bot_id, volume) -> dict:
         volume = max(0, min(200, volume))
-        calls  = self.calls.get(bot_id)
         sess   = self.sessions.get((chat_id, bot_id))
-        if not calls or not sess:
+        if not sess:
             return {"ok": False, "error": "Nothing playing"}
+        ub_id = sess.get("userbot_id")
+        calls = self.calls.get(ub_id)
+        if not calls:
+            return {"ok": False, "error": "No music client available"}
         try:
             await calls.change_volume_call(chat_id, volume)
             sess["volume"] = volume
@@ -549,12 +604,15 @@ class MusicService:
 
 
     async def _leave_vc(self, chat_id, bot_id):
-        calls = self.calls.get(bot_id)
-        if calls:
-            try:
-                await calls.leave_group_call(chat_id)
-            except Exception:
-                pass
+        sess = self.sessions.get((chat_id, bot_id))
+        if sess:
+            ub_id = sess.get("userbot_id")
+            calls = self.calls.get(ub_id)
+            if calls:
+                try:
+                    await calls.leave_group_call(chat_id)
+                except Exception:
+                    pass
 
 
     async def _stop_stream(self, chat_id, bot_id):
@@ -576,6 +634,7 @@ class MusicService:
             "is_paused":       str(sess["is_paused"]),
             "is_looping":      str(sess["is_looping"]),
             "volume":          str(sess["volume"]),
+            "userbot_id":      str(sess.get("userbot_id", 0)),
             "current_title":   current.get("title", ""),
             "current_duration":str(current.get("duration", 0)),
             "current_source":  current.get("source", ""),

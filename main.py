@@ -382,20 +382,13 @@ async def serve_webapp():
 
 
 @fastapi_app.get("/miniapp", response_class=HTMLResponse)
-async def serve_miniapp():
-    """New Vanilla JS Mini App entry point — served with no-cache headers."""
-    html_path = os.path.join(os.path.dirname(__file__), "miniapp", "index.html")
-    if os.path.exists(html_path):
-        from fastapi.responses import FileResponse
-        return FileResponse(
-            html_path,
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma":        "no-cache",
-                "Expires":       "0",
-            }
-        )
-    return RedirectResponse(url="/miniapp/")
+async def serve_miniapp(request: Request):
+    """New Vanilla JS Mini App entry point — redirect to trailing slash version."""
+    query_params = str(request.query_params)
+    url = "/miniapp/"
+    if query_params:
+        url += f"?{query_params}"
+    return RedirectResponse(url=url)
 
 
 @fastapi_app.get("/miniapp/", response_class=HTMLResponse)

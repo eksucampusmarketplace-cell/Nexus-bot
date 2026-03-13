@@ -67,5 +67,23 @@ async def get_current_user(request: Request):
         data = validate_init_data(init_data, settings.PRIMARY_BOT_TOKEN)
         return data["user"]
     except Exception as e:
+        # If primary bot token fails, try all registered clone bots
+        from bot.registry import get_all
+        registered_bots = get_all()
+        
+        for bot_id, bot_app in registered_bots.items():
+            try:
+                # Get token from the bot instance
+                bot_token = bot_app.bot.token
+                if bot_token == settings.PRIMARY_BOT_TOKEN:
+                    continue
+                data = validate_init_data(init_data, bot_token)
+                return data["user"]
+            except Exception:
+                continue
+        
         logger.error(f"Auth validation failed: {e}")
-        raise HTTPException(status_code=401, detail={"error": "Invalid initData", "code": "AUTH_FAILED"})
+        raise HTTPException(
+            status_code=401, 
+            detail={"error": "Invalid or expired initData", "code": "AUTH_FAILED"}
+        )

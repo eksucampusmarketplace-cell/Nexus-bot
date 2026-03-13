@@ -30,10 +30,7 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
     return {"user": user_data}
 
 async def get_current_user(request: Request):
-    init_data = (
-        request.headers.get("X-Telegram-Init-Data")
-        or request.headers.get("x-init-data")
-    )
+    init_data = request.headers.get("X-Telegram-Init-Data")
     if not init_data:
         if settings.SKIP_AUTH:
              return {"id": settings.OWNER_ID or 12345}

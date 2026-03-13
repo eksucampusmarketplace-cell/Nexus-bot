@@ -145,62 +145,19 @@ const COMMAND_CATEGORIES = [
  * @param {HTMLElement} container - Container element to render into
  */
 export function renderCommandsPage(container) {
+  const chatId = store.getState().activeChatId;
+  
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
-  const msgBanner = document.createElement('div');
-  msgBanner.style.cssText = `
-    background: var(--accent-dim);
-    border: 1px solid var(--accent);
-    border-radius: var(--r-lg);
-    padding: var(--sp-3) var(--sp-4);
-    margin-bottom: var(--sp-4);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-  `;
-  msgBanner.innerHTML = `
-    <div>
-      <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);color:var(--accent)">✏️ Customize Bot Messages</div>
-      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px">
-        Edit welcome, goodbye, warnings & more — with live preview
-      </div>
-    </div>
-  `;
-  const openBtn = document.createElement('button');
-  openBtn.textContent = 'Open Editor →';
-  openBtn.style.cssText = `
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--accent);
-    color: #000;
-    border: none;
-    border-radius: var(--r-lg);
-    font-size: var(--text-xs);
-    font-weight: var(--fw-semibold);
-    cursor: pointer;
-    white-space: nowrap;
-    flex-shrink: 0;
-  `;
-  openBtn.onclick = () => {
-    const store = useStore;
-    store.getState().setActivePage?.('greetings');
-    document.querySelectorAll('.page').forEach(p => {
-      p.classList.remove('active');
-      if (p.id === 'page-greetings') p.classList.add('active');
-    });
-    document.querySelectorAll('[data-page]').forEach(el => {
-      el.classList.toggle('active', el.dataset.page === 'greetings');
-    });
-    const greetingsPage = document.getElementById('page-greetings');
-    if (greetingsPage) {
-      import('../pages/greetings.js').then(({ renderGreetingsPage }) => {
-        renderGreetingsPage(greetingsPage);
-      });
-    }
-  };
-  msgBanner.appendChild(openBtn);
-  container.appendChild(msgBanner);
+  if (!chatId) {
+    container.appendChild(EmptyState({
+      icon: '👆',
+      title: 'Select a group',
+      description: 'Choose a group to see available commands'
+    }));
+    return;
+  }
 
   // Search box
   const searchContainer = document.createElement('div');

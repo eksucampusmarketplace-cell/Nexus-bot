@@ -101,6 +101,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Anti-raid and CAPTCHA migration failed: {e}")
 
+    # Run scheduling migration
+    try:
+        sched_migration_path = os.path.join(os.path.dirname(__file__), "db", "migrations", "add_scheduling.sql")
+        if os.path.exists(sched_migration_path):
+            with open(sched_migration_path, 'r') as f:
+                sched_migration_sql = f.read()
+            await pool.execute(sched_migration_sql)
+            logger.info("[STARTUP] ✅ Scheduling tables migrated")
+    except Exception as e:
+        logger.debug(f"[STARTUP] Scheduling migration info: {e}")
+
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
 
@@ -252,6 +263,15 @@ async def lifespan(app: FastAPI):
     from bot.tasks.scheduler import scheduled_post_runner
     asyncio.create_task(scheduled_post_runner(pool, registry_get))
 
+    # Start Nexus scheduler (repeat messages + silent times)
+    try:
+        from bot.scheduler.engine import NexusScheduler
+        nexus_scheduler = NexusScheduler(bot=primary_app.bot, db=pool)
+        await nexus_scheduler.start()
+        logger.info("[STARTUP] ✅ NexusScheduler started")
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ NexusScheduler failed to start: {e}")
+
     yield
 
     # Shutdown
@@ -286,6 +306,7 @@ from api.routes.auth import router as auth_router
 from api.routes.admin import router as admin_router
 from api.routes.billing import router as billing_router
 from api.routes import automod as automod_router
+from api.routes.scheduler import router as scheduler_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -307,6 +328,7 @@ fastapi_app.include_router(admin_router)
 fastapi_app.include_router(billing_router)
 fastapi_app.include_router(events.router)
 fastapi_app.include_router(automod_router.router)
+fastapi_app.include_router(scheduler_router)
 
 # Serve miniapp static files
 miniapp_dir = os.path.join(os.path.dirname(__file__), "miniapp")

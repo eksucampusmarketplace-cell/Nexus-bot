@@ -22,6 +22,7 @@ from telegram.error import TelegramError
 from db.ops.pins import (
     record_pin, get_current_pin, get_last_pin, mark_unpinned
 )
+from bot.logging.log_channel import log_event
 
 log = logging.getLogger("pins")
 
@@ -54,6 +55,14 @@ async def cmd_pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(
             f"📌 Message pinned{'(silently)' if silent else ''}."
         )
+        await log_event(
+            bot=context.bot, db=db, chat_id=chat.id,
+            event_type="pin",
+            actor=update.effective_user,
+            details={"message_id": target_id},
+            chat_title=chat.title or "",
+            bot_id=context.bot.id,
+        )
         log.info(f"[PINS] Pinned | chat={chat.id} msg={target_id}")
     except TelegramError as e:
         await msg.reply_text(f"❌ Failed to pin: {e}")
@@ -69,6 +78,13 @@ async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.unpin_chat_message(chat_id=chat.id)
         await mark_unpinned(db, chat.id)
         await msg.reply_text("✅ Message unpinned.")
+        await log_event(
+            bot=context.bot, db=db, chat_id=chat.id,
+            event_type="unpin",
+            actor=update.effective_user,
+            chat_title=chat.title or "",
+            bot_id=context.bot.id,
+        )
         log.info(f"[PINS] Unpinned | chat={chat.id}")
     except TelegramError as e:
         await msg.reply_text(f"❌ Failed to unpin: {e}")

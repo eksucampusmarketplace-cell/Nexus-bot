@@ -307,6 +307,8 @@ async def update_group_setting(pool, chat_id: int, key: str, value):
         "regex_active",
         "group_password", "password_kick_on_fail", "password_attempts",
         "password_timeout_mins",
+        "log_channel_id", "log_include_preview", "log_include_userid",
+        "inline_mode_enabled",
     }
 
     async with pool.acquire() as conn:

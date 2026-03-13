@@ -42,6 +42,7 @@ from db.ops.scheduler import (
     get_active_silent_times
 )
 from db.ops.automod import get_group_settings
+from bot.logging.log_channel import log_event
 
 log = logging.getLogger("scheduler")
 
@@ -153,6 +154,15 @@ class NexusScheduler:
 
         next_send = _calc_next_send(msg)
         await mark_sent(self.db, msg["id"], new_count, next_send)
+        await log_event(
+            bot=self.bot, db=self.db, chat_id=chat_id,
+            event_type="schedule_send",
+            details={
+                "schedule_type": msg.get("schedule_type"),
+                "message_id":    msg["id"],
+            },
+            bot_id=self.bot.id,
+        )
         log.info(
             f"[SCHEDULER] Sent | id={msg['id']} chat={chat_id} "
             f"count={new_count} next={next_send}"

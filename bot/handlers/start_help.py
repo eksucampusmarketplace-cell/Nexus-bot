@@ -119,8 +119,7 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /help handler. Works in private and group chats.
-    Always redirects to main bot + support group.
-    Shows docs link if DOCS_URL is configured.
+    Shows comprehensive command list with link to Mini App for full details.
     """
     user = update.effective_user
     chat = update.effective_chat
@@ -129,19 +128,37 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     log.info(f"[HELP] user={user.id} chat={chat.id}")
 
-    msg = await get_message(
-        key="help",
-        group_id=chat.id if chat.type != "private" else None,
-        variables={
-            "clone_name": bot_username,
-            "first_name": user.first_name,
-        },
-        db=db_pool
-    )
+    # Get miniapp URL
+    miniapp_url = settings.mini_app_url
+    if not miniapp_url and chat.type != "private":
+        miniapp_url = await get_group_miniapp_url(db_pool, chat.id)
+
+    help_text = f"""⚡ <b>Nexus Bot Commands</b>
+
+<b>📱 Open the Mini App for full command documentation</b>
+All commands are listed with detailed descriptions and usage examples.
+Configure all features deeply through the visual interface.
+
+{f'<a href="{miniapp_url}">🚀 Open Commands Panel</a>' if miniapp_url else ''}
+
+<b>🛡️ Quick Reference:</b>
+
+<b>Moderation:</b> /warn, /ban, /mute, /kick, /purge, /pin, /unpin
+<b>Security:</b> !antispam, !antiflood, !antilink, !captcha, /slowmode
+<b>Messages:</b> /setwelcome, /setgoodbye, /setrules, /setflood
+<b>Music:</b> /play, /skip, /queue, /volume, /loop
+<b>Pins:</b> /pin, /unpin, /unpinall, /repin, /editpin
+<b>Fun:</b> /afk, /poll, /dice, /coin, /8ball, /roll, /joke
+<b>Utilities:</b> /panel, /stats, /info, /admins, /rules, /id
+
+<b>💡 Tip:</b> Use /panel to open the full management interface where you can configure all features with easy-to-use controls.
+
+⚡ Powered by {settings.BOT_DISPLAY_NAME}"""
 
     await update.message.reply_text(
-        text=msg,
+        text=help_text,
         parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True,
         reply_markup=support_keyboard(include_docs=True)
     )
 

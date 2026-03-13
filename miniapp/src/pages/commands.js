@@ -33,8 +33,7 @@ const COMMAND_CATEGORIES = [
       { cmd: '/unban', args: '', desc: 'Unban a user' },
       { cmd: '/kick', args: '<reason>', desc: 'Kick a user from group' },
       { cmd: '/purge', args: '<count>', desc: 'Delete recent messages (max 100)' },
-      { cmd: '/pin', args: '', desc: 'Pin a message (reply to message)' },
-      { cmd: '/unpin', args: '', desc: 'Unpin the pinned message' },
+      { cmd: '/kickme', args: '', desc: 'Kick yourself from the group' },
     ]
   },
   {
@@ -43,15 +42,18 @@ const COMMAND_CATEGORIES = [
     description: 'Anti-spam and security features',
     icon: '🔒',
     commands: [
-      { cmd: '!antispam', args: '', desc: 'Toggle anti-spam' },
-      { cmd: '!antiflood', args: '', desc: 'Toggle anti-flood' },
-      { cmd: '!antilink', args: '', desc: 'Toggle anti-link' },
+      { cmd: '!antispam', args: '', desc: 'Toggle anti-spam protection' },
+      { cmd: '!antiflood', args: '', desc: 'Toggle anti-flood (rapid messages)' },
+      { cmd: '!antilink', args: '', desc: 'Toggle anti-link (block links)' },
       { cmd: '!captcha', args: '', desc: 'Toggle CAPTCHA verification' },
       { cmd: '!antiraid', args: '', desc: 'Toggle anti-raid mode' },
-      { cmd: '/slowmode', args: '<seconds>', desc: 'Set slow mode (0-300)' },
+      { cmd: '/slowmode', args: '<seconds>', desc: 'Set slow mode delay (0-300s)' },
       { cmd: '/setflood', args: '<number>', desc: 'Set flood message limit' },
+      { cmd: '/setpassword', args: '<password>', desc: 'Set group password for new members' },
+      { cmd: '/clearpassword', args: '', desc: 'Remove group password' },
       { cmd: '/addfilter', args: '<word>', desc: 'Add word filter' },
       { cmd: '/delfilter', args: '<word>', desc: 'Remove word filter' },
+      { cmd: '/filters', args: '', desc: 'List all active word filters' },
     ]
   },
   {
@@ -60,7 +62,7 @@ const COMMAND_CATEGORIES = [
     description: 'Welcome and goodbye messages',
     icon: '👋',
     commands: [
-      { cmd: '/setwelcome', args: '<message>', desc: 'Set welcome message' },
+      { cmd: '/setwelcome', args: '<message>', desc: 'Set welcome message for new members' },
       { cmd: '/setgoodbye', args: '<message>', desc: 'Set goodbye message' },
       { cmd: '/setrules', args: '<rules>', desc: 'Set group rules' },
       { cmd: '/welcome', args: '', desc: 'Preview welcome message' },
@@ -68,6 +70,7 @@ const COMMAND_CATEGORIES = [
       { cmd: '/rules', args: '', desc: 'Show group rules' },
       { cmd: '/resetwelcome', args: '', desc: 'Reset welcome to default' },
       { cmd: '/resetgoodbye', args: '', desc: 'Reset goodbye to default' },
+      { cmd: '/resetrules', args: '', desc: 'Reset rules to default' },
     ]
   },
   {
@@ -83,9 +86,9 @@ const COMMAND_CATEGORIES = [
       { cmd: '/skip', args: '', desc: 'Skip current track' },
       { cmd: '/stop', args: '', desc: 'Stop and clear queue' },
       { cmd: '/queue', args: '', desc: 'Show music queue' },
-      { cmd: '/volume', args: '<0-200>', desc: 'Set volume level' },
-      { cmd: '/loop', args: '', desc: 'Toggle loop mode' },
-      { cmd: '/musicmode', args: 'all|admins', desc: 'Set who can use music' },
+      { cmd: '/volume', args: '<0-200>', desc: 'Set volume level (default 100)' },
+      { cmd: '/loop', args: '', desc: 'Toggle loop current track' },
+      { cmd: '/musicmode', args: 'all|admins', desc: 'Set who can use music commands' },
     ]
   },
   {
@@ -96,17 +99,17 @@ const COMMAND_CATEGORIES = [
     commands: [
       { cmd: '/afk', args: '<reason>', desc: 'Set AFK status' },
       { cmd: '/back', args: '', desc: 'Clear AFK status' },
-      { cmd: '/poll', args: '<question>', desc: 'Create a poll' },
+      { cmd: '/poll', args: '<question>', desc: 'Create a yes/no poll' },
       { cmd: '/dice', args: '', desc: 'Roll a dice' },
       { cmd: '/coin', args: '', desc: 'Flip a coin' },
       { cmd: '/choose', args: 'opt1|opt2', desc: 'Randomly choose between options' },
-      { cmd: '/8ball', args: '<question>', desc: 'Magic 8-ball' },
-      { cmd: '/roll', args: '<max>', desc: 'Roll random number' },
+      { cmd: '/8ball', args: '<question>', desc: 'Magic 8-ball response' },
+      { cmd: '/roll', args: '<max>', desc: 'Roll random number (1-max)' },
       { cmd: '/joke', args: '', desc: 'Get a random joke' },
       { cmd: '/quote', args: '', desc: 'Get an inspirational quote' },
       { cmd: '/roast', args: '', desc: 'Playful roast (reply to someone)' },
-      { cmd: '/compliment', args: '', desc: 'Give a compliment' },
-      { cmd: '/calc', args: '<expression>', desc: 'Simple calculator' },
+      { cmd: '/compliment', args: '', desc: 'Give a compliment (reply to someone)' },
+      { cmd: '/calc', args: '<expression>', desc: 'Simple calculator (e.g., 5 + 3)' },
     ]
   },
   {
@@ -115,12 +118,71 @@ const COMMAND_CATEGORIES = [
     description: 'Advanced administration tools',
     icon: '⚡',
     commands: [
-      { cmd: '/announce', args: '<message>', desc: 'Send announcement' },
-      { cmd: '/pinmessage', args: '<text>', desc: 'Pin custom message' },
-      { cmd: '/admininfo', args: '', desc: 'Show detailed group info' },
+      { cmd: '/announce', args: '<message>', desc: 'Send announcement to group' },
+      { cmd: '/pinmessage', args: '<text>', desc: 'Create and pin custom message' },
+      { cmd: '/admininfo', args: '', desc: 'Show detailed group information' },
       { cmd: '/exportsettings', args: '', desc: 'Export settings as JSON' },
-      { cmd: '/importsettings', args: '<json>', desc: 'Import settings' },
-      { cmd: '/filters', args: '', desc: 'List word filters' },
+      { cmd: '/importsettings', args: '<json>', desc: 'Import settings from JSON' },
+      { cmd: '/backup', args: '', desc: 'Create group backup' },
+      { cmd: '/cleardata', args: '', desc: 'Clear bot data for group' },
+      { cmd: '/admintimeout', args: '<user> <mins>', desc: 'Timeout a user temporarily' },
+    ]
+  },
+  {
+    id: 'pins',
+    title: '📌 Pin Management',
+    description: 'Advanced pin management commands',
+    icon: '📌',
+    commands: [
+      { cmd: '/pin', args: '[silent]', desc: 'Pin replied message (silent=no notify)' },
+      { cmd: '/unpin', args: '', desc: 'Unpin current pinned message' },
+      { cmd: '/unpinall', args: '', desc: 'Unpin all messages in group' },
+      { cmd: '/repin', args: '', desc: 'Re-pin the last pinned message' },
+      { cmd: '/editpin', args: '<text>', desc: 'Edit the pinned message text' },
+      { cmd: '/delpin', args: '', desc: 'Delete the pinned message' },
+      { cmd: '/pinmsg', args: '[silent]', desc: 'Alias for /pin' },
+      { cmd: '/unpinmsg', args: '', desc: 'Alias for /unpin' },
+    ]
+  },
+  {
+    id: 'channel',
+    title: '📢 Channel Management',
+    description: 'Channel posting and scheduling',
+    icon: '📢',
+    commands: [
+      { cmd: '/channelpost', args: '<message>', desc: 'Post to linked channel' },
+      { cmd: '/schedulepost', args: '<time> <message>', desc: 'Schedule a channel post' },
+      { cmd: '/approvepost', args: '', desc: 'Approve scheduled post' },
+      { cmd: '/cancelpost', args: '', desc: 'Cancel scheduled post' },
+      { cmd: '/editpost', args: '<post_id> <message>', desc: 'Edit scheduled post' },
+      { cmd: '/deletepost', args: '<post_id>', desc: 'Delete scheduled post' },
+    ]
+  },
+  {
+    id: 'economy',
+    title: '⭐ Economy',
+    description: 'Stars economy system',
+    icon: '⭐',
+    commands: [
+      { cmd: '/redeem', args: '<code>', desc: 'Redeem a promo code' },
+      { cmd: '/referral', args: '', desc: 'Get referral link and stats' },
+      { cmd: '/mystars', args: '', desc: 'Show Stars balance and purchases' },
+    ]
+  },
+  {
+    id: 'public',
+    title: '👥 Public Commands',
+    description: 'Commands for all group members',
+    icon: '👥',
+    commands: [
+      { cmd: '/rules', args: '', desc: 'Show group rules' },
+      { cmd: '/time', args: '', desc: 'Show current group time' },
+      { cmd: '/id', args: '', desc: 'Get your user ID and chat ID' },
+      { cmd: '/report', args: '<reason>', desc: 'Report a message to admins (reply)' },
+      { cmd: '/adminlist', args: '', desc: 'List all group admins' },
+      { cmd: '/staff', args: '', desc: 'Alias for /adminlist' },
+      { cmd: '/invitelink', args: '', desc: 'Get group invite link' },
+      { cmd: '/groupinfo', args: '', desc: 'Show group statistics and features' },
     ]
   },
   {
@@ -129,13 +191,12 @@ const COMMAND_CATEGORIES = [
     description: 'General utility commands',
     icon: '🔧',
     commands: [
-      { cmd: '/panel', args: '', desc: 'Open mini app panel' },
-      { cmd: '/help', args: '', desc: 'Show help message' },
-      { cmd: '/id', args: '', desc: 'Get chat and user IDs' },
-      { cmd: '/info', args: '', desc: 'Show group information' },
-      { cmd: '/admins', args: '', desc: 'List group admins' },
+      { cmd: '/panel', args: '', desc: 'Open mini app management panel' },
+      { cmd: '/help', args: '', desc: 'Show help message with command list' },
+      { cmd: '/info', args: '', desc: 'Show basic group information' },
+      { cmd: '/admins', args: '', desc: 'List group admins (alias)' },
       { cmd: '/stats', args: '', desc: 'Show group statistics' },
-      { cmd: '/report', args: '', desc: 'Report a message' },
+      { cmd: '/privacy', args: '', desc: 'View privacy policy' },
     ]
   }
 ];
@@ -146,7 +207,7 @@ const COMMAND_CATEGORIES = [
  */
 export function renderCommandsPage(container) {
   const chatId = store.getState().activeChatId;
-  
+
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
@@ -159,13 +220,34 @@ export function renderCommandsPage(container) {
     return;
   }
 
+  // Header with description
+  const header = document.createElement('div');
+  header.style.cssText = 'margin-bottom: var(--sp-6);';
+  header.innerHTML = `
+    <div style="
+      background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.1), rgba(var(--accent-rgb), 0.05));
+      border: 1px solid rgba(var(--accent-rgb), 0.2);
+      border-radius: var(--r-xl);
+      padding: var(--sp-5);
+      margin-bottom: var(--sp-4);
+    ">
+      <div style="font-size: 24px; margin-bottom: var(--sp-2);">📚 <b>Complete Command Reference</b></div>
+      <div style="color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6;">
+        All available bot commands with detailed descriptions and usage examples.
+        <br><br>
+        <b>🔧 Deep Configuration:</b> Use the <a href="#automod" style="color: var(--accent);">AutoMod</a>, <a href="#settings" style="color: var(--accent);">Settings</a>, and <a href="#modules" style="color: var(--accent);">Modules</a> pages for advanced configuration options that go beyond simple commands.
+      </div>
+    </div>
+  `;
+  container.appendChild(header);
+
   // Search box
   const searchContainer = document.createElement('div');
   searchContainer.style.cssText = 'margin-bottom: var(--sp-4);';
   searchContainer.innerHTML = `
-    <input 
-      type="text" 
-      id="cmd-search" 
+    <input
+      type="text"
+      id="cmd-search"
       placeholder="🔍 Search commands..."
       class="input"
       style="

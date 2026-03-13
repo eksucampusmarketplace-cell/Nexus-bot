@@ -82,36 +82,52 @@ HELP_CATEGORIES = {
 }
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from config import settings
+
+    # Get miniapp URL
+    miniapp_url = settings.mini_app_url
+
     if context.args:
         arg = context.args[0].lower()
         if arg == "modules":
             await help_modules(update, context)
             return
-        
+
         # Check if it is a category
         for cat, cmds in HELP_CATEGORIES.items():
             if arg in cat.lower():
                 text = f"⚡ *Nexus Help: {cat}*\n\n" + "\n".join(cmds)
-                await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+                text += f"\n\n📱 <a href=\"{miniapp_url}\">Open Mini App for detailed configuration</a>" if miniapp_url else ""
+                await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
                 return
-        
+
         # Check if it is a command
-        await update.message.reply_text(f"Detailed help for `{arg}` is coming soon.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"Detailed help for `{arg}` is coming soon. Use the Mini App for complete command documentation.", parse_mode=ParseMode.MARKDOWN)
         return
 
     keyboard = [
+        [InlineKeyboardButton("📱 Open Mini App", url=miniapp_url)] if miniapp_url else [],
         [InlineKeyboardButton("🛡️ Moderation", callback_data="help_mod"), InlineKeyboardButton("🚫 Anti-Spam", callback_data="help_spam")],
         [InlineKeyboardButton("👋 Greetings", callback_data="help_greet"), InlineKeyboardButton("🔒 Security", callback_data="help_sec")],
         [InlineKeyboardButton("📢 Channel", callback_data="help_chan"), InlineKeyboardButton("📊 Analytics", callback_data="help_ana")],
         [InlineKeyboardButton("📝 Content", callback_data="help_cont"), InlineKeyboardButton("🎮 Fun", callback_data="help_fun")],
         [InlineKeyboardButton("🔧 Utilities", callback_data="help_util"), InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")]
     ]
+
+    # Filter out empty rows
+    keyboard = [row for row in keyboard if row]
+
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
+
+    help_text = "⚡ *Nexus Help System*\n\nChoose a category or open the Mini App for detailed configuration:\n\n" + (
+        f"📱 Full command documentation with descriptions and examples available in the [Mini App]({miniapp_url})" if miniapp_url else ""
+    )
+
     await update.message.reply_text(
-        "⚡ *Nexus Help System*\n\nChoose a category:",
+        help_text,
         reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.MARKDOWN,
+        disable_web_page_preview=True
     )
 
 async def help_modules(update: Update, context: ContextTypes.DEFAULT_TYPE):

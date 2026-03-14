@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
@@ -90,3 +91,26 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 log.error(f"Failed to delete locked message: {e}")
 
     # TODO: Add filter and blacklist checks here
+
+    # Award XP for sending a message (non-blocking)
+    try:
+        from bot.engagement.xp import award_xp
+        pool = context.bot_data.get("db") or context.bot_data.get("db_pool")
+        redis = context.bot_data.get("redis")
+        bot_info = context.bot_data.get("cached_bot_info", {})
+        bot_id = bot_info.get("id", 0)
+        if pool and bot_id:
+            asyncio.create_task(
+                award_xp(
+                    pool=pool,
+                    redis=redis,
+                    bot=context.bot,
+                    chat_id=chat_id,
+                    user_id=user_id,
+                    bot_id=bot_id,
+                    amount=1,
+                    reason="message",
+                )
+            )
+    except Exception:
+        pass

@@ -58,10 +58,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     )
 
     # ── Import all handlers ───────────────────────────────────────────────
-    from pyrogram import Client
-
-    import db.ops.music_new as db_music
-    from bot.handlers.adduserbot import adduserbot_conversation
     from bot.handlers.admin_request import (
         admin_request_callback,
         admin_request_command_handlers,
@@ -126,20 +122,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         warn_handler,
         warns_handler,
     )
-
-    # OLD MUSIC SYSTEM IMPORTS - REPLACED BY NEW STREAMING SYSTEM
-    # from bot.handlers.music import (
-    #     play_command, skip_command, queue_command, stop_command,
-    #     pause_command, resume_command, nowplaying_command,
-    #     music_callback_handler
-    # )
-    # from bot.handlers.music_advanced import (
-    #     play_youtube_command, volume_command, repeat_command,
-    #     shuffle_command, playlist_create_command, playlist_list_command,
-    #     playlist_play_command, playlist_delete_command, history_command,
-    #     search_command, sync_command, music_settings_command,
-    #     music_advanced_callback_handler
-    # )
+    from bot.handlers.engagement import engagement_handlers
     from bot.handlers.errors import error_handler as global_error_handler
     from bot.handlers.fun import fun_handlers
     from bot.handlers.greetings import (
@@ -161,7 +144,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.group_lifecycle import group_lifecycle_handler
     from bot.handlers.help import help_callback_handler
     from bot.handlers.help import help_handler as nexus_help_handler
-    from bot.handlers.music_new import music_handlers as new_music_handlers
     from bot.handlers.new_member import handle_chat_member_update
     from bot.handlers.prefix_handler import prefix_handler
     from bot.handlers.privacy import privacy_handler
@@ -171,9 +153,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Import new start_help and setmessage handlers (for all bots)
     from bot.handlers.start_help import help_handler, start_callback_handler, start_handler
 
-    # ── Music setup ────────────────────────────────────────────────────────
-    # Initialize music worker for this bot if userbot configured
-    from bot.userbot.music_worker import MusicWorker
     from bot.utils.alerts import alert_error
     from bot.utils.aliases import register_aliases
     from bot.utils.crypto import decrypt_token
@@ -181,20 +160,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     app.bot_data["is_primary"] = is_primary
 
-    # Store DB pool for later use
-    # This will be set by main.py before calling setup_music_worker
-
     # ── PM Tracking ────────────────────────────────────────────────────────
     app.add_handler(MessageHandler(filters.ChatType.PRIVATE, track_pm_handler), group=-1)
-
-    # Music commands handler for new streaming system
-    for h in new_music_handlers:
-        app.add_handler(h)
-
-    # Register /adduserbot on PRIMARY bot only
-    if is_primary:
-        app.add_handler(adduserbot_conversation)
-        logger.info(f"[FACTORY] AddUserbot handler registered (primary bot only)")
 
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(
@@ -218,7 +185,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("captchamode", cmd_captchamode, filters=GROUP))
 
     # ── Basic commands (all bots) ─────────────────────────────────────────
-    # Use the new start_help handlers for all bots
     app.add_handler(start_handler)  # /start from start_help.py
     app.add_handler(help_handler)  # /help from start_help.py
     app.add_handler(privacy_handler)  # /privacy from privacy.py
@@ -308,47 +274,24 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Message handler for message_guard (checks locks, filters, etc.)
     app.add_handler(MessageHandler(GROUP & filters.ALL, message_guard), group=0)
 
-    # ── Full report system (replaces stub report_handler for new commands) ──
+    # ── Full report system ─────────────────────────────────────────────────
     for h in full_report_handlers:
         app.add_handler(h)
 
     # ── Admin request system (@admins mentions) ──────────────────────────
     for h in admin_request_command_handlers:
         app.add_handler(h)
-    # Message handler for @admins mentions (run before automod)
     app.add_handler(MessageHandler(GROUP & filters.TEXT, handle_admin_mention), group=-1)
 
     # ── Advanced automod commands ───────────────────────────────────────
-    # These are also handled by prefix_handler (!, !!) in group 0
-    # But we also register specific commands here as fallback
     app.add_handler(
         MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_automod_command), group=2
     )
 
-    # ── Music commands (groups only) ───────────────────────────────────────
-    # OLD MUSIC SYSTEM - REPLACED BY NEW STREAMING SYSTEM
-    # app.add_handler(CommandHandler("play",           play_command,           filters=GROUP))
-    # app.add_handler(CommandHandler("skip",           skip_command,           filters=GROUP))
-    # app.add_handler(CommandHandler("queue",          queue_command,          filters=GROUP))
-    # app.add_handler(CommandHandler("stop",           stop_command,           filters=GROUP))
-    # app.add_handler(CommandHandler("pause",          pause_command,          filters=GROUP))
-    # app.add_handler(CommandHandler("resume",         resume_command,         filters=GROUP))
-    # app.add_handler(CommandHandler("nowplaying",     nowplaying_command,     filters=GROUP))
-
-    # ── Advanced music commands (groups only) ─────────────────────────────
-    # OLD MUSIC SYSTEM - REPLACED BY NEW STREAMING SYSTEM
-    # app.add_handler(CommandHandler("play_youtube",   play_youtube_command,   filters=GROUP))
-    # app.add_handler(CommandHandler("volume",         volume_command,         filters=GROUP))
-    # app.add_handler(CommandHandler("repeat",         repeat_command,         filters=GROUP))
-    # app.add_handler(CommandHandler("shuffle",        shuffle_command,        filters=GROUP))
-    # app.add_handler(CommandHandler("playlist_create", playlist_create_command, filters=GROUP))
-    # app.add_handler(CommandHandler("playlist_list",   playlist_list_command,   filters=GROUP))
-    # app.add_handler(CommandHandler("playlist_play",   playlist_play_command,   filters=GROUP))
-    # app.add_handler(CommandHandler("playlist_delete", playlist_delete_command, filters=GROUP))
-    # app.add_handler(CommandHandler("history",        history_command,        filters=GROUP))
-    # app.add_handler(CommandHandler("search",         search_command,         filters=GROUP))
-    # app.add_handler(CommandHandler("sync",           sync_command,           filters=GROUP))
-    # app.add_handler(CommandHandler("music_settings", music_settings_command, filters=GROUP))
+    # ── Engagement commands (XP, rep, badges, network) ────────────────────
+    for h in engagement_handlers:
+        app.add_handler(h)
+    logger.info(f"[FACTORY] Engagement handlers registered")
 
     # ── Clone commands — PRIMARY BOT ONLY ─────────────────────────────────
     if is_primary:
@@ -359,12 +302,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
             myclones_command_handler,
         )
 
-        # ConversationHandler for /clone flow (must be added before other clone handlers)
         app.add_handler(clone_conversation)
-        # Non-conversation commands
         app.add_handler(CommandHandler("myclones", myclones_command_handler, filters=PRIVATE))
         app.add_handler(CommandHandler("cloneset", cloneset_handler, filters=PRIVATE))
-        # Management callbacks outside of conversation (remove, confirm_remove, keep)
         app.add_handler(
             CallbackQueryHandler(
                 clone_management_callback, pattern=r"^clone:(remove|confirm_remove|keep)$"
@@ -376,7 +316,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # ── Help callbacks (all bots) ─────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r"^help_"))
-    app.add_handler(start_callback_handler)  # For start_clone and help_main buttons
+    app.add_handler(start_callback_handler)
 
     # ── Admin request callbacks (all bots) ────────────────────────────────
     app.add_handler(
@@ -385,12 +325,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(
         MessageHandler(GROUP & filters.TEXT & ~filters.COMMAND, handle_captcha_message), group=0
     )
-
-    # ── Music callbacks (all bots) ─────────────────────────────────────────
-    # OLD MUSIC SYSTEM - REPLACED BY NEW STREAMING SYSTEM
-    # app.add_handler(CallbackQueryHandler(music_callback_handler, pattern=r'^music:skip|stop|queue|pause'))
-    # app.add_handler(CallbackQueryHandler(music_advanced_callback_handler, pattern=r'^music:vol|repeat|shuffle'))
-    # New music system uses callbacks with pattern=r'^music:' from music_handlers
 
     # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
     app.add_handler(MessageHandler(GROUP & filters.ALL, antiflood_handler), group=1)
@@ -405,8 +339,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Advanced member join/leave handler
     app.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
 
-    # ── Global error handler with alert ─────────────────────────────────────
-    # Group lifecycle - on ALL bots
+    # ── Group lifecycle ────────────────────────────────────────────────────
     app.add_handler(group_lifecycle_handler)
 
     # Clone approval callbacks (PRIMARY bot only)
@@ -426,7 +359,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         )
         log.error(f"[ERROR] {error_str[:500]}")
 
-        # Try to get bot username for alert
         try:
             me = await context.bot.get_me()
             chat_id = update.effective_chat.id if update and update.effective_chat else 0
@@ -434,13 +366,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         except Exception:
             pass
 
-        # Call original error handler
         try:
             await global_error_handler(update, context)
         except Exception:
             pass
 
-        # Try to notify user something went wrong
         try:
             if update and update.effective_message:
                 from bot.utils.messages import DEFAULTS
@@ -580,63 +510,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
     return app
-
-
-async def setup_music_worker(app, bot_id: int, is_primary: bool, db):
-    """
-    Load music userbot from DB and attach MusicWorker to app.bot_data.
-    For primary bot: load all accounts in pool (MUSIC_WORKER_COUNT).
-    For clone bots: load their single account if configured.
-    If no account found: set music_worker = None (commands show setup instructions).
-    """
-    import logging
-
-    from pyrogram import Client
-
-    from bot.userbot.music_worker import MusicWorker
-    from bot.utils.crypto import decrypt_token
-    from config import settings
-
-    logger = logging.getLogger(__name__)
-
-    if not db:
-        app.bot_data["music_worker"] = None
-        return
-
-    owner_id = 0 if is_primary else bot_id
-    rows = await db.fetch(
-        "SELECT * FROM music_userbots WHERE owner_bot_id=$1 AND is_active=TRUE LIMIT 1", owner_id
-    )
-
-    if not rows:
-        app.bot_data["music_worker"] = None
-        logger.info(f"[MUSIC] No userbot configured | bot={bot_id}")
-        return
-
-    row = rows[0]
-    try:
-        # Check if Pyrogram credentials are configured
-        if not settings.PYROGRAM_API_ID or not settings.PYROGRAM_API_HASH:
-            logger.warning(f"[MUSIC] Pyrogram credentials not configured | bot={bot_id}")
-            app.bot_data["music_worker"] = None
-            return
-
-        raw_session = decrypt_token(row["session_string"])
-        pyro_client = Client(
-            name=f"music_{bot_id}",
-            api_id=settings.PYROGRAM_API_ID,
-            api_hash=settings.PYROGRAM_API_HASH,
-            session_string=raw_session,
-            in_memory=True,
-        )
-        await pyro_client.start()
-        worker = MusicWorker(pyro_client, bot_id, db)
-        await worker.start()
-        app.bot_data["music_worker"] = worker
-        logger.info(f"[MUSIC] Worker ready | bot={bot_id} account={row['tg_name']}")
-    except Exception as e:
-        logger.error(f"[MUSIC] Worker startup failed | bot={bot_id} error={e}")
-        app.bot_data["music_worker"] = None
 
 
 # Keep backward compatibility

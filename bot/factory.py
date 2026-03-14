@@ -121,7 +121,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.booster import register_handlers as register_booster_handlers
 
     # Import new start_help and setmessage handlers (for all bots)
-    from bot.handlers.start_help import start_handler, help_handler
+    from bot.handlers.start_help import start_handler, help_handler, start_callback_handler
     from bot.handlers.setmessage import setmessage_conversation
     from bot.handlers.privacy import privacy_handler
     from bot.handlers.fun import fun_handlers
@@ -288,6 +288,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # ── Help callbacks (all bots) ─────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r'^help_'))
+    app.add_handler(start_callback_handler)  # For start_clone and help_main buttons
 
     # ── Admin request callbacks (all bots) ────────────────────────────────
     app.add_handler(CallbackQueryHandler(admin_request_callback, pattern=r'^admin_req:(responding|close):\d+$'))

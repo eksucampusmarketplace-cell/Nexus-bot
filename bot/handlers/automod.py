@@ -1,14 +1,16 @@
 import logging
+from datetime import datetime, timedelta
+
 from telegram import Update, constants
 from telegram.ext import ContextTypes
+
 from db.ops.groups import get_group, upsert_group
 from db.ops.users import increment_message_count, upsert_user
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 # Simple in-memory flood tracking
-flood_data = {} # {chat_id: {user_id: [timestamps]}}
+flood_data = {}  # {chat_id: {user_id: [timestamps]}}
 
 # Default automod settings (same as in db/ops/groups.py)
 DEFAULT_AUTOMOD = {
@@ -16,38 +18,39 @@ DEFAULT_AUTOMOD = {
     "antispam": {"enabled": True, "threshold": 3, "action": "warn"},
     "antilink": {"enabled": False, "whitelist": ["github.com", "stackoverflow.com"]},
     "captcha": {"enabled": True, "timeout": 120, "action": "kick"},
-    "antibot": {"enabled": True, "min_age_days": 7}
+    "antibot": {"enabled": True, "min_age_days": 7},
 }
 
 DEFAULT_SETTINGS = {
     "automod": DEFAULT_AUTOMOD,
-    "welcome": {"enabled": True, "text": "👋 Welcome {first_name}!", "delete_after": 60}
+    "welcome": {"enabled": True, "text": "👋 Welcome {first_name}!", "delete_after": 60},
 }
+
 
 def get_setting(settings: dict, *keys, default=None, modules=None):
     """
     Safely get nested settings value with fallback to defaults.
     Also checks the modules dict for module-based settings.
-    
+
     Module naming convention (prefix_handler.py):
       - antiflood -> module: antiflood
-      - antispam -> module: antispam  
+      - antispam -> module: antispam
       - antilink -> module: antilink
       - captcha -> module: captcha
       - antiraid -> module: anti_raid
     """
     # Map settings keys to module names
     module_key_map = {
-        'antiflood': 'antiflood',
-        'antispam': 'antispam',
-        'antilink': 'antilink',
-        'captcha': 'captcha',
-        'antibot': 'antibot',
-        'antiraid': 'anti_raid',
-        'welcome': 'welcome_message',
-        'goodbye': 'goodbye_message',
+        "antiflood": "antiflood",
+        "antispam": "antispam",
+        "antilink": "antilink",
+        "captcha": "captcha",
+        "antibot": "antibot",
+        "antiraid": "anti_raid",
+        "welcome": "welcome_message",
+        "goodbye": "goodbye_message",
     }
-    
+
     # First check if this is a module-controlled setting
     if modules and len(keys) >= 1:
         setting_key = keys[0]
@@ -63,9 +66,9 @@ def get_setting(settings: dict, *keys, default=None, modules=None):
                     else:
                         return default
                 if isinstance(default_value, dict):
-                    return {**default_value, 'enabled': False}
+                    return {**default_value, "enabled": False}
                 return default_value
-    
+
     value = settings
     for key in keys:
         if isinstance(value, dict) and key in value:
@@ -81,6 +84,7 @@ def get_setting(settings: dict, *keys, default=None, modules=None):
             return default_value
     return value if value is not None else default
 
+
 async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or update.effective_chat.type == "private":
         return
@@ -90,13 +94,16 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
 
     # Track stats
-    await upsert_user(user_id, chat_id, update.effective_user.username, update.effective_user.first_name)
+    await upsert_user(
+        user_id, chat_id, update.effective_user.username, update.effective_user.first_name
+    )
     await increment_message_count(user_id, chat_id)
 
     # ── Trust Score: recalculate on every message ─────────────────────
     if db_pool:
         try:
-            from bot.utils.trust_score import calculate_trust_score, apply_trust_consequences
+            from bot.utils.trust_score import apply_trust_consequences, calculate_trust_score
+
             score = await calculate_trust_score(user_id, chat_id, db_pool)
             await apply_trust_consequences(user_id, chat_id, score, context)
         except Exception as _te:
@@ -108,25 +115,27 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await upsert_group(chat_id, update.effective_chat.title, "")
         return
 
-    settings = group.get('settings') or {}
-    modules = group.get('modules') or {}
+    settings = group.get("settings") or {}
+    modules = group.get("modules") or {}
 
     # ── Advanced Automod Engine Check ───────────────────────────────────
     # Call the new advanced automod engine first
     from bot.automod.engine import check_message
+
     result = await check_message(update, context)
     if result.violated:
         return  # Message handled by engine
 
     # ── Legacy automod (for backward compatibility) ──────────────
     # 1. Anti-link
-    antilink = get_setting(settings, 'automod', 'antilink', modules=modules)
-    if antilink['enabled'] and update.message.text:
+    antilink = get_setting(settings, "automod", "antilink", modules=modules)
+    if antilink["enabled"] and update.message.text:
         import re
-        links = re.findall(r'(https?://[^\s]+)', update.message.text)
+
+        links = re.findall(r"(https?://[^\s]+)", update.message.text)
         for link in links:
             whitelisted = False
-            for domain in antilink['whitelist']:
+            for domain in antilink["whitelist"]:
                 if domain in link:
                     whitelisted = True
                     break
@@ -135,15 +144,17 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
     # 2. Anti-flood
-    antiflood = get_setting(settings, 'automod', 'antiflood', modules=modules)
-    if antiflood['enabled']:
+    antiflood = get_setting(settings, "automod", "antiflood", modules=modules)
+    if antiflood["enabled"]:
         now = datetime.now()
-        if chat_id not in flood_data: flood_data[chat_id] = {}
-        if user_id not in flood_data[chat_id]: flood_data[chat_id][user_id] = []
+        if chat_id not in flood_data:
+            flood_data[chat_id] = {}
+        if user_id not in flood_data[chat_id]:
+            flood_data[chat_id][user_id] = []
 
         timestamps = flood_data[chat_id][user_id]
-        window = antiflood['window']
-        limit = antiflood['limit']
+        window = antiflood["window"]
+        limit = antiflood["limit"]
 
         # Clean old timestamps
         timestamps = [t for t in timestamps if now - t < timedelta(seconds=window)]
@@ -151,16 +162,22 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         flood_data[chat_id][user_id] = timestamps
 
         if len(timestamps) > limit:
-            action = antiflood['action']
-            duration = antiflood['duration']
+            action = antiflood["action"]
+            duration = antiflood["duration"]
             until = now + timedelta(seconds=duration)
 
             if action == "mute":
-                await context.bot.restrict_chat_member(chat_id, user_id, permissions={"can_send_messages": False}, until_date=until)
-                await update.message.reply_text(f"🔇 {update.effective_user.first_name} muted for flooding.")
+                await context.bot.restrict_chat_member(
+                    chat_id, user_id, permissions={"can_send_messages": False}, until_date=until
+                )
+                await update.message.reply_text(
+                    f"🔇 {update.effective_user.first_name} muted for flooding."
+                )
             elif action == "kick":
                 await context.bot.unban_chat_member(chat_id, user_id)
-                await update.message.reply_text(f"👢 {update.effective_user.first_name} kicked for flooding.")
+                await update.message.reply_text(
+                    f"👢 {update.effective_user.first_name} kicked for flooding."
+                )
             return
 
 
@@ -171,45 +188,47 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not update.message:
         return
-    
+
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    
+
     group = await get_group(chat_id)
     if not group:
         return
-    
-    settings = group.get('settings') or {}
-    modules = group.get('modules') or {}
+
+    settings = group.get("settings") or {}
+    modules = group.get("modules") or {}
     # Ensure automod settings exist with defaults
-    if 'automod' not in settings:
+    if "automod" not in settings:
         settings = dict(settings)
-        settings['automod'] = DEFAULT_AUTOMOD
-    antiflood = get_setting(settings, 'automod', 'antiflood', modules=modules)
-    
-    if antiflood['enabled']:
+        settings["automod"] = DEFAULT_AUTOMOD
+    antiflood = get_setting(settings, "automod", "antiflood", modules=modules)
+
+    if antiflood["enabled"]:
         now = datetime.now()
         if chat_id not in flood_data:
             flood_data[chat_id] = {}
         if user_id not in flood_data[chat_id]:
             flood_data[chat_id][user_id] = []
-        
+
         timestamps = flood_data[chat_id][user_id]
-        window = antiflood['window']
-        limit = antiflood['limit']
-        
+        window = antiflood["window"]
+        limit = antiflood["limit"]
+
         # Clean old timestamps
         timestamps = [t for t in timestamps if now - t < timedelta(seconds=window)]
         timestamps.append(now)
         flood_data[chat_id][user_id] = timestamps
-        
+
         if len(timestamps) > limit:
-            action = antiflood['action']
-            duration = antiflood['duration']
+            action = antiflood["action"]
+            duration = antiflood["duration"]
             until = now + timedelta(seconds=duration)
-            
+
             if action == "mute":
-                await context.bot.restrict_chat_member(chat_id, user_id, permissions={"can_send_messages": False}, until_date=until)
+                await context.bot.restrict_chat_member(
+                    chat_id, user_id, permissions={"can_send_messages": False}, until_date=until
+                )
             elif action == "kick":
                 await context.bot.unban_chat_member(chat_id, user_id)
             elif action == "ban":
@@ -223,7 +242,7 @@ async def antispam_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not update.message or not update.message.text:
         return
-    
+
     # Simple spam detection - check for repeated messages
     # This is a placeholder - real implementation would check against spam databases
     pass
@@ -236,27 +255,28 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     if not update.message or not update.message.text:
         return
-    
+
     chat_id = update.effective_chat.id
-    
+
     group = await get_group(chat_id)
     if not group:
         return
-    
-    settings = group.get('settings') or {}
-    modules = group.get('modules') or {}
+
+    settings = group.get("settings") or {}
+    modules = group.get("modules") or {}
     # Ensure automod settings exist with defaults
-    if 'automod' not in settings:
+    if "automod" not in settings:
         settings = dict(settings)
-        settings['automod'] = DEFAULT_AUTOMOD
-    antilink = get_setting(settings, 'automod', 'antilink', modules=modules)
-    
-    if antilink['enabled']:
+        settings["automod"] = DEFAULT_AUTOMOD
+    antilink = get_setting(settings, "automod", "antilink", modules=modules)
+
+    if antilink["enabled"]:
         import re
-        links = re.findall(r'(https?://[^\s]+)', update.message.text)
+
+        links = re.findall(r"(https?://[^\s]+)", update.message.text)
         for link in links:
             whitelisted = False
-            for domain in antilink['whitelist']:
+            for domain in antilink["whitelist"]:
                 if domain in link:
                     whitelisted = True
                     break
@@ -267,19 +287,22 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     pass
                 return
 
+
 async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     group = await get_group(chat_id)
-    if not group: return
-    
-    settings = group.get('settings') or {}
-    modules = group.get('modules') or {}
+    if not group:
+        return
+
+    settings = group.get("settings") or {}
+    modules = group.get("modules") or {}
     for member in update.message.new_chat_members:
-        if member.is_bot: continue
-        
+        if member.is_bot:
+            continue
+
         # Anti-bot
-        antibot = get_setting(settings, 'automod', 'antibot', modules=modules)
-        if antibot['enabled']:
+        antibot = get_setting(settings, "automod", "antibot", modules=modules)
+        if antibot["enabled"]:
             # min_age_days check is hard via TG API directly without extra info
             # but we can check for username
             if not member.username:
@@ -287,19 +310,27 @@ async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 return
 
         # Captcha
-        captcha = get_setting(settings, 'automod', 'captcha')
-        if captcha['enabled']:
+        captcha = get_setting(settings, "automod", "captcha")
+        if captcha["enabled"]:
             from bot.handlers.captcha import send_captcha
+
             await send_captcha(update, context, member)
-        
+
         # Welcome message
         else:
-            welcome = get_setting(settings, 'welcome')
-            if welcome['enabled']:
-                text = welcome['text'].format(first_name=member.first_name, last_name=member.last_name or "", username=member.username or "")
+            welcome = get_setting(settings, "welcome")
+            if welcome["enabled"]:
+                text = welcome["text"].format(
+                    first_name=member.first_name,
+                    last_name=member.last_name or "",
+                    username=member.username or "",
+                )
                 msg = await update.message.reply_text(text)
-                if welcome['delete_after'] > 0:
-                    context.job_queue.run_once(delete_msg, welcome['delete_after'], data=(chat_id, msg.message_id))
+                if welcome["delete_after"] > 0:
+                    context.job_queue.run_once(
+                        delete_msg, welcome["delete_after"], data=(chat_id, msg.message_id)
+                    )
+
 
 async def delete_msg(context: ContextTypes.DEFAULT_TYPE):
     chat_id, msg_id = context.job.data

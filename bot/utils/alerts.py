@@ -21,11 +21,7 @@ async def _post(bot: Bot, text: str):
     if not settings.SUPPORT_GROUP_ID:
         return
     try:
-        await bot.send_message(
-            chat_id=settings.SUPPORT_GROUP_ID,
-            text=text,
-            parse_mode="HTML"
-        )
+        await bot.send_message(chat_id=settings.SUPPORT_GROUP_ID, text=text, parse_mode="HTML")
     except Exception as e:
         log.warning(f"[ALERTS] Failed to post alert | error={e}")
 
@@ -35,11 +31,12 @@ async def alert_error(bot: Bot, clone_username: str, chat_id: int, error: str):
     if not settings.ALERT_ON_ERRORS:
         return
     ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-    await _post(bot,
+    await _post(
+        bot,
         f"🔴 <b>Error on @{clone_username}</b>\n"
         f"Chat: <code>{chat_id}</code>\n"
         f"Error: <code>{error[:300]}</code>\n"
-        f"Time: {ts}"
+        f"Time: {ts}",
     )
 
 
@@ -47,11 +44,12 @@ async def alert_new_clone(bot: Bot, clone_username: str, owner_id: int, owner_na
     """Post when a new clone is registered."""
     if not settings.ALERT_ON_NEW_CLONES:
         return
-    await _post(bot,
+    await _post(
+        bot,
         f"🆕 <b>New clone registered</b>\n"
         f"Bot: @{clone_username}\n"
         f"Owner: <a href='tg://user?id={owner_id}'>{owner_name}</a> "
-        f"(<code>{owner_id}</code>)"
+        f"(<code>{owner_id}</code>)",
     )
 
 
@@ -60,10 +58,11 @@ async def alert_dead_clone(bot: Bot, clone_username: str, owner_id: int, bot_id:
     if not settings.ALERT_ON_DEAD_CLONES:
         return
     ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
-    await _post(bot,
+    await _post(
+        bot,
         f"⚠️ <b>Dead clone detected</b>\n"
         f"Bot: @{clone_username}\n"
         f"Bot ID: <code>{bot_id}</code>\n"
         f"Owner: <code>{owner_id}</code>\n"
-        f"Detected: {ts}"
+        f"Detected: {ts}",
     )

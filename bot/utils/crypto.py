@@ -24,7 +24,7 @@ def _get_fernet() -> Fernet:
     if not key:
         raise RuntimeError(
             "SECRET_KEY environment variable is not set. "
-            "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+            'Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"'
         )
     try:
         return Fernet(key.encode())
@@ -88,5 +88,6 @@ def validate_token_format(token: str) -> bool:
     - secret: alphanumeric/hyphen/underscore (usually 35-50 chars)
     """
     import re
+
     # More permissive regex to handle newer/longer Telegram bot tokens
-    return bool(re.match(r'^\d{8,12}:[\w-]{35,50}$', token))
+    return bool(re.match(r"^\d{8,12}:[\w-]{35,50}$", token))

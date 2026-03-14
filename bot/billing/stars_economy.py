@@ -28,30 +28,22 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 from config import settings
-from bot.billing.entitlements import (
-    grant_entitlement, invalidate_cache
-)
+from bot.billing.entitlements import grant_entitlement, invalidate_cache
 
 log = logging.getLogger("economy")
 
 
 # ── BONUS STARS ─────────────────────────────────────────────────────────────
 
+
 async def get_bonus_balance(db, owner_id: int) -> int:
     """Get current bonus Stars balance for owner."""
-    row = await db.fetchrow(
-        "SELECT balance FROM bonus_stars_balance WHERE owner_id=$1",
-        owner_id
-    )
+    row = await db.fetchrow("SELECT balance FROM bonus_stars_balance WHERE owner_id=$1", owner_id)
     return row["balance"] if row else 0
 
 
 async def grant_bonus_stars(
-    db,
-    owner_id: int,
-    amount: int,
-    reason: str,
-    granted_by: int = 0
+    db, owner_id: int, amount: int, reason: str, granted_by: int = 0
 ) -> int:
     """
     Grant bonus Stars to owner.
@@ -63,19 +55,19 @@ async def grant_bonus_stars(
         INSERT INTO bonus_stars (owner_id, amount, reason, granted_by)
         VALUES ($1,$2,$3,$4)
         """,
-        owner_id, amount, reason, granted_by or None
+        owner_id,
+        amount,
+        reason,
+        granted_by or None,
     )
     balance = await get_bonus_balance(db, owner_id)
-    log.info(f"[ECONOMY] Bonus granted | owner={owner_id} amount={amount} reason={reason} balance={balance}")
+    log.info(
+        f"[ECONOMY] Bonus granted | owner={owner_id} amount={amount} reason={reason} balance={balance}"
+    )
     return balance
 
 
-async def spend_bonus_stars(
-    db,
-    owner_id: int,
-    amount: int,
-    item_type: str
-) -> dict:
+async def spend_bonus_stars(db, owner_id: int, amount: int, item_type: str) -> dict:
     """
     Spend bonus Stars to unlock a feature.
     Returns { ok, error, remaining_balance }
@@ -89,7 +81,7 @@ async def spend_bonus_stars(
     balance = await get_bonus_balance(db, owner_id)
     if balance < amount:
         return {
-            "ok":    False,
+            "ok": False,
             "error": f"Not enough bonus Stars. You have ⭐{balance}, need ⭐{amount}.",
         }
 
@@ -99,7 +91,8 @@ async def spend_bonus_stars(
         INSERT INTO bonus_stars (owner_id, amount, reason)
         VALUES ($1,$2,'purchase_spend')
         """,
-        owner_id, -amount
+        owner_id,
+        -amount,
     )
 
     # Grant entitlement (same as real Stars)
@@ -112,18 +105,22 @@ async def spend_bonus_stars(
         INSERT INTO payment_events (owner_id, event_type, item_type, stars_paid)
         VALUES ($1,'bonus_stars_spend',$2,$3)
         """,
-        owner_id, item_type, amount
+        owner_id,
+        item_type,
+        amount,
     )
 
     new_balance = await get_bonus_balance(db, owner_id)
-    log.info(f"[ECONOMY] Bonus spent | owner={owner_id} amount={amount} item={item_type} remaining={new_balance}")
+    log.info(
+        f"[ECONOMY] Bonus spent | owner={owner_id} amount={amount} item={item_type} remaining={new_balance}"
+    )
     return {"ok": True, "remaining_balance": new_balance}
 
 
 # ── REFERRALS ────────────────────────────────────────────────────────────────
 
-REFERRAL_BONUS_STARS    = getattr(settings, "REFERRAL_BONUS_STARS",    100)
-REFERRAL_REFERRED_BONUS = getattr(settings, "REFERRAL_REFERRED_BONUS",  50)
+REFERRAL_BONUS_STARS = getattr(settings, "REFERRAL_BONUS_STARS", 100)
+REFERRAL_REFERRED_BONUS = getattr(settings, "REFERRAL_REFERRED_BONUS", 50)
 
 
 async def record_referral(db, referrer_id: int, referred_id: int) -> bool:
@@ -141,7 +138,9 @@ async def record_referral(db, referrer_id: int, referred_id: int) -> bool:
             VALUES ($1,$2,$3)
             ON CONFLICT (referred_id) DO NOTHING
             """,
-            referrer_id, referred_id, REFERRAL_BONUS_STARS
+            referrer_id,
+            referred_id,
+            REFERRAL_BONUS_STARS,
         )
         log.info(f"[ECONOMY] Referral recorded | referrer={referrer_id} referred={referred_id}")
         return True
@@ -157,8 +156,7 @@ async def process_referral_reward(db, bot, referred_id: int):
     Sends notification DMs.
     """
     row = await db.fetchrow(
-        "SELECT * FROM referrals WHERE referred_id=$1 AND rewarded=FALSE",
-        referred_id
+        "SELECT * FROM referrals WHERE referred_id=$1 AND rewarded=FALSE", referred_id
     )
     if not row:
         return
@@ -177,8 +175,7 @@ async def process_referral_reward(db, bot, referred_id: int):
 
     # Mark rewarded
     await db.execute(
-        "UPDATE referrals SET rewarded=TRUE, rewarded_at=NOW() WHERE referred_id=$1",
-        referred_id
+        "UPDATE referrals SET rewarded=TRUE, rewarded_at=NOW() WHERE referred_id=$1", referred_id
     )
 
     # DM referrer
@@ -192,7 +189,7 @@ async def process_referral_reward(db, bot, referred_id: int):
                 f"Balance: ⭐{referrer_balance} bonus Stars\n\n"
                 f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
             ),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     except Exception:
         pass
@@ -209,7 +206,7 @@ async def process_referral_reward(db, bot, referred_id: int):
                 f"Use them to unlock features!\n\n"
                 f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
             ),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     except Exception:
         pass
@@ -224,31 +221,25 @@ async def get_referral_link(bot_username: str, owner_id: int) -> str:
 
 async def get_referral_stats(db, owner_id: int) -> dict:
     """Get referral stats for owner."""
-    total = await db.fetchval(
-        "SELECT COUNT(*) FROM referrals WHERE referrer_id=$1", owner_id
-    )
+    total = await db.fetchval("SELECT COUNT(*) FROM referrals WHERE referrer_id=$1", owner_id)
     rewarded = await db.fetchval(
         "SELECT COUNT(*) FROM referrals WHERE referrer_id=$1 AND rewarded=TRUE", owner_id
     )
     pending = total - rewarded
-    earned  = rewarded * REFERRAL_BONUS_STARS
+    earned = rewarded * REFERRAL_BONUS_STARS
     return {
-        "total_referrals":   total,
-        "rewarded":          rewarded,
-        "pending":           pending,
-        "stars_earned":      earned,
+        "total_referrals": total,
+        "rewarded": rewarded,
+        "pending": pending,
+        "stars_earned": earned,
         "bonus_per_referral": REFERRAL_BONUS_STARS,
     }
 
 
 # ── PROMO CODES ──────────────────────────────────────────────────────────────
 
-async def redeem_promo_code(
-    db,
-    bot,
-    owner_id: int,
-    code: str
-) -> dict:
+
+async def redeem_promo_code(db, bot, owner_id: int, code: str) -> dict:
     """
     Redeem a promo code for owner.
     Returns { ok, message, reward_type, reward_value }
@@ -262,8 +253,7 @@ async def redeem_promo_code(
     code = code.strip().upper()
 
     promo = await db.fetchrow(
-        "SELECT * FROM promo_codes WHERE UPPER(code)=$1 AND is_active=TRUE",
-        code
+        "SELECT * FROM promo_codes WHERE UPPER(code)=$1 AND is_active=TRUE", code
     )
 
     if not promo:
@@ -280,17 +270,18 @@ async def redeem_promo_code(
     # Check if already redeemed by this user
     already = await db.fetchval(
         "SELECT COUNT(*) FROM promo_redemptions WHERE code_id=$1 AND owner_id=$2",
-        promo["id"], owner_id
+        promo["id"],
+        owner_id,
     )
     if already:
         return {"ok": False, "message": "You've already redeemed this code."}
 
     # Apply reward
-    reward_type    = promo["reward_type"]
-    reward_value   = promo["reward_value"]
+    reward_type = promo["reward_type"]
+    reward_value = promo["reward_value"]
     reward_feature = promo["reward_feature"]
-    reward_days    = promo["reward_days"]
-    message        = ""
+    reward_days = promo["reward_days"]
+    message = ""
 
     ITEM_LABELS = {
         "feat_music": "Music Player",
@@ -319,11 +310,11 @@ async def redeem_promo_code(
             owner_id,
             f"promo_{code}_{owner_id}",
             reward_feature,
-            expires_at
+            expires_at,
         )
         await grant_entitlement(db, owner_id, reward_feature)
         invalidate_cache(owner_id)
-        label   = ITEM_LABELS.get(reward_feature, reward_feature)
+        label = ITEM_LABELS.get(reward_feature, reward_feature)
         message = f"🎉 <b>{label}</b> unlocked for {reward_days} days!"
 
     elif reward_type in ("group_slot", "clone_slot"):
@@ -338,37 +329,34 @@ async def redeem_promo_code(
             owner_id,
             f"promo_{code}_{owner_id}",
             reward_type,
-            expires_at
+            expires_at,
         )
         await grant_entitlement(db, owner_id, reward_type)
         invalidate_cache(owner_id)
-        label   = ITEM_LABELS.get(reward_type, reward_type)
+        label = ITEM_LABELS.get(reward_type, reward_type)
         message = f"🎉 <b>{label}</b> unlocked for {reward_days} days!"
 
     # Record redemption
     await db.execute(
-        "INSERT INTO promo_redemptions (code_id, owner_id) VALUES ($1,$2)",
-        promo["id"], owner_id
+        "INSERT INTO promo_redemptions (code_id, owner_id) VALUES ($1,$2)", promo["id"], owner_id
     )
-    await db.execute(
-        "UPDATE promo_codes SET current_uses=current_uses+1 WHERE id=$1",
-        promo["id"]
-    )
+    await db.execute("UPDATE promo_codes SET current_uses=current_uses+1 WHERE id=$1", promo["id"])
     await db.execute(
         """
         INSERT INTO payment_events (owner_id, event_type, item_type, stars_paid,
                                      metadata)
         VALUES ($1,'promo_redemption',$2,0,$3)
         """,
-        owner_id, reward_feature or reward_type,
-        {"code": code, "reward_type": reward_type}
+        owner_id,
+        reward_feature or reward_type,
+        {"code": code, "reward_type": reward_type},
     )
 
     log.info(f"[ECONOMY] Promo redeemed | owner={owner_id} code={code} reward={reward_type}")
     return {
-        "ok":           True,
-        "message":      message,
-        "reward_type":  reward_type,
+        "ok": True,
+        "message": message,
+        "reward_type": reward_type,
         "reward_value": reward_value,
     }
 
@@ -389,10 +377,7 @@ async def create_promo_code(
     Returns { ok, code } or { ok: False, error }
     """
     code = code.strip().upper()
-    expires_at = (
-        datetime.now(timezone.utc) + timedelta(days=expires_days)
-        if expires_days else None
-    )
+    expires_at = datetime.now(timezone.utc) + timedelta(days=expires_days) if expires_days else None
     try:
         await db.execute(
             """
@@ -401,8 +386,14 @@ async def create_promo_code(
                  reward_days, max_uses, expires_at, created_by)
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
             """,
-            code, reward_type, reward_value, reward_feature,
-            reward_days, max_uses, expires_at, created_by
+            code,
+            reward_type,
+            reward_value,
+            reward_feature,
+            reward_days,
+            max_uses,
+            expires_at,
+            created_by,
         )
         log.info(f"[ECONOMY] Promo created | code={code} type={reward_type} by={created_by}")
         return {"ok": True, "code": code}

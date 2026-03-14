@@ -2,16 +2,23 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from db.ops.booster import (
-    get_channel_gate_config, save_channel_gate_config, get_channel_stats,
-    get_channel_record, create_channel_record, set_channel_verified,
-    set_channel_restricted, get_unverified_channel_users, delete_channel_record,
-    delete_all_channel_records
+    get_channel_gate_config,
+    save_channel_gate_config,
+    get_channel_stats,
+    get_channel_record,
+    create_channel_record,
+    set_channel_verified,
+    set_channel_restricted,
+    get_unverified_channel_users,
+    delete_channel_record,
+    delete_all_channel_records,
 )
 
 router = APIRouter(prefix="/api/groups/{chat_id}/channel-gate", tags=["channel-gate"])
 
 
 # ==================== Config ====================
+
 
 class ChannelGateConfigUpdate(BaseModel):
     force_channel_enabled: Optional[bool] = None
@@ -43,6 +50,7 @@ async def update_channel_gate_config(chat_id: int, config: ChannelGateConfigUpda
 
 # ==================== Stats ====================
 
+
 @router.get("/stats")
 async def get_channel_gate_stats(chat_id: int):
     """Get channel gate statistics."""
@@ -50,6 +58,7 @@ async def get_channel_gate_stats(chat_id: int):
 
 
 # ==================== Records ====================
+
 
 @router.get("/records/{user_id}")
 async def get_channel_record_route(chat_id: int, user_id: int):
@@ -68,6 +77,7 @@ async def get_pending_users(chat_id: int):
 
 # ==================== Actions ====================
 
+
 class ChannelLinkRequest(BaseModel):
     channel_id: Optional[int] = None
     channel_username: Optional[str] = None
@@ -81,13 +91,13 @@ class VerifyRequest(BaseModel):
 async def link_channel(chat_id: int, data: ChannelLinkRequest):
     """Link a required channel to a group."""
     config = await get_channel_gate_config(chat_id)
-    config['force_channel_enabled'] = True
-    
+    config["force_channel_enabled"] = True
+
     if data.channel_id:
-        config['force_channel_id'] = data.channel_id
+        config["force_channel_id"] = data.channel_id
     if data.channel_username:
-        config['force_channel_username'] = data.channel_username
-    
+        config["force_channel_username"] = data.channel_username
+
     await save_channel_gate_config(chat_id, config)
     return {"success": True, "config": config}
 
@@ -97,12 +107,12 @@ async def unlink_channel(chat_id: int):
     """Remove channel requirement."""
     # Unrestrict all users first
     await delete_all_channel_records(chat_id)
-    
+
     config = await get_channel_gate_config(chat_id)
-    config['force_channel_enabled'] = False
-    config['force_channel_id'] = None
-    config['force_channel_username'] = None
-    
+    config["force_channel_enabled"] = False
+    config["force_channel_id"] = None
+    config["force_channel_username"] = None
+
     await save_channel_gate_config(chat_id, config)
     return {"success": True}
 
@@ -113,19 +123,19 @@ async def verify_user(chat_id: int, user_id: int, data: VerifyRequest):
     # Check if user is member of the channel
     from bot.registry import get as registry_get
     from telegram.error import TelegramError
-    
+
     ptb_app = registry_get(0)  # Get primary bot
     if not ptb_app:
         raise HTTPException(status_code=500, detail="Bot not available")
-    
+
     try:
         member = await ptb_app.bot.get_chat_member(data.channel_id, user_id)
-        if member.status in ['member', 'administrator', 'creator']:
+        if member.status in ["member", "administrator", "creator"]:
             await set_channel_verified(chat_id, user_id)
             return {"success": True, "verified": True}
     except TelegramError:
         pass
-    
+
     return {"success": True, "verified": False}
 
 
@@ -133,11 +143,11 @@ async def verify_user(chat_id: int, user_id: int, data: VerifyRequest):
 async def kick_user(chat_id: int, user_id: int):
     """Kick a user from the group."""
     from bot.registry import get as registry_get
-    
+
     ptb_app = registry_get(0)
     if not ptb_app:
         raise HTTPException(status_code=500, detail="Bot not available")
-    
+
     try:
         await ptb_app.bot.ban_chat_member(chat_id, user_id)
         await ptb_app.bot.unban_chat_member(chat_id, user_id)

@@ -35,9 +35,7 @@ Logs prefix: [MUSIC_CMD]
 
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import (
-    ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-)
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from telegram.constants import ParseMode
 
 from config import settings
@@ -73,18 +71,20 @@ def _no_worker_message(bot_is_primary: bool) -> str:
 def _np_keyboard(chat_id: int, is_paused: bool, is_looping: bool) -> InlineKeyboardMarkup:
     pause_label = "▶️ Resume" if is_paused else "⏸ Pause"
     loop_label = "🔁 Loop ✅" if is_looping else "🔁 Loop"
-    return InlineKeyboardMarkup([
+    return InlineKeyboardMarkup(
         [
-            InlineKeyboardButton(pause_label, callback_data=f"music:pause:{chat_id}"),
-            InlineKeyboardButton("⏭ Skip", callback_data=f"music:skip:{chat_id}"),
-            InlineKeyboardButton("⏹ Stop", callback_data=f"music:stop:{chat_id}"),
-        ],
-        [
-            InlineKeyboardButton(loop_label, callback_data=f"music:loop:{chat_id}"),
-            InlineKeyboardButton("📋 Queue", callback_data=f"music:queue:{chat_id}"),
-            InlineKeyboardButton("🔊 Vol", callback_data=f"music:vol:{chat_id}"),
+            [
+                InlineKeyboardButton(pause_label, callback_data=f"music:pause:{chat_id}"),
+                InlineKeyboardButton("⏭ Skip", callback_data=f"music:skip:{chat_id}"),
+                InlineKeyboardButton("⏹ Stop", callback_data=f"music:stop:{chat_id}"),
+            ],
+            [
+                InlineKeyboardButton(loop_label, callback_data=f"music:loop:{chat_id}"),
+                InlineKeyboardButton("📋 Queue", callback_data=f"music:queue:{chat_id}"),
+                InlineKeyboardButton("🔊 Vol", callback_data=f"music:vol:{chat_id}"),
+            ],
         ]
-    ])
+    )
 
 
 def _np_text(title: str, duration: int, volume: int, source: str, queue_len: int) -> str:
@@ -129,6 +129,7 @@ async def cmd_play(update: Update, context: ContextTypes.DEFAULT_TYPE, playnow=F
     is_voice = False
     if message.reply_to_message and message.reply_to_message.voice:
         from bot.userbot.music_voice import resolve_voice_message
+
         track_data = await resolve_voice_message(message.reply_to_message, context.bot)
         if track_data:
             is_voice = True
@@ -150,7 +151,7 @@ async def cmd_play(update: Update, context: ContextTypes.DEFAULT_TYPE, playnow=F
                 f"Examples:\n"
                 f"<code>/{cmd_name} https://youtube.com/watch?v=...</code>\n"
                 f"<code>/{cmd_name} Never Gonna Give You Up</code>",
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
             )
             return
 
@@ -165,21 +166,28 @@ async def cmd_play(update: Update, context: ContextTypes.DEFAULT_TYPE, playnow=F
         try:
             if next_track:
                 text = _np_text(
-                    next_track.title, next_track.duration,
-                    session.volume, next_track.source, len(session.queue)
+                    next_track.title,
+                    next_track.duration,
+                    session.volume,
+                    next_track.source,
+                    len(session.queue),
                 )
                 kb = _np_keyboard(chat_id, session.is_paused, session.is_looping)
                 if session.np_message_id:
                     await context.bot.edit_message_text(
-                        chat_id=chat_id, message_id=session.np_message_id,
-                        text=text, reply_markup=kb, parse_mode=ParseMode.HTML
+                        chat_id=chat_id,
+                        message_id=session.np_message_id,
+                        text=text,
+                        reply_markup=kb,
+                        parse_mode=ParseMode.HTML,
                     )
             else:
                 if session.np_message_id:
                     await context.bot.edit_message_text(
-                        chat_id=chat_id, message_id=session.np_message_id,
+                        chat_id=chat_id,
+                        message_id=session.np_message_id,
                         text=f"✅ Queue finished.\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-                        parse_mode=ParseMode.HTML
+                        parse_mode=ParseMode.HTML,
                     )
         except Exception as e:
             log.warning(f"[MUSIC_CMD] NP update failed | error={e}")
@@ -190,7 +198,7 @@ async def cmd_play(update: Update, context: ContextTypes.DEFAULT_TYPE, playnow=F
         requested_by=user.id,
         requested_by_name=user.full_name,
         playnow=playnow,
-        on_track_end=on_track_end
+        on_track_end=on_track_end,
     )
 
     await loading_msg.delete()
@@ -203,19 +211,19 @@ async def cmd_play(update: Update, context: ContextTypes.DEFAULT_TYPE, playnow=F
 
     if data.get("queued"):
         await message.reply_text(
-            f"📋 Added to queue (position {data['position']})\n"
-            f"<b>{data['title']}</b>",
-            parse_mode=ParseMode.HTML
+            f"📋 Added to queue (position {data['position']})\n" f"<b>{data['title']}</b>",
+            parse_mode=ParseMode.HTML,
         )
         return
 
     # Now playing card
     session = worker._sessions.get(chat.id)
     text = _np_text(
-        data["title"], data["duration"],
+        data["title"],
+        data["duration"],
         session.volume if session else 100,
         data["source"],
-        data.get("queue_len", 0)
+        data.get("queue_len", 0),
     )
     kb = _np_keyboard(chat.id, False, False)
     np_msg = await message.reply_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
@@ -239,13 +247,11 @@ async def cmd_pause(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.edit_message_reply_markup(
                 chat_id=update.effective_chat.id,
                 message_id=session.np_message_id,
-                reply_markup=_np_keyboard(update.effective_chat.id, True, session.is_looping)
+                reply_markup=_np_keyboard(update.effective_chat.id, True, session.is_looping),
             )
         except Exception:
             pass
-    await update.effective_message.reply_text(
-        "⏸ Paused." if result.ok else f"❌ {result.error}"
-    )
+    await update.effective_message.reply_text("⏸ Paused." if result.ok else f"❌ {result.error}")
 
 
 async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -253,9 +259,7 @@ async def cmd_resume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not worker:
         return
     result = await worker.resume(update.effective_chat.id)
-    await update.effective_message.reply_text(
-        "▶️ Resumed." if result.ok else f"❌ {result.error}"
-    )
+    await update.effective_message.reply_text("▶️ Resumed." if result.ok else f"❌ {result.error}")
 
 
 async def cmd_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -263,9 +267,7 @@ async def cmd_skip(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not worker:
         return
     result = await worker.skip(update.effective_chat.id)
-    await update.effective_message.reply_text(
-        f"⏭ Skipped." if result.ok else f"❌ {result.error}"
-    )
+    await update.effective_message.reply_text(f"⏭ Skipped." if result.ok else f"❌ {result.error}")
 
 
 async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -303,10 +305,11 @@ async def cmd_queue(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     loop_str = "🔁 Looping on" if data.get("is_looping") else ""
     await update.effective_message.reply_text(
-        "📋 <b>Queue</b>\n\n" + "\n".join(lines) +
-        (f"\n\n{loop_str}" if loop_str else "") +
-        f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-        parse_mode=ParseMode.HTML
+        "📋 <b>Queue</b>\n\n"
+        + "\n".join(lines)
+        + (f"\n\n{loop_str}" if loop_str else "")
+        + f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
+        parse_mode=ParseMode.HTML,
     )
 
 
@@ -325,13 +328,12 @@ async def cmd_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "<code>/volume 100</code> - Full volume\n"
             "<code>/volume 150</code> - 150% (loud)\n\n"
             "<i>Default is 100%</i>",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
     if vol < 0 or vol > 200:
         await update.effective_message.reply_text(
-            "❌ Volume must be between 0 and 200.",
-            parse_mode=ParseMode.HTML
+            "❌ Volume must be between 0 and 200.", parse_mode=ParseMode.HTML
         )
         return
     result = await worker.set_volume(update.effective_chat.id, vol)
@@ -368,13 +370,12 @@ async def cmd_musicmode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if db:
-        await db_music.upsert_music_settings(
-            db, chat.id, context.bot.id,
-            play_mode=mode
-        )
+        await db_music.upsert_music_settings(db, chat.id, context.bot.id, play_mode=mode)
 
     label = "Everyone" if mode == "all" else "Admins only"
-    await update.effective_message.reply_text(f"🎵 Music access: <b>{label}</b>", parse_mode=ParseMode.HTML)
+    await update.effective_message.reply_text(
+        f"🎵 Music access: <b>{label}</b>", parse_mode=ParseMode.HTML
+    )
 
 
 # Inline button callbacks
@@ -399,8 +400,7 @@ async def music_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif action == "stop":
         await worker.stop(chat_id)
         await query.edit_message_text(
-            f"⏹ Stopped.\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-            parse_mode=ParseMode.HTML
+            f"⏹ Stopped.\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}", parse_mode=ParseMode.HTML
         )
         return
     elif action == "loop":

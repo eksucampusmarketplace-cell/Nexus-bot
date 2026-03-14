@@ -1,4 +1,3 @@
-
 import asyncio
 import asyncpg
 import os
@@ -6,12 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 async def check_schema():
     dsn = os.getenv("DATABASE_URL")
     if not dsn:
         print("DATABASE_URL not set")
         return
-    
+
     # Note: statement_cache_size=0 is required for Supabase/pgbouncer compatibility
     conn = await asyncpg.connect(dsn, statement_cache_size=0)
     try:
@@ -27,6 +27,7 @@ async def check_schema():
         print(f"Error: {e}")
     finally:
         await conn.close()
+
 
 if __name__ == "__main__":
     asyncio.run(check_schema())

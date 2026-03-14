@@ -57,9 +57,15 @@ async def create_music_tables(pool: asyncpg.Pool):
         """)
 
         # Create indexes
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_music_queues_chat_id ON music_queues(chat_id)")
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_playlists_chat_id ON music_playlists(chat_id)")
-        await conn.execute("CREATE INDEX IF NOT EXISTS idx_history_chat_id ON music_history(chat_id, played_at DESC)")
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_music_queues_chat_id ON music_queues(chat_id)"
+        )
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_playlists_chat_id ON music_playlists(chat_id)"
+        )
+        await conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_history_chat_id ON music_history(chat_id, played_at DESC)"
+        )
 
         logger.info("Music tables created successfully")
 
@@ -67,11 +73,8 @@ async def create_music_tables(pool: asyncpg.Pool):
 async def get_or_create_queue(pool: asyncpg.Pool, chat_id: int) -> Optional[Dict]:
     """Get queue for a chat, create if doesn't exist"""
     async with pool.acquire() as conn:
-        queue = await conn.fetchrow(
-            "SELECT * FROM music_queues WHERE chat_id = $1",
-            chat_id
-        )
-        
+        queue = await conn.fetchrow("SELECT * FROM music_queues WHERE chat_id = $1", chat_id)
+
         if not queue:
             queue = await conn.fetchrow(
                 """
@@ -79,10 +82,10 @@ async def get_or_create_queue(pool: asyncpg.Pool, chat_id: int) -> Optional[Dict
                 VALUES ($1)
                 RETURNING *
                 """,
-                chat_id
+                chat_id,
             )
             logger.info(f"Created new music queue for chat {chat_id}")
-        
+
         return dict(queue)
 
 
@@ -91,7 +94,7 @@ async def update_queue(
     chat_id: int,
     queue: List[Dict],
     current_track: Optional[Dict] = None,
-    is_playing: bool = False
+    is_playing: bool = False,
 ):
     """Update queue for a chat"""
     async with pool.acquire() as conn:
@@ -104,7 +107,7 @@ async def update_queue(
             chat_id,
             json.dumps(queue),
             json.dumps(current_track) if current_track else None,
-            is_playing
+            is_playing,
         )
 
 
@@ -117,17 +120,14 @@ async def clear_queue(pool: asyncpg.Pool, chat_id: int):
             SET queue = '[]'::jsonb, current_track = NULL, is_playing = FALSE, updated_at = NOW()
             WHERE chat_id = $1
             """,
-            chat_id
+            chat_id,
         )
 
 
 async def get_volume(pool: asyncpg.Pool, chat_id: int) -> int:
     """Get volume for a chat"""
     async with pool.acquire() as conn:
-        result = await conn.fetchval(
-            "SELECT volume FROM music_queues WHERE chat_id = $1",
-            chat_id
-        )
+        result = await conn.fetchval("SELECT volume FROM music_queues WHERE chat_id = $1", chat_id)
         return result or 100
 
 
@@ -142,7 +142,7 @@ async def set_volume(pool: asyncpg.Pool, chat_id: int, volume: int):
             WHERE chat_id = $2
             """,
             volume,
-            chat_id
+            chat_id,
         )
 
 
@@ -150,17 +150,16 @@ async def get_repeat_mode(pool: asyncpg.Pool, chat_id: int) -> str:
     """Get repeat mode for a chat"""
     async with pool.acquire() as conn:
         result = await conn.fetchval(
-            "SELECT repeat_mode FROM music_queues WHERE chat_id = $1",
-            chat_id
+            "SELECT repeat_mode FROM music_queues WHERE chat_id = $1", chat_id
         )
-        return result or 'none'
+        return result or "none"
 
 
 async def set_repeat_mode(pool: asyncpg.Pool, chat_id: int, mode: str):
     """Set repeat mode: 'none', 'one', 'all'"""
-    if mode not in ['none', 'one', 'all']:
+    if mode not in ["none", "one", "all"]:
         raise ValueError("Invalid repeat mode. Must be 'none', 'one', or 'all'")
-    
+
     async with pool.acquire() as conn:
         await conn.execute(
             """
@@ -169,7 +168,7 @@ async def set_repeat_mode(pool: asyncpg.Pool, chat_id: int, mode: str):
             WHERE chat_id = $2
             """,
             mode,
-            chat_id
+            chat_id,
         )
 
 
@@ -177,8 +176,7 @@ async def get_shuffle_mode(pool: asyncpg.Pool, chat_id: int) -> bool:
     """Get shuffle mode for a chat"""
     async with pool.acquire() as conn:
         result = await conn.fetchval(
-            "SELECT shuffle_mode FROM music_queues WHERE chat_id = $1",
-            chat_id
+            "SELECT shuffle_mode FROM music_queues WHERE chat_id = $1", chat_id
         )
         return result or False
 
@@ -193,16 +191,12 @@ async def set_shuffle_mode(pool: asyncpg.Pool, chat_id: int, shuffle: bool):
             WHERE chat_id = $2
             """,
             shuffle,
-            chat_id
+            chat_id,
         )
 
 
 async def create_playlist(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    playlist_name: str,
-    tracks: List[Dict],
-    created_by: int
+    pool: asyncpg.Pool, chat_id: int, playlist_name: str, tracks: List[Dict], created_by: int
 ):
     """Create a playlist"""
     async with pool.acquire() as conn:
@@ -215,7 +209,7 @@ async def create_playlist(
             chat_id,
             playlist_name,
             json.dumps(tracks),
-            created_by
+            created_by,
         )
         logger.info(f"Created playlist '{playlist_name}' for chat {chat_id}")
         return dict(playlist)
@@ -225,8 +219,7 @@ async def get_playlists(pool: asyncpg.Pool, chat_id: int) -> List[Dict]:
     """Get all playlists for a chat"""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM music_playlists WHERE chat_id = $1 ORDER BY created_at DESC",
-            chat_id
+            "SELECT * FROM music_playlists WHERE chat_id = $1 ORDER BY created_at DESC", chat_id
         )
         return [dict(row) for row in rows]
 
@@ -240,7 +233,7 @@ async def get_playlist(pool: asyncpg.Pool, chat_id: int, playlist_name: str) -> 
             WHERE chat_id = $1 AND playlist_name = $2
             """,
             chat_id,
-            playlist_name
+            playlist_name,
         )
         return dict(playlist) if playlist else None
 
@@ -254,17 +247,12 @@ async def delete_playlist(pool: asyncpg.Pool, chat_id: int, playlist_name: str):
             WHERE chat_id = $1 AND playlist_name = $2
             """,
             chat_id,
-            playlist_name
+            playlist_name,
         )
         logger.info(f"Deleted playlist '{playlist_name}' for chat {chat_id}")
 
 
-async def update_playlist(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    playlist_name: str,
-    tracks: List[Dict]
-):
+async def update_playlist(pool: asyncpg.Pool, chat_id: int, playlist_name: str, tracks: List[Dict]):
     """Update a playlist"""
     async with pool.acquire() as conn:
         await conn.execute(
@@ -275,16 +263,11 @@ async def update_playlist(
             """,
             chat_id,
             playlist_name,
-            json.dumps(tracks)
+            json.dumps(tracks),
         )
 
 
-async def add_to_history(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    track: Dict,
-    played_by: int
-):
+async def add_to_history(pool: asyncpg.Pool, chat_id: int, track: Dict, played_by: int):
     """Add track to play history"""
     async with pool.acquire() as conn:
         await conn.execute(
@@ -294,15 +277,11 @@ async def add_to_history(
             """,
             chat_id,
             json.dumps(track),
-            played_by
+            played_by,
         )
 
 
-async def get_history(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    limit: int = 20
-) -> List[Dict]:
+async def get_history(pool: asyncpg.Pool, chat_id: int, limit: int = 20) -> List[Dict]:
     """Get play history for a chat"""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -313,7 +292,7 @@ async def get_history(
             LIMIT $2
             """,
             chat_id,
-            limit
+            limit,
         )
         return [dict(row) for row in rows]
 
@@ -337,30 +316,30 @@ set_shuffle = set_shuffle_mode
 async def add_to_queue(pool: asyncpg.Pool, chat_id: int, track: Dict):
     """Add a track to the queue"""
     queue_data = await get_or_create_queue(pool, chat_id)
-    queue = queue_data.get('queue', []) or []
+    queue = queue_data.get("queue", []) or []
     queue.append(track)
     await update_queue(
-        pool, chat_id, queue,
-        current_track=queue_data.get('current_track'),
-        is_playing=queue_data.get('is_playing', False)
+        pool,
+        chat_id,
+        queue,
+        current_track=queue_data.get("current_track"),
+        is_playing=queue_data.get("is_playing", False),
     )
 
 
 async def get_queue(pool: asyncpg.Pool, chat_id: int) -> List[Dict]:
     """Get queue for a chat"""
     queue_data = await get_or_create_queue(pool, chat_id)
-    return queue_data.get('queue', []) or []
+    return queue_data.get("queue", []) or []
 
 
 async def skip_track(pool: asyncpg.Pool, chat_id: int) -> Optional[Dict]:
     """Skip current track and return next track"""
     queue_data = await get_or_create_queue(pool, chat_id)
-    queue = queue_data.get('queue', []) or []
+    queue = queue_data.get("queue", []) or []
     next_track = queue.pop(0) if queue else None
     await update_queue(
-        pool, chat_id, queue,
-        current_track=next_track,
-        is_playing=next_track is not None
+        pool, chat_id, queue, current_track=next_track, is_playing=next_track is not None
     )
     return next_track
 
@@ -369,9 +348,11 @@ async def pause_track(pool: asyncpg.Pool, chat_id: int):
     """Pause current track"""
     queue_data = await get_or_create_queue(pool, chat_id)
     await update_queue(
-        pool, chat_id, queue_data.get('queue', []) or [],
-        current_track=queue_data.get('current_track'),
-        is_playing=False
+        pool,
+        chat_id,
+        queue_data.get("queue", []) or [],
+        current_track=queue_data.get("current_track"),
+        is_playing=False,
     )
 
 
@@ -379,43 +360,40 @@ async def resume_track(pool: asyncpg.Pool, chat_id: int):
     """Resume current track"""
     queue_data = await get_or_create_queue(pool, chat_id)
     await update_queue(
-        pool, chat_id, queue_data.get('queue', []) or [],
-        current_track=queue_data.get('current_track'),
-        is_playing=True
+        pool,
+        chat_id,
+        queue_data.get("queue", []) or [],
+        current_track=queue_data.get("current_track"),
+        is_playing=True,
     )
 
 
 async def get_current_track(pool: asyncpg.Pool, chat_id: int) -> Optional[Dict]:
     """Get current playing track"""
     queue_data = await get_or_create_queue(pool, chat_id)
-    return queue_data.get('current_track')
+    return queue_data.get("current_track")
 
 
 async def get_player_state(pool: asyncpg.Pool, chat_id: int) -> Dict:
     """Get full player state for a chat"""
     queue_data = await get_or_create_queue(pool, chat_id)
     return {
-        'current_track': queue_data.get('current_track'),
-        'queue': queue_data.get('queue', []) or [],
-        'is_playing': queue_data.get('is_playing', False),
-        'volume': queue_data.get('volume', 100),
-        'repeat_mode': queue_data.get('repeat_mode', 'none'),
-        'shuffle_mode': queue_data.get('shuffle_mode', False),
+        "current_track": queue_data.get("current_track"),
+        "queue": queue_data.get("queue", []) or [],
+        "is_playing": queue_data.get("is_playing", False),
+        "volume": queue_data.get("volume", 100),
+        "repeat_mode": queue_data.get("repeat_mode", "none"),
+        "shuffle_mode": queue_data.get("shuffle_mode", False),
     }
 
 
-async def add_to_playlist(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    playlist_name: str,
-    track: Dict
-):
+async def add_to_playlist(pool: asyncpg.Pool, chat_id: int, playlist_name: str, track: Dict):
     """Add a track to a playlist"""
     playlist = await get_playlist(pool, chat_id, playlist_name)
     if not playlist:
         raise ValueError(f"Playlist '{playlist_name}' not found")
 
-    tracks = playlist.get('tracks', []) or []
+    tracks = playlist.get("tracks", []) or []
     tracks.append(track)
     await update_playlist(pool, chat_id, playlist_name, tracks)
 
@@ -423,7 +401,7 @@ async def add_to_playlist(
 async def get_playlist_tracks(pool: asyncpg.Pool, chat_id: int, playlist_name: str) -> List[Dict]:
     """Get tracks from a playlist"""
     playlist = await get_playlist(pool, chat_id, playlist_name)
-    return playlist.get('tracks', []) if playlist else []
+    return playlist.get("tracks", []) if playlist else []
 
 
 async def search_youtube(query: str) -> List[Dict]:
@@ -438,10 +416,10 @@ async def play_youtube(pool: asyncpg.Pool, chat_id: int, url: str, requested_by:
     # This is a placeholder - actual implementation would use yt-dlp
     logger.warning("play_youtube called but not fully implemented")
     track = {
-        'title': 'Unknown',
-        'url': url,
-        'requested_by': requested_by,
-        'duration': 0,
+        "title": "Unknown",
+        "url": url,
+        "requested_by": requested_by,
+        "duration": 0,
     }
     await add_to_queue(pool, chat_id, track)
     return track

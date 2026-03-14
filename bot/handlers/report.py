@@ -60,7 +60,9 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text("❌ You cannot report bot messages this way.")
         return
 
-    reason = " ".join(context.args).strip()[:_MAX_REASON_LEN] if context.args else "No reason provided"
+    reason = (
+        " ".join(context.args).strip()[:_MAX_REASON_LEN] if context.args else "No reason provided"
+    )
 
     if not db:
         await message.reply_text("⚠️ Report system unavailable right now.")
@@ -90,18 +92,16 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     await message.reply_text(
-        f"✅ <b>Report #{report_id} submitted</b>\n"
-        f"Admins have been notified.",
+        f"✅ <b>Report #{report_id} submitted</b>\n" f"Admins have been notified.",
         parse_mode=ParseMode.HTML,
     )
 
     target_name = (
-        f"@{target_user.username}" if target_user and target_user.username
+        f"@{target_user.username}"
+        if target_user and target_user.username
         else (target_user.full_name if target_user else "Unknown")
     )
-    reporter_name = (
-        f"@{reporter.username}" if reporter.username else reporter.full_name
-    )
+    reporter_name = f"@{reporter.username}" if reporter.username else reporter.full_name
 
     admin_text = (
         f"🚨 <b>New Report #{report_id}</b>\n\n"
@@ -112,12 +112,14 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"<b>Time:</b> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
     )
 
-    keyboard = InlineKeyboardMarkup([
+    keyboard = InlineKeyboardMarkup(
         [
-            InlineKeyboardButton("✅ Resolve", callback_data=f"report:resolve:{report_id}"),
-            InlineKeyboardButton("❌ Dismiss", callback_data=f"report:dismiss:{report_id}"),
+            [
+                InlineKeyboardButton("✅ Resolve", callback_data=f"report:resolve:{report_id}"),
+                InlineKeyboardButton("❌ Dismiss", callback_data=f"report:dismiss:{report_id}"),
+            ]
         ]
-    ])
+    )
 
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
@@ -179,7 +181,7 @@ async def cmd_reports(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(
             f"<b>#{r['id']}</b> — {reason_short}\n"
             f"  <i>Reporter: <code>{r['reporter_id']}</code>"
-            + (f" | Reported: <code>{r['reported_id']}</code>" if r['reported_id'] else "")
+            + (f" | Reported: <code>{r['reported_id']}</code>" if r["reported_id"] else "")
             + f" | {ts}</i>"
         )
 
@@ -298,13 +300,11 @@ async def report_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
     if success:
         await query.edit_message_text(
-            query.message.text + f"\n\n{emoji} <b>{label}</b> by @{query.from_user.username or query.from_user.first_name}",
+            query.message.text
+            + f"\n\n{emoji} <b>{label}</b> by @{query.from_user.username or query.from_user.first_name}",
             parse_mode=ParseMode.HTML,
         )
-        log.info(
-            f"[REPORT] {label} via button | report_id={report_id} "
-            f"by={query.from_user.id}"
-        )
+        log.info(f"[REPORT] {label} via button | report_id={report_id} " f"by={query.from_user.id}")
     else:
         await query.edit_message_text(
             query.message.text + f"\n\n⚠️ Report #{report_id} was already actioned.",
@@ -313,7 +313,7 @@ async def report_callback_handler(update: Update, context: ContextTypes.DEFAULT_
 
 
 report_handlers = [
-    CommandHandler("report",  cmd_report,  filters=None),
+    CommandHandler("report", cmd_report, filters=None),
     CommandHandler("reports", cmd_reports, filters=None),
     CommandHandler("resolve", cmd_resolve, filters=None),
     CommandHandler("dismiss", cmd_dismiss, filters=None),

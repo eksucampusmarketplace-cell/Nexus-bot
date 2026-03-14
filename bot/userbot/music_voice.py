@@ -42,9 +42,9 @@ async def resolve_voice_message(message: Message, bot) -> dict | None:
 
         # Convert OGG -> MP3 via ffmpeg
         loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: os.system(
-            f"ffmpeg -y -i {ogg_path} -q:a 0 {mp3_path} -loglevel quiet"
-        ))
+        await loop.run_in_executor(
+            None, lambda: os.system(f"ffmpeg -y -i {ogg_path} -q:a 0 {mp3_path} -loglevel quiet")
+        )
         os.remove(ogg_path)
 
         sender = message.from_user

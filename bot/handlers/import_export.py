@@ -41,97 +41,90 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     /export
     Bot sends complete settings as a downloadable JSON file.
     """
-    msg   = update.effective_message
-    chat  = update.effective_chat
-    db    = context.bot_data.get("db")
-    bot   = context.bot
-    user  = update.effective_user
+    msg = update.effective_message
+    chat = update.effective_chat
+    db = context.bot_data.get("db")
+    bot = context.bot
+    user = update.effective_user
 
-    settings_row = await db.fetchrow(
-        "SELECT * FROM groups WHERE chat_id=$1", chat.id
-    )
+    settings_row = await db.fetchrow("SELECT * FROM groups WHERE chat_id=$1", chat.id)
     settings_dict = {}
     if settings_row:
         raw = dict(settings_row)
         settings_dict = {
-            k: raw[k] for k in COPYABLE_SETTINGS_KEYS
-            if k in raw and raw[k] is not None
+            k: raw[k] for k in COPYABLE_SETTINGS_KEYS if k in raw and raw[k] is not None
         }
 
     notes = await db.fetch(
         """SELECT name, content, media_type, is_private
            FROM notes WHERE chat_id=$1 ORDER BY name""",
-        chat.id
+        chat.id,
     )
     filters = await db.fetch(
         """SELECT keyword, reply_content, media_type, reply_mode
            FROM filters WHERE chat_id=$1 AND is_active=TRUE""",
-        chat.id
+        chat.id,
     )
     blocklist = await db.fetch(
         """SELECT keyword, action
            FROM blocklist WHERE chat_id=$1 AND is_active=TRUE""",
-        chat.id
+        chat.id,
     )
     silent_times = await db.fetch(
         """SELECT slot, start_time::text, end_time::text,
                   is_active, start_text, end_text
            FROM silent_times WHERE chat_id=$1""",
-        chat.id
+        chat.id,
     )
     regex_pats = await db.fetch(
-        "SELECT pattern, penalty FROM regex_patterns WHERE chat_id=$1",
-        chat.id
+        "SELECT pattern, penalty FROM regex_patterns WHERE chat_id=$1", chat.id
     )
     nec_words = await db.fetch(
-        "SELECT word FROM necessary_words WHERE chat_id=$1 AND is_active=TRUE",
-        chat.id
+        "SELECT word FROM necessary_words WHERE chat_id=$1 AND is_active=TRUE", chat.id
     )
     rule_priority = await db.fetchrow(
         "SELECT rule_order FROM rule_priority WHERE chat_id=$1", chat.id
     )
     time_windows = await db.fetch(
         "SELECT rule_key, start_time::text, end_time::text FROM rule_time_windows WHERE chat_id=$1",
-        chat.id
+        chat.id,
     )
     penalties = await db.fetch(
-        "SELECT rule_key, penalty, duration_hours FROM rule_penalties WHERE chat_id=$1",
-        chat.id
+        "SELECT rule_key, penalty, duration_hours FROM rule_penalties WHERE chat_id=$1", chat.id
     )
 
     export_data = {
-        "nexus_version":    EXPORT_VERSION,
-        "exported_at":      datetime.now(timezone.utc).isoformat(),
-        "chat_id":          chat.id,
-        "chat_title":       chat.title,
-        "settings":         settings_dict,
-        "notes":            [dict(r) for r in notes],
-        "filters":          [dict(r) for r in filters],
-        "blocklist":        [dict(r) for r in blocklist],
-        "silent_times":     [dict(r) for r in silent_times],
-        "regex_patterns":   [dict(r) for r in regex_pats],
-        "necessary_words":  [r["word"] for r in nec_words],
-        "rule_priority":    rule_priority["rule_order"] if rule_priority else [],
-        "rule_time_windows":{r["rule_key"]: {
-                                "start": r["start_time"],
-                                "end":   r["end_time"]
-                             } for r in time_windows},
-        "rule_penalties":   {r["rule_key"]: {
-                                "penalty":        r["penalty"],
-                                "duration_hours": r["duration_hours"]
-                             } for r in penalties},
+        "nexus_version": EXPORT_VERSION,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "chat_id": chat.id,
+        "chat_title": chat.title,
+        "settings": settings_dict,
+        "notes": [dict(r) for r in notes],
+        "filters": [dict(r) for r in filters],
+        "blocklist": [dict(r) for r in blocklist],
+        "silent_times": [dict(r) for r in silent_times],
+        "regex_patterns": [dict(r) for r in regex_pats],
+        "necessary_words": [r["word"] for r in nec_words],
+        "rule_priority": rule_priority["rule_order"] if rule_priority else [],
+        "rule_time_windows": {
+            r["rule_key"]: {"start": r["start_time"], "end": r["end_time"]} for r in time_windows
+        },
+        "rule_penalties": {
+            r["rule_key"]: {"penalty": r["penalty"], "duration_hours": r["duration_hours"]}
+            for r in penalties
+        },
     }
 
     json_bytes = json.dumps(export_data, indent=2, default=str).encode()
-    buf        = BytesIO(json_bytes)
-    buf.name   = f"nexus_settings_{chat.id}_{datetime.now().strftime('%Y%m%d')}.json"
+    buf = BytesIO(json_bytes)
+    buf.name = f"nexus_settings_{chat.id}_{datetime.now().strftime('%Y%m%d')}.json"
 
     try:
         await bot.send_document(
-            chat_id  = chat.id,
-            document = buf,
-            filename = buf.name,
-            caption  = (
+            chat_id=chat.id,
+            document=buf,
+            filename=buf.name,
+            caption=(
                 f"📤 <b>Settings Export</b>\n"
                 f"Group: {chat.title}\n"
                 f"Exported: {len(settings_dict)} settings, "
@@ -139,19 +132,22 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"{len(blocklist)} blocklist entries\n\n"
                 "Use /import to restore these settings in another group."
             ),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     except TelegramError as e:
         await msg.reply_text(f"❌ Export failed: {e}")
         return
 
     await log_event(
-        bot=bot, db=db, chat_id=chat.id,
-        event_type="export", actor=user,
+        bot=bot,
+        db=db,
+        chat_id=chat.id,
+        event_type="export",
+        actor=user,
         details={
-            "export_keys":  len(settings_dict),
-            "notes_count":  len(notes),
-            "filters_count":len(filters),
+            "export_keys": len(settings_dict),
+            "notes_count": len(notes),
+            "filters_count": len(filters),
         },
         chat_title=chat.title,
         bot_id=bot.id,
@@ -167,10 +163,10 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
     /import (reply to a JSON document message)
     Validates and applies the settings from the uploaded file.
     """
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
-    bot  = context.bot
+    db = context.bot_data.get("db")
+    bot = context.bot
     user = update.effective_user
 
     doc = None
@@ -195,11 +191,11 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
-        file     = await bot.get_file(doc.file_id)
-        buf      = BytesIO()
+        file = await bot.get_file(doc.file_id)
+        buf = BytesIO()
         await file.download_to_memory(buf)
         buf.seek(0)
-        data     = json.loads(buf.read().decode())
+        data = json.loads(buf.read().decode())
     except (json.JSONDecodeError, Exception) as e:
         await msg.reply_text(f"❌ Invalid JSON file: {e}")
         return
@@ -222,39 +218,38 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ {changes['silent_times']} silent time slots imported\n"
         f"✅ {changes['regex_patterns']} regex patterns imported\n"
         f"✅ {changes['necessary_words']} necessary words imported",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
     await log_event(
-        bot=bot, db=db, chat_id=chat.id,
-        event_type="import", actor=user,
-        details=changes, chat_title=chat.title,
+        bot=bot,
+        db=db,
+        chat_id=chat.id,
+        event_type="import",
+        actor=user,
+        details=changes,
+        chat_title=chat.title,
         bot_id=bot.id,
     )
-    log.info(
-        f"[IMPORT_EXPORT] Imported | chat={chat.id} changes={changes}"
-    )
+    log.info(f"[IMPORT_EXPORT] Imported | chat={chat.id} changes={changes}")
 
 
 async def _apply_import(db, chat_id: int, data: dict) -> dict:
     """Apply all sections of an import. Returns count of changes."""
     changes = {
-        "settings":       0,
-        "notes":          0,
-        "filters":        0,
-        "blocklist":      0,
-        "silent_times":   0,
+        "settings": 0,
+        "notes": 0,
+        "filters": 0,
+        "blocklist": 0,
+        "silent_times": 0,
         "regex_patterns": 0,
-        "necessary_words":0,
+        "necessary_words": 0,
     }
 
     settings = data.get("settings", {})
-    allowed  = {k: v for k, v in settings.items()
-                if k in COPYABLE_SETTINGS_KEYS}
+    allowed = {k: v for k, v in settings.items() if k in COPYABLE_SETTINGS_KEYS}
     if allowed:
-        set_clauses = ", ".join(
-            f"{k}=${i+2}" for i, k in enumerate(allowed.keys())
-        )
+        set_clauses = ", ".join(f"{k}=${i+2}" for i, k in enumerate(allowed.keys()))
         values = [chat_id] + list(allowed.values())
         await db.execute(
             f"""INSERT INTO groups
@@ -262,7 +257,7 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
                 VALUES ($1, {', '.join(f'${i+2}' for i in range(len(allowed)))})
                 ON CONFLICT (chat_id)
                 DO UPDATE SET {set_clauses}""",
-            *values
+            *values,
         )
         changes["settings"] = len(allowed)
 
@@ -278,7 +273,7 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
             note.get("name", ""),
             note.get("content", ""),
             note.get("media_type"),
-            note.get("is_private", False)
+            note.get("is_private", False),
         )
         changes["notes"] += 1
 
@@ -294,7 +289,7 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
             f.get("keyword", ""),
             f.get("reply_content", ""),
             f.get("media_type"),
-            f.get("reply_mode", "reply")
+            f.get("reply_mode", "reply"),
         )
         changes["filters"] += 1
 
@@ -304,7 +299,9 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
                VALUES ($1,$2,$3)
                ON CONFLICT (chat_id, keyword)
                DO UPDATE SET action=EXCLUDED.action""",
-            chat_id, b.get("keyword", ""), b.get("action", "delete")
+            chat_id,
+            b.get("keyword", ""),
+            b.get("action", "delete"),
         )
         changes["blocklist"] += 1
 
@@ -326,7 +323,7 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
             st.get("end_time", "08:00"),
             st.get("is_active", True),
             st.get("start_text", ""),
-            st.get("end_text", "")
+            st.get("end_text", ""),
         )
         changes["silent_times"] += 1
 
@@ -335,7 +332,9 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
             """INSERT INTO regex_patterns (chat_id, pattern, penalty)
                VALUES ($1,$2,$3)
                ON CONFLICT DO NOTHING""",
-            chat_id, p.get("pattern", ""), p.get("penalty", "delete")
+            chat_id,
+            p.get("pattern", ""),
+            p.get("penalty", "delete"),
         )
         changes["regex_patterns"] += 1
 
@@ -344,7 +343,8 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
             """INSERT INTO necessary_words (chat_id, word)
                VALUES ($1,$2)
                ON CONFLICT (chat_id, word) DO NOTHING""",
-            chat_id, word
+            chat_id,
+            word,
         )
         changes["necessary_words"] += 1
 
@@ -354,7 +354,8 @@ async def _apply_import(db, chat_id: int, data: dict) -> dict:
                VALUES ($1,$2)
                ON CONFLICT (chat_id)
                DO UPDATE SET rule_order=EXCLUDED.rule_order""",
-            chat_id, json.dumps(data["rule_priority"])
+            chat_id,
+            json.dumps(data["rule_priority"]),
         )
 
     return changes
@@ -365,19 +366,19 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     /reset — wipe all custom settings and restore defaults.
     Shows confirmation buttons first.
     """
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
 
-    markup = InlineKeyboardMarkup([[
-        InlineKeyboardButton(
-            "✅ Yes, reset everything",
-            callback_data=f"reset_confirm:{chat.id}"
-        ),
-        InlineKeyboardButton(
-            "❌ Cancel",
-            callback_data="reset_cancel"
-        ),
-    ]])
+    markup = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "✅ Yes, reset everything", callback_data=f"reset_confirm:{chat.id}"
+                ),
+                InlineKeyboardButton("❌ Cancel", callback_data="reset_cancel"),
+            ]
+        ]
+    )
 
     await msg.reply_text(
         "⚠️ <b>Reset Group Settings</b>\n\n"
@@ -397,19 +398,17 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Activity log\n\n"
         "Are you sure?",
         parse_mode="HTML",
-        reply_markup=markup
+        reply_markup=markup,
     )
 
 
-async def handle_reset_callback(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def handle_reset_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle reset confirmation button presses."""
     query = update.callback_query
-    data  = query.data or ""
-    db    = context.bot_data.get("db")
-    user  = query.from_user
-    bot   = context.bot
+    data = query.data or ""
+    db = context.bot_data.get("db")
+    user = query.from_user
+    bot = context.bot
 
     await query.answer()
 
@@ -431,40 +430,41 @@ async def handle_reset_callback(
         return
 
     tables = [
-        ("groups",             "DELETE FROM groups WHERE chat_id=$1"),
-        ("notes",              "DELETE FROM notes WHERE chat_id=$1"),
-        ("filters",            "DELETE FROM filters WHERE chat_id=$1"),
-        ("blocklist",          "DELETE FROM blocklist WHERE chat_id=$1"),
-        ("silent_times",       "DELETE FROM silent_times WHERE chat_id=$1"),
-        ("regex_patterns",     "DELETE FROM regex_patterns WHERE chat_id=$1"),
-        ("necessary_words",    "DELETE FROM necessary_words WHERE chat_id=$1"),
-        ("rule_priority",      "DELETE FROM rule_priority WHERE chat_id=$1"),
-        ("rule_time_windows",  "DELETE FROM rule_time_windows WHERE chat_id=$1"),
-        ("rule_penalties",     "DELETE FROM rule_penalties WHERE chat_id=$1"),
+        ("groups", "DELETE FROM groups WHERE chat_id=$1"),
+        ("notes", "DELETE FROM notes WHERE chat_id=$1"),
+        ("filters", "DELETE FROM filters WHERE chat_id=$1"),
+        ("blocklist", "DELETE FROM blocklist WHERE chat_id=$1"),
+        ("silent_times", "DELETE FROM silent_times WHERE chat_id=$1"),
+        ("regex_patterns", "DELETE FROM regex_patterns WHERE chat_id=$1"),
+        ("necessary_words", "DELETE FROM necessary_words WHERE chat_id=$1"),
+        ("rule_priority", "DELETE FROM rule_priority WHERE chat_id=$1"),
+        ("rule_time_windows", "DELETE FROM rule_time_windows WHERE chat_id=$1"),
+        ("rule_penalties", "DELETE FROM rule_penalties WHERE chat_id=$1"),
         ("captcha_challenges", "DELETE FROM captcha_challenges WHERE chat_id=$1"),
-        ("password_challenges","DELETE FROM password_challenges WHERE chat_id=$1"),
+        ("password_challenges", "DELETE FROM password_challenges WHERE chat_id=$1"),
         ("scheduled_messages", "DELETE FROM scheduled_messages WHERE chat_id=$1"),
-        ("pinned_messages",    "DELETE FROM pinned_messages WHERE chat_id=$1"),
+        ("pinned_messages", "DELETE FROM pinned_messages WHERE chat_id=$1"),
     ]
 
     for table_name, query_str in tables:
         try:
             await db.execute(query_str, chat_id)
         except Exception as e:
-            log.warning(
-                f"[IMPORT_EXPORT] Reset failed on {table_name}: {e}"
-            )
+            log.warning(f"[IMPORT_EXPORT] Reset failed on {table_name}: {e}")
 
     await query.edit_message_text(
         "✅ <b>Group reset complete.</b>\n\n"
         "All settings have been cleared. "
         "The bot will use default settings until you reconfigure.",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
     await log_event(
-        bot=bot, db=db, chat_id=chat_id,
-        event_type="reset", actor=user,
+        bot=bot,
+        db=db,
+        chat_id=chat_id,
+        event_type="reset",
+        actor=user,
         details={"tables_cleared": len(tables)},
         bot_id=bot.id,
     )

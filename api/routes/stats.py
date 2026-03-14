@@ -38,7 +38,7 @@ async def get_stats_overview(user: dict = Depends(get_current_user)):
             "music_plays_today": 0,
             "games_played_today": 0,
             "top_commands": [],
-            "growth_chart": []
+            "growth_chart": [],
         }
 
         # Get today's date
@@ -47,36 +47,49 @@ async def get_stats_overview(user: dict = Depends(get_current_user)):
 
         async with db.pool.acquire() as conn:
             # Total groups
-            stats["total_groups"] = await conn.fetchval(
-                "SELECT COUNT(DISTINCT chat_id) FROM groups WHERE bot_id = $1",
-                bot_id
-            ) or 0
+            stats["total_groups"] = (
+                await conn.fetchval(
+                    "SELECT COUNT(DISTINCT chat_id) FROM groups WHERE bot_id = $1", bot_id
+                )
+                or 0
+            )
 
             # Active groups (7 days)
-            stats["active_groups_7d"] = await conn.fetchval(
-                """SELECT COUNT(DISTINCT chat_id) FROM command_usage
+            stats["active_groups_7d"] = (
+                await conn.fetchval(
+                    """SELECT COUNT(DISTINCT chat_id) FROM command_usage
                    WHERE bot_id = $1 AND date >= $2""",
-                bot_id, week_ago
-            ) or 0
+                    bot_id,
+                    week_ago,
+                )
+                or 0
+            )
 
             # Total unique users
-            stats["total_users"] = await conn.fetchval(
-                "SELECT COUNT(DISTINCT user_id) FROM command_usage WHERE bot_id = $1",
-                bot_id
-            ) or 0
+            stats["total_users"] = (
+                await conn.fetchval(
+                    "SELECT COUNT(DISTINCT user_id) FROM command_usage WHERE bot_id = $1", bot_id
+                )
+                or 0
+            )
 
             # Active users (7 days)
-            stats["active_users_7d"] = await conn.fetchval(
-                """SELECT COUNT(DISTINCT user_id) FROM command_usage
+            stats["active_users_7d"] = (
+                await conn.fetchval(
+                    """SELECT COUNT(DISTINCT user_id) FROM command_usage
                    WHERE bot_id = $1 AND date >= $2""",
-                bot_id, week_ago
-            ) or 0
+                    bot_id,
+                    week_ago,
+                )
+                or 0
+            )
 
             # Today's stats
             daily_stats = await conn.fetchrow(
                 """SELECT commands_count, music_plays, games_played
                    FROM bot_stats_daily WHERE bot_id = $1 AND date = $2""",
-                bot_id, today
+                bot_id,
+                today,
             )
 
             if daily_stats:
@@ -92,18 +105,24 @@ async def get_stats_overview(user: dict = Depends(get_current_user)):
                    GROUP BY command
                    ORDER BY count DESC
                    LIMIT 10""",
-                bot_id, week_ago
+                bot_id,
+                week_ago,
             )
-            stats["top_commands"] = [{"command": r["command"], "count": r["count"]} for r in top_cmds]
+            stats["top_commands"] = [
+                {"command": r["command"], "count": r["count"]} for r in top_cmds
+            ]
 
             # Growth chart (last 30 days)
             growth = await conn.fetch(
                 """SELECT date, new_groups FROM bot_stats_daily
                    WHERE bot_id = $1 AND date >= $2
                    ORDER BY date ASC""",
-                bot_id, today - timedelta(days=30)
+                bot_id,
+                today - timedelta(days=30),
             )
-            stats["growth_chart"] = [{"date": r["date"].isoformat(), "new_groups": r["new_groups"]} for r in growth]
+            stats["growth_chart"] = [
+                {"date": r["date"].isoformat(), "new_groups": r["new_groups"]} for r in growth
+            ]
 
         return {"ok": True, "stats": stats}
 
@@ -127,7 +146,8 @@ async def get_chat_stats(chat_id: int, user: dict = Depends(get_current_user)):
             # Check access
             has_access = await conn.fetchval(
                 "SELECT EXISTS(SELECT 1 FROM groups WHERE chat_id = $1 AND bot_id = $2)",
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
             if not has_access:
                 raise HTTPException(status_code=403, detail="No access to this group")
@@ -138,7 +158,7 @@ async def get_chat_stats(chat_id: int, user: dict = Depends(get_current_user)):
                    SUM(total_plays) as total_plays, MAX(high_score) as top_score
                    FROM game_scores WHERE chat_id = $1
                    GROUP BY game_type""",
-                chat_id
+                chat_id,
             )
 
             # Get command usage
@@ -146,14 +166,22 @@ async def get_chat_stats(chat_id: int, user: dict = Depends(get_current_user)):
                 """SELECT command, COUNT(*) as count
                    FROM command_usage WHERE chat_id = $1 AND date >= $2
                    GROUP BY command ORDER BY count DESC LIMIT 10""",
-                chat_id, datetime.now().date() - timedelta(days=7)
+                chat_id,
+                datetime.now().date() - timedelta(days=7),
             )
 
             return {
                 "ok": True,
-                "games": [{"type": r["game_type"], "players": r["players"],
-                          "total_plays": r["total_plays"], "top_score": r["top_score"]} for r in scores],
-                "commands": [{"command": r["command"], "count": r["count"]} for r in commands]
+                "games": [
+                    {
+                        "type": r["game_type"],
+                        "players": r["players"],
+                        "total_plays": r["total_plays"],
+                        "top_score": r["top_score"],
+                    }
+                    for r in scores
+                ],
+                "commands": [{"command": r["command"], "count": r["count"]} for r in commands],
             }
 
     except HTTPException:
@@ -191,7 +219,11 @@ async def record_command_usage(pool, bot_id: int, command: str, user_id: int, ch
             await conn.execute(
                 """INSERT INTO command_usage (date, bot_id, command, user_id, chat_id)
                    VALUES ($1, $2, $3, $4, $5)""",
-                today, bot_id, command, user_id, chat_id
+                today,
+                bot_id,
+                command,
+                user_id,
+                chat_id,
             )
 
             # Update daily stats
@@ -200,7 +232,8 @@ async def record_command_usage(pool, bot_id: int, command: str, user_id: int, ch
                    VALUES ($1, $2, 1)
                    ON CONFLICT (date, bot_id) DO UPDATE
                    SET commands_count = bot_stats_daily.commands_count + 1""",
-                today, bot_id
+                today,
+                bot_id,
             )
     except Exception as e:
         logger.error(f"[STATS] Error recording command: {e}")
@@ -219,7 +252,8 @@ async def record_game_played(pool, bot_id: int, game_type: str):
                    VALUES ($1, $2, 1)
                    ON CONFLICT (date, bot_id) DO UPDATE
                    SET games_played = bot_stats_daily.games_played + 1""",
-                today, bot_id
+                today,
+                bot_id,
             )
     except Exception as e:
         logger.error(f"[STATS] Error recording game: {e}")
@@ -238,7 +272,8 @@ async def record_music_play(pool, bot_id: int):
                    VALUES ($1, $2, 1)
                    ON CONFLICT (date, bot_id) DO UPDATE
                    SET music_plays = bot_stats_daily.music_plays + 1""",
-                today, bot_id
+                today,
+                bot_id,
             )
     except Exception as e:
         logger.error(f"[STATS] Error recording music play: {e}")

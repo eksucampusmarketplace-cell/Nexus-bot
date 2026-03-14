@@ -28,81 +28,79 @@ from typing import Optional
 from telegram import Bot, User
 from telegram.error import TelegramError
 
-from db.ops.log_channel import (
-    get_log_channel, get_log_categories, log_activity
-)
+from db.ops.log_channel import get_log_channel, get_log_categories, log_activity
 
 log = logging.getLogger("log_channel")
 
 EVENT_META = {
-    "ban":            ("🚫", "BAN"),
-    "mute":           ("🔇", "MUTE"),
-    "warn":           ("⚠️", "WARN"),
-    "kick":           ("👢", "KICK"),
-    "delete":         ("🗑", "DELETE"),
-    "join":           ("👋", "JOIN"),
-    "leave":          ("🚪", "LEAVE"),
-    "raid":           ("🚨", "RAID"),
+    "ban": ("🚫", "BAN"),
+    "mute": ("🔇", "MUTE"),
+    "warn": ("⚠️", "WARN"),
+    "kick": ("👢", "KICK"),
+    "delete": ("🗑", "DELETE"),
+    "join": ("👋", "JOIN"),
+    "leave": ("🚪", "LEAVE"),
+    "raid": ("🚨", "RAID"),
     "antiraid_start": ("🛡", "ANTI-RAID START"),
-    "antiraid_end":   ("🛡", "ANTI-RAID END"),
-    "captcha_pass":   ("✅", "CAPTCHA PASSED"),
-    "captcha_fail":   ("❌", "CAPTCHA FAILED"),
-    "filter":         ("🔍", "FILTER TRIGGERED"),
-    "blocklist":      ("🚫", "BLOCKLIST"),
-    "settings_change":("⚙️", "SETTINGS CHANGED"),
-    "pin":            ("📌", "PIN"),
-    "unpin":          ("📌", "UNPIN"),
-    "report":         ("🚨", "REPORT"),
-    "note_access":    ("📝", "NOTE ACCESSED"),
-    "schedule_send":  ("📅", "SCHEDULED SEND"),
-    "password_pass":  ("🔐", "PASSWORD PASSED"),
-    "password_fail":  ("🔐", "PASSWORD FAILED"),
-    "import":         ("📥", "IMPORT"),
-    "export":         ("📤", "EXPORT"),
-    "reset":          ("🔄", "RESET"),
-    "inline_query":   ("⚡", "INLINE QUERY"),
+    "antiraid_end": ("🛡", "ANTI-RAID END"),
+    "captcha_pass": ("✅", "CAPTCHA PASSED"),
+    "captcha_fail": ("❌", "CAPTCHA FAILED"),
+    "filter": ("🔍", "FILTER TRIGGERED"),
+    "blocklist": ("🚫", "BLOCKLIST"),
+    "settings_change": ("⚙️", "SETTINGS CHANGED"),
+    "pin": ("📌", "PIN"),
+    "unpin": ("📌", "UNPIN"),
+    "report": ("🚨", "REPORT"),
+    "note_access": ("📝", "NOTE ACCESSED"),
+    "schedule_send": ("📅", "SCHEDULED SEND"),
+    "password_pass": ("🔐", "PASSWORD PASSED"),
+    "password_fail": ("🔐", "PASSWORD FAILED"),
+    "import": ("📥", "IMPORT"),
+    "export": ("📤", "EXPORT"),
+    "reset": ("🔄", "RESET"),
+    "inline_query": ("⚡", "INLINE QUERY"),
 }
 
 CATEGORY_MAP = {
-    "ban":            "ban",
-    "mute":           "mute",
-    "warn":           "warn",
-    "kick":           "kick",
-    "delete":         "delete",
-    "join":           "join",
-    "leave":          "leave",
-    "raid":           "raid",
+    "ban": "ban",
+    "mute": "mute",
+    "warn": "warn",
+    "kick": "kick",
+    "delete": "delete",
+    "join": "join",
+    "leave": "leave",
+    "raid": "raid",
     "antiraid_start": "raid",
-    "antiraid_end":   "raid",
-    "captcha_pass":   "captcha",
-    "captcha_fail":   "captcha",
-    "filter":         "filter",
-    "blocklist":      "blocklist",
-    "settings_change":"settings",
-    "pin":            "pin",
-    "unpin":          "pin",
-    "report":         "report",
-    "note_access":    "note",
-    "schedule_send":  "schedule",
-    "password_pass":  "password",
-    "password_fail":  "password",
-    "import":         "import_export",
-    "export":         "import_export",
-    "reset":          "import_export",
-    "inline_query":   "settings",
+    "antiraid_end": "raid",
+    "captcha_pass": "captcha",
+    "captcha_fail": "captcha",
+    "filter": "filter",
+    "blocklist": "blocklist",
+    "settings_change": "settings",
+    "pin": "pin",
+    "unpin": "pin",
+    "report": "report",
+    "note_access": "note",
+    "schedule_send": "schedule",
+    "password_pass": "password",
+    "password_fail": "password",
+    "import": "import_export",
+    "export": "import_export",
+    "reset": "import_export",
+    "inline_query": "settings",
 }
 
 
 async def log_event(
-    bot:        Bot,
+    bot: Bot,
     db,
-    chat_id:    int,
+    chat_id: int,
     event_type: str,
-    actor:      Optional[User] = None,
-    target:     Optional[User] = None,
-    details:    dict           = None,
-    chat_title: str            = "",
-    bot_id:     int            = 0,
+    actor: Optional[User] = None,
+    target: Optional[User] = None,
+    details: dict = None,
+    chat_title: str = "",
+    bot_id: int = 0,
 ):
     """
     Main entry point. Call this from every action handler.
@@ -114,14 +112,14 @@ async def log_event(
     try:
         await log_activity(
             db,
-            chat_id    = chat_id,
-            bot_id     = bot_id,
-            event_type = event_type,
-            actor_id   = actor.id   if actor  else None,
-            target_id  = target.id  if target else None,
-            actor_name = _user_label(actor),
-            target_name= _user_label(target),
-            details    = details,
+            chat_id=chat_id,
+            bot_id=bot_id,
+            event_type=event_type,
+            actor_id=actor.id if actor else None,
+            target_id=target.id if target else None,
+            actor_name=_user_label(actor),
+            target_name=_user_label(target),
+            details=details,
         )
     except Exception as e:
         log.warning(f"[LOG_CHANNEL] activity_log write failed: {e}")
@@ -144,40 +142,30 @@ async def log_event(
     if category and not categories.get(category, True):
         return
 
-    text = _build_log_message(
-        event_type, actor, target,
-        details, chat_title, chat_id
-    )
+    text = _build_log_message(event_type, actor, target, details, chat_title, chat_id)
 
     try:
         await bot.send_message(
-            chat_id    = channel_id,
-            text       = text,
-            parse_mode = "HTML",
-            disable_web_page_preview = True
+            chat_id=channel_id, text=text, parse_mode="HTML", disable_web_page_preview=True
         )
         log.debug(
-            f"[LOG_CHANNEL] Posted | chat={chat_id} "
-            f"type={event_type} channel={channel_id}"
+            f"[LOG_CHANNEL] Posted | chat={chat_id} " f"type={event_type} channel={channel_id}"
         )
     except TelegramError as e:
-        log.warning(
-            f"[LOG_CHANNEL] Post failed | chat={chat_id} "
-            f"channel={channel_id} err={e}"
-        )
+        log.warning(f"[LOG_CHANNEL] Post failed | chat={chat_id} " f"channel={channel_id} err={e}")
 
 
 def _build_log_message(
     event_type: str,
-    actor:      Optional[User],
-    target:     Optional[User],
-    details:    dict,
+    actor: Optional[User],
+    target: Optional[User],
+    details: dict,
     chat_title: str,
-    chat_id:    int,
+    chat_id: int,
 ) -> str:
     """Build a rich HTML log message."""
     emoji, label = EVENT_META.get(event_type, ("📋", event_type.upper()))
-    now          = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     lines = [f"{emoji} <b>{label}</b>"]
 
@@ -191,20 +179,20 @@ def _build_log_message(
         lines.append(f"├ <b>Target:</b> {_user_html(target)}")
 
     DETAIL_LABELS = {
-        "rule_key":       "Rule",
-        "reason":         "Reason",
-        "penalty":        "Penalty",
-        "duration":       "Duration",
-        "note_name":      "Note",
+        "rule_key": "Rule",
+        "reason": "Reason",
+        "penalty": "Penalty",
+        "duration": "Duration",
+        "note_name": "Note",
         "filter_keyword": "Filter",
-        "template":       "Template",
-        "schedule_type":  "Schedule",
-        "report_id":      "Report #",
-        "settings_key":   "Setting",
-        "old_value":      "Old value",
-        "new_value":      "New value",
-        "export_keys":    "Exported keys",
-        "query":          "Query",
+        "template": "Template",
+        "schedule_type": "Schedule",
+        "report_id": "Report #",
+        "settings_key": "Setting",
+        "old_value": "Old value",
+        "new_value": "New value",
+        "export_keys": "Exported keys",
+        "query": "Query",
     }
 
     for key, label_str in DETAIL_LABELS.items():
@@ -230,7 +218,7 @@ def _user_html(user: User) -> str:
     if user.username:
         return (
             f'<a href="tg://user?id={user.id}">{name}</a> '
-            f'(@{user.username}, <code>{user.id}</code>)'
+            f"(@{user.username}, <code>{user.id}</code>)"
         )
     return f'<a href="tg://user?id={user.id}">{name}</a> (<code>{user.id}</code>)'
 

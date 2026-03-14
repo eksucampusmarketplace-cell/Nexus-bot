@@ -3,13 +3,10 @@ import logging
 import os
 import re
 import sys
-import time
 from contextlib import asynccontextmanager
-
-import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from telegram import Update
 
@@ -18,7 +15,7 @@ from bot.factory import create_application
 from bot.registry import get as registry_get
 from bot.registry import get_all as registry_get_all
 from bot.registry import register as registry_register
-from bot.utils.crypto import decrypt_token, encrypt_token, hash_token
+from bot.utils.crypto import decrypt_token
 from config import settings
 from db.client import db
 
@@ -281,6 +278,7 @@ try:
         channel_gate,
         channels,
         events,
+        events_new,
         games,
         groups,
         log_channel,
@@ -288,6 +286,9 @@ try:
         member_stats,
         members,
         messages,
+    )
+    from api.routes import moderation as moderation_api
+    from api.routes import (
         modules,
         music,
         music_auth,
@@ -306,8 +307,10 @@ try:
     # Routes with full paths defined in the router (no prefix needed)
     app.include_router(automod.router, tags=["automod"])
     app.include_router(events.router, tags=["events"])
+    app.include_router(events_new.router, tags=["events_new"])
     app.include_router(scheduler.router, tags=["scheduler"])
     app.include_router(log_channel.router, tags=["log_channel"])
+    app.include_router(moderation_api.router, tags=["moderation"])
 
     # Routes that need prefix
     app.include_router(me.router, prefix="/api/me", tags=["me"])

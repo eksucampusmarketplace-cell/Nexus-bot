@@ -40,6 +40,7 @@ class EventBus:
     Bot handlers call EventBus.publish(chat_id, event_type, data).
     SSE connections for that chat_id receive the event.
     """
+
     _connections: dict[int, list[asyncio.Queue]] = {}
 
     @classmethod
@@ -54,17 +55,16 @@ class EventBus:
     @classmethod
     def unsubscribe(cls, chat_id: int, queue: asyncio.Queue):
         if chat_id in cls._connections:
-            cls._connections[chat_id] = [
-                q for q in cls._connections[chat_id] if q is not queue
-            ]
+            cls._connections[chat_id] = [q for q in cls._connections[chat_id] if q is not queue]
         log.debug(f"[SSE] Unsubscribe | chat={chat_id}")
 
     @classmethod
     async def publish(cls, chat_id: int, event_type: str, data: dict):
         if chat_id not in cls._connections:
             return
-        payload = json.dumps({"type": event_type, "data": data,
-                               "ts": datetime.now(timezone.utc).isoformat()})
+        payload = json.dumps(
+            {"type": event_type, "data": data, "ts": datetime.now(timezone.utc).isoformat()}
+        )
         dead = []
         for q in cls._connections[chat_id]:
             try:
@@ -83,6 +83,7 @@ def push_event(owner_id: int, data: dict):
     chat_id = data.get("chat_id")
     if chat_id:
         import asyncio
+
         asyncio.create_task(EventBus.publish(chat_id, data.get("type", "notification"), data))
 
 
@@ -91,6 +92,7 @@ async def sse_events(request: Request, chat_id: int, token: str = ""):
     """SSE stream for a specific chat_id."""
     # Validate token
     from api.auth import validate_init_data
+
     if not settings.SKIP_AUTH:
         user_data = None
         # Try primary bot first
@@ -99,6 +101,7 @@ async def sse_events(request: Request, chat_id: int, token: str = ""):
         except Exception:
             # Try clones
             from bot.registry import get_all
+
             registered_bots = get_all()
             for bot_id, bot_app in registered_bots.items():
                 try:
@@ -110,13 +113,13 @@ async def sse_events(request: Request, chat_id: int, token: str = ""):
                         break
                 except Exception:
                     continue
-        
+
         if not user_data:
             return StreamingResponse(
                 iter([f"event: error\ndata: {json.dumps({'error':'unauthorized'})}\n\n"]),
-                media_type="text/event-stream"
+                media_type="text/event-stream",
             )
-        
+
         user_id = user_data["user"].get("id")
 
     queue = EventBus.subscribe(chat_id)
@@ -146,8 +149,8 @@ async def sse_events(request: Request, chat_id: int, token: str = ""):
         stream(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control":   "no-cache",
+            "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection":      "keep-alive",
-        }
+            "Connection": "keep-alive",
+        },
     )

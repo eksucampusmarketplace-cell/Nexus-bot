@@ -33,54 +33,48 @@ log = logging.getLogger("public_cmd")
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/rules — show group rules from settings."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     settings = await get_group_settings(db, chat.id)
-    rules    = settings.get("rules_text") if settings else None
+    rules = settings.get("rules_text") if settings else None
 
     if not rules:
         rules = await _generate_rules(settings)
 
-    await msg.reply_text(
-        f"📋 <b>Group Rules</b>\n\n{rules}",
-        parse_mode="HTML"
-    )
+    await msg.reply_text(f"📋 <b>Group Rules</b>\n\n{rules}", parse_mode="HTML")
 
 
 async def cmd_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/time — show current time in group's timezone."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     settings = await get_group_settings(db, chat.id)
-    tz_name  = settings.get("timezone", "UTC") if settings else "UTC"
+    tz_name = settings.get("timezone", "UTC") if settings else "UTC"
 
     try:
-        tz       = pytz.timezone(tz_name)
-        now      = datetime.now(tz)
+        tz = pytz.timezone(tz_name)
+        now = datetime.now(tz)
         time_str = now.strftime("%H:%M:%S")
         date_str = now.strftime("%A, %d %B %Y")
     except Exception:
-        now      = datetime.utcnow()
+        now = datetime.utcnow()
         time_str = now.strftime("%H:%M:%S")
         date_str = now.strftime("%A, %d %B %Y")
-        tz_name  = "UTC"
+        tz_name = "UTC"
 
     await msg.reply_text(
-        f"🕐 <b>Group Time</b>\n\n"
-        f"📅 {date_str}\n"
-        f"⏰ {time_str}\n"
-        f"🌍 Timezone: {tz_name}",
-        parse_mode="HTML"
+        f"🕐 <b>Group Time</b>\n\n" f"📅 {date_str}\n" f"⏰ {time_str}\n" f"🌍 Timezone: {tz_name}",
+        parse_mode="HTML",
     )
 
 
 async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/id — show user ID and chat ID."""
-    msg  = update.effective_message
+    msg = update.effective_message
     user = update.effective_user
     chat = update.effective_chat
 
@@ -90,7 +84,7 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👤 <b>User ID:</b> <code>{target.id}</code>\n"
         f"💬 <b>Chat ID:</b> <code>{chat.id}</code>\n"
         f"📝 <b>Username:</b> @{target.username or 'none'}",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
 
@@ -100,42 +94,36 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Reports the replied-to message to group admins.
     Notifies all admins via private message.
     """
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     if not msg.reply_to_message:
-        await msg.reply_text(
-            "Reply to a message to report it.\n"
-            "Usage: /report [reason]"
-        )
+        await msg.reply_text("Reply to a message to report it.\n" "Usage: /report [reason]")
         return
 
-    reported_msg  = msg.reply_to_message
+    reported_msg = msg.reply_to_message
     reported_user = reported_msg.from_user
     reason = " ".join(context.args) if context.args else "No reason given"
 
     report_id = await save_report(
-        db, chat.id,
+        db,
+        chat.id,
         reporter_id=user.id,
         reported_id=reported_user.id if reported_user else None,
         message_id=reported_msg.message_id,
-        reason=reason
+        reason=reason,
     )
 
-    await msg.reply_text(
-        f"✅ Report submitted (#{report_id}).\n"
-        "Admins have been notified."
-    )
+    await msg.reply_text(f"✅ Report submitted (#{report_id}).\n" "Admins have been notified.")
 
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
-        reporter_name = (
-            f"@{user.username}" if user.username else user.full_name
-        )
+        reporter_name = f"@{user.username}" if user.username else user.full_name
         reported_name = (
-            f"@{reported_user.username}" if reported_user and reported_user.username
+            f"@{reported_user.username}"
+            if reported_user and reported_user.username
             else (reported_user.full_name if reported_user else "Unknown")
         )
 
@@ -153,9 +141,7 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 continue
             try:
                 await context.bot.send_message(
-                    chat_id=admin.user.id,
-                    text=alert_text,
-                    parse_mode="HTML"
+                    chat_id=admin.user.id, text=alert_text, parse_mode="HTML"
                 )
             except Exception:
                 pass
@@ -163,7 +149,9 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         log.warning(f"[PUBLIC_CMD] Admin notify failed | {e}")
 
     await log_event(
-        bot=context.bot, db=db, chat_id=chat.id,
+        bot=context.bot,
+        db=db,
+        chat_id=chat.id,
         event_type="report",
         actor=user,
         details={"report_id": report_id, "reason": reason},
@@ -178,17 +166,14 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_kickme(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/kickme — user kicks themselves."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
 
     try:
         await context.bot.ban_chat_member(chat.id, user.id)
         await context.bot.unban_chat_member(chat.id, user.id)
-        await msg.reply_text(
-            f"👢 {user.mention_html()} has left.",
-            parse_mode="HTML"
-        )
+        await msg.reply_text(f"👢 {user.mention_html()} has left.", parse_mode="HTML")
         log.info(f"[PUBLIC_CMD] Kickme | chat={chat.id} user={user.id}")
     except Exception as e:
         await msg.reply_text(f"❌ Failed: {e}")
@@ -196,24 +181,23 @@ async def cmd_kickme(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_adminlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/adminlist — list all group admins."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
 
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
-        lines  = []
+        lines = []
         for a in admins:
             if a.user.is_bot:
                 continue
-            name   = a.user.full_name
+            name = a.user.full_name
             handle = f"@{a.user.username}" if a.user.username else ""
-            role   = "👑 Owner" if a.status == "creator" else "⚡ Admin"
-            title  = f" ({a.custom_title})" if getattr(a, "custom_title", None) else ""
+            role = "👑 Owner" if a.status == "creator" else "⚡ Admin"
+            title = f" ({a.custom_title})" if getattr(a, "custom_title", None) else ""
             lines.append(f"{role} {name} {handle}{title}")
 
         await msg.reply_text(
-            f"👮 <b>Admins ({len(lines)}):</b>\n\n" + "\n".join(lines),
-            parse_mode="HTML"
+            f"👮 <b>Admins ({len(lines)}):</b>\n\n" + "\n".join(lines), parse_mode="HTML"
         )
     except Exception as e:
         await msg.reply_text(f"❌ Failed to get admin list: {e}")
@@ -221,7 +205,7 @@ async def cmd_adminlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_invitelink(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/invitelink — get the group invite link."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
 
     try:
@@ -233,19 +217,19 @@ async def cmd_invitelink(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_groupinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/groupinfo — show group statistics and settings."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     settings = await get_group_settings(db, chat.id)
-    tz_name  = settings.get("timezone", "UTC") if settings else "UTC"
+    tz_name = settings.get("timezone", "UTC") if settings else "UTC"
 
     try:
-        count    = await context.bot.get_chat_member_count(chat.id)
-        admins   = await context.bot.get_chat_administrators(chat.id)
+        count = await context.bot.get_chat_member_count(chat.id)
+        admins = await context.bot.get_chat_administrators(chat.id)
         n_admins = sum(1 for a in admins if not a.user.is_bot)
     except Exception:
-        count    = "?"
+        count = "?"
         n_admins = "?"
 
     features = []
@@ -267,7 +251,7 @@ async def cmd_groupinfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"👮 Admins: {n_admins}\n"
         f"🌍 Timezone: {tz_name}\n\n"
         f"<b>Features:</b>\n{features_str}",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )
 
 
@@ -278,18 +262,18 @@ async def _generate_rules(settings: dict) -> str:
 
     locks = settings.get("locks", {}) or {}
     rules = []
-    n     = 1
+    n = 1
 
     LOCK_LABELS = {
-        "link":          "No Telegram links",
-        "website":       "No external links",
-        "sticker":       "No stickers",
-        "gif":           "No GIFs",
-        "forward":       "No forwarded messages",
-        "photo":         "No photos",
-        "video":         "No videos",
-        "voice":         "No voice messages",
-        "bot":           "No adding bots",
+        "link": "No Telegram links",
+        "website": "No external links",
+        "sticker": "No stickers",
+        "gif": "No GIFs",
+        "forward": "No forwarded messages",
+        "photo": "No photos",
+        "video": "No videos",
+        "voice": "No voice messages",
+        "bot": "No adding bots",
         "unofficial_tg": "No unofficial Telegram app ads",
     }
 
@@ -299,8 +283,6 @@ async def _generate_rules(settings: dict) -> str:
             n += 1
 
     if settings.get("max_warnings", 0):
-        rules.append(
-            f"{n}. Maximum {settings['max_warnings']} warnings before action"
-        )
+        rules.append(f"{n}. Maximum {settings['max_warnings']} warnings before action")
 
     return "\n".join(rules) if rules else "Be respectful and follow group guidelines."

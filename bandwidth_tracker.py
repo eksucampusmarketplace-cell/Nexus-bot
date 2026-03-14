@@ -2,12 +2,14 @@
 Bandwidth tracking middleware for monitoring outbound usage.
 Logs bandwidth usage by endpoint and helps identify optimization opportunities.
 """
+
 import time
 import logging
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("bandwidth")
+
 
 class BandwidthTrackerMiddleware(BaseHTTPMiddleware):
     """
@@ -28,7 +30,7 @@ class BandwidthTrackerMiddleware(BaseHTTPMiddleware):
 
         # Calculate bandwidth
         process_time = time.time() - start_time
-        response_size = len(response.body) if hasattr(response, 'body') else 0
+        response_size = len(response.body) if hasattr(response, "body") else 0
         response_size_kb = response_size / 1024
         response_size_mb = response_size_kb / 1024
 
@@ -72,15 +74,16 @@ class BandwidthReportMiddleware(BaseHTTPMiddleware):
                 "total_bytes": total_bytes,
                 "total_mb": round(total_bytes / 1024 / 1024, 2),
                 "total_requests": total_requests,
-                "endpoints": self.stats
+                "endpoints": self.stats,
             }
 
             from fastapi.responses import JSONResponse
+
             return JSONResponse(stats_summary)
 
         # Track usage
         response = await call_next(request)
-        response_size = len(response.body) if hasattr(response, 'body') else 0
+        response_size = len(response.body) if hasattr(response, "body") else 0
 
         path = request.url.path
         if path not in self.stats:

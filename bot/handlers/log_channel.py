@@ -32,9 +32,9 @@ async def cmd_setlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     /setlog -100123456789
     or forward a message from the channel and reply with /setlog
     """
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     channel_id = None
 
@@ -58,42 +58,41 @@ async def cmd_setlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await context.bot.send_message(
-            chat_id    = channel_id,
-            text       = (
+            chat_id=channel_id,
+            text=(
                 "✅ <b>Nexus Log Channel Configured</b>\n\n"
                 f"Group: <b>{chat.title}</b> (<code>{chat.id}</code>)\n"
                 "All moderation actions will be logged here."
             ),
-            parse_mode = "HTML"
+            parse_mode="HTML",
         )
     except TelegramError as e:
         await msg.reply_text(
             f"❌ Could not post to channel <code>{channel_id}</code>.\n"
             "Make sure the bot is an admin in that channel.\n\n"
             f"Error: {e}",
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
         return
 
     from db.ops.automod import update_group_setting
+
     await update_group_setting(db, chat.id, "log_channel_id", channel_id)
     await msg.reply_text(
-        f"✅ Log channel set to <code>{channel_id}</code>.\n"
-        "A test message has been posted.",
-        parse_mode="HTML"
+        f"✅ Log channel set to <code>{channel_id}</code>.\n" "A test message has been posted.",
+        parse_mode="HTML",
     )
-    log.info(
-        f"[LOG_CHANNEL_CMD] Set | chat={chat.id} channel={channel_id}"
-    )
+    log.info(f"[LOG_CHANNEL_CMD] Set | chat={chat.id} channel={channel_id}")
 
 
 async def cmd_unsetlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/unsetlog — remove log channel."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     from db.ops.automod import update_group_setting
+
     await update_group_setting(db, chat.id, "log_channel_id", None)
     await msg.reply_text("✅ Log channel removed.")
     log.info(f"[LOG_CHANNEL_CMD] Unset | chat={chat.id}")
@@ -101,16 +100,13 @@ async def cmd_unsetlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_logchannel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/logchannel — show current log channel and category status."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     channel_id = await get_log_channel(db, chat.id)
     if not channel_id:
-        await msg.reply_text(
-            "No log channel configured.\n"
-            "Use /setlog <channel_id> to set one."
-        )
+        await msg.reply_text("No log channel configured.\n" "Use /setlog <channel_id> to set one.")
         return
 
     categories = await get_log_categories(db, chat.id)
@@ -124,5 +120,5 @@ async def cmd_logchannel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📡 <b>Log Channel:</b> <code>{channel_id}</code>\n\n"
         f"<b>Categories:</b>\n" + "\n".join(cat_lines) + "\n\n"
         "Use the Mini App to toggle categories.",
-        parse_mode="HTML"
+        parse_mode="HTML",
     )

@@ -2,20 +2,39 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from db.ops.booster import (
-    get_boost_config, save_boost_config, get_boost_stats,
-    get_boost_record, get_restricted_members, get_exempted_users,
-    create_credit_request, get_pending_credit_requests, get_credit_request,
-    approve_credit_request, deny_credit_request,
-    get_unassigned_adds, assign_manual_add_credit, record_manual_add,
-    get_recent_manual_adds, get_invited_by, get_user_invites, get_recent_invite_events,
-    get_all_boost_records, create_boost_record, set_unlocked, set_restricted, set_exempted,
-    grant_access, revoke_access, reset_boost_record
+    get_boost_config,
+    save_boost_config,
+    get_boost_stats,
+    get_boost_record,
+    get_restricted_members,
+    get_exempted_users,
+    create_credit_request,
+    get_pending_credit_requests,
+    get_credit_request,
+    approve_credit_request,
+    deny_credit_request,
+    get_unassigned_adds,
+    assign_manual_add_credit,
+    record_manual_add,
+    get_recent_manual_adds,
+    get_invited_by,
+    get_user_invites,
+    get_recent_invite_events,
+    get_all_boost_records,
+    create_boost_record,
+    set_unlocked,
+    set_restricted,
+    set_exempted,
+    grant_access,
+    revoke_access,
+    reset_boost_record,
 )
 
 router = APIRouter(prefix="/api/groups/{chat_id}/boost", tags=["member-boost"])
 
 
 # ==================== Config ====================
+
 
 class BoostConfigUpdate(BaseModel):
     force_add_enabled: Optional[bool] = None
@@ -51,6 +70,7 @@ async def update_boost_config(chat_id: int, config: BoostConfigUpdate):
 
 # ==================== Stats ====================
 
+
 @router.get("/stats")
 async def get_boost_stats_route(chat_id: int):
     """Get boost statistics for a group."""
@@ -58,6 +78,7 @@ async def get_boost_stats_route(chat_id: int):
 
 
 # ==================== Records ====================
+
 
 @router.get("/records")
 async def get_all_records(chat_id: int):
@@ -87,6 +108,7 @@ async def get_exempted(chat_id: int):
 
 
 # ==================== Manual Add Credit Requests ====================
+
 
 class CreditRequestCreate(BaseModel):
     claimant_user_id: int
@@ -125,7 +147,7 @@ async def create_credit_request_route(chat_id: int, request: CreditRequestCreate
         request.claimant_user_id,
         request.claimant_username,
         request.claimed_count,
-        request.claimed_user_ids
+        request.claimed_user_ids,
     )
     return {"success": True, "request": result}
 
@@ -144,15 +166,14 @@ async def approve_credit(chat_id: int, request_id: int, data: CreditApproval):
 @router.post("/credits/{request_id}/deny")
 async def deny_credit(chat_id: int, request_id: int, data: CreditDenial):
     """Deny a credit request."""
-    result = await deny_credit_request(
-        chat_id, request_id, data.reviewed_by, data.reason
-    )
+    result = await deny_credit_request(chat_id, request_id, data.reviewed_by, data.reason)
     if not result:
         raise HTTPException(status_code=404, detail="Credit request not found")
     return {"success": True, "request": result}
 
 
 # ==================== Manual Add Tracking ====================
+
 
 @router.get("/manual-adds")
 async def get_unassigned_manual_adds(chat_id: int, hours: int = 24):
@@ -169,9 +190,7 @@ async def get_recent_manual_adds_route(chat_id: int, hours: int = 2):
 @router.post("/manual-adds/assign")
 async def assign_manual_add(chat_id: int, data: AssignCredit):
     """Assign credit for a manual add."""
-    success = await assign_manual_add_credit(
-        chat_id, data.added_user_id, data.inviter_user_id
-    )
+    success = await assign_manual_add_credit(chat_id, data.added_user_id, data.inviter_user_id)
     if not success:
         raise HTTPException(status_code=404, detail="Manual add not found or already credited")
     return {"success": True}
@@ -183,7 +202,7 @@ async def record_manual_add_route(
     added_user_id: int,
     added_username: Optional[str] = None,
     added_first_name: Optional[str] = None,
-    added_by_user_id: Optional[int] = None
+    added_by_user_id: Optional[int] = None,
 ):
     """Record a detected manual add."""
     result = await record_manual_add(
@@ -193,6 +212,7 @@ async def record_manual_add_route(
 
 
 # ==================== Invite Tracking ====================
+
 
 @router.get("/invited-by/{user_id}")
 async def get_invited_by_route(chat_id: int, user_id: int):
@@ -213,6 +233,7 @@ async def get_recent_events(chat_id: int, limit: int = 50):
 
 
 # ==================== Actions ====================
+
 
 class ExemptRequest(BaseModel):
     user_id: int
@@ -269,9 +290,9 @@ async def reset_boost_route(chat_id: int, data: ResetRequest):
         # Reset all - delete all records
         records = await get_all_boost_records(chat_id)
         for record in records:
-            await reset_boost_record(chat_id, record['user_id'])
+            await reset_boost_record(chat_id, record["user_id"])
         success = True
-    
+
     return {"success": success}
 
 

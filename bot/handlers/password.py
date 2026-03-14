@@ -34,9 +34,7 @@ from db.ops.automod import update_group_setting
 log = logging.getLogger("password")
 
 
-async def send_password_challenge(
-    bot, chat_id: int, user, settings: dict, db
-):
+async def send_password_challenge(bot, chat_id: int, user, settings: dict, db):
     """
     Called after new member joins (if password enabled).
     Restrict user + DM them the challenge.
@@ -46,9 +44,7 @@ async def send_password_challenge(
 
     try:
         await bot.restrict_chat_member(
-            chat_id=chat_id,
-            user_id=user.id,
-            permissions=ChatPermissions(can_send_messages=False)
+            chat_id=chat_id, user_id=user.id, permissions=ChatPermissions(can_send_messages=False)
         )
     except TelegramError:
         pass
@@ -61,7 +57,7 @@ async def send_password_challenge(
                 "This group requires a password to participate.\n"
                 "📩 Please DM me the password to unlock your access."
             ),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     except TelegramError:
         pass
@@ -72,7 +68,9 @@ async def send_password_challenge(
            VALUES ($1,$2,0,FALSE,$3)
            ON CONFLICT (chat_id, user_id)
            DO UPDATE SET attempts=0, passed=FALSE, expires_at=$3""",
-        chat_id, user.id, expires
+        chat_id,
+        user.id,
+        expires,
     )
 
     try:
@@ -84,43 +82,32 @@ async def send_password_challenge(
                 "Please enter the password below.\n\n"
                 f"⏱ You have {timeout} minute(s)."
             ),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     except TelegramError:
-        log.warning(
-            f"[PASSWORD] DM failed | user={user.id} "
-            "(user may have DMs disabled)"
-        )
+        log.warning(f"[PASSWORD] DM failed | user={user.id} " "(user may have DMs disabled)")
         try:
             me = await bot.get_me()
             await bot.send_message(
                 chat_id=chat_id,
-                text=(
-                    f"{user.mention_html()} — please start the bot "
-                    f"first: @{me.username}"
-                ),
-                parse_mode="HTML"
+                text=(f"{user.mention_html()} — please start the bot " f"first: @{me.username}"),
+                parse_mode="HTML",
             )
         except TelegramError:
             pass
 
-    asyncio.create_task(
-        _password_timeout(bot, chat_id, user.id, timeout * 60, db)
-    )
+    asyncio.create_task(_password_timeout(bot, chat_id, user.id, timeout * 60, db))
     log.info(f"[PASSWORD] Challenge sent | chat={chat_id} user={user.id}")
 
 
-async def handle_password_dm(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
+async def handle_password_dm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handles DM messages from users who have pending password challenges.
     Only fires in private chats.
     """
-    msg  = update.effective_message
+    msg = update.effective_message
     user = update.effective_user
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     if not msg or not user:
         return
@@ -133,27 +120,30 @@ async def handle_password_dm(
            WHERE pc.user_id=$1 AND pc.passed=FALSE
            AND pc.expires_at > NOW()
            ORDER BY pc.created_at DESC""",
-        user.id
+        user.id,
     )
 
     if not rows:
         return
 
     challenge = dict(rows[0])
-    chat_id   = challenge["chat_id"]
-    correct   = challenge["group_password"]
-    max_att   = challenge.get("password_attempts", 3)
-    attempts  = challenge["attempts"] + 1
+    chat_id = challenge["chat_id"]
+    correct = challenge["group_password"]
+    max_att = challenge.get("password_attempts", 3)
+    attempts = challenge["attempts"] + 1
 
     await db.execute(
         "UPDATE password_challenges SET attempts=$1 WHERE chat_id=$2 AND user_id=$3",
-        attempts, chat_id, user.id
+        attempts,
+        chat_id,
+        user.id,
     )
 
     if msg.text and msg.text.strip() == correct:
         await db.execute(
             "UPDATE password_challenges SET passed=TRUE WHERE chat_id=$1 AND user_id=$2",
-            chat_id, user.id
+            chat_id,
+            user.id,
         )
         try:
             await context.bot.restrict_chat_member(
@@ -165,14 +155,13 @@ async def handle_password_dm(
                     can_send_polls=True,
                     can_send_other_messages=True,
                     can_add_web_page_previews=True,
-                )
+                ),
             )
         except TelegramError:
             pass
 
         await msg.reply_text(
-            "✅ <b>Correct!</b> You now have access to the group.",
-            parse_mode="HTML"
+            "✅ <b>Correct!</b> You now have access to the group.", parse_mode="HTML"
         )
         log.info(f"[PASSWORD] Passed | chat={chat_id} user={user.id}")
 
@@ -185,21 +174,15 @@ async def handle_password_dm(
             except TelegramError:
                 pass
             await msg.reply_text("❌ Too many wrong attempts. You've been removed.")
-            log.info(
-                f"[PASSWORD] Kicked (wrong password) | "
-                f"chat={chat_id} user={user.id}"
-            )
+            log.info(f"[PASSWORD] Kicked (wrong password) | " f"chat={chat_id} user={user.id}")
         else:
-            await msg.reply_text(
-                f"❌ Wrong password. {max(0, remaining)} attempt(s) left."
-            )
+            await msg.reply_text(f"❌ Wrong password. {max(0, remaining)} attempt(s) left.")
 
 
 async def _password_timeout(bot, chat_id, user_id, delay, db):
     await asyncio.sleep(delay)
     row = await db.fetchrow(
-        "SELECT passed FROM password_challenges WHERE chat_id=$1 AND user_id=$2",
-        chat_id, user_id
+        "SELECT passed FROM password_challenges WHERE chat_id=$1 AND user_id=$2", chat_id, user_id
     )
     if row and not row["passed"]:
         try:
@@ -207,18 +190,14 @@ async def _password_timeout(bot, chat_id, user_id, delay, db):
             await bot.unban_chat_member(chat_id, user_id)
         except TelegramError:
             pass
-        log.info(
-            f"[PASSWORD] Timeout kick | chat={chat_id} user={user_id}"
-        )
+        log.info(f"[PASSWORD] Timeout kick | chat={chat_id} user={user_id}")
 
 
-async def cmd_setpassword(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def cmd_setpassword(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/setpassword word123"""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     if not context.args:
         await msg.reply_text("Usage: /setpassword <password>")
@@ -227,20 +206,17 @@ async def cmd_setpassword(
     password = context.args[0]
     await update_group_setting(db, chat.id, "group_password", password)
     await msg.reply_text(
-        f"🔐 Group password set.\n"
-        f"New members must DM the bot with: <code>{password}</code>",
-        parse_mode="HTML"
+        f"🔐 Group password set.\n" f"New members must DM the bot with: <code>{password}</code>",
+        parse_mode="HTML",
     )
     log.info(f"[PASSWORD] Set | chat={chat.id}")
 
 
-async def cmd_clearpassword(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-):
+async def cmd_clearpassword(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/clearpassword — disable group password."""
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     await update_group_setting(db, chat.id, "group_password", None)
     await msg.reply_text("✅ Group password cleared. Anyone can join freely.")

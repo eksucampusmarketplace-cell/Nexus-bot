@@ -19,32 +19,32 @@ and calls the same enable/disable logic as the Mini App toggle.
 
 # Map of prefix command names to module names
 PREFIX_COMMAND_MAP = {
-    "welcome":    "welcome_message",
-    "goodbye":    "goodbye_message",
-    "antiflood":  "antiflood",
-    "antispam":   "antispam",
-    "antilink":   "antilink",
-    "captcha":    "captcha",
-    "warn":       "warn_system",
-    "trust":      "trust_score",
-    "ai":         "ai_moderation",
-    "analytics":  "activity_tracking",
-    "sentiment":  "sentiment_analysis",
-    "notes":      "notes_system",
-    "afk":        "afk_system",
-    "polls":      "poll_manager",
-    "pins":       "pin_manager",
-    "autoban":    "auto_ban",
-    "timedmute":  "timed_mute",
-    "timedban":   "timed_ban",
-    "silent":     "silent_mode",
+    "welcome": "welcome_message",
+    "goodbye": "goodbye_message",
+    "antiflood": "antiflood",
+    "antispam": "antispam",
+    "antilink": "antilink",
+    "captcha": "captcha",
+    "warn": "warn_system",
+    "trust": "trust_score",
+    "ai": "ai_moderation",
+    "analytics": "activity_tracking",
+    "sentiment": "sentiment_analysis",
+    "notes": "notes_system",
+    "afk": "afk_system",
+    "polls": "poll_manager",
+    "pins": "pin_manager",
+    "autoban": "auto_ban",
+    "timedmute": "timed_mute",
+    "timedban": "timed_ban",
+    "silent": "silent_mode",
     "require_reason": "require_reason",
     "reputation": "reputation_system",
-    "antiraid":   "anti_raid",
-    "globalban":  "global_ban_sync",
+    "antiraid": "anti_raid",
+    "globalban": "global_ban_sync",
     "newaccount": "new_account_filter",
     "suspicious": "suspicious_activity_alert",
-    "welcomedm":  "welcome_dm",
+    "welcomedm": "welcome_dm",
     "muteonjoin": "mute_on_join",
     "deleteoldwelcome": "delete_old_welcome",
     "autodeletewelcome": "auto_delete_welcome",
@@ -67,16 +67,18 @@ PREFIX_COMMAND_MAP = {
     "afksystem": "afk_system",
     "pollmanager": "poll_manager",
     "notessystem": "notes_system",
-    "pinmanager": "pin_manager"
+    "pinmanager": "pin_manager",
 }
+
 
 async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
-    if chat.type == 'private':
+    if chat.type == "private":
         return True
     member = await chat.get_member(user.id)
-    return member.status in ['creator', 'administrator']
+    return member.status in ["creator", "administrator"]
+
 
 async def prefix_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -87,7 +89,7 @@ async def prefix_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not command_limiter.allow(user_id):
         wait_time = command_limiter.get_reset_time(user_id)
         await update.message.reply_text(
-            f'⚠️ Slow down! Too many commands. Try again in {format_wait_time(wait_time)}.'
+            f"⚠️ Slow down! Too many commands. Try again in {format_wait_time(wait_time)}."
         )
         return
 
@@ -108,7 +110,7 @@ async def prefix_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"⚠️ `{command}` is not a toggleable module.\n"
             f"Use `/help modules` to see all toggleable features.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.MARKDOWN,
         )
         return
 
@@ -119,28 +121,29 @@ async def prefix_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     enabled = action == "enable"
     db_pool = context.bot_data["db_pool"]
-    
+
     async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT modules FROM groups WHERE chat_id = $1", update.effective_chat.id)
+        row = await conn.fetchrow(
+            "SELECT modules FROM groups WHERE chat_id = $1", update.effective_chat.id
+        )
         import json
+
         modules = {}
-        if row and row['modules']:
-            modules = row['modules']
+        if row and row["modules"]:
+            modules = row["modules"]
             if isinstance(modules, str):
                 modules = json.loads(modules)
-        
+
         modules[module_name] = enabled
-        
+
         await conn.execute(
             "UPDATE groups SET modules = $1 WHERE chat_id = $2",
-            json.dumps(modules), update.effective_chat.id
+            json.dumps(modules),
+            update.effective_chat.id,
         )
 
     status = "✅ Enabled" if enabled else "❌ Disabled"
-    await update.message.reply_text(
-        f"{status}: `{module_name}`",
-        parse_mode=ParseMode.MARKDOWN
-    )
+    await update.message.reply_text(f"{status}: `{module_name}`", parse_mode=ParseMode.MARKDOWN)
     logger.info(
         f"[PREFIX] Module toggled | "
         f"chat_id={update.effective_chat.id} | "
@@ -150,6 +153,7 @@ async def prefix_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     # Stop other handlers
     from telegram.ext import Application
-    # raise ApplicationHandlerStop() - Wait, this is for MessageHandler, but PTB does not have ApplicationHandlerStop() like this. 
+
+    # raise ApplicationHandlerStop() - Wait, this is for MessageHandler, but PTB does not have ApplicationHandlerStop() like this.
     # Actually, the group 0 prefix_handler will not block other handlers unless it is intended.
     # But since it's a command like action, we might want to stop here.

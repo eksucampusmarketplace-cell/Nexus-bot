@@ -24,7 +24,7 @@ async def handle_privacy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
 
     log.info(f"[PRIVACY] user={user.id} chat={chat.id}")
-    
+
     miniapp_url = settings.mini_app_url
     privacy_url = f"{miniapp_url}privacy.html" if miniapp_url else None
 
@@ -59,13 +59,19 @@ View the complete policy with detailed information."""
 
     keyboard = []
     if privacy_url:
-        keyboard.append([InlineKeyboardButton("📄 View Full Privacy Policy", web_app={"url": privacy_url})])
-    keyboard.append([InlineKeyboardButton("📧 Contact Support", url=f"https://t.me/{settings.MAIN_BOT_USERNAME}")])
-    
+        keyboard.append(
+            [InlineKeyboardButton("📄 View Full Privacy Policy", web_app={"url": privacy_url})]
+        )
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                "📧 Contact Support", url=f"https://t.me/{settings.MAIN_BOT_USERNAME}"
+            )
+        ]
+    )
+
     await update.message.reply_text(
-        privacy_summary,
-        parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        privacy_summary, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 

@@ -40,7 +40,7 @@ async def register(bot_id: int, app: Application) -> None:
                 await _registry[bot_id].shutdown()
             except Exception as e:
                 logger.error(f"[REGISTRY] Error stopping old instance for {bot_id}: {e}")
-        
+
         _registry[bot_id] = app
         username = getattr(app.bot, "username", "unknown") if hasattr(app, "bot") else "unknown"
         logger.info(
@@ -59,18 +59,19 @@ async def deregister(bot_id: int) -> bool:
     async with _lock:
         app = _registry.pop(bot_id, None)
         if not app:
-            logger.warning(f"[REGISTRY] Tried to deregister bot_id={bot_id} but it was not registered")
+            logger.warning(
+                f"[REGISTRY] Tried to deregister bot_id={bot_id} but it was not registered"
+            )
             return False
-        
+
         try:
             await app.stop()
             await app.shutdown()
         except Exception as e:
             logger.error(f"[REGISTRY] Error during shutdown of bot_id={bot_id}: {e}")
-        
+
         logger.info(
-            f"[REGISTRY] Deregistered bot_id={bot_id} "
-            f"| Remaining bots: {len(_registry)}"
+            f"[REGISTRY] Deregistered bot_id={bot_id} " f"| Remaining bots: {len(_registry)}"
         )
         return True
 
@@ -105,7 +106,7 @@ def get_summary() -> list[dict]:
         {
             "bot_id": bot_id,
             "username": getattr(app.bot, "username", "unknown"),
-            "is_registered": True
+            "is_registered": True,
         }
         for bot_id, app in _registry.items()
     ]

@@ -5,15 +5,11 @@ from telegram.constants import ParseMode
 
 logger = logging.getLogger(__name__)
 
-async def substitute_variables(
-    text: str,
-    user: User,
-    chat: Chat,
-    db_pool
-) -> str:
+
+async def substitute_variables(text: str, user: User, chat: Chat, db_pool) -> str:
     """
     Replace all supported variables in text with live values.
-    
+
     {first}     → user.first_name
     {last}      → user.last_name or ""
     {fullname}  → user.full_name
@@ -23,7 +19,7 @@ async def substitute_variables(
     {count}     → live member count from bot.get_chat_member_count(chat.id)
     {chatname}  → chat.title
     {rules}     → short link to rules or "No rules set" if empty
-    
+
     Returns substituted string safe for both HTML and MarkdownV2 parse modes.
     Logs: [TEXT_ENGINE] Substituted {n} variables for user_id={user.id}
     """
@@ -40,13 +36,14 @@ async def substitute_variables(
     rules_link = "No rules set"
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("SELECT text_config FROM groups WHERE chat_id = $1", chat.id)
-        if row and row['text_config']:
+        if row and row["text_config"]:
             import json
-            text_config = row['text_config']
+
+            text_config = row["text_config"]
             if isinstance(text_config, str):
                 text_config = json.loads(text_config)
-            if text_config.get('rules'):
-                rules_link = f"Rules for {chat.title}" # In reality this might be a link to a message or /rules
+            if text_config.get("rules"):
+                rules_link = f"Rules for {chat.title}"  # In reality this might be a link to a message or /rules
 
     variables = {
         "{first}": user.first_name,
@@ -57,7 +54,7 @@ async def substitute_variables(
         "{id}": str(user.id),
         "{count}": str(count),
         "{chatname}": chat.title,
-        "{rules}": rules_link
+        "{rules}": rules_link,
     }
 
     n = 0

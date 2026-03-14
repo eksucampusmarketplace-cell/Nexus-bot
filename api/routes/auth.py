@@ -53,10 +53,10 @@ async def validate_session(request: Request):
       7. Reload MusicWorker for the clone
     """
     owner_id = request.state.user_id
-    db       = request.app.state.db
-    body     = await request.json()
-    raw      = body.get("session_string", "").strip()
-    bot_id   = body.get("bot_id", 0)
+    db = request.app.state.db
+    body = await request.json()
+    raw = body.get("session_string", "").strip()
+    bot_id = body.get("bot_id", 0)
 
     if not raw:
         raise HTTPException(status_code=400, detail="session_string required")
@@ -75,7 +75,7 @@ async def validate_session(request: Request):
             api_id=settings.PYROGRAM_API_ID,
             api_hash=settings.PYROGRAM_API_HASH,
             session_string=pyrogram_session,
-            in_memory=True
+            in_memory=True,
         )
         await client.connect()
         me = await client.get_me()
@@ -95,7 +95,7 @@ async def validate_session(request: Request):
         tg_user_id=me.id,
         tg_name=f"{me.first_name} {me.last_name or ''}".strip(),
         tg_username=me.username or "",
-        encrypted_session=encrypted
+        encrypted_session=encrypted,
     )
 
     # Reload MusicWorker for this clone
@@ -105,11 +105,11 @@ async def validate_session(request: Request):
     return {
         "ok": True,
         "user": {
-            "id":         me.id,
+            "id": me.id,
             "first_name": me.first_name,
-            "last_name":  me.last_name or "",
-            "username":   me.username  or "",
-        }
+            "last_name": me.last_name or "",
+            "username": me.username or "",
+        },
     }
 
 
@@ -121,7 +121,7 @@ async def _to_pyrogram_session(raw: str) -> str | None:
     # Try: browser JSON format (base64 encoded JSON)
     try:
         decoded = base64.b64decode(raw + "==").decode("utf-8")
-        data    = json.loads(decoded)
+        data = json.loads(decoded)
 
         if all(k in data for k in ("dc_id", "auth_key", "user_id")):
             # Build Pyrogram StringSession from browser session data
@@ -160,7 +160,7 @@ async def _reload_music_worker(bot_id: int, session_string: str, db):
             api_id=settings.PYROGRAM_API_ID,
             api_hash=settings.PYROGRAM_API_HASH,
             session_string=session_string,
-            in_memory=True
+            in_memory=True,
         )
         await pyro.start()
         worker = MusicWorker(pyro, bot_id, db)

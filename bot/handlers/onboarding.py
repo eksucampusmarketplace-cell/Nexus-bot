@@ -42,7 +42,7 @@ async def start_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"👋 Welcome! I'm {context.bot.bot.username}, your group management bot.\n\n"
         "Let's get you set up. First, choose your language:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
     return LANGUAGE
@@ -69,9 +69,8 @@ async def handle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await query.edit_message_text(
-        "🛠️ Which features would you like to enable?\n\n"
-        "You can change these later in settings.",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        "🛠️ Which features would you like to enable?\n\n" "You can change these later in settings.",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
     return MODULES
@@ -98,7 +97,7 @@ async def handle_modules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(
         "💬 Would you like to set a custom welcome message for new members?\n\n"
         "You can also send a photo/gif/video to include media!",
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
     return WELCOME
@@ -119,8 +118,9 @@ async def handle_welcome_choice(update: Update, context: ContextTypes.DEFAULT_TY
         pool = context.bot_data.get("db_pool")
         if pool:
             await db_groups.set_group_setting(
-                pool, chat_id,
-                welcome_message="Welcome {mention}! 👋\nPlease read the rules and enjoy your stay!"
+                pool,
+                chat_id,
+                welcome_message="Welcome {mention}! 👋\nPlease read the rules and enjoy your stay!",
             )
         await complete_onboarding(update, context)
         return ConversationHandler.END
@@ -149,37 +149,38 @@ async def handle_welcome_message(update: Update, context: ContextTypes.DEFAULT_T
     # Check for media
     if update.message.photo:
         file_id = update.message.photo[-1].file_id
-        await db_groups.set_group_setting(pool, chat_id,
-            welcome_media_file_id=file_id,
-            welcome_media_type='photo'
+        await db_groups.set_group_setting(
+            pool, chat_id, welcome_media_file_id=file_id, welcome_media_type="photo"
         )
         text = update.message.caption or "Welcome {mention}! 👋"
     elif update.message.video:
-        await db_groups.set_group_setting(pool, chat_id,
+        await db_groups.set_group_setting(
+            pool,
+            chat_id,
             welcome_media_file_id=update.message.video.file_id,
-            welcome_media_type='video'
+            welcome_media_type="video",
         )
         text = update.message.caption or "Welcome {mention}! 👋"
     elif update.message.animation:
-        await db_groups.set_group_setting(pool, chat_id,
+        await db_groups.set_group_setting(
+            pool,
+            chat_id,
             welcome_media_file_id=update.message.animation.file_id,
-            welcome_media_type='animation'
+            welcome_media_type="animation",
         )
         text = update.message.caption or "Welcome {mention}! 👋"
     elif update.message.sticker:
-        await db_groups.set_group_setting(pool, chat_id,
+        await db_groups.set_group_setting(
+            pool,
+            chat_id,
             welcome_media_file_id=update.message.sticker.file_id,
-            welcome_media_type='sticker'
+            welcome_media_type="sticker",
         )
         text = "Welcome {mention}! 👋"
     else:
         text = update.message.text
 
-    await db_groups.set_group_setting(
-        pool, chat_id,
-        welcome_message=text,
-        onboarding_complete=True
-    )
+    await db_groups.set_group_setting(pool, chat_id, welcome_message=text, onboarding_complete=True)
 
     await complete_onboarding(update, context)
     return ConversationHandler.END
@@ -227,7 +228,10 @@ onboarding_handler = ConversationHandler(
         WELCOME: [
             CallbackQueryHandler(handle_welcome_choice, pattern="^(welcome:|skip)"),
             MessageHandler(filters.TEXT & ~filters.COMMAND, handle_welcome_message),
-            MessageHandler(filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.Sticker.ALL, handle_welcome_message),
+            MessageHandler(
+                filters.PHOTO | filters.VIDEO | filters.ANIMATION | filters.Sticker.ALL,
+                handle_welcome_message,
+            ),
         ],
     },
     fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],

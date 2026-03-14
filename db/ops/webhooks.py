@@ -1,6 +1,7 @@
 """
 Database operations for webhook system.
 """
+
 import json
 from datetime import datetime
 from typing import List, Optional, Dict, Any
@@ -13,7 +14,7 @@ async def create_webhook(
     url: str,
     events: List[str],
     secret: Optional[str] = None,
-    created_by: Optional[int] = None
+    created_by: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Create a new webhook configuration."""
     async with db.pool.acquire() as conn:
@@ -29,7 +30,12 @@ async def create_webhook(
                 updated_at = NOW()
             RETURNING *
             """,
-            chat_id, name, url, events, secret, created_by
+            chat_id,
+            name,
+            url,
+            events,
+            secret,
+            created_by,
         )
         return dict(row) if row else None
 
@@ -45,7 +51,7 @@ async def get_webhooks(chat_id: int) -> List[Dict[str, Any]]:
             WHERE chat_id = $1
             ORDER BY created_at DESC
             """,
-            chat_id
+            chat_id,
         )
         return [dict(r) for r in rows]
 
@@ -61,7 +67,8 @@ async def get_active_webhooks_for_event(chat_id: int, event_type: str) -> List[D
               AND is_active = TRUE
               AND ($2 = ANY(events) OR 'all' = ANY(events))
             """,
-            chat_id, event_type
+            chat_id,
+            event_type,
         )
         return [dict(r) for r in rows]
 
@@ -69,10 +76,7 @@ async def get_active_webhooks_for_event(chat_id: int, event_type: str) -> List[D
 async def get_webhook_by_id(webhook_id: int) -> Optional[Dict[str, Any]]:
     """Get a single webhook by ID."""
     async with db.pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM webhook_configs WHERE id = $1",
-            webhook_id
-        )
+        row = await conn.fetchrow("SELECT * FROM webhook_configs WHERE id = $1", webhook_id)
         return dict(row) if row else None
 
 
@@ -82,13 +86,13 @@ async def update_webhook(
     url: Optional[str] = None,
     events: Optional[List[str]] = None,
     secret: Optional[str] = None,
-    is_active: Optional[bool] = None
+    is_active: Optional[bool] = None,
 ) -> Optional[Dict[str, Any]]:
     """Update webhook configuration."""
     updates = []
     params = [webhook_id]
     param_idx = 2
-    
+
     if name is not None:
         updates.append(f"name = ${param_idx}")
         params.append(name)
@@ -109,12 +113,12 @@ async def update_webhook(
         updates.append(f"is_active = ${param_idx}")
         params.append(is_active)
         param_idx += 1
-    
+
     if not updates:
         return await get_webhook_by_id(webhook_id)
-    
+
     updates.append("updated_at = NOW()")
-    
+
     async with db.pool.acquire() as conn:
         row = await conn.fetchrow(
             f"""
@@ -123,7 +127,7 @@ async def update_webhook(
             WHERE id = $1
             RETURNING *
             """,
-            *params
+            *params,
         )
         return dict(row) if row else None
 
@@ -131,10 +135,7 @@ async def update_webhook(
 async def delete_webhook(webhook_id: int) -> bool:
     """Delete a webhook configuration."""
     async with db.pool.acquire() as conn:
-        result = await conn.execute(
-            "DELETE FROM webhook_configs WHERE id = $1",
-            webhook_id
-        )
+        result = await conn.execute("DELETE FROM webhook_configs WHERE id = $1", webhook_id)
         return result != "DELETE 0"
 
 
@@ -145,7 +146,7 @@ async def log_webhook_delivery(
     success: bool,
     response_status: Optional[int] = None,
     response_body: Optional[str] = None,
-    duration_ms: Optional[int] = None
+    duration_ms: Optional[int] = None,
 ) -> None:
     """Log a webhook delivery attempt."""
     async with db.pool.acquire() as conn:
@@ -156,10 +157,15 @@ async def log_webhook_delivery(
             (webhook_id, event_type, payload, success, response_status, response_body, delivery_duration_ms)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             """,
-            webhook_id, event_type, json.dumps(payload), success,
-            response_status, response_body, duration_ms
+            webhook_id,
+            event_type,
+            json.dumps(payload),
+            success,
+            response_status,
+            response_body,
+            duration_ms,
         )
-        
+
         # Update webhook stats
         await conn.execute(
             """
@@ -169,14 +175,13 @@ async def log_webhook_delivery(
                 last_error = CASE WHEN $2 THEN NULL ELSE $3 END
             WHERE id = $1
             """,
-            webhook_id, success, response_body[:500] if response_body and not success else None
+            webhook_id,
+            success,
+            response_body[:500] if response_body and not success else None,
         )
 
 
-async def get_webhook_deliveries(
-    webhook_id: int,
-    limit: int = 50
-) -> List[Dict[str, Any]]:
+async def get_webhook_deliveries(webhook_id: int, limit: int = 50) -> List[Dict[str, Any]]:
     """Get delivery history for a webhook."""
     async with db.pool.acquire() as conn:
         rows = await conn.fetch(
@@ -187,7 +192,8 @@ async def get_webhook_deliveries(
             ORDER BY created_at DESC
             LIMIT $2
             """,
-            webhook_id, limit
+            webhook_id,
+            limit,
         )
         return [dict(r) for r in rows]
 
@@ -204,9 +210,9 @@ async def get_chat_webhook_stats(chat_id: int) -> Dict[str, Any]:
             FROM webhook_configs
             WHERE chat_id = $1
             """,
-            chat_id
+            chat_id,
         )
-        
+
         recent_deliveries = await conn.fetchval(
             """
             SELECT COUNT(*) 
@@ -214,12 +220,12 @@ async def get_chat_webhook_stats(chat_id: int) -> Dict[str, Any]:
             JOIN webhook_configs wc ON wd.webhook_id = wc.id
             WHERE wc.chat_id = $1 AND wd.created_at > NOW() - INTERVAL '24 hours'
             """,
-            chat_id
+            chat_id,
         )
-        
+
         return {
             "active": stats["active_count"] or 0,
             "inactive": stats["inactive_count"] or 0,
             "total": stats["total_count"] or 0,
-            "deliveries_24h": recent_deliveries or 0
+            "deliveries_24h": recent_deliveries or 0,
         }

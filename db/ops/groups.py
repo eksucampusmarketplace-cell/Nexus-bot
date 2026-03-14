@@ -45,7 +45,7 @@ async def get_group_miniapp_url(db_pool, chat_id: int) -> str | None:
         )
         return row["url"] if row else None
 
-async def upsert_group(chat_id: int, title: str, bot_token_hash: str, settings: dict = None, member_count: int = 0):
+async def upsert_group(chat_id: int, title: str, bot_token_hash: str, settings: dict = None, member_count: int = 0, photo_big: str = None, photo_small: str = None):
     if settings is None:
         # ... (keep existing settings default logic)
         settings = {
@@ -71,14 +71,16 @@ async def upsert_group(chat_id: int, title: str, bot_token_hash: str, settings: 
     
     async with db.pool.acquire() as conn:
         await conn.execute("""
-            INSERT INTO groups (chat_id, title, bot_token_hash, settings, member_count)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO groups (chat_id, title, bot_token_hash, settings, member_count, photo_big, photo_small)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (chat_id) DO UPDATE
             SET title = EXCLUDED.title, 
                 bot_token_hash = EXCLUDED.bot_token_hash, 
                 settings = EXCLUDED.settings,
-                member_count = CASE WHEN EXCLUDED.member_count > 0 THEN EXCLUDED.member_count ELSE groups.member_count END
-        """, chat_id, title, bot_token_hash, json.dumps(settings), member_count or 0)
+                member_count = CASE WHEN EXCLUDED.member_count > 0 THEN EXCLUDED.member_count ELSE groups.member_count END,
+                photo_big = CASE WHEN EXCLUDED.photo_big IS NOT NULL AND EXCLUDED.photo_big != '' THEN EXCLUDED.photo_big ELSE groups.photo_big END,
+                photo_small = CASE WHEN EXCLUDED.photo_small IS NOT NULL AND EXCLUDED.photo_small != '' THEN EXCLUDED.photo_small ELSE groups.photo_small END
+        """, chat_id, title, bot_token_hash, json.dumps(settings), member_count or 0, photo_big, photo_small)
 
 async def update_group_settings(chat_id: int, settings: dict):
     async with db.pool.acquire() as conn:

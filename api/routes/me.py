@@ -90,7 +90,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         # Find all groups managed by this bot
         # First get all groups for this bot
         all_groups = await conn.fetch("""
-            SELECT chat_id, title, member_count, settings 
+            SELECT chat_id, title, member_count, settings, photo_big, photo_small 
             FROM groups 
             WHERE bot_token_hash = $1
             ORDER BY title
@@ -99,7 +99,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         # If no groups found for this bot, try getting all groups (fallback for legacy)
         if not all_groups:
             all_groups = await conn.fetch("""
-                SELECT chat_id, title, member_count, settings 
+                SELECT chat_id, title, member_count, settings, photo_big, photo_small 
                 FROM groups 
                 ORDER BY title
                 LIMIT 100
@@ -115,6 +115,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         title = group_row['title']
         username = None
         member_count = group_row['member_count']
+        photo_big = group_row.get('photo_big')
         group_settings = group_row['settings'] or {}
         if isinstance(group_settings, str):
             try:
@@ -134,7 +135,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
                 "title": title,
                 "username": username,
                 "member_count": member_count or 0,
-                "photo_url": None,  # Could be fetched from Telegram
+                "photo_big": photo_big,
                 "is_owner": status == 'owner',
                 "boost_enabled": boost_settings.get('force_add_enabled', False),
                 "channel_gate_enabled": channel_settings.get('force_channel_enabled', False)

@@ -16,6 +16,12 @@ pillow>=11.0.0
 pyrogram>=2.0.106
 tgcrypto>=1.2.5
 py-tgcalls>=2.1.0
+# Note: py-tgcalls requires the ntgcalls native binary which may not be available
+# on all platforms (e.g., Render free/hobby plans). If ntgcalls is missing,
+# music streaming features will be gracefully disabled. To enable:
+# 1. Ensure ffmpeg is installed
+# 2. Install py-tgcalls on a system that supports native binaries (WSL, local PC)
+# 3. Run the music worker on your local PC with the standalone music_worker_local.py
 redis>=5.0.4
 aioredis>=2.0.1
 psutil>=5.9.8

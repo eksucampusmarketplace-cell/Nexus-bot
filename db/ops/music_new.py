@@ -4,7 +4,8 @@ Handles userbot accounts, queues, sessions, and settings
 """
 
 import logging
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
+
 import asyncpg
 
 logger = logging.getLogger(__name__)
@@ -13,29 +14,31 @@ logger = logging.getLogger(__name__)
 async def create_music_tables(pool: asyncpg.Pool):
     """Create music streaming tables if they don't exist"""
     async with pool.acquire() as conn:
-        # Schema migration check: 
+        # Schema migration check:
         # The old music system used a different music_queues table without bot_id.
         # If we detect it, we drop it to let the new schema be created.
         try:
             # Check if music_queues exists
             table_exists = await conn.fetchval("""
                 SELECT EXISTS (
-                    SELECT 1 FROM information_schema.tables 
+                    SELECT 1 FROM information_schema.tables
                     WHERE table_schema = 'public' AND table_name = 'music_queues'
                 )
             """)
-            
+
             if table_exists:
                 # Check for bot_id column
                 has_bot_id = await conn.fetchval("""
                     SELECT EXISTS (
-                        SELECT 1 FROM information_schema.columns 
+                        SELECT 1 FROM information_schema.columns
                         WHERE table_name = 'music_queues' AND column_name = 'bot_id'
                     )
                 """)
-                
+
                 if not has_bot_id:
-                    logger.info("[MUSIC_DB] Old music_queues schema detected. Dropping for migration.")
+                    logger.info(
+                        "[MUSIC_DB] Old music_queues schema detected. Dropping for migration."
+                    )
                     # Drop old tables that might conflict
                     await conn.execute("DROP TABLE IF EXISTS music_queues CASCADE")
                     await conn.execute("DROP TABLE IF EXISTS music_sessions CASCADE")
@@ -60,14 +63,15 @@ async def save_music_userbot(
     tg_name: str,
     tg_username: str,
     encrypted_session: str,
-    phone: Optional[str] = None
+    phone: Optional[str] = None,
 ) -> Dict:
     """Save or update a music userbot account"""
     async with pool.acquire() as conn:
         # Check if already exists
         existing = await conn.fetchrow(
             "SELECT id FROM music_userbots WHERE owner_bot_id=$1 AND tg_user_id=$2",
-            owner_bot_id, tg_user_id
+            owner_bot_id,
+            tg_user_id,
         )
 
         if existing:
@@ -79,8 +83,12 @@ async def save_music_userbot(
                 WHERE owner_bot_id=$5 AND tg_user_id=$6
                 RETURNING *
                 """,
-                encrypted_session, tg_name, tg_username, phone,
-                owner_bot_id, tg_user_id
+                encrypted_session,
+                tg_name,
+                tg_username,
+                phone,
+                owner_bot_id,
+                tg_user_id,
             )
             logger.info(f"[MUSIC_DB] Updated userbot | owner={owner_bot_id} user={tg_user_id}")
         else:
@@ -91,7 +99,12 @@ async def save_music_userbot(
                 VALUES ($1, $2, $3, $4, $5, $6)
                 RETURNING *
                 """,
-                owner_bot_id, tg_user_id, tg_name, tg_username, encrypted_session, phone
+                owner_bot_id,
+                tg_user_id,
+                tg_name,
+                tg_username,
+                encrypted_session,
+                phone,
             )
             logger.info(f"[MUSIC_DB] Saved userbot | owner={owner_bot_id} user={tg_user_id}")
 
@@ -99,44 +112,36 @@ async def save_music_userbot(
 
 
 async def get_music_userbots(
-    pool: asyncpg.Pool,
-    owner_bot_id: int,
-    active_only: bool = True
+    pool: asyncpg.Pool, owner_bot_id: int, active_only: bool = True
 ) -> List[Dict]:
     """Get all userbot accounts for a bot owner"""
     async with pool.acquire() as conn:
         if active_only:
             rows = await conn.fetch(
                 "SELECT * FROM music_userbots WHERE owner_bot_id=$1 AND is_active=TRUE ORDER BY added_at DESC",
-                owner_bot_id
+                owner_bot_id,
             )
         else:
             rows = await conn.fetch(
                 "SELECT * FROM music_userbots WHERE owner_bot_id=$1 ORDER BY added_at DESC",
-                owner_bot_id
+                owner_bot_id,
             )
         return [dict(row) for row in rows]
 
 
 async def get_music_userbot_by_id(
-    pool: asyncpg.Pool,
-    owner_bot_id: int,
-    userbot_id: int
+    pool: asyncpg.Pool, owner_bot_id: int, userbot_id: int
 ) -> Optional[Dict]:
     """Get a specific userbot by ID"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT * FROM music_userbots WHERE owner_bot_id=$1 AND id=$2",
-            owner_bot_id, userbot_id
+            "SELECT * FROM music_userbots WHERE owner_bot_id=$1 AND id=$2", owner_bot_id, userbot_id
         )
         return dict(row) if row else None
 
 
 async def update_userbot_risk_free(
-    pool: asyncpg.Pool,
-    owner_bot_id: int,
-    userbot_id: int,
-    risk_free: int
+    pool: asyncpg.Pool, owner_bot_id: int, userbot_id: int, risk_free: int
 ) -> Dict:
     """Update risk free for a userbot"""
     async with pool.acquire() as conn:
@@ -147,16 +152,15 @@ async def update_userbot_risk_free(
             WHERE owner_bot_id=$2 AND id=$3
             RETURNING *
             """,
-            risk_free, owner_bot_id, userbot_id
+            risk_free,
+            owner_bot_id,
+            userbot_id,
         )
         return dict(row) if row else None
 
 
 async def ban_userbot(
-    pool: asyncpg.Pool,
-    owner_bot_id: int,
-    userbot_id: int,
-    ban_reason: str = None
+    pool: asyncpg.Pool, owner_bot_id: int, userbot_id: int, ban_reason: str = None
 ) -> Dict:
     """Ban a userbot (for risk free non-payment)"""
     async with pool.acquire() as conn:
@@ -167,16 +171,14 @@ async def ban_userbot(
             WHERE owner_bot_id=$2 AND id=$3
             RETURNING *
             """,
-            ban_reason, owner_bot_id, userbot_id
+            ban_reason,
+            owner_bot_id,
+            userbot_id,
         )
         return dict(row) if row else None
 
 
-async def unban_userbot(
-    pool: asyncpg.Pool,
-    owner_bot_id: int,
-    userbot_id: int
-) -> Dict:
+async def unban_userbot(pool: asyncpg.Pool, owner_bot_id: int, userbot_id: int) -> Dict:
     """Unban a userbot"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -186,7 +188,8 @@ async def unban_userbot(
             WHERE owner_bot_id=$2 AND id=$3
             RETURNING *
             """,
-            owner_bot_id, userbot_id
+            owner_bot_id,
+            userbot_id,
         )
         return dict(row) if row else None
 
@@ -197,13 +200,13 @@ async def delete_music_userbot(pool: asyncpg.Pool, owner_bot_id: int, userbot_id
         if userbot_id:
             result = await conn.execute(
                 "DELETE FROM music_userbots WHERE owner_bot_id=$1 AND id=$2",
-                owner_bot_id, userbot_id
+                owner_bot_id,
+                userbot_id,
             )
             logger.info(f"[MUSIC_DB] Deleted userbot | owner={owner_bot_id} id={userbot_id}")
         else:
             result = await conn.execute(
-                "DELETE FROM music_userbots WHERE owner_bot_id=$1",
-                owner_bot_id
+                "DELETE FROM music_userbots WHERE owner_bot_id=$1", owner_bot_id
             )
             logger.info(f"[MUSIC_DB] Deleted all userbots | owner={owner_bot_id}")
 
@@ -218,21 +221,16 @@ async def get_owner_clones(pool: asyncpg.Pool, owner_user_id: int) -> List[Dict]
             WHERE owner_user_id=$1 AND is_primary=FALSE AND status='active'
             ORDER BY created_at DESC
             """,
-            owner_user_id
+            owner_user_id,
         )
         return [dict(row) for row in rows]
 
 
-async def get_music_settings(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    bot_id: int
-) -> Optional[Dict]:
+async def get_music_settings(pool: asyncpg.Pool, chat_id: int, bot_id: int) -> Optional[Dict]:
     """Get music settings for a chat"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT * FROM music_settings WHERE chat_id=$1 AND bot_id=$2",
-            chat_id, bot_id
+            "SELECT * FROM music_settings WHERE chat_id=$1 AND bot_id=$2", chat_id, bot_id
         )
         return dict(row) if row else None
 
@@ -244,33 +242,41 @@ async def upsert_music_settings(
     play_mode: str = "all",
     announce_tracks: bool = True,
     dj_role_id: Optional[int] = None,
-    userbot_id: Optional[int] = None
+    userbot_id: Optional[int] = None,
+    volume: int = 100,
+    rotation_mode: str = "manual",
+    auto_rotate: bool = False,
 ) -> Dict:
     """Create or update music settings for a chat"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            INSERT INTO music_settings (chat_id, bot_id, play_mode, announce_tracks, dj_role_id, userbot_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO music_settings (chat_id, bot_id, play_mode, announce_tracks, dj_role_id, userbot_id, volume, rotation_mode, auto_rotate)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (chat_id, bot_id) DO UPDATE
             SET play_mode=EXCLUDED.play_mode,
                 announce_tracks=EXCLUDED.announce_tracks,
                 dj_role_id=EXCLUDED.dj_role_id,
-                userbot_id=EXCLUDED.userbot_id
+                userbot_id=EXCLUDED.userbot_id,
+                volume=EXCLUDED.volume,
+                rotation_mode=EXCLUDED.rotation_mode,
+                auto_rotate=EXCLUDED.auto_rotate
             RETURNING *
             """,
-            chat_id, bot_id, play_mode, announce_tracks, dj_role_id, userbot_id
+            chat_id,
+            bot_id,
+            play_mode,
+            announce_tracks,
+            dj_role_id,
+            userbot_id,
+            volume,
+            rotation_mode,
+            auto_rotate,
         )
         return dict(row)
 
 
-async def can_user_play(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    bot_id: int,
-    user_id: int,
-    bot
-) -> bool:
+async def can_user_play(pool: asyncpg.Pool, chat_id: int, bot_id: int, user_id: int, bot) -> bool:
     """Check if a user is allowed to use music commands in a chat"""
     # Get music settings
     settings = await get_music_settings(pool, chat_id, bot_id)
@@ -304,7 +310,7 @@ async def save_queue_entry(
     thumbnail: str,
     source: str,
     requested_by: int,
-    requested_by_name: str
+    requested_by_name: str,
 ) -> Dict:
     """Save a queue entry to the database"""
     async with pool.acquire() as conn:
@@ -315,50 +321,183 @@ async def save_queue_entry(
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
             """,
-            chat_id, bot_id, position, url, title, duration, thumbnail, source,
-            requested_by, requested_by_name
+            chat_id,
+            bot_id,
+            position,
+            url,
+            title,
+            duration,
+            thumbnail,
+            source,
+            requested_by,
+            requested_by_name,
         )
         return dict(row)
 
 
 async def get_queue_entries(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    bot_id: int,
-    played: bool = False
+    pool: asyncpg.Pool, chat_id: int, bot_id: int, played: bool = False
 ) -> List[Dict]:
     """Get all queue entries for a chat"""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT * FROM music_queues WHERE chat_id=$1 AND bot_id=$2 AND played=$3 ORDER BY position",
-            chat_id, bot_id, played
+            chat_id,
+            bot_id,
+            played,
         )
         return [dict(row) for row in rows]
 
 
-async def clear_queue_entries(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    bot_id: int
-):
+async def delete_queue_entry(pool: asyncpg.Pool, chat_id: int, bot_id: int, track_id: int) -> bool:
+    """Delete a specific queue entry and renumber positions"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Get the position of the track being deleted
+            row = await conn.fetchrow(
+                "SELECT position FROM music_queues WHERE id=$1 AND chat_id=$2 AND bot_id=$3 AND played=FALSE",
+                track_id,
+                chat_id,
+                bot_id,
+            )
+            if not row:
+                return False
+
+            deleted_position = row["position"]
+
+            # Delete the track
+            await conn.execute(
+                "DELETE FROM music_queues WHERE id=$1 AND chat_id=$2 AND bot_id=$3",
+                track_id,
+                chat_id,
+                bot_id,
+            )
+
+            # Renumber positions for remaining tracks
+            await conn.execute(
+                """
+                UPDATE music_queues
+                SET position = position - 1
+                WHERE chat_id=$1 AND bot_id=$2 AND played=FALSE AND position > $3
+                """,
+                chat_id,
+                bot_id,
+                deleted_position,
+            )
+
+            logger.info(f"[MUSIC_DB] Deleted queue entry | chat={chat_id} track_id={track_id}")
+            return True
+
+
+async def reorder_queue_entry(
+    pool: asyncpg.Pool, chat_id: int, bot_id: int, track_id: int, new_position: int
+) -> bool:
+    """Move a queue entry to a new position and renumber others"""
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Get current position of the track
+            row = await conn.fetchrow(
+                "SELECT position FROM music_queues WHERE id=$1 AND chat_id=$2 AND bot_id=$3 AND played=FALSE",
+                track_id,
+                chat_id,
+                bot_id,
+            )
+            if not row:
+                return False
+
+            old_position = row["position"]
+
+            if old_position == new_position:
+                return True
+
+            if old_position < new_position:
+                # Moving down: decrement positions between old and new
+                await conn.execute(
+                    """
+                    UPDATE music_queues
+                    SET position = position - 1
+                    WHERE chat_id=$1 AND bot_id=$2 AND played=FALSE AND position > $3 AND position <= $4
+                    """,
+                    chat_id,
+                    bot_id,
+                    old_position,
+                    new_position,
+                )
+            else:
+                # Moving up: increment positions between new and old
+                await conn.execute(
+                    """
+                    UPDATE music_queues
+                    SET position = position + 1
+                    WHERE chat_id=$1 AND bot_id=$2 AND played=FALSE AND position >= $3 AND position < $4
+                    """,
+                    chat_id,
+                    bot_id,
+                    new_position,
+                    old_position,
+                )
+
+            # Update the moved track's position
+            await conn.execute(
+                "UPDATE music_queues SET position=$1 WHERE id=$2", new_position, track_id
+            )
+
+            logger.info(
+                f"[MUSIC_DB] Reordered queue entry | chat={chat_id} track_id={track_id} from={old_position} to={new_position}"
+            )
+            return True
+
+
+async def get_play_history(
+    pool: asyncpg.Pool, chat_id: int, bot_id: int, limit: int = 50
+) -> List[Dict]:
+    """Get play history (played tracks) for a chat"""
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT * FROM music_queues
+            WHERE chat_id=$1 AND bot_id=$2 AND played=TRUE
+            ORDER BY added_at DESC
+            LIMIT $3
+            """,
+            chat_id,
+            bot_id,
+            limit,
+        )
+        return [dict(row) for row in rows]
+
+
+async def search_queue(pool: asyncpg.Pool, chat_id: int, bot_id: int, query: str) -> List[Dict]:
+    """Search for tracks in the unplayed queue"""
+    async with pool.acquire() as conn:
+        search_pattern = f"%{query}%"
+        rows = await conn.fetch(
+            """
+            SELECT * FROM music_queues
+            WHERE chat_id=$1 AND bot_id=$2 AND played=FALSE
+            AND title ILIKE $3
+            ORDER BY position
+            """,
+            chat_id,
+            bot_id,
+            search_pattern,
+        )
+        return [dict(row) for row in rows]
+
+
+async def clear_queue_entries(pool: asyncpg.Pool, chat_id: int, bot_id: int):
     """Mark all queue entries as played"""
     async with pool.acquire() as conn:
         await conn.execute(
-            "UPDATE music_queues SET played=TRUE WHERE chat_id=$1 AND bot_id=$2",
-            chat_id, bot_id
+            "UPDATE music_queues SET played=TRUE WHERE chat_id=$1 AND bot_id=$2", chat_id, bot_id
         )
 
 
-async def get_session_state(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    bot_id: int
-) -> Optional[Dict]:
+async def get_session_state(pool: asyncpg.Pool, chat_id: int, bot_id: int) -> Optional[Dict]:
     """Get playback session state for a chat"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT * FROM music_sessions WHERE chat_id=$1 AND bot_id=$2",
-            chat_id, bot_id
+            "SELECT * FROM music_sessions WHERE chat_id=$1 AND bot_id=$2", chat_id, bot_id
         )
         return dict(row) if row else None
 
@@ -372,7 +511,7 @@ async def update_session_state(
     is_looping: bool = None,
     volume: int = None,
     current_track_id: int = None,
-    np_message_id: int = None
+    np_message_id: int = None,
 ) -> Dict:
     """Update playback session state"""
     async with pool.acquire() as conn:
@@ -421,19 +560,184 @@ async def update_session_state(
             SET {', '.join(updates)}
             RETURNING *
             """,
-            *params
+            *params,
         )
         return dict(row)
 
 
-async def delete_session_state(
-    pool: asyncpg.Pool,
-    chat_id: int,
-    bot_id: int
-):
+async def delete_session_state(pool: asyncpg.Pool, chat_id: int, bot_id: int):
     """Delete playback session state"""
     async with pool.acquire() as conn:
         await conn.execute(
-            "DELETE FROM music_sessions WHERE chat_id=$1 AND bot_id=$2",
-            chat_id, bot_id
+            "DELETE FROM music_sessions WHERE chat_id=$1 AND bot_id=$2", chat_id, bot_id
         )
+
+
+# ── Userbot Rotation Functions ───────────────────────────────────────────────
+
+
+async def get_next_rotation_userbot(
+    pool: asyncpg.Pool, owner_bot_id: int, rotation_mode: str = "round_robin"
+) -> Optional[int]:
+    """
+    Get the next userbot for rotation based on the specified mode.
+
+    Args:
+        pool: Database connection pool
+        owner_bot_id: The bot that owns the userbots
+        rotation_mode: Strategy - 'round_robin', 'least_used', 'random'
+
+    Returns:
+        userbot_id or None if no active userbots available
+    """
+    async with pool.acquire() as conn:
+        if rotation_mode == "least_used":
+            # Pick the userbot with the lowest play_count
+            row = await conn.fetchrow(
+                """
+                SELECT id FROM music_userbots
+                WHERE owner_bot_id=$1 AND is_active=TRUE AND is_banned=FALSE
+                ORDER BY play_count ASC, last_used_at ASC NULLS FIRST
+                LIMIT 1
+                """,
+                owner_bot_id,
+            )
+        elif rotation_mode == "random":
+            # Pick a random active userbot
+            row = await conn.fetchrow(
+                """
+                SELECT id FROM music_userbots
+                WHERE owner_bot_id=$1 AND is_active=TRUE AND is_banned=FALSE
+                ORDER BY RANDOM()
+                LIMIT 1
+                """,
+                owner_bot_id,
+            )
+        else:
+            # Default: round_robin - pick the one used longest ago
+            row = await conn.fetchrow(
+                """
+                SELECT id FROM music_userbots
+                WHERE owner_bot_id=$1 AND is_active=TRUE AND is_banned=FALSE
+                ORDER BY last_used_at ASC NULLS FIRST
+                LIMIT 1
+                """,
+                owner_bot_id,
+            )
+
+        return row["id"] if row else None
+
+
+async def record_userbot_usage(pool: asyncpg.Pool, userbot_id: int, chat_id: Optional[int] = None):
+    """
+    Record that a userbot was used for playback.
+    Increments play_count and updates last_used_at.
+
+    Args:
+        pool: Database connection pool
+        userbot_id: The userbot that was used
+        chat_id: Optional chat ID for per-chat tracking
+    """
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            UPDATE music_userbots
+            SET play_count = play_count + 1,
+                last_used_at = NOW()
+            WHERE id=$1
+            """,
+            userbot_id,
+        )
+
+        # Also update per-chat assignment if provided
+        if chat_id:
+            await conn.execute(
+                """
+                INSERT INTO music_userbot_assignments (chat_id, userbot_id, play_count, last_used_at)
+                VALUES ($1, $2, 1, NOW())
+                ON CONFLICT (chat_id, userbot_id) DO UPDATE
+                SET play_count = music_userbot_assignments.play_count + 1,
+                    last_used_at = NOW()
+                """,
+                chat_id,
+                userbot_id,
+            )
+
+
+async def check_userbot_health(pool: asyncpg.Pool, bot_id: int) -> List[Dict]:
+    """
+    Check the health of all userbots for a bot.
+    Tries to connect each userbot and verify it's working.
+
+    Args:
+        pool: Database connection pool
+        bot_id: The bot owner ID
+
+    Returns:
+        List of dicts with health status for each userbot
+    """
+    from pyrogram import Client
+
+    from bot.utils.crypto import decrypt_token
+    from config import settings
+
+    userbots = await get_music_userbots(pool, bot_id, active_only=False)
+    results = []
+
+    for ub in userbots:
+        ub_id = ub["id"]
+        result = {
+            "id": ub_id,
+            "tg_name": ub.get("tg_name", "Unknown"),
+            "healthy": False,
+            "error": None,
+        }
+
+        try:
+            # Decrypt session
+            session_string = decrypt_token(ub["session_string"])
+
+            # Try to create and start client
+            client = Client(
+                name=f"health_check_{ub_id}",
+                api_id=settings.PYROGRAM_API_ID,
+                api_hash=settings.PYROGRAM_API_HASH,
+                session_string=session_string,
+                in_memory=True,
+            )
+
+            await client.start()
+
+            # Verify by calling get_me()
+            me = await client.get_me()
+            if me:
+                result["healthy"] = True
+                result["tg_name"] = me.first_name
+
+            await client.stop()
+
+        except Exception as e:
+            result["error"] = str(e)
+
+        results.append(result)
+
+    return results
+
+
+async def toggle_userbot_active(
+    pool: asyncpg.Pool, owner_bot_id: int, userbot_id: int, is_active: bool
+) -> Optional[Dict]:
+    """Toggle the is_active status of a userbot"""
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            UPDATE music_userbots
+            SET is_active=$1
+            WHERE owner_bot_id=$2 AND id=$3
+            RETURNING *
+            """,
+            is_active,
+            owner_bot_id,
+            userbot_id,
+        )
+        return dict(row) if row else None

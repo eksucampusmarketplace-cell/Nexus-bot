@@ -33,7 +33,7 @@ export async function renderBotsPage(container) {
             </div>
             <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
               <span style="color: var(--text-muted);">Groups:</span>
-              <span>${bot.group_limit || 1} limit</span>
+              <span>${bot.is_primary ? 'Unlimited' : (bot.group_limit || 1) + ' limit'}</span>
             </div>
           </div>
         `,

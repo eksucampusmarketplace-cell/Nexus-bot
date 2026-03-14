@@ -20,14 +20,23 @@ const store = useStore;
  * @param {HTMLElement} container - Container element to render into
  */
 export async function renderMusicPage(container) {
-  const chatId = store.getState().activeChatId;
-  const initData = window.Telegram?.WebApp?.initData || '';
-  
+  const state = store.getState();
+  const chatId = state.activeChatId;
+
   // Always clear container first
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
-  if (!chatId) {
+  // If no chatId, try to get first available group
+  if (!chatId && state.groups && state.groups.length > 0) {
+    const firstGroup = state.groups[0];
+    state.setActiveChatId(firstGroup.chat_id);
+  }
+
+  // Check again after auto-selecting
+  const finalChatId = store.getState().activeChatId;
+
+  if (!finalChatId) {
     container.appendChild(EmptyState({
       icon: '👆',
       title: 'Select a group',
@@ -35,6 +44,8 @@ export async function renderMusicPage(container) {
     }));
     return;
   }
+
+  const initData = window.Telegram?.WebApp?.initData || '';
 
   // Show loading state
   container.innerHTML = `
@@ -45,7 +56,7 @@ export async function renderMusicPage(container) {
   `;
 
   // Fetch music data
-  await fetchMusicData(chatId, initData, container);
+  await fetchMusicData(finalChatId, initData, container);
 }
 
 async function fetchMusicData(chatId, initData, container) {
@@ -436,9 +447,13 @@ async function renderUserbotsSection(container, chatId) {
   const state = store.getState();
   const userContext = state.userContext;
   const activeBotId = userContext?.bot_info?.id;
-  
+
   if (!activeBotId) {
-    return; // No bot associated with this user
+    // Try to get bot_id from store if not in userContext
+    const botId = state.bot_info?.id;
+    if (!botId) {
+      return; // No bot associated with this user
+    }
   }
 
   // Userbot section
@@ -448,11 +463,14 @@ async function renderUserbotsSection(container, chatId) {
     children: '<div id="userbots-container"></div>'
   });
   container.appendChild(userbotsCard);
-  
+
   const userbotsContainer = userbotsCard.querySelector('#userbots-container');
-  
+
   // Check if user owns this bot
   const isBotOwner = userContext?.role === 'owner' || userContext?.is_bot_owner;
+
+  // Use the bot ID we found
+  const finalBotId = activeBotId || state.bot_info?.id;
   
   if (!isBotOwner) {
     userbotsContainer.innerHTML = `
@@ -465,8 +483,8 @@ async function renderUserbotsSection(container, chatId) {
 
   // Load userbots
   try {
-    const response = await apiFetch(`/api/bots/${activeBotId}/music/userbots`);
-    renderUserbotsList(userbotsContainer, response.userbots || [], activeBotId);
+    const response = await apiFetch(`/api/bots/${finalBotId}/music/userbots`);
+    renderUserbotsList(userbotsContainer, response.userbots || [], finalBotId);
   } catch (e) {
     userbotsContainer.innerHTML = `
       <div style="text-align: center; padding: var(--sp-4); color: var(--text-muted);">

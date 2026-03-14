@@ -219,14 +219,24 @@ const COMMAND_CATEGORIES = [
  * @param {HTMLElement} container - Container element to render into
  */
 export async function renderCommandsPage(container) {
-  const chatId = store.getState().activeChatId;
-  const settings = store.getState().settings || {};
+  const state = store.getState();
+  const chatId = state.activeChatId;
 
   // Ensure clean container
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
-  if (!chatId) {
+  // If no chatId, try to get first available group
+  if (!chatId && state.groups && state.groups.length > 0) {
+    const firstGroup = state.groups[0];
+    state.setActiveChatId(firstGroup.chat_id);
+  }
+
+  // Check again after auto-selecting
+  const finalChatId = store.getState().activeChatId;
+  const settings = store.getState().settings || {};
+
+  if (!finalChatId) {
     container.appendChild(EmptyState({
       icon: '👆',
       title: 'Select a group',

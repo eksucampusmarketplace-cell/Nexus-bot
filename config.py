@@ -129,7 +129,7 @@ class Settings(BaseSettings):
         """Append a cache-busting version param using RENDER_GIT_COMMIT or a static marker."""
         import os as _os
         commit = _os.environ.get("RENDER_GIT_COMMIT", "")
-        version = commit[:8] if commit else "1"
+        version = commit[:8] if commit else "2"
         separator = "&" if "?" in url else "?"
         return f"{url}{separator}v={version}"
 

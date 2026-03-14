@@ -69,6 +69,52 @@ async def bulk_update_settings(chat_id: int, request: Request):
 
 
 @router.get("/{chat_id}/logs")
-async def group_logs(chat_id: int, user: dict = Depends(get_current_user)):
+async def group_logs(chat_id: int, limit: int = 50, user: dict = Depends(get_current_user)):
     logs = await get_recent_logs(chat_id)
-    return logs
+    return logs[:limit] if isinstance(logs, list) else logs
+
+
+@router.post("/{chat_id}/copy-settings")
+async def copy_settings_to_groups(
+    chat_id: int,
+    body: dict,
+    user: dict = Depends(get_current_user)
+):
+    """Copy settings from source group to target groups."""
+    target_chat_ids = body.get("target_chat_ids", [])
+    modules = body.get("modules", [])
+    if not target_chat_ids:
+        raise HTTPException(status_code=400, detail="No target groups specified")
+
+    source = await get_group(chat_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source group not found")
+
+    source_settings = source.get("settings") or {}
+    results = []
+    for target_id in target_chat_ids:
+        try:
+            target = await get_group(int(target_id))
+            if not target:
+                results.append({"chat_id": target_id, "ok": False, "error": "Group not found"})
+                continue
+            target_settings = target.get("settings") or {}
+            if not modules or "automod" in modules:
+                automod_keys = ["antiflood", "antispam", "lock_link", "captcha_enabled", "warn_max", "warn_action"]
+                for k in automod_keys:
+                    if k in source_settings:
+                        target_settings[k] = source_settings[k]
+            if not modules or "welcome" in modules:
+                for k in ["welcome_enabled", "goodbye_enabled"]:
+                    if k in source_settings:
+                        target_settings[k] = source_settings[k]
+            if not modules or "modules" in modules:
+                for k in ["xp_enabled", "games_enabled", "reports_enabled", "notes_enabled"]:
+                    if k in source_settings:
+                        target_settings[k] = source_settings[k]
+            await update_group_settings(int(target_id), target_settings)
+            results.append({"chat_id": target_id, "ok": True})
+        except Exception as e:
+            results.append({"chat_id": target_id, "ok": False, "error": str(e)})
+
+    return {"ok": True, "results": results}

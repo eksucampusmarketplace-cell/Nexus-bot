@@ -273,10 +273,11 @@ function _renderTemplatesSection() {
       btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
 
       try {
-        await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
+        const response = await apiFetch(`/api/groups/${chatId}/settings`, {
           method: 'PUT',
-          body: JSON.stringify({ settings: templateSettings[template.id] }),
+          body: JSON.stringify(templateSettings[template.id] || {}),
         });
+        if (response === null || response === undefined) throw new Error('No response');
 
         btn.innerHTML = '<span style="color: var(--success);">✅ Applied!</span>';
         setTimeout(() => {

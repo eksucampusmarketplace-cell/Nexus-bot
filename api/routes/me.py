@@ -294,6 +294,44 @@ async def get_member_warn_count(group_id: int, user_id: int) -> int:
         return 0
 
 
+@router.get("/usage")
+async def get_usage(user: dict = Depends(get_current_user)):
+    """Return usage stats for the current owner."""
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid user data")
+
+    async with db.pool.acquire() as conn:
+        bot_row = await conn.fetchrow(
+            "SELECT id, group_limit, groups_count FROM bots WHERE owner_user_id=$1 AND is_primary=FALSE",
+            user_id
+        )
+        bots_count = await conn.fetchval(
+            "SELECT COUNT(*) FROM bots WHERE owner_user_id=$1", user_id
+        ) or 0
+        groups_count = await conn.fetchval(
+            """SELECT COUNT(DISTINCT g.chat_id) FROM groups g
+               JOIN bots b ON b.id::text = split_part(g.bot_token_hash, '_', 1)
+                           OR g.bot_token_hash IN (SELECT token_hash FROM bots WHERE owner_user_id=$1)
+               WHERE b.owner_user_id=$1""",
+            user_id
+        ) or 0
+
+    group_limit = 10
+    bot_limit = 3
+    if bot_row:
+        gl = bot_row.get("group_limit") or 0
+        group_limit = gl if gl > 0 else 10
+
+    return {
+        "bots_count": int(bots_count),
+        "groups_count": int(groups_count),
+        "plan_limit_bots": bot_limit,
+        "plan_limit_groups": group_limit,
+        "plan_name": "Free",
+    }
+
+
 async def get_warn_limit(group_id: int) -> int:
     """Get warning limit for a group."""
     from db.ops.groups import get_group

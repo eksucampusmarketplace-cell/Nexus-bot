@@ -5,9 +5,9 @@
  * [⭐ XP & Levels] [👍 Reputation] [🏅 Badges] [📰 Newsletter] [🌐 Network]
  */
 
-import { Card, Toggle, Badge, EmptyState, showToast } from '../../lib/components.js';
-import { useStore } from '../../store/index.js';
-import { apiFetch } from '../../lib/api.js';
+import { Card, Toggle, Badge, EmptyState, showToast } from '../../lib/components.js?v=1.5.0';
+import { useStore } from '../../store/index.js?v=1.5.0';
+import { apiFetch } from '../../lib/api.js?v=1.5.0';
 
 const store = useStore;
 const getState = store.getState;

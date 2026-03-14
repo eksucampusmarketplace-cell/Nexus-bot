@@ -246,8 +246,12 @@ if os.path.exists(miniapp_path):
 # Import and include API routers
 try:
     from api.routes import (
+        analytics,
         auth,
         automod,
+        backup,
+        billing,
+        boost,
         bots,
         broadcast,
         channel_gate,
@@ -262,9 +266,11 @@ try:
         member_stats,
         members,
         messages,
+        stats,
     )
     from api.routes import moderation as moderation_api
     from api.routes import (
+        admin,
         modules,
         reports,
         roles,
@@ -288,6 +294,18 @@ try:
 
     # Routes that need prefix
     app.include_router(me.router, prefix="/api/me", tags=["me"])
+
+    # Analytics routes
+    app.include_router(analytics.router, tags=["analytics"])
+
+    # Backup routes
+    app.include_router(backup.router, tags=["backup"])
+
+    # Additional routes
+    app.include_router(stats.router, tags=["stats"])
+    app.include_router(admin.router, tags=["admin"])
+    app.include_router(billing.router, tags=["billing"])
+    app.include_router(boost.router, tags=["boost"])
 
     # Engagement routes
     app.include_router(engagement.router, tags=["engagement"])

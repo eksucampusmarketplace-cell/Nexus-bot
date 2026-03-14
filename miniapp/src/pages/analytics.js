@@ -27,7 +27,6 @@ export async function renderAnalyticsPage(container) {
   const state = store.getState();
   const chatId = state.activeChatId;
 
-  // Always clear and reset container first
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
@@ -40,66 +39,97 @@ export async function renderAnalyticsPage(container) {
     return;
   }
 
-  // Show loading state
-  container.innerHTML = `
-    <div style="text-align: center; padding: var(--sp-8);">
-      <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
-      <div style="color: var(--text-muted);">Loading analytics...</div>
+  const header = document.createElement('div');
+  header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
+  header.innerHTML = `
+    <div>
+      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">📊 Analytics</h2>
+      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Group activity overview</p>
     </div>
   `;
+  container.appendChild(header);
 
-  let analytics, memberStats, reports;
+  const rangeBar = document.createElement('div');
+  rangeBar.style.cssText = 'display:flex;gap:var(--sp-1);margin-bottom:var(--sp-4);background:var(--bg-input);padding:4px;border-radius:var(--r-xl);width:fit-content;';
+  const ranges = [{ label: '7d', days: 7 }, { label: '30d', days: 30 }, { label: '90d', days: 90 }];
+  let activeDays = 30;
+  ranges.forEach(r => {
+    const btn = document.createElement('button');
+    btn.textContent = r.label;
+    btn.dataset.days = r.days;
+    btn.style.cssText = `padding:var(--sp-1) var(--sp-3);border:none;border-radius:var(--r-lg);font-size:var(--text-xs);font-weight:var(--fw-medium);cursor:pointer;transition:all var(--dur-fast);background:${r.days===activeDays?'var(--bg-card)':'transparent'};color:${r.days===activeDays?'var(--text-primary)':'var(--text-muted)'};`;
+    btn.addEventListener('click', async () => {
+      activeDays = r.days;
+      rangeBar.querySelectorAll('button').forEach(b => {
+        const isActive = parseInt(b.dataset.days) === activeDays;
+        b.style.background = isActive ? 'var(--bg-card)' : 'transparent';
+        b.style.color = isActive ? 'var(--text-primary)' : 'var(--text-muted)';
+      });
+      await loadAnalytics(activeDays);
+    });
+    rangeBar.appendChild(btn);
+  });
+  container.appendChild(rangeBar);
 
-  try {
-    [analytics, memberStats, reports] = await Promise.all([
-      apiFetch(`/api/groups/${chatId}/analytics`),
-      apiFetch(`/api/groups/${chatId}/member-stats`).catch(() => null),
-      apiFetch(`/api/groups/${chatId}/reports`).catch(() => ({ reports: [], count: 0 })),
-    ]);
-  } catch (err) {
-    container.innerHTML = '';
-    container.appendChild(EmptyState({
-      icon: '⚠️',
-      title: 'Failed to load analytics',
-      description: err.message || 'Please try again.',
-    }));
-    return;
+  const dataContainer = document.createElement('div');
+  container.appendChild(dataContainer);
+
+  async function loadAnalytics(days) {
+    dataContainer.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading analytics...</div>`;
+
+    let analytics, memberStats, reports;
+    try {
+      [analytics, memberStats, reports] = await Promise.all([
+        apiFetch(`/api/groups/${chatId}/analytics?days=${days}`),
+        apiFetch(`/api/groups/${chatId}/member-stats`).catch(() => null),
+        apiFetch(`/api/groups/${chatId}/reports`).catch(() => ({ reports: [], count: 0 })),
+      ]);
+    } catch (err) {
+      dataContainer.innerHTML = '';
+      dataContainer.appendChild(EmptyState({
+        icon: '⚠️',
+        title: 'Failed to load analytics',
+        description: err.message || 'Please try again.',
+      }));
+      return;
+    }
+
+    dataContainer.innerHTML = '';
+
+    const { activity = [], growth = [], modules: modActions = [] } = analytics || {};
+
+    const totalMessages = activity.reduce((s, d) => s + (d.messages || 0), 0);
+    const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.messages || 0) : 0;
+    const totalJoins    = growth.reduce((s, d) => s + (d.joins || 0), 0);
+    const openReports   = reports?.count || 0;
+
+    const summaryGrid = document.createElement('div');
+    summaryGrid.className = 'stats-grid';
+    summaryGrid.style.marginBottom = 'var(--sp-5)';
+    const cards = [
+      { label: `Messages (${days}d)`, value: totalMessages.toLocaleString(), icon: '💬', color: 'accent' },
+      { label: 'Today',               value: todayMessages.toLocaleString(),  icon: '📅', color: 'success' },
+      { label: `Joins (${days}d)`,    value: totalJoins.toLocaleString(),     icon: '👋', color: 'warning' },
+      { label: 'Open Reports',        value: openReports.toLocaleString(),    icon: '🚨', color: openReports > 0 ? 'danger' : 'success' },
+    ];
+    cards.forEach(c => summaryGrid.appendChild(StatCard(c)));
+    dataContainer.appendChild(summaryGrid);
+
+    dataContainer.appendChild(_buildActivityChart(activity));
+    if (analytics.peak_hours) {
+      dataContainer.appendChild(_buildPeakHoursChart(analytics.peak_hours));
+    }
+    dataContainer.appendChild(_buildGrowthChart(growth));
+    dataContainer.appendChild(_buildModActionsCard(modActions));
+
+    if (memberStats && Array.isArray(memberStats.top_members)) {
+      dataContainer.appendChild(_buildLeaderboard(memberStats.top_members));
+    }
+
+    dataContainer.appendChild(await _buildReportsInbox(chatId, reports?.reports || []));
   }
 
-  container.innerHTML = '';
-
-  const { activity = [], growth = [], modules: modActions = [] } = analytics || {};
-
-  const totalMessages = activity.reduce((s, d) => s + (d.messages || 0), 0);
-  const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.messages || 0) : 0;
-  const totalJoins    = growth.reduce((s, d) => s + (d.joins || 0), 0);
-  const totalLeaves   = growth.reduce((s, d) => s + (d.leaves || 0), 0);
-  const openReports   = reports?.count || 0;
-
-  const summaryGrid = document.createElement('div');
-  summaryGrid.className = 'stats-grid';
-  summaryGrid.style.marginBottom = 'var(--sp-5)';
-  const cards = [
-    { label: 'Messages (30d)', value: totalMessages.toLocaleString(), icon: '💬', color: 'accent' },
-    { label: 'Today',          value: todayMessages.toLocaleString(),  icon: '📅', color: 'success' },
-    { label: 'Joins (30d)',    value: totalJoins.toLocaleString(),     icon: '👋', color: 'warning' },
-    { label: 'Open Reports',   value: openReports.toLocaleString(),    icon: '🚨', color: openReports > 0 ? 'danger' : 'success' },
-  ];
-  cards.forEach(c => summaryGrid.appendChild(StatCard(c)));
-  container.appendChild(summaryGrid);
-
-  container.appendChild(_buildActivityChart(activity));
-  if (analytics.peak_hours) {
-    container.appendChild(_buildPeakHoursChart(analytics.peak_hours));
-  }
-  container.appendChild(_buildGrowthChart(growth));
-  container.appendChild(_buildModActionsCard(modActions));
-
-  if (memberStats && Array.isArray(memberStats.top_members)) {
-    container.appendChild(_buildLeaderboard(memberStats.top_members));
-  }
-
-  container.appendChild(await _buildReportsInbox(chatId, reports?.reports || []));
+  await loadAnalytics(activeDays);
 }
 
 

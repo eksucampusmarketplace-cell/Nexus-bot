@@ -69,8 +69,8 @@ ALTER TABLE groups ADD COLUMN IF NOT EXISTS welcome_media_type TEXT; -- 'photo',
 ALTER TABLE groups ADD COLUMN IF NOT EXISTS auto_delete_seconds INTEGER DEFAULT 0;
 
 -- Broadcast with media
-ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS media_file_id TEXT;
-ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS media_type TEXT; -- 'photo', 'video', 'animation'
+ALTER TABLE broadcast_tasks ADD COLUMN IF NOT EXISTS media_file_id TEXT;
+ALTER TABLE broadcast_tasks ADD COLUMN IF NOT EXISTS media_type TEXT; -- 'photo', 'video', 'animation'
 
 -- Warning system improvements
 ALTER TABLE warnings ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;

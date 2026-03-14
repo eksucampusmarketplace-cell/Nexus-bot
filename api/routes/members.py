@@ -179,8 +179,23 @@ async def list_members(chat_id: int, user: dict = Depends(get_current_user)):
             }
 
     # Convert map to list and sort by last_seen (most recent first)
+    from datetime import datetime
     members_list = list(members_map.values())
-    members_list.sort(key=lambda x: x.get('last_seen') or '1970-01-01', reverse=True)
+
+    def get_sort_key(x):
+        last_seen = x.get('last_seen')
+        if last_seen is None:
+            return datetime(1970, 1, 1)
+        if isinstance(last_seen, datetime):
+            return last_seen
+        if isinstance(last_seen, str):
+            try:
+                return datetime.fromisoformat(last_seen.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                return datetime(1970, 1, 1)
+        return datetime(1970, 1, 1)
+
+    members_list.sort(key=get_sort_key, reverse=True)
 
     return members_list
 

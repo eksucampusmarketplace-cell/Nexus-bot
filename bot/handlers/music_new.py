@@ -138,9 +138,19 @@ async def cmd_play(update: Update, context: ContextTypes.DEFAULT_TYPE, playnow=F
     if not is_voice:
         url = " ".join(context.args) if context.args else None
         if not url:
+            cmd_name = "playnow" if playnow else "play"
             await message.reply_text(
-                "❓ Usage: /play <YouTube URL, Spotify URL, SoundCloud URL, or direct audio link>\n"
-                "Or reply to a voice message with /play"
+                f"❓ <b>Usage:</b> <code>/{cmd_name} &lt;URL or search query&gt;</code>\n\n"
+                f"<b>Supported sources:</b>\n"
+                f"• YouTube URL\n"
+                f"• Spotify URL\n"
+                f"• SoundCloud URL\n"
+                f"• Direct audio link\n\n"
+                f"<b>Or:</b> Reply to a voice message with <code>/{cmd_name}</code>\n\n"
+                f"Examples:\n"
+                f"<code>/{cmd_name} https://youtube.com/watch?v=...</code>\n"
+                f"<code>/{cmd_name} Never Gonna Give You Up</code>",
+                parse_mode=ParseMode.HTML
             )
             return
 
@@ -307,7 +317,22 @@ async def cmd_volume(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         vol = int(context.args[0])
     except (IndexError, ValueError):
-        await update.effective_message.reply_text("❓ Usage: /volume <0-200>")
+        await update.effective_message.reply_text(
+            "❓ <b>Usage:</b> <code>/volume &lt;0-200&gt;</code>\n\n"
+            "Set the playback volume.\n\n"
+            "Examples:\n"
+            "<code>/volume 50</code> - Half volume\n"
+            "<code>/volume 100</code> - Full volume\n"
+            "<code>/volume 150</code> - 150% (loud)\n\n"
+            "<i>Default is 100%</i>",
+            parse_mode=ParseMode.HTML
+        )
+        return
+    if vol < 0 or vol > 200:
+        await update.effective_message.reply_text(
+            "❌ Volume must be between 0 and 200.",
+            parse_mode=ParseMode.HTML
+        )
         return
     result = await worker.set_volume(update.effective_chat.id, vol)
     await update.effective_message.reply_text(

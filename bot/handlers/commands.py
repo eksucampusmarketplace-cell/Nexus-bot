@@ -214,6 +214,15 @@ async def warn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     target = update.message.reply_to_message.from_user
+    # Prevent self-warn
+    if target.id == update.effective_user.id:
+        await update.message.reply_text("❌ You can't warn yourself! 😄")
+        return
+    # Prevent warning the bot
+    if target.id == context.bot.id:
+        await update.message.reply_text("❌ I can't warn myself! 🤖")
+        return
+
     reason = " ".join(context.args) if context.args else "No reason provided"
     
     count = await add_warn(target.id, update.effective_chat.id, reason, update.effective_user.id)
@@ -260,23 +269,28 @@ async def warn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _get_user_from_arg(update: Update, context: ContextTypes.DEFAULT_TYPE, arg: str):
     """Resolve a user from username, user_id, or reply."""
-    # First try reply
-    if update.message.reply_to_message:
+    # First try reply (but not if this is called from username/ID lookup)
+    if update.message.reply_to_message and not arg:
         return update.message.reply_to_message.from_user
-    
+
     if not arg:
         return None
-    
+
     # Try username (with or without @)
     if arg.startswith('@'):
         username = arg[1:]
         try:
-            # Try to get chat member by username
-            member = await context.bot.get_chat_member(update.effective_chat.id, arg)
-            return member.user
+            # Try to get chat member by username - need to search via get_chat
+            chat = await context.bot.get_chat(update.effective_chat.id)
+            # Get all admins and members to find by username
+            members = await context.bot.get_chat_administrators(update.effective_chat.id)
+            for member in members:
+                if member.user.username and member.user.username.lower() == username.lower():
+                    return member.user
+            # Also try regular member lookup via member count iteration if needed
         except Exception:
             pass
-    
+
     # Try user_id
     if arg.isdigit():
         try:
@@ -285,7 +299,7 @@ async def _get_user_from_arg(update: Update, context: ContextTypes.DEFAULT_TYPE,
             return member.user
         except Exception:
             pass
-    
+
     return None
 
 
@@ -315,8 +329,18 @@ async def ban_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
         return
-    
-    # Can't ban admins or the bot itself
+
+    # Prevent self-ban
+    if target.id == update.effective_user.id:
+        await update.message.reply_text("❌ You can't ban yourself! 😄")
+        return
+
+    # Prevent banning the bot
+    if target.id == context.bot.id:
+        await update.message.reply_text("❌ I can't ban myself! 🤖")
+        return
+
+    # Can't ban admins
     try:
         member = await context.bot.get_chat_member(update.effective_chat.id, target.id)
         if member.status in ['creator', 'administrator']:
@@ -400,7 +424,17 @@ async def mute_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
         return
-    
+
+    # Prevent self-mute
+    if target.id == update.effective_user.id:
+        await update.message.reply_text("❌ You can't mute yourself! 😄")
+        return
+
+    # Prevent muting the bot
+    if target.id == context.bot.id:
+        await update.message.reply_text("❌ I can't mute myself! 🤖")
+        return
+
     duration = parse_duration(duration_str)
     
     until = datetime.now() + timedelta(seconds=duration) if duration > 0 else None
@@ -485,7 +519,17 @@ async def kick_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="HTML"
         )
         return
-    
+
+    # Prevent self-kick
+    if target.id == update.effective_user.id:
+        await update.message.reply_text("❌ You can't kick yourself! 😄")
+        return
+
+    # Prevent kicking the bot
+    if target.id == context.bot.id:
+        await update.message.reply_text("❌ I can't kick myself! 🤖")
+        return
+
     await context.bot.ban_chat_member(update.effective_chat.id, target.id)
     await context.bot.unban_chat_member(update.effective_chat.id, target.id)
     await update.message.reply_text(f"👢 {format_user(target)} has been kicked.\nReason: {reason}", parse_mode="HTML")
@@ -613,9 +657,17 @@ async def unwarn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context):
         return
     if not update.message.reply_to_message:
-        await update.message.reply_text("Reply to a user's message to remove their warning.")
+        await update.message.reply_text(
+            "❓ <b>Usage:</b> Reply to a user's message to remove their warning.\n\n"
+            "Example: Reply to someone's message and type <code>/unwarn</code>",
+            parse_mode="HTML"
+        )
         return
     target = update.message.reply_to_message.from_user
+    # Prevent self-unwarn
+    if target.id == update.effective_user.id:
+        await update.message.reply_text("❌ You can't remove your own warnings! 😄")
+        return
     count = await remove_warn(target.id, update.effective_chat.id)
     await update.message.reply_text(f"✅ Removed warning for {format_user(target)}. ({count} remaining)", parse_mode="HTML")
 

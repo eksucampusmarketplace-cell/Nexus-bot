@@ -85,12 +85,29 @@
     /* Mobile sidebar toggle */
     .mobile-menu-btn {
       display: none;
-      padding: 8px;
+      padding: var(--sp-2);
       font-size: 20px;
       cursor: pointer;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--r-lg);
+      color: var(--text-primary);
+      line-height: 1;
+      transition: all var(--dur-fast);
+      min-width: 40px;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .mobile-menu-btn:hover {
+      background: var(--bg-hover);
+    }
+    .mobile-menu-btn:active {
+      transform: scale(0.95);
     }
     @media (max-width: 767px) {
-      .mobile-menu-btn { display: block; }
+      .mobile-menu-btn { display: flex !important; }
       #sidebar.mobile-open {
         display: flex !important;
         position: fixed;
@@ -374,16 +391,18 @@
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <!-- Topbar -->
     <div id="topbar">
-      <button id="mobile-menu-toggle" class="mobile-menu-btn">☰</button>
-      <div id="group-switcher"></div>
-      <div style="flex: 1"></div>
-      <div id="notification-bell" class="notification-bell">
-        <span style="font-size: 20px;">🔔</span>
-        <span class="notification-badge" id="notification-count">0</span>
+      <!-- Mobile hamburger - moved to right side with better spacing -->
+      <div id="group-switcher" style="flex: 1; min-width: 0; overflow: hidden;"></div>
+      <div style="display: flex; align-items: center; gap: var(--sp-2); margin-left: auto;">
+        <div id="notification-bell" class="notification-bell">
+          <span style="font-size: 20px;">🔔</span>
+          <span class="notification-badge" id="notification-count">0</span>
+        </div>
+        <button id="theme-toggle" class="btn btn-secondary" style="padding: 8px; min-width: 40px; min-height: 40px;">
+          🎨
+        </button>
+        <button id="mobile-menu-toggle" class="mobile-menu-btn">☰</button>
       </div>
-      <button id="theme-toggle" class="btn btn-secondary" style="padding: 8px;">
-        🎨
-      </button>
     </div>
 
     <!-- Sidebar (desktop) -->
@@ -555,29 +574,45 @@
         </div>
       `).join('');
 
-      // Build bottom nav (limit to 4 most important + More)
+      // Build bottom nav (limit to 5 most important - prevent duplicates)
       const bottomNav = document.getElementById('bottom-nav');
+      
+      // Clear existing content first to prevent duplication
+      bottomNav.innerHTML = '';
+      
       const bottomPages = [
         pages.find(p => p.id === 'dashboard'),
         pages.find(p => p.id === 'commands'),
-        pages.find(p => p.id === 'music'),
         pages.find(p => p.id === 'automod'),
+        pages.find(p => p.id === 'music'),
+        pages.find(p => p.id === 'settings'),
       ].filter(Boolean);
 
-      bottomNav.innerHTML = bottomPages.map(p => `
-        <div class="bottom-nav-item ${getState().activePage === p.id ? 'active' : ''}" data-page="${p.id}">
-          ${p.icon}
-          <span>${p.label}</span>
-        </div>
-      `).join('') + `
-        <div class="bottom-nav-item" id="bottom-nav-more">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-          <span>More</span>
-        </div>
-      `;
+      // Create nav items programmatically to avoid issues
+      bottomPages.forEach(p => {
+        const item = document.createElement('div');
+        item.className = `bottom-nav-item ${getState().activePage === p.id ? 'active' : ''}`;
+        item.dataset.page = p.id;
+        item.innerHTML = `${p.icon}<span>${p.label}</span>`;
+        item.onclick = () => {
+          navigateToPage(p.id);
+          if (sidebar.classList.contains('mobile-open')) {
+            toggleMenu();
+          }
+        };
+        bottomNav.appendChild(item);
+      });
+      
+      // Add "More" button
+      const moreBtn = document.createElement('div');
+      moreBtn.className = 'bottom-nav-item';
+      moreBtn.id = 'bottom-nav-more';
+      moreBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span>More</span>`;
+      moreBtn.onclick = toggleMenu;
+      bottomNav.appendChild(moreBtn);
 
-      // Setup click handlers
-      document.querySelectorAll('[data-page]').forEach(el => {
+      // Setup click handlers for sidebar nav only (bottom nav handled above)
+      sidebarNav.querySelectorAll('[data-page]').forEach(el => {
         el.onclick = () => {
           navigateToPage(el.dataset.page);
           if (sidebar.classList.contains('mobile-open')) {
@@ -585,8 +620,6 @@
           }
         };
       });
-
-      document.getElementById('bottom-nav-more').onclick = toggleMenu;
     }
 
     async function navigateToPage(pageId) {
@@ -867,22 +900,30 @@
             🚀 <b>Quick Actions</b>
           </div>
           <div style="display: flex; gap: var(--sp-2); flex-wrap: wrap;">
-            <button onclick="document.querySelector('[data-page=\\'commands\\']').click()" class="btn btn-primary">
+            <button id="qa-commands" class="btn btn-primary">
               📚 View Commands
             </button>
-            <button onclick="document.querySelector('[data-page=\\'automod\\']').click()" class="btn btn-secondary">
+            <button id="qa-automod" class="btn btn-secondary">
               🛡️ Configure AutoMod
             </button>
-            <button onclick="document.querySelector('[data-page=\\'modules\\']').click()" class="btn btn-secondary">
+            <button id="qa-modules" class="btn btn-secondary">
               📦 Manage Modules
             </button>
-            <button onclick="document.querySelector('[data-page=\\'analytics\\']').click()" class="btn btn-secondary">
+            <button id="qa-analytics" class="btn btn-secondary">
               📊 Analytics
             </button>
           </div>
         </div>
       `;
       container.appendChild(quickActions);
+      
+      // Attach click handlers after DOM insertion
+      setTimeout(() => {
+        document.getElementById('qa-commands')?.addEventListener('click', () => navigateToPage('commands'));
+        document.getElementById('qa-automod')?.addEventListener('click', () => navigateToPage('automod'));
+        document.getElementById('qa-modules')?.addEventListener('click', () => navigateToPage('modules'));
+        document.getElementById('qa-analytics')?.addEventListener('click', () => navigateToPage('analytics'));
+      }, 0);
 
       const statsGrid = document.createElement('div');
       statsGrid.className = 'stats-grid';
@@ -968,33 +1009,130 @@
       const state = getState();
       const chatId = state.activeChatId;
       container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
       if (!chatId) {
-        container.appendChild(EmptyState({ icon: '👆', title: 'Select a group' }));
+        container.appendChild(EmptyState({ 
+          icon: '👆', 
+          title: 'Select a group',
+          description: 'Choose a group from the top to view members'
+        }));
         return;
       }
+      
+      // Show loading state
+      container.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text-muted);">
+          <span style="margin-right:12px;">⏳</span> Loading members...
+        </div>
+      `;
+      
       try {
         const members = await apiFetch(`/api/groups/${chatId}/members`);
+        
+        // Handle case where members is not an array
+        if (!Array.isArray(members)) {
+          throw new Error('Invalid response format');
+        }
+        
         state.setMembers(members);
-        container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => filterMembers(val, members, container) }));
+        container.innerHTML = '';
+        
+        // Add header
+        const header = document.createElement('div');
+        header.style.cssText = 'margin-bottom: var(--sp-4);';
+        header.innerHTML = `
+          <h2 style="font-size:20px;font-weight:700;margin:0;">👥 Members</h2>
+          <p style="color:var(--text-muted);font-size:13px;margin:4px 0 0;">${members.length} total members</p>
+        `;
+        container.appendChild(header);
+        
+        if (members.length === 0) {
+          container.appendChild(EmptyState({ 
+            icon: '👤', 
+            title: 'No members found',
+            description: 'Members will appear here once they interact with the group'
+          }));
+          return;
+        }
+        
+        container.appendChild(SearchInput({ 
+          placeholder: 'Search members...', 
+          onChange: (val) => filterMembers(val, members, container) 
+        }));
+        
         const list = document.createElement('div');
         list.className = 'member-list';
-        members.forEach(m => list.appendChild(MemberRow({ 
-          member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
-          selectable: true,
-          onSelect: (m) => state.toggleMemberSelection(m.id)
-        })));
+        list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+        
+        members.forEach(m => {
+          const memberData = { 
+            id: m.user_id || m.id, 
+            name: m.first_name || 'User', 
+            username: m.username, 
+            avatar: (m.first_name?.[0] || '?').toUpperCase(), 
+            trust_score: m.trust_score || 50, 
+            message_count: m.message_count || 0, 
+            warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0),
+            is_admin: m.is_admin || false,
+            is_owner: m.is_owner || false,
+            is_muted: m.is_muted || false,
+            is_banned: m.is_banned || false,
+            is_approved: m.is_approved || false
+          };
+          list.appendChild(MemberRow({ 
+            member: memberData,
+            selectable: true,
+            onSelect: (m) => state.toggleMemberSelection(m.id)
+          }));
+        });
+        
         container.appendChild(list);
       } catch (e) {
-        showToast('Failed to load members', 'error');
+        console.error('[Members] Error loading:', e);
+        container.innerHTML = '';
+        container.appendChild(EmptyState({ 
+          icon: '⚠️', 
+          title: 'Failed to load members',
+          description: e.message || 'Please try again later'
+        }));
       }
     }
 
     function filterMembers(query, all, container) {
       const q = query.toLowerCase();
-      const filtered = all.filter(m => (m.first_name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q));
+      const filtered = all.filter(m => 
+        (m.first_name || '').toLowerCase().includes(q) || 
+        (m.username || '').toLowerCase().includes(q)
+      );
+      
       const list = container.querySelector('.member-list');
+      if (!list) return;
+      
       list.innerHTML = '';
-      filtered.forEach(m => list.appendChild(MemberRow({ member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) } })));
+      
+      if (filtered.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:var(--sp-6);color:var(--text-muted);">No members found</div>';
+        return;
+      }
+      
+      filtered.forEach(m => {
+        const memberData = { 
+          id: m.user_id || m.id, 
+          name: m.first_name || 'User', 
+          username: m.username, 
+          avatar: (m.first_name?.[0] || '?').toUpperCase(), 
+          trust_score: m.trust_score || 50, 
+          message_count: m.message_count || 0, 
+          warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0),
+          is_admin: m.is_admin || false,
+          is_owner: m.is_owner || false,
+          is_muted: m.is_muted || false,
+          is_banned: m.is_banned || false,
+          is_approved: m.is_approved || false
+        };
+        list.appendChild(MemberRow({ member: memberData }));
+      });
     }
 
     function renderModules(container) {

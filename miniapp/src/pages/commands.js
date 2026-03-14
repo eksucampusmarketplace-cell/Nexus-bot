@@ -188,10 +188,8 @@ const COMMAND_CATEGORIES = [
     description: 'Commands for all group members',
     icon: '👥',
     commands: [
-      { cmd: '/rules', args: '', desc: 'Show group rules' },
       { cmd: '/time', args: '', desc: 'Show current group time' },
       { cmd: '/id', args: '', desc: 'Get your user ID and chat ID' },
-      { cmd: '/report', args: '<reason>', desc: 'Report a message to admins (reply)' },
       { cmd: '/adminlist', args: '', desc: 'List all group admins' },
       { cmd: '/staff', args: '', desc: 'Alias for /adminlist' },
       { cmd: '/invitelink', args: '', desc: 'Get group invite link' },

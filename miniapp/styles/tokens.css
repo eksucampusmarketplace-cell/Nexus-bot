@@ -7,6 +7,7 @@
 :root {
   /* ── Brand ──────────────────────────────────────────── */
   --accent:         #00d4ff;
+  --accent-rgb:     0, 212, 255;
   --accent-dim:     #00d4ff22;
   --accent-hover:   #00b8e0;
   --violet:         #7c3aed;

@@ -206,26 +206,23 @@ export async function renderAutomodPage(container) {
   container.innerHTML = '';
 
   // Templates section
+  const templatesSection = _renderTemplatesSection();
   const templatesCard = Card({
-    title: 'Quick Templates',
+    title: '📋 Quick Templates',
     subtitle: 'Apply a preset configuration',
+    children: templatesSection
   });
   container.appendChild(templatesCard);
 
-  // Render templates section DOM
-  const templatesContainer = templatesCard;
-  templatesContainer.appendChild(_renderTemplatesSection());
-
   // AutoMod sections
   AUTOMOD_SECTIONS.forEach(section => {
+    const sectionContent = _renderSection(section, settings);
     const sectionCard = Card({
       title: `${section.icon} ${section.title}`,
       subtitle: section.description,
+      children: sectionContent
     });
     container.appendChild(sectionCard);
-
-    // Render section DOM
-    sectionCard.appendChild(_renderSection(section, settings));
   });
 }
 

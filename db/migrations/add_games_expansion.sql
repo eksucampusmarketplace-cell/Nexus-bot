@@ -73,6 +73,20 @@ ALTER TABLE broadcast_tasks ADD COLUMN IF NOT EXISTS media_file_id TEXT;
 ALTER TABLE broadcast_tasks ADD COLUMN IF NOT EXISTS media_type TEXT; -- 'photo', 'video', 'animation'
 
 -- Warning system improvements
+-- First ensure the warnings table exists (for new installations)
+CREATE TABLE IF NOT EXISTS warnings (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    chat_id BIGINT NOT NULL,
+    reason TEXT,
+    by_user_id BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ,
+    is_expired BOOLEAN DEFAULT FALSE
+);
+CREATE INDEX IF NOT EXISTS idx_warnings_user_chat ON warnings(user_id, chat_id);
+
+-- Add columns if they don't exist
 ALTER TABLE warnings ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 ALTER TABLE warnings ADD COLUMN IF NOT EXISTS is_expired BOOLEAN DEFAULT FALSE;
 

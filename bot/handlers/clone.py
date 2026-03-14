@@ -77,23 +77,49 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
     # Access control
     if settings.CLONE_ACCESS == "owner_only" and user.id != settings.OWNER_ID:
         logger.warning(f"[CLONE] Access denied | user_id={user.id} | reason=not_owner")
-        await update.message.reply_text("⛔ Cloning is restricted to the bot owner.")
+        # Check if this is a callback query or message
+        if update.callback_query:
+            await update.callback_query.answer("⛔ Cloning is restricted to the bot owner.", show_alert=True)
+            await update.callback_query.edit_message_text("⛔ Cloning is restricted to the bot owner.")
+        else:
+            await update.message.reply_text("⛔ Cloning is restricted to the bot owner.")
         return ConversationHandler.END
+    
+    # Get bot username from cache (avoid API call)
+    cached_info = context.bot_data.get("cached_bot_info", {})
+    bot_username = cached_info.get("username")
+    if not bot_username:
+        # Fallback to API call if cache miss
+        bot_username = (await context.bot.get_me()).username
     
     # Force redirect to PM for clone creation
     if chat.type != "private":
-        bot_username = (await context.bot.get_me()).username
-        await update.message.reply_text(
+        reply_text = (
             "🤖 *Create Your Own Bot*\n\n"
             "To create your own Nexus bot clone, please continue in a private message with me\.",
-            parse_mode=ParseMode.MARKDOWN_V2,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🚀 Continue in PM", url=f"https://t.me/{bot_username}?start=clone")
-            ]])
         )
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🚀 Continue in PM", url=f"https://t.me/{bot_username}?start=clone")
+        ]])
+        
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.callback_query.edit_message_text(reply_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=keyboard)
+        else:
+            await update.message.reply_text(reply_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=keyboard)
         return ConversationHandler.END
 
-    await update.message.reply_text(
+    # Determine if this is from a callback query or message
+    # For callback queries, we use edit_message_text on the callback's message
+    if update.callback_query:
+        # This was triggered from a button click
+        reply_method = update.callback_query.edit_message_text
+        await update.callback_query.answer()
+    else:
+        # This was triggered from a /clone command
+        reply_method = update.message.reply_text
+
+    await reply_method(
         "🔁 *Create Your Own Bot*\n\n"
         "Follow these steps to create your branded Nexus bot:\n\n"
         "*Step 1:* Open @BotFather\n"
@@ -114,6 +140,11 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
 # ─── State: WAITING_FOR_TOKEN ─────────────────────────────────────────────────
 
 async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Handle callback query (shouldn't normally happen in this state, but handle it)
+    if update.callback_query:
+        await update.callback_query.answer("Please send me the bot token as a message.")
+        return WAITING_FOR_TOKEN
+    
     user = update.effective_user
     token = update.message.text.strip()
 

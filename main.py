@@ -128,6 +128,14 @@ async def lifespan(app: FastAPI):
 
         logger.info(f"[STARTUP] ✅ Primary bot @{primary_me.username} (ID: {primary_me.id}) is online")
         
+        # Cache bot info to reduce API calls
+        primary_app.bot_data["cached_bot_info"] = {
+            "id": primary_me.id,
+            "username": primary_me.username,
+            "first_name": primary_me.first_name,
+            "is_bot": primary_me.is_bot,
+        }
+        
         # Save primary bot to DB if not exists
         await db_ops_bots.upsert_bot(
             pool,
@@ -165,6 +173,14 @@ async def lifespan(app: FastAPI):
                     me = await clone_app.bot.get_me()
                 except AttributeError:
                     me = clone_app.bot.get_me()
+                
+                # Cache bot info to reduce API calls
+                clone_app.bot_data["cached_bot_info"] = {
+                    "id": me.id,
+                    "username": me.username,
+                    "first_name": me.first_name,
+                    "is_bot": me.is_bot,
+                }
                     
                 await registry_register(me.id, clone_app)
                 logger.info(f"[STARTUP] ✅ Started clone bot @{me.username} (ID: {me.id})")

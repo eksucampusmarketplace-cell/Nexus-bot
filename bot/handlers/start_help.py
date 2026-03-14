@@ -43,7 +43,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     db_pool = context.bot_data["db_pool"]
-    bot_username = (await context.bot.get_me()).username
+    
+    # Get bot username from cache to avoid API call
+    cached_info = context.bot_data.get("cached_bot_info", {})
+    bot_username = cached_info.get("username")
+    if not bot_username:
+        # Fallback to API call if cache miss
+        bot_username = (await context.bot.get_me()).username
+    
     is_primary = context.bot_data.get("is_primary", False)
 
     log.info(f"[START] user={user.id} chat={chat.id} type={chat.type}")
@@ -149,7 +156,13 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     db_pool = context.bot_data["db_pool"]
-    bot_username = (await context.bot.get_me()).username
+    
+    # Get bot username from cache to avoid API call
+    cached_info = context.bot_data.get("cached_bot_info", {})
+    bot_username = cached_info.get("username")
+    if not bot_username:
+        # Fallback to API call if cache miss
+        bot_username = (await context.bot.get_me()).username
 
     log.info(f"[HELP] user={user.id} chat={chat.id}")
 
@@ -187,7 +200,6 @@ async def handle_start_callback(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     
-    bot_username = (await context.bot.get_me()).username
     is_primary = context.bot_data.get("is_primary", False)
     
     if query.data == "start_clone":

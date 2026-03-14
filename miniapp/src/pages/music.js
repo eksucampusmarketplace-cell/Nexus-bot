@@ -15,6 +15,9 @@ import { apiFetch } from '../../lib/api.js?v=1.3.3';
 
 const store = useStore;
 
+// Store music worker status globally
+let musicWorkerStatus = { available: false, reason: '' };
+
 /**
  * Render the Music player page
  * @param {HTMLElement} container - Container element to render into
@@ -55,6 +58,13 @@ export async function renderMusicPage(container) {
     </div>
   `;
 
+  // Check music worker status first
+  try {
+    musicWorkerStatus = await apiFetch('/api/music/status');
+  } catch (e) {
+    musicWorkerStatus = { available: false, reason: 'Could not check music status' };
+  }
+
   // Fetch music data
   await fetchMusicData(finalChatId, initData, container);
 }
@@ -63,9 +73,12 @@ async function fetchMusicData(chatId, initData, container) {
   try {
     const data = await apiFetch(`/api/music/${chatId}/queue`);
     renderMusicInterface(container, data, chatId, initData);
-    
+
     // Also load userbots section (async, don't wait)
     renderUserbotsSection(container, chatId);
+
+    // Load play history (async, don't wait)
+    renderPlayHistory(container, chatId);
   } catch (error) {
     console.error('[Music] Error loading data:', error);
     container.innerHTML = '';
@@ -77,8 +90,65 @@ async function fetchMusicData(chatId, initData, container) {
   }
 }
 
+function formatRelativeTime(dateString) {
+  if (!dateString) return 'Never';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now - date;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+
+  if (diffSec < 60) return 'Just now';
+  if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? 's' : ''} ago`;
+  if (diffHour < 24) return `${diffHour} hour${diffHour > 1 ? 's' : ''} ago`;
+  if (diffDay < 7) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+  return date.toLocaleDateString();
+}
+
 function renderMusicInterface(container, data, chatId, initData) {
   container.innerHTML = '';
+
+  // Music Worker Status Banner
+  const statusBanner = document.createElement('div');
+  if (!musicWorkerStatus.available) {
+    statusBanner.style.cssText = `
+      background: var(--warning-dim, #FFF3CD);
+      border: 1px solid var(--warning, #FFC107);
+      border-radius: var(--r-lg);
+      padding: var(--sp-3);
+      margin-bottom: var(--sp-4);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+    `;
+    statusBanner.innerHTML = `
+      <span>⚠️</span>
+      <span style="flex: 1; font-size: var(--text-sm); color: var(--text-primary);">
+        ${musicWorkerStatus.reason || 'Music worker is offline. Start it on your PC to enable streaming.'}
+      </span>
+      <button onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; padding: 4px;">✕</button>
+    `;
+  } else {
+    statusBanner.style.cssText = `
+      background: var(--success-dim, #D4EDDA);
+      border: 1px solid var(--success, #28A745);
+      border-radius: var(--r-lg);
+      padding: var(--sp-2) var(--sp-3);
+      margin-bottom: var(--sp-4);
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      font-size: var(--text-sm);
+      color: var(--success, #28A745);
+    `;
+    statusBanner.innerHTML = `
+      <span>🟢</span>
+      <span>Worker online</span>
+    `;
+  }
+  container.appendChild(statusBanner);
 
   // Now Playing Card
   const nowPlayingCard = document.createElement('div');
@@ -133,7 +203,7 @@ function renderMusicInterface(container, data, chatId, initData) {
           </div>
         </div>
       </div>
-      
+
       <!-- Progress Bar (decorative) -->
       <div style="
         height: 4px;
@@ -150,7 +220,7 @@ function renderMusicInterface(container, data, chatId, initData) {
           transition: width 1s linear;
         "></div>
       </div>
-      
+
       <!-- Controls -->
       <div style="
         display: flex;
@@ -164,7 +234,7 @@ function renderMusicInterface(container, data, chatId, initData) {
         <button class="music-btn" data-action="skip" style="${getButtonStyle()}">⏭</button>
         <button class="music-btn" data-action="stop" style="${getButtonStyle()}">⏹</button>
       </div>
-      
+
       <div style="
         display: flex;
         justify-content: center;
@@ -197,7 +267,7 @@ function renderMusicInterface(container, data, chatId, initData) {
 
   container.appendChild(nowPlayingCard);
 
-  // Queue Card
+  // Queue Card with management controls
   if (data.queue && data.queue.length > 0) {
     const queueCard = Card({
       title: `📋 Queue (${data.queue.length})`,
@@ -207,15 +277,16 @@ function renderMusicInterface(container, data, chatId, initData) {
             const mins = Math.floor(track.duration / 60);
             const secs = track.duration % 60;
             return `
-              <div style="
+              <div class="queue-item" data-position="${i}" style="
                 display: flex;
                 align-items: center;
                 gap: var(--sp-3);
                 padding: var(--sp-2);
                 background: var(--bg-input);
                 border-radius: var(--r-lg);
-              ">
-                <span style="color: var(--text-muted); font-size: var(--text-sm); min-width: 24px;">${i + 1}.</span>
+              " draggable="true">
+                <span style="color: var(--text-muted); font-size: var(--text-sm); min-width: 24px; cursor: move;">☰</span>
+                <span style="color: var(--text-muted); font-size: var(--text-sm); min-width: 20px;">${i + 1}.</span>
                 <div style="flex: 1; min-width: 0;">
                   <div style="font-size: var(--text-sm); font-weight: var(--fw-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     ${escapeHtml(track.title)}
@@ -224,6 +295,14 @@ function renderMusicInterface(container, data, chatId, initData) {
                     ${escapeHtml(track.performer || 'Unknown')} • ${mins}:${secs.toString().padStart(2, '0')}
                   </div>
                 </div>
+                <button class="queue-delete-btn" data-position="${i}" style="
+                  background: none;
+                  border: none;
+                  cursor: pointer;
+                  padding: 4px;
+                  font-size: 16px;
+                  color: var(--danger);
+                ">🗑️</button>
               </div>
             `;
           }).join('')}
@@ -232,6 +311,11 @@ function renderMusicInterface(container, data, chatId, initData) {
       `
     });
     container.appendChild(queueCard);
+
+    // Add drag-and-drop handlers for reordering
+    setTimeout(() => {
+      initDragAndDrop(container, chatId);
+    }, 0);
   }
 
   // Quick Actions Card
@@ -260,24 +344,24 @@ function renderMusicInterface(container, data, chatId, initData) {
   });
   container.appendChild(actionsCard);
 
-  // Settings Card
+  // Settings Card with rotation controls
   const settingsCard = Card({
     title: '⚙️ Music Settings',
     children: `
       <div style="display: flex; flex-direction: column; gap: var(--sp-3);">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span style="font-size: var(--text-sm); color: var(--text-primary);">Volume</span>
-          <span style="font-size: var(--text-sm); color: var(--accent); font-weight: var(--fw-semibold);">${data.volume}%</span>
+          <span id="volume-display" style="font-size: var(--text-sm); color: var(--accent); font-weight: var(--fw-semibold);">${data.volume}%</span>
         </div>
-        <input 
-          type="range" 
-          min="0" 
-          max="200" 
-          value="${data.volume}" 
+        <input
+          type="range"
+          min="0"
+          max="200"
+          value="${data.volume}"
           class="volume-slider"
           style="width: 100%;"
         >
-        
+
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--sp-2);">
           <span style="font-size: var(--text-sm); color: var(--text-primary);">Who can play music</span>
           <select class="music-mode-select" style="
@@ -292,6 +376,37 @@ function renderMusicInterface(container, data, chatId, initData) {
             <option value="admins" ${data.play_mode === 'admins' ? 'selected' : ''}>Admins only</option>
           </select>
         </div>
+
+        <div style="border-top: 1px solid var(--border); margin-top: var(--sp-2); padding-top: var(--sp-3);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-2);">
+            <div>
+              <span style="font-size: var(--text-sm); color: var(--text-primary); display: block;">Auto-rotate userbots</span>
+              <span style="font-size: var(--text-xs); color: var(--text-muted);">Automatically switch between userbots for load balancing</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" class="auto-rotate-toggle" ${data.auto_rotate ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="rotation-mode-container" style="display: ${data.auto_rotate ? 'block' : 'none'}; margin-top: var(--sp-2);">
+            <span style="font-size: var(--text-sm); color: var(--text-primary);">Rotation mode</span>
+            <select class="rotation-mode-select" style="
+              width: 100%;
+              margin-top: var(--sp-1);
+              padding: var(--sp-2) var(--sp-3);
+              background: var(--bg-input);
+              border: 1px solid var(--border);
+              border-radius: var(--r-lg);
+              color: var(--text-primary);
+              font-size: var(--text-sm);
+            ">
+              <option value="round_robin" ${data.rotation_mode === 'round_robin' ? 'selected' : ''}>Round Robin</option>
+              <option value="least_used" ${data.rotation_mode === 'least_used' ? 'selected' : ''}>Least Used</option>
+              <option value="random" ${data.rotation_mode === 'random' ? 'selected' : ''}>Random</option>
+            </select>
+          </div>
+        </div>
       </div>
     `
   });
@@ -299,6 +414,96 @@ function renderMusicInterface(container, data, chatId, initData) {
 
   // Add event listeners
   addEventListeners(container, chatId, initData);
+}
+
+function initDragAndDrop(container, chatId) {
+  const queueList = container.querySelector('.queue-list');
+  if (!queueList) return;
+
+  let draggedItem = null;
+  let draggedPosition = null;
+
+  queueList.querySelectorAll('.queue-item').forEach(item => {
+    item.addEventListener('dragstart', (e) => {
+      draggedItem = item;
+      draggedPosition = parseInt(item.dataset.position);
+      item.style.opacity = '0.5';
+    });
+
+    item.addEventListener('dragend', async (e) => {
+      item.style.opacity = '1';
+      draggedItem = null;
+    });
+
+    item.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!draggedItem) return;
+
+      const afterElement = getDragAfterElement(queueList, e.clientY);
+      if (afterElement) {
+        queueList.insertBefore(draggedItem, afterElement);
+      } else {
+        queueList.appendChild(draggedItem);
+      }
+    });
+
+    item.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      if (draggedPosition === null) return;
+
+      // Calculate new position
+      const items = [...queueList.querySelectorAll('.queue-item')];
+      const newPosition = items.indexOf(draggedItem);
+
+      if (newPosition !== draggedPosition) {
+        // Call API to reorder
+        try {
+          await apiFetch(`/api/music/${chatId}/queue/reorder`, {
+            method: 'POST',
+            body: JSON.stringify({ track_id: draggedItem.dataset.trackId, new_position: newPosition })
+          });
+          showToast('Queue reordered!', 'success');
+        } catch (err) {
+          showToast('Failed to reorder', 'error');
+          // Refresh to reset
+          renderMusicPage(document.getElementById('page-music'));
+        }
+      }
+    });
+  });
+
+  // Delete buttons
+  queueList.querySelectorAll('.queue-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const position = btn.dataset.position;
+      try {
+        // Get track ID from the queue item
+        const queueItem = btn.closest('.queue-item');
+        const trackId = queueItem?.dataset.trackId;
+        if (trackId) {
+          await apiFetch(`/api/music/${chatId}/queue/${trackId}`, { method: 'DELETE' });
+          showToast('Track removed!', 'success');
+          renderMusicPage(document.getElementById('page-music'));
+        }
+      } catch (err) {
+        showToast('Failed to remove track', 'error');
+      }
+    });
+  });
+}
+
+function getDragAfterElement(container, y) {
+  const draggableElements = [...container.querySelectorAll('.queue-item:not([style*="opacity: 0.5"])')];
+
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 function addEventListeners(container, chatId, initData) {
@@ -323,6 +528,8 @@ function addEventListeners(container, chatId, initData) {
   if (volumeSlider) {
     volumeSlider.addEventListener('change', async () => {
       const volume = parseInt(volumeSlider.value);
+      const volumeDisplay = container.querySelector('#volume-display');
+      if (volumeDisplay) volumeDisplay.textContent = `${volume}%`;
       await updateMusicSettings(chatId, { volume }, initData);
     });
   }
@@ -333,6 +540,81 @@ function addEventListeners(container, chatId, initData) {
     modeSelect.addEventListener('change', async () => {
       await sendMusicCommand(chatId, 'musicmode', initData, modeSelect.value);
     });
+  }
+
+  // Auto-rotate toggle
+  const autoRotateToggle = container.querySelector('.auto-rotate-toggle');
+  if (autoRotateToggle) {
+    autoRotateToggle.addEventListener('change', async () => {
+      const autoRotate = autoRotateToggle.checked;
+      const rotationModeContainer = container.querySelector('.rotation-mode-container');
+      if (rotationModeContainer) {
+        rotationModeContainer.style.display = autoRotate ? 'block' : 'none';
+      }
+
+      const rotationMode = container.querySelector('.rotation-mode-select')?.value || 'round_robin';
+      await updateMusicSettings(chatId, { auto_rotate: autoRotate, rotation_mode: rotationMode }, initData);
+    });
+  }
+
+  // Rotation mode select
+  const rotationModeSelect = container.querySelector('.rotation-mode-select');
+  if (rotationModeSelect) {
+    rotationModeSelect.addEventListener('change', async () => {
+      const autoRotate = container.querySelector('.auto-rotate-toggle')?.checked || false;
+      await updateMusicSettings(chatId, { auto_rotate: autoRotate, rotation_mode: rotationModeSelect.value }, initData);
+    });
+  }
+}
+
+async function renderPlayHistory(container, chatId) {
+  try {
+    const response = await apiFetch(`/api/music/${chatId}/history?limit=20`);
+    if (!response.history || response.history.length === 0) return;
+
+    const historyCard = Card({
+      title: `📜 History (${response.count})`,
+      children: `
+        <div class="history-list" style="
+          display: flex;
+          flex-direction: column;
+          gap: var(--sp-2);
+          max-height: 300px;
+          overflow-y: auto;
+        ">
+          ${response.history.map(entry => {
+            const mins = Math.floor(entry.duration / 60);
+            const secs = entry.duration % 60;
+            const sourceEmoji = getSourceEmoji(entry.source);
+            const playedAt = new Date(entry.added_at).toLocaleString();
+            return `
+              <div style="
+                display: flex;
+                align-items: center;
+                gap: var(--sp-3);
+                padding: var(--sp-2);
+                background: var(--bg-input);
+                border-radius: var(--r-lg);
+                opacity: 0.8;
+              ">
+                <span style="font-size: 16px;">${sourceEmoji}</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${escapeHtml(entry.title)}
+                  </div>
+                  <div style="font-size: var(--text-xs); color: var(--text-muted);">
+                    ${escapeHtml(entry.performer || 'Unknown')} • ${mins}:${secs.toString().padStart(2, '0')} • ${playedAt}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `
+    });
+    container.appendChild(historyCard);
+  } catch (e) {
+    console.error('[Music] Error loading history:', e);
   }
 }
 
@@ -471,7 +753,7 @@ async function renderUserbotsSection(container, chatId) {
 
   // Use the bot ID we found
   const finalBotId = activeBotId || state.bot_info?.id;
-  
+
   if (!isBotOwner) {
     userbotsContainer.innerHTML = `
       <div style="text-align: center; padding: var(--sp-4); color: var(--text-muted);">
@@ -484,7 +766,10 @@ async function renderUserbotsSection(container, chatId) {
   // Load userbots
   try {
     const response = await apiFetch(`/api/bots/${finalBotId}/music/userbots`);
-    renderUserbotsList(userbotsContainer, response.userbots || [], finalBotId);
+    // Get current settings to know which userbot is active for this group
+    const settingsResponse = await apiFetch(`/api/music/${chatId}/settings`).catch(() => ({}));
+    const activeUserbotId = settingsResponse.userbot_id;
+    renderUserbotsList(userbotsContainer, response.userbots || [], finalBotId, activeUserbotId);
   } catch (e) {
     userbotsContainer.innerHTML = `
       <div style="text-align: center; padding: var(--sp-4); color: var(--text-muted);">
@@ -494,9 +779,9 @@ async function renderUserbotsSection(container, chatId) {
   }
 }
 
-function renderUserbotsList(container, userbots, botId) {
+function renderUserbotsList(container, userbots, botId, activeUserbotId) {
   const activeChatId = store.getState().activeChatId;
-  
+
   if (userbots.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: var(--sp-4);">
@@ -511,17 +796,21 @@ function renderUserbotsList(container, userbots, botId) {
   }
 
   container.innerHTML = '';
-  
+
   const list = document.createElement('div');
   list.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-3);';
-  
+
   userbots.forEach(ub => {
+    const isActiveForGroup = ub.id === activeUserbotId;
+    const statusColor = ub.is_banned ? 'var(--danger)' : (ub.is_active ? 'var(--success, #28A745)' : 'var(--text-muted)');
+    const statusText = ub.is_banned ? 'Banned' : (ub.is_active ? 'Active' : 'Inactive');
+
     const item = document.createElement('div');
     item.style.cssText = `
       padding: var(--sp-3);
       background: var(--bg-input);
       border-radius: var(--r-lg);
-      border: 1px solid ${ub.is_banned ? 'var(--danger)' : 'var(--border)'};
+      border: 2px solid ${isActiveForGroup ? 'var(--accent)' : (ub.is_banned ? 'var(--danger)' : 'var(--border)')};
       display: flex;
       flex-direction: column;
       gap: var(--sp-2);
@@ -529,32 +818,46 @@ function renderUserbotsList(container, userbots, botId) {
 
     const top = document.createElement('div');
     top.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
-    
+
     const info = document.createElement('div');
     info.style.cssText = 'display: flex; align-items: center; gap: var(--sp-2);';
     info.appendChild(Avatar({ name: ub.tg_name, size: 32 }));
-    
+
     const nameWrap = document.createElement('div');
     nameWrap.innerHTML = `
-      <div style="font-weight: var(--fw-medium); font-size: var(--text-sm);">
+      <div style="font-weight: var(--fw-medium); font-size: var(--text-sm); display: flex; align-items: center; gap: var(--sp-1);">
         ${escapeHtml(ub.tg_name || 'Unknown')}
+        ${isActiveForGroup ? '<span style="background: var(--accent-dim); color: var(--accent); padding: 2px 6px; border-radius: var(--r-sm); font-size: 10px;">✅ Active for this group</span>' : ''}
       </div>
       <div style="font-size: var(--text-xs); color: var(--text-muted);">
         ${ub.tg_username ? `@${escapeHtml(ub.tg_username)}` : 'No username'}
       </div>
     `;
     info.appendChild(nameWrap);
-    
+
     const stats = document.createElement('div');
     stats.style.textAlign = 'right';
     stats.innerHTML = `
       <div style="font-size: var(--text-xs); color: var(--text-muted);">Risk Free</div>
       <div style="font-weight: var(--fw-semibold); color: var(--accent); font-size: var(--text-sm);">${ub.risk_free || 0} ⭐</div>
     `;
-    
+
     top.appendChild(info);
     top.appendChild(stats);
     item.appendChild(top);
+
+    // Status row
+    const statusRow = document.createElement('div');
+    statusRow.style.cssText = 'display: flex; align-items: center; gap: var(--sp-2); font-size: var(--text-xs);';
+    statusRow.innerHTML = `
+      <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${statusColor};"></span>
+      <span style="color: ${statusColor};">${statusText}</span>
+      <span style="color: var(--text-muted);">•</span>
+      <span style="color: var(--text-muted);">${ub.play_count || 0} plays</span>
+      <span style="color: var(--text-muted);">•</span>
+      <span style="color: var(--text-muted);">Last used: ${formatRelativeTime(ub.last_used_at)}</span>
+    `;
+    item.appendChild(statusRow);
 
     if (ub.is_banned) {
       const banInfo = document.createElement('div');
@@ -565,12 +868,16 @@ function renderUserbotsList(container, userbots, botId) {
 
     const actions = document.createElement('div');
     actions.style.cssText = 'display: flex; gap: var(--sp-2); flex-wrap: wrap;';
-    
+
     // Assign to group button
     const assignBtn = document.createElement('button');
     assignBtn.className = 'btn btn-secondary';
     assignBtn.style.cssText = 'padding: 4px 8px; font-size: 11px; flex: 1;';
-    assignBtn.textContent = '📍 Use for this Group';
+    assignBtn.textContent = isActiveForGroup ? '✓ Currently Active' : '📍 Use for this Group';
+    if (isActiveForGroup) {
+      assignBtn.disabled = true;
+      assignBtn.style.opacity = '0.7';
+    }
     assignBtn.onclick = () => window.assignUserbot(botId, activeChatId, ub.id);
     actions.appendChild(assignBtn);
 
@@ -597,6 +904,14 @@ function renderUserbotsList(container, userbots, botId) {
       actions.appendChild(banBtn);
     }
 
+    // Activate/Deactivate toggle
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'btn btn-secondary';
+    toggleBtn.style.cssText = `padding: 4px 8px; font-size: 11px; ${ub.is_active ? '' : 'color: var(--accent);'}`;
+    toggleBtn.textContent = ub.is_active ? '🔴 Deactivate' : '🟢 Activate';
+    toggleBtn.onclick = () => window.toggleUserbotActive(botId, ub.id);
+    actions.appendChild(toggleBtn);
+
     const delBtn = document.createElement('button');
     delBtn.className = 'btn btn-secondary';
     delBtn.style.cssText = 'padding: 4px 8px; font-size: 11px; color: var(--danger);';
@@ -607,7 +922,7 @@ function renderUserbotsList(container, userbots, botId) {
     item.appendChild(actions);
     list.appendChild(item);
   });
-  
+
   container.appendChild(list);
 
   const addMoreBtn = document.createElement('button');
@@ -620,11 +935,21 @@ function renderUserbotsList(container, userbots, botId) {
 
 window.assignUserbot = async function(botId, chatId, userbotId) {
   try {
+    // First fetch current settings
+    const currentSettings = await apiFetch(`/api/music/${chatId}/settings`).catch(() => ({}));
+
+    // Merge with new userbot_id
+    const newSettings = {
+      ...currentSettings,
+      userbot_id: userbotId
+    };
+
     await apiFetch(`/api/music/${chatId}/settings`, {
       method: 'PUT',
-      body: JSON.stringify({ userbot_id: userbotId }),
+      body: JSON.stringify(newSettings),
     });
     showToast('Userbot assigned to this group!', 'success');
+    renderMusicPage(document.getElementById('page-music'));
   } catch (e) {
     showToast('Failed to assign userbot', 'error');
   }
@@ -634,7 +959,7 @@ window.assignUserbot = async function(botId, chatId, userbotId) {
 window.openUserbotGenerator = async function(botId) {
   const content = document.createElement('div');
   content.id = 'auth-modal-content';
-  
+
   let currentTab = 'qr';
   let pollingInterval = null;
 
@@ -644,10 +969,10 @@ window.openUserbotGenerator = async function(botId) {
       clearInterval(pollingInterval);
       pollingInterval = null;
     }
-    
+
     const container = content.querySelector('#tab-container');
     container.innerHTML = '';
-    
+
     if (tabId === 'qr') {
       renderQRTab(container);
     } else if (tabId === 'phone') {
@@ -678,7 +1003,7 @@ window.openUserbotGenerator = async function(botId) {
         const display = container.querySelector('#qr-display');
         display.style.display = 'block';
         container.querySelector('#qr-image').src = `data:image/png;base64,${res.qr_image_base64}`;
-        
+
         // Start polling
         pollingInterval = setInterval(async () => {
           try {
@@ -740,11 +1065,11 @@ window.openUserbotGenerator = async function(botId) {
     const phoneInput = container.querySelector('#phone-input');
     const otpInput = container.querySelector('#otp-input');
     const passInput = container.querySelector('#2fa-input');
-    
+
     container.querySelector('#send-otp-btn').onclick = async () => {
       const phone = phoneInput.value.trim();
       if (!phone) return showToast('Enter phone number', 'warning');
-      
+
       try {
         const res = await apiFetch(`/api/bots/${botId}/music/auth/start-phone`, {
           method: 'POST', body: JSON.stringify({ phone })
@@ -761,7 +1086,7 @@ window.openUserbotGenerator = async function(botId) {
     container.querySelector('#verify-otp-btn').onclick = async () => {
       const code = otpInput.value.trim();
       if (!code) return showToast('Enter code', 'warning');
-      
+
       try {
         const res = await apiFetch(`/api/bots/${botId}/music/auth/verify-otp`, {
           method: 'POST', body: JSON.stringify({ code })
@@ -780,7 +1105,7 @@ window.openUserbotGenerator = async function(botId) {
     container.querySelector('#verify-2fa-btn').onclick = async () => {
       const password = passInput.value.trim();
       if (!password) return showToast('Enter password', 'warning');
-      
+
       try {
         const res = await apiFetch(`/api/bots/${botId}/music/auth/verify-2fa`, {
           method: 'POST', body: JSON.stringify({ password })
@@ -808,11 +1133,11 @@ window.openUserbotGenerator = async function(botId) {
         <button id="save-session-btn" class="btn btn-primary">Add Userbot</button>
       </div>
     `;
-    
+
     container.querySelector('#save-session-btn').onclick = async () => {
       const str = container.querySelector('#session-input').value.trim();
       if (!str) return showToast('Paste session string', 'warning');
-      
+
       try {
         const res = await apiFetch(`/api/bots/${botId}/music/auth/session-string`, {
           method: 'POST', body: JSON.stringify({ session_string: str })
@@ -830,7 +1155,7 @@ window.openUserbotGenerator = async function(botId) {
     <div id="tabs-placeholder"></div>
     <div id="tab-container" style="min-height: 280px;"></div>
   `;
-  
+
   const modal = Modal({
     title: '🎭 Add Music Userbot',
     content: content,
@@ -848,7 +1173,7 @@ window.openUserbotGenerator = async function(botId) {
     active: currentTab,
     onChange: renderTab
   });
-  
+
   content.querySelector('#tabs-placeholder').appendChild(tabBar);
   renderTab(currentTab);
 };
@@ -900,7 +1225,7 @@ window.unbanUserbot = async function(botId, userbotId) {
 
 window.deleteUserbot = async function(botId, userbotId) {
   if (!confirm('Are you sure you want to delete this userbot?')) return;
-  
+
   try {
     await apiFetch(`/api/bots/${botId}/music/userbot/${userbotId}`, {
       method: 'DELETE'
@@ -909,5 +1234,19 @@ window.deleteUserbot = async function(botId, userbotId) {
     renderMusicPage(document.getElementById('page-music'));
   } catch (e) {
     showToast('Failed to delete userbot', 'error');
+  }
+};
+
+window.toggleUserbotActive = async function(botId, userbotId) {
+  try {
+    const res = await apiFetch(`/api/bots/${botId}/music/userbots/${userbotId}/activate`, {
+      method: 'PUT'
+    });
+    if (res.ok) {
+      showToast(res.is_active ? 'Userbot activated!' : 'Userbot deactivated!', 'success');
+      renderMusicPage(document.getElementById('page-music'));
+    }
+  } catch (e) {
+    showToast('Failed to toggle userbot status', 'error');
   }
 };

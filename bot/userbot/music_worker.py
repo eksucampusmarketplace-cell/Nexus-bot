@@ -22,38 +22,72 @@ Logs prefix: [MUSIC]
 import asyncio
 import logging
 import os
-import tempfile
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Awaitable
+from typing import Awaitable, Callable, Optional
+
+from pyrogram import Client
 
 log = logging.getLogger("music_worker")
 
-from pyrogram import Client
+# Import PyTGCalls with fallback
+HAS_PYTGCALLS = False
+PyTGCalls = None
+AudioPiped = None
+HighQualityAudio = None
+TGUpdate = None
+
 try:
-    from pytgcalls import PyTGCalls
-    from pytgcalls.types import Update as TGUpdate
-    from pytgcalls.types.input_stream import AudioPiped
-    from pytgcalls.types.input_stream.quality import HighQualityAudio
+    from pytgcalls import PyTGCalls as _PyTGCalls
+    from pytgcalls.types import Update as _TGUpdate
+    from pytgcalls.types.input_stream import AudioPiped as _AudioPiped
+    from pytgcalls.types.input_stream.quality import HighQualityAudio as _HighQualityAudio
+
     HAS_PYTGCALLS = True
+    PyTGCalls = _PyTGCalls
+    AudioPiped = _AudioPiped
+    HighQualityAudio = _HighQualityAudio
+    TGUpdate = _TGUpdate
 except ImportError:
-    HAS_PYTGCALLS = False
     log.warning("[MUSIC] pytgcalls not installed. Music features will be disabled.")
+
     # Define dummy classes for type hinting if needed
-    class PyTGCalls:
-        def __init__(self, *args, **kwargs): pass
+    class _PyTGCalls:
+        def __init__(self, *args, **kwargs):
+            pass
+
         def on_stream_end(self, *args, **kwargs):
-            def decorator(f): return f
+            def decorator(f):
+                return f
+
             return decorator
-        async def start(self): pass
-    class AudioPiped: pass
-    class HighQualityAudio: pass
-    class TGUpdate:
+
+        async def start(self):
+            pass
+
+    class _AudioPiped:
+        pass
+
+    class _HighQualityAudio:
+        pass
+
+    class _TGUpdate:
         chat_id: int
+
+    PyTGCalls = _PyTGCalls
+    AudioPiped = _AudioPiped
+    HighQualityAudio = _HighQualityAudio
+    TGUpdate = _TGUpdate
+
 import yt_dlp
 
 from config import settings
 
 os.makedirs(settings.MUSIC_DOWNLOAD_DIR, exist_ok=True)
+
+# Log warning about PyTGCalls availability at module load time
+if not HAS_PYTGCALLS:
+    log.warning("[MUSIC] WARNING: PyTGCalls unavailable. Voice chat streaming disabled.")
+    log.warning("[MUSIC] Bot will still respond to /play commands but cannot stream audio.")
 
 
 @dataclass
@@ -89,27 +123,88 @@ class GroupSession:
 
 class MusicWorker:
 
-    def __init__(self, pyrogram_client: Client, bot_id: int, db=None):
+    def __init__(self, pyrogram_client: Client, bot_id: int, db=None, db_pool=None):
         self.client = pyrogram_client
         self.bot_id = bot_id
         self.db = db
-        self.calls = PyTGCalls(pyrogram_client)
+        self.db_pool = db_pool  # For rotation queries
+        self.calls = PyTGCalls(pyrogram_client) if HAS_PYTGCALLS else None
         self._sessions: dict[int, GroupSession] = {}
         self._started = False
+        self._tgcalls_pool: dict[int, PyTGCalls] = {}  # userbot_id -> PyTGCalls for multi-userbot
 
-        # Register PyTGCalls stream end callback
-        @self.calls.on_stream_end()
-        async def _on_end(_, update: TGUpdate):
-            await self._handle_stream_end(update.chat_id)
+        if HAS_PYTGCALLS:
+            # Register PyTGCalls stream end callback
+            @self.calls.on_stream_end()
+            async def _on_end(_, update: TGUpdate):
+                await self._handle_stream_end(update.chat_id)
 
-        log.info(f"[MUSIC] MusicWorker created | bot={bot_id}")
+        log.info(f"[MUSIC] MusicWorker created | bot={bot_id} pytgcalls={HAS_PYTGCALLS}")
+
+    def status(self) -> dict:
+        """Return status of PyTGCalls availability"""
+        return {
+            "available": HAS_PYTGCALLS,
+            "reason": (
+                "PyTGCalls installed and ready"
+                if HAS_PYTGCALLS
+                else "pytgcalls not installed. Install py-tgcalls and ntgcalls binary."
+            ),
+        }
 
     async def start(self):
         """Start PyTGCalls. Call once after Pyrogram client starts."""
-        if not self._started:
+        if not HAS_PYTGCALLS:
+            log.warning("[MUSIC] Cannot start PyTGCalls - not available on this server")
+            return
+
+        if not self._started and self.calls:
             await self.calls.start()
             self._started = True
             log.info(f"[MUSIC] PyTGCalls started | bot={self.bot_id}")
+
+    async def get_active_userbot_for_chat(self, chat_id: int) -> Optional[int]:
+        """
+        Get the active userbot ID for a chat based on settings and rotation mode.
+
+        Args:
+            chat_id: The chat/group ID
+
+        Returns:
+            userbot_id or None if no userbots available
+        """
+        if not self.db_pool:
+            return None
+
+        import db.ops.music_new as db_music
+
+        # Get music settings for this chat
+        settings_data = await db_music.get_music_settings(self.db_pool, chat_id, self.bot_id)
+
+        if not settings_data:
+            # No settings - return default behavior
+            return None
+
+        auto_rotate = settings_data.get("auto_rotate", False)
+        rotation_mode = settings_data.get("rotation_mode", "manual")
+        configured_userbot_id = settings_data.get("userbot_id")
+
+        userbot_id = None
+
+        if auto_rotate:
+            # Use rotation to pick the next userbot
+            userbot_id = await db_music.get_next_rotation_userbot(
+                self.db_pool, owner_bot_id=self.bot_id, rotation_mode=rotation_mode
+            )
+        else:
+            # Use configured userbot
+            userbot_id = configured_userbot_id
+
+        # Record usage if we have a userbot
+        if userbot_id:
+            await db_music.record_userbot_usage(self.db_pool, userbot_id, chat_id)
+
+        return userbot_id
 
     # ── PUBLIC API ────────────────────────────────────────────────────────
 
@@ -120,7 +215,7 @@ class MusicWorker:
         requested_by: int,
         requested_by_name: str,
         playnow: bool = False,
-        on_track_end: Optional[Callable[..., Awaitable]] = None
+        on_track_end: Optional[Callable[..., Awaitable]] = None,
     ) -> MusicResult:
         """
         Add a track to the queue (or play immediately if playnow=True).
@@ -129,8 +224,11 @@ class MusicWorker:
                       PTB bot uses this to update the now-playing message.
         """
         if not HAS_PYTGCALLS:
-            return MusicResult(ok=False, error="Music features are not available on this server due to missing dependencies (pytgcalls).")
-        
+            return MusicResult(
+                ok=False,
+                error="Music worker not available on this server. Make sure your local PC worker is running.",
+            )
+
         log.info(f"[MUSIC] Play request | bot={self.bot_id} chat={chat_id} url={url[:60]}")
 
         # Resolve track info
@@ -156,14 +254,20 @@ class MusicWorker:
             return await self._play_next(chat_id)
 
         pos = session.queue.index(track) + 1
-        return MusicResult(ok=True, data={
-            "queued": True,
-            "position": pos,
-            "title": track.title,
-            "duration": track.duration,
-        })
+        return MusicResult(
+            ok=True,
+            data={
+                "queued": True,
+                "position": pos,
+                "title": track.title,
+                "duration": track.duration,
+            },
+        )
 
     async def pause(self, chat_id: int) -> MusicResult:
+        if not HAS_PYTGCALLS:
+            return MusicResult(ok=False, error="Music worker not available on this server.")
+
         session = self._sessions.get(chat_id)
         if not session or not session.is_playing:
             return MusicResult(ok=False, error="Nothing is playing.")
@@ -177,6 +281,9 @@ class MusicWorker:
             return MusicResult(ok=False, error=str(e))
 
     async def resume(self, chat_id: int) -> MusicResult:
+        if not HAS_PYTGCALLS:
+            return MusicResult(ok=False, error="Music worker not available on this server.")
+
         session = self._sessions.get(chat_id)
         if not session or not session.is_paused:
             return MusicResult(ok=False, error="Nothing is paused.")
@@ -190,6 +297,9 @@ class MusicWorker:
             return MusicResult(ok=False, error=str(e))
 
     async def skip(self, chat_id: int) -> MusicResult:
+        if not HAS_PYTGCALLS:
+            return MusicResult(ok=False, error="Music worker not available on this server.")
+
         session = self._sessions.get(chat_id)
         if not session or (not session.is_playing and not session.is_paused):
             return MusicResult(ok=False, error="Nothing is playing.")
@@ -197,6 +307,9 @@ class MusicWorker:
         return await self._play_next(chat_id)
 
     async def stop(self, chat_id: int) -> MusicResult:
+        if not HAS_PYTGCALLS:
+            return MusicResult(ok=False, error="Music worker not available on this server.")
+
         session = self._sessions.get(chat_id)
         if not session:
             return MusicResult(ok=False, error="Nothing is playing.")
@@ -207,6 +320,9 @@ class MusicWorker:
         return MusicResult(ok=True)
 
     async def set_volume(self, chat_id: int, volume: int) -> MusicResult:
+        if not HAS_PYTGCALLS:
+            return MusicResult(ok=False, error="Music worker not available on this server.")
+
         volume = max(0, min(200, volume))
         session = self._sessions.get(chat_id)
         if not session:
@@ -219,6 +335,9 @@ class MusicWorker:
             return MusicResult(ok=False, error=str(e))
 
     async def toggle_loop(self, chat_id: int) -> MusicResult:
+        if not HAS_PYTGCALLS:
+            return MusicResult(ok=False, error="Music worker not available on this server.")
+
         session = self._sessions.get(chat_id)
         if not session:
             return MusicResult(ok=False, error="Nothing is playing.")
@@ -229,19 +348,61 @@ class MusicWorker:
         session = self._sessions.get(chat_id)
         if not session:
             return MusicResult(ok=True, data={"queue": [], "current": None})
-        return MusicResult(ok=True, data={
-            "current": {
-                "title": session.current.title,
-                "duration": session.current.duration,
-                "source": session.current.source,
-            } if session.current else None,
-            "queue": [
-                {"title": t.title, "duration": t.duration, "source": t.source}
-                for t in session.queue
-            ],
-            "is_looping": session.is_looping,
+        return MusicResult(
+            ok=True,
+            data={
+                "current": (
+                    {
+                        "title": session.current.title,
+                        "duration": session.current.duration,
+                        "source": session.current.source,
+                    }
+                    if session.current
+                    else None
+                ),
+                "queue": [
+                    {"title": t.title, "duration": t.duration, "source": t.source}
+                    for t in session.queue
+                ],
+                "is_looping": session.is_looping,
+                "volume": session.volume,
+            },
+        )
+
+    async def get_status(self, chat_id: int) -> dict:
+        """
+        Get current session state for a chat.
+        Used by the API queue endpoint.
+
+        Returns:
+            Dict with playing, paused, current track, queue length, volume
+        """
+        session = self._sessions.get(chat_id)
+        if not session:
+            return {
+                "playing": False,
+                "paused": False,
+                "current": None,
+                "queue_length": 0,
+                "volume": 100,
+            }
+
+        return {
+            "playing": session.is_playing,
+            "paused": session.is_paused,
+            "current": (
+                {
+                    "title": session.current.title,
+                    "duration": session.current.duration,
+                    "source": session.current.source,
+                }
+                if session.current
+                else None
+            ),
+            "queue_length": len(session.queue),
             "volume": session.volume,
-        })
+            "is_looping": session.is_looping,
+        }
 
     # ── INTERNALS ─────────────────────────────────────────────────────────
 
@@ -265,14 +426,16 @@ class MusicWorker:
             "extract_flat": False,
             "noplaylist": True,
             "outtmpl": f"{settings.MUSIC_DOWNLOAD_DIR}/%(id)s.%(ext)s",
-            "postprocessors": [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": "mp3",
-            }],
+            "postprocessors": [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                }
+            ],
         }
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             def _extract():
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -285,7 +448,7 @@ class MusicWorker:
             if duration > settings.MUSIC_MAX_DURATION:
                 return MusicResult(
                     ok=False,
-                    error=f"Track too long ({duration//60}min). Max is {settings.MUSIC_MAX_DURATION//60}min."
+                    error=f"Track too long ({duration//60}min). Max is {settings.MUSIC_MAX_DURATION//60}min.",
                 )
 
             # Find downloaded file
@@ -302,14 +465,17 @@ class MusicWorker:
             else:
                 source = "direct"
 
-            return MusicResult(ok=True, data={
-                "url": url,
-                "title": info.get("title", "Unknown"),
-                "duration": duration,
-                "thumbnail": info.get("thumbnail", ""),
-                "source": source,
-                "file_path": file_path,
-            })
+            return MusicResult(
+                ok=True,
+                data={
+                    "url": url,
+                    "title": info.get("title", "Unknown"),
+                    "duration": duration,
+                    "thumbnail": info.get("thumbnail", ""),
+                    "source": source,
+                    "file_path": file_path,
+                },
+            )
 
         except Exception as e:
             log.warning(f"[MUSIC] Resolve failed | url={url[:60]} error={e}")
@@ -320,6 +486,12 @@ class MusicWorker:
         session = self._sessions.get(chat_id)
         if not session:
             return MusicResult(ok=False, error="No session.")
+
+        # Get active userbot for this chat (handles rotation)
+        if self.db_pool:
+            active_userbot_id = await self.get_active_userbot_for_chat(chat_id)
+            if active_userbot_id:
+                log.info(f"[MUSIC] Using userbot {active_userbot_id} for chat {chat_id}")
 
         # Loop: re-add current track to front
         if session.is_looping and session.current:
@@ -344,26 +516,26 @@ class MusicWorker:
             # Join VC if not already in it
             try:
                 await self.calls.join_group_call(
-                    chat_id,
-                    AudioPiped(track.file_path, HighQualityAudio()),
-                    stream_type=None
+                    chat_id, AudioPiped(track.file_path, HighQualityAudio()), stream_type=None
                 )
             except Exception:
                 # Already in VC — change stream instead
                 await self.calls.change_stream(
-                    chat_id,
-                    AudioPiped(track.file_path, HighQualityAudio())
+                    chat_id, AudioPiped(track.file_path, HighQualityAudio())
                 )
 
             log.info(f"[MUSIC] Streaming | chat={chat_id} title={track.title}")
-            return MusicResult(ok=True, data={
-                "playing": True,
-                "title": track.title,
-                "duration": track.duration,
-                "thumbnail": track.thumbnail,
-                "source": track.source,
-                "queue_len": len(session.queue),
-            })
+            return MusicResult(
+                ok=True,
+                data={
+                    "playing": True,
+                    "title": track.title,
+                    "duration": track.duration,
+                    "thumbnail": track.thumbnail,
+                    "source": track.source,
+                    "queue_len": len(session.queue),
+                },
+            )
 
         except Exception as e:
             log.error(f"[MUSIC] Stream failed | chat={chat_id} error={e}")
@@ -398,9 +570,7 @@ class MusicWorker:
             # Queue empty — start idle timer before leaving
             session_ref = self._sessions.get(chat_id)
             if session_ref:
-                session_ref.idle_task = asyncio.create_task(
-                    self._idle_leave(chat_id)
-                )
+                session_ref.idle_task = asyncio.create_task(self._idle_leave(chat_id))
 
     async def _idle_leave(self, chat_id: int):
         """Leave VC after MUSIC_IDLE_TIMEOUT seconds of inactivity."""
@@ -427,3 +597,26 @@ class MusicWorker:
             log.info(f"[MUSIC] Left VC | chat={chat_id}")
         except Exception as e:
             log.warning(f"[MUSIC] Leave VC failed | chat={chat_id} error={e}")
+
+    # ── Redis Job Helper ──────────────────────────────────────────────────
+
+    @staticmethod
+    async def push_job_to_redis(redis, job: dict) -> bool:
+        """
+        Push a music job to the Redis queue for processing by a worker.
+
+        Args:
+            redis: Redis client instance
+            job: Job dict with action, chat_id, bot_id, etc.
+
+        Returns:
+            True if job was pushed successfully
+        """
+        import json
+
+        try:
+            await redis.lpush("music:jobs", json.dumps(job))
+            return True
+        except Exception as e:
+            log.error(f"[MUSIC] Failed to push job to Redis: {e}")
+            return False

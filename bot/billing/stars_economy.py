@@ -284,7 +284,6 @@ async def redeem_promo_code(db, bot, owner_id: int, code: str) -> dict:
     message = ""
 
     ITEM_LABELS = {
-        "feat_music": "Music Player",
         "feat_autojoin": "Auto Join",
         "feat_analytics": "Analytics",
         "feat_webhooks": "Webhooks",

@@ -90,3 +90,29 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 log.error(f"Failed to delete locked message: {e}")
 
     # TODO: Add filter and blacklist checks here
+
+    # ── XP Award ─────────────────────────────────────────────────────────
+    # Award XP for sending a message (non-blocking, create_task)
+    try:
+        import asyncio
+        from bot.engagement.xp import XPEngine
+
+        xp_engine = XPEngine()
+        pool = context.bot_data.get("db") or db.pool
+        redis = context.bot_data.get("redis")
+
+        asyncio.create_task(
+            xp_engine.award_xp(
+                pool=pool,
+                redis=redis,
+                bot=context.bot,
+                chat_id=chat_id,
+                user_id=user_id,
+                bot_id=context.bot.id,
+                amount=1,
+                reason="message"
+            )
+        )
+    except Exception:
+        # Never block message processing for XP
+        pass

@@ -6,7 +6,7 @@ Caches active purchases in memory per owner.
 
 Features can be:
   - One-time unlocks (e.g., extra group slot)
-  - Time-based subscriptions (e.g., music player for 30 days)
+  - Time-based subscriptions (e.g., analytics for 30 days)
 
 Logs prefix: [ENTITLEMENT]
 """
@@ -24,7 +24,6 @@ log = logging.getLogger("entitlements")
 # ── PRICING & LABELS ─────────────────────────────────────────────────────────
 
 STARS_PRICES = {
-    "feat_music": 100,
     "feat_autojoin": 50,
     "feat_analytics": 200,
     "feat_webhooks": 150,
@@ -33,7 +32,6 @@ STARS_PRICES = {
 }
 
 ITEM_LABELS = {
-    "feat_music": "Music Player",
     "feat_autojoin": "Auto Join",
     "feat_analytics": "Analytics",
     "feat_webhooks": "Webhooks",

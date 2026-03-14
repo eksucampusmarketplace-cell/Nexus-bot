@@ -56,3 +56,27 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to kick: {e}")
+
+
+async def skick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Silent kick — no notification, deletes command message."""
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+    target, reason = await resolve_target(update, context)
+
+    if not target:
+        return
+
+    allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
+    if not allowed:
+        return
+
+    try:
+        await context.bot.ban_chat_member(chat_id, target.id)
+        await context.bot.unban_chat_member(chat_id, target.id)
+        await update.message.delete()
+        await log_action(
+            chat_id, "skick", target.id, target.full_name, invoker.id, invoker.full_name, reason or "Silent kick"
+        )
+    except Exception:
+        pass

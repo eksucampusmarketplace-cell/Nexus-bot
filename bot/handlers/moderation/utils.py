@@ -56,10 +56,33 @@ async def resolve_target(
 
     # Try as username
     if target_str.startswith("@"):
-        pass
-
-    # Fallback: try to find user in DB if we had a username -> id map
-    # For this implementation, we'll mostly rely on reply or ID
+        username = target_str.lstrip("@")
+        try:
+            chat_member = await context.bot.get_chat_member(
+                update.effective_chat.id, f"@{username}"
+            )
+            return chat_member.user, reason
+        except BadRequest:
+            pass
+        try:
+            chat = await context.bot.get_chat(f"@{username}")
+            if chat:
+                from telegram import User as TGUser
+                fake_user = type(
+                    "User",
+                    (),
+                    {
+                        "id": chat.id,
+                        "full_name": chat.full_name or username,
+                        "first_name": chat.first_name or username,
+                        "username": chat.username,
+                        "is_bot": False,
+                    },
+                )()
+                return fake_user, reason
+        except Exception:
+            pass
+        return None, f"User @{username} not found."
 
     return None, "User not found or invalid format."
 

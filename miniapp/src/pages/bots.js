@@ -1,6 +1,6 @@
 
-import { Card, Badge, EmptyState, showToast } from '../../lib/components.js?v=1.5.0';
-import { apiFetch } from '../../lib/api.js?v=1.5.0';
+import { Card, Badge, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
 
 export async function renderBotsPage(container) {
   container.innerHTML = '<div class="loading-screen">⏳ Loading your bots...</div>';

@@ -15,9 +15,9 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, StatCard, EmptyState, showToast, Spinner } from '../../lib/components.js?v=1.5.0';
-import { apiFetch } from '../../lib/api.js?v=1.5.0';
-import { useStore } from '../../store/index.js?v=1.5.0';
+import { Card, StatCard, EmptyState, showToast, Spinner } from '../../lib/components.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { useStore } from '../../store/index.js?v=1.6.0';
 
 const store = useStore;
 

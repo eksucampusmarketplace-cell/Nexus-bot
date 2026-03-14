@@ -119,15 +119,59 @@ async def demote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Failed to demote: {e}")
 
 
+async def title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    from bot.handlers.moderation.utils import get_user_rank
+
+    if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_OWNER:
+        await update.message.reply_text("❌ Only the group owner can set admin titles.")
+        return
+
+    target, title = await resolve_target(update, context)
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    if not title:
+        await update.message.reply_text("❌ Provide a title. Example: /title @user Head Mod")
+        return
+
+    title = title[:16]
+
+    try:
+        await context.bot.set_chat_administrator_custom_title(chat_id, target.id, title)
+        await db.execute(
+            "INSERT INTO admin_titles (chat_id, user_id, title, set_by) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (chat_id, user_id) DO UPDATE SET title=EXCLUDED.title",
+            chat_id,
+            target.id,
+            title,
+            invoker.id,
+        )
+        await update.message.reply_text(
+            f"📛 Title set | {await mention_user(target)}\nTitle: *{title}*",
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to set title: {e}")
+
+
 async def admins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     try:
         admins = await context.bot.get_chat_administrators(chat_id)
-        text = f"👮 Admins in *{update.effective_chat.title}*\n\n"
+        text = f"👮 *Admins in {update.effective_chat.title}*\n\n"
         for admin in admins:
-            status = "Owner" if admin.status == "creator" else "Admin"
-            custom_title = admin.custom_title or ""
-            text += f"• {await mention_user(admin.user)} — {status} {f'({custom_title})' if custom_title else ''}\n"
+            if admin.status == "creator":
+                prefix = "👑"
+                status = "Owner"
+            else:
+                prefix = "⭐"
+                status = admin.custom_title or "Admin"
+            text += f"{prefix} {await mention_user(admin.user)} — {status}\n"
+        text += f"\nTotal: {len(admins)} admins"
         await update.message.reply_text(text, parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to fetch admins: {e}")

@@ -152,14 +152,107 @@ async def warns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target.id,
     )
 
+    settings = await db.fetchrow(
+        "SELECT max_warns FROM warn_settings WHERE chat_id = $1", chat_id
+    )
+    max_warns = settings["max_warns"] if settings else 3
+
     if not history:
         await update.message.reply_text(
             f"✅ No active warnings for {await mention_user(target)}", parse_mode="Markdown"
         )
         return
 
-    text = f"⚠️ Warnings for {await mention_user(target)}: {len(history)}\n\n"
+    text = f"⚠️ Warnings for {await mention_user(target)}: {len(history)}/{max_warns}\n\n"
     for i, row in enumerate(history, 1):
         text += f"{i}. Reason: {row['reason']} — {row['issued_at'].strftime('%b %d')}\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def resetwarns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    target, _ = await resolve_target(update, context)
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
+    if not allowed:
+        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        return
+
+    await db.execute(
+        "UPDATE warnings SET is_active = FALSE WHERE chat_id = $1 AND user_id = $2",
+        chat_id,
+        target.id,
+    )
+
+    await update.message.reply_text(
+        f"✅ All warnings cleared | {await mention_user(target)}\n"
+        f"👮 By: {await mention_user(invoker)}",
+        parse_mode="Markdown",
+    )
+    await log_action(
+        chat_id, "resetwarns", target.id, target.full_name, invoker.id, invoker.full_name, "Warnings reset"
+    )
+
+
+async def warnmode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
+    if await get_user_rank(context.bot, chat_id, update.effective_user.id) < RANK_ADMIN:
+        await update.message.reply_text(ERRORS["no_permission"])
+        return
+
+    valid_actions = ["mute", "kick", "ban", "tban"]
+    if not context.args or context.args[0].lower() not in valid_actions:
+        await update.message.reply_text(
+            f"❌ Usage: /warnmode <{'|'.join(valid_actions)}> [duration]\n"
+            "Duration is used for tban/tmute actions."
+        )
+        return
+
+    action = context.args[0].lower()
+    duration = context.args[1] if len(context.args) > 1 else "1h"
+
+    await db.execute(
+        "INSERT INTO warn_settings (chat_id, warn_action, warn_duration) VALUES ($1, $2, $3) "
+        "ON CONFLICT (chat_id) DO UPDATE SET warn_action = EXCLUDED.warn_action, warn_duration = EXCLUDED.warn_duration",
+        chat_id,
+        action,
+        duration,
+    )
+
+    await update.message.reply_text(
+        f"✅ Warn action set: *{action}*"
+        + (f" for {duration}" if action in ["tban", "tmute"] else ""),
+        parse_mode="Markdown",
+    )
+
+
+async def warnlimit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
+    if await get_user_rank(context.bot, chat_id, update.effective_user.id) < RANK_ADMIN:
+        await update.message.reply_text(ERRORS["no_permission"])
+        return
+
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❌ Usage: /warnlimit <number> (1-10)")
+        return
+
+    limit = int(context.args[0])
+    if not 1 <= limit <= 10:
+        await update.message.reply_text("❌ Warn limit must be between 1 and 10.")
+        return
+
+    await db.execute(
+        "INSERT INTO warn_settings (chat_id, max_warns) VALUES ($1, $2) "
+        "ON CONFLICT (chat_id) DO UPDATE SET max_warns = EXCLUDED.max_warns",
+        chat_id,
+        limit,
+    )
+    await update.message.reply_text(f"✅ Max warnings set to *{limit}*", parse_mode="Markdown")

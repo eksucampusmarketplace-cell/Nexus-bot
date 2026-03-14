@@ -169,3 +169,83 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to unmute: {e}")
+
+
+async def smute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Silent mute — no notification, deletes command message."""
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+    target, reason = await resolve_target(update, context)
+
+    if not target:
+        return
+
+    allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
+    if not allowed:
+        return
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat_id, target.id, permissions=ChatPermissions(can_send_messages=False)
+        )
+        await db.execute(
+            "INSERT INTO mutes (chat_id, user_id, muted_by, reason) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (chat_id, user_id) DO UPDATE SET is_active=TRUE, muted_at=NOW()",
+            chat_id,
+            target.id,
+            invoker.id,
+            reason or "Silent mute",
+        )
+        await update.message.delete()
+        await log_action(
+            chat_id, "smute", target.id, target.full_name, invoker.id, invoker.full_name, reason or "Silent mute"
+        )
+    except Exception:
+        pass
+
+
+async def restrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Partial restrict — can still send text but not media/polls/other."""
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+    target, reason = await resolve_target(update, context)
+
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
+    if not allowed:
+        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        return
+
+    reason = reason or "No reason provided"
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat_id,
+            target.id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=False,
+                can_send_polls=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+            ),
+        )
+        await update.message.reply_text(
+            f"🔒 Restricted | {await mention_user(target)}\n"
+            f"📋 Reason: {reason}\n"
+            f"👮 By: {await mention_user(invoker)}",
+            parse_mode="Markdown",
+        )
+        await log_action(
+            chat_id, "restrict", target.id, target.full_name, invoker.id, invoker.full_name, reason
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to restrict: {e}")
+
+
+async def unrestrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Remove all restrictions (alias for unmute)."""
+    await unmute_command(update, context)

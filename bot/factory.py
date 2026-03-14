@@ -246,7 +246,16 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # ── New Moderation Handlers ───────────────────────────────────────────
     from bot.handlers.moderation import admins_command as nexus_admins_command
-    from bot.handlers.moderation import ban_command, clearrules_command, del_command, demote_command
+    from bot.handlers.moderation import (
+        ban_command,
+        blacklist_command,
+        blacklistmode_command,
+        clearrules_command,
+        del_command,
+        demote_command,
+        filter_command,
+        filters_list_command,
+    )
     from bot.handlers.moderation import id_command as nexus_id_command
     from bot.handlers.moderation import info_command as nexus_info_command
     from bot.handlers.moderation import (
@@ -256,20 +265,28 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         mute_command,
         promote_command,
         purge_command,
-    )
-    from bot.handlers.moderation import rules_command as nexus_rules_command
-    from bot.handlers.moderation import (
+        resetwarns_command,
+        restrict_command,
         sban_command,
         setrules_command,
+        skick_command,
+        smute_command,
+        stop_filter_command,
         tban_command,
+        title_command,
         tmute_command,
         unban_command,
+        unblacklist_command,
         unlock_command,
         unmute_command,
+        unrestrict_command,
         unwarn_command,
         warn_command,
+        warnlimit_command,
+        warnmode_command,
         warns_command,
     )
+    from bot.handlers.moderation import rules_command as nexus_rules_command
     from bot.handlers.moderation.message_guard import message_guard
 
     # ── Moderation commands (groups only) ─────────────────────────────────
@@ -304,6 +321,20 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.commands import stats_handler
 
     app.add_handler(CommandHandler("stats", stats_handler, filters=GROUP))
+    app.add_handler(CommandHandler("resetwarns", resetwarns_command, filters=GROUP))
+    app.add_handler(CommandHandler("warnmode", warnmode_command, filters=GROUP))
+    app.add_handler(CommandHandler("warnlimit", warnlimit_command, filters=GROUP))
+    app.add_handler(CommandHandler("skick", skick_command, filters=GROUP))
+    app.add_handler(CommandHandler("smute", smute_command, filters=GROUP))
+    app.add_handler(CommandHandler("restrict", restrict_command, filters=GROUP))
+    app.add_handler(CommandHandler("unrestrict", unrestrict_command, filters=GROUP))
+    app.add_handler(CommandHandler("title", title_command, filters=GROUP))
+    app.add_handler(CommandHandler("filter", filter_command, filters=GROUP))
+    app.add_handler(CommandHandler("filters", filters_list_command, filters=GROUP))
+    app.add_handler(CommandHandler("stop", stop_filter_command, filters=GROUP))
+    app.add_handler(CommandHandler("blacklist", blacklist_command, filters=GROUP))
+    app.add_handler(CommandHandler("unblacklist", unblacklist_command, filters=GROUP))
+    app.add_handler(CommandHandler("blacklistmode", blacklistmode_command, filters=GROUP))
 
     # Message handler for message_guard (checks locks, filters, etc.)
     app.add_handler(MessageHandler(GROUP & filters.ALL, message_guard), group=0)

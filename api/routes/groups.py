@@ -5,7 +5,7 @@ from db.ops.groups import get_user_managed_groups, get_group, update_group_setti
 from db.ops.logs import get_recent_logs
 import json
 
-router = APIRouter(prefix="/api/groups")
+router = APIRouter()
 
 @router.get("")
 async def list_groups(user: dict = Depends(get_current_user)):

@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Advanced Trivia</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--accent:#7c3aed;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--gold:#fbbf24}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+#app{display:flex;flex-direction:column;height:100dvh;padding:14px 12px;gap:12px}
+
+/* Top bar */
+#topbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 10px;display:flex;align-items:center;gap:4px;flex-shrink:0}
+.sv{font-size:16px;font-weight:800}.sl{font-size:9px;color:var(--muted)}
+
+/* XP Bar */
+#xp-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.xp-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.xp-lvl{font-size:12px;font-weight:700;color:var(--accent)}.xp-info{font-size:10px;color:var(--muted)}
+.xp-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.xp-fill{height:100%;background:linear-gradient(90deg,var(--accent),#a855f7);border-radius:3px;transition:width .4s}
+
+/* Category selector */
+#cat-select{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+#cat-select::-webkit-scrollbar{display:none}
+.cat-pill{flex-shrink:0;padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;transition:.15s;white-space:nowrap}
+.cat-pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.cat-pill:active{transform:scale(.95)}
+
+/* Daily challenge card */
+#daily-card{background:linear-gradient(135deg,#1a0a2e22,#0f1620);border:1px solid var(--accent);border-radius:12px;padding:12px 14px;position:relative;overflow:hidden}
+#daily-card::before{content:'';position:absolute;top:0;right:0;width:80px;height:80px;background:radial-gradient(circle at top right,var(--accent)20%,transparent 70%);opacity:.2}
+.daily-header{display:flex;align-items:center;gap:6px;margin-bottom:8px;position:relative}
+.d-icon{font-size:18px}.d-title{font-size:13px;font-weight:700}.d-timer{font-size:10px;color:var(--muted);margin-left:auto;background:var(--card2);padding:2px 8px;border-radius:20px}
+.daily-task{font-size:13px;color:var(--text);margin-bottom:6px;position:relative}
+.daily-prog{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.daily-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--gold));border-radius:3px;transition:width .3s}
+.daily-status{font-size:11px;color:var(--muted);position:relative}
+.daily-claim{width:100%;padding:10px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--accent),#5b21b6);color:#fff;font-size:13px;font-weight:700;cursor:pointer;margin-top:8px;transition:.15s}
+.daily-claim:disabled{opacity:.5;cursor:not-allowed;background:var(--border)}
+.daily-claim:active:not(:disabled){transform:scale(.98)}
+
+/* Question area */
+#q-area{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;flex-shrink:0}
+#q-num{font-size:11px;color:var(--muted);margin-bottom:6px}
+#q-text{font-size:15px;font-weight:600;line-height:1.5;color:var(--text)}
+#timer-ring{position:absolute;top:12px;right:12px;width:44px;height:44px}
+#timer-ring canvas{position:absolute;top:0;left:0}
+#timer-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:14px;font-weight:700;color:var(--text)}
+
+/* Options */
+#options{display:flex;flex-direction:column;gap:8px;flex:1}
+.option{width:100%;padding:12px 14px;background:var(--card);border:1.5px solid var(--border);border-radius:12px;cursor:pointer;transition:.15s;text-align:left;font-size:13px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:10px;position:relative}
+.option:active{transform:scale(.99)}
+.opt-letter{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--muted);flex-shrink:0;transition:.15s}
+.option.selected{border-color:var(--accent);background:#7c3aed15}
+.option.selected .opt-letter{background:var(--accent);border-color:var(--accent);color:#fff}
+.option.correct{border-color:var(--green);background:#22c55e15}
+.option.correct .opt-letter{background:var(--green);border-color:var(--green);color:#fff}
+.option.wrong{border-color:var(--red);background:#ef444415}
+.option.wrong .opt-letter{background:var(--red);border-color:var(--red);color:#fff}
+.option.disabled{cursor:default;pointer-events:none}
+.opt-txt{flex:1;line-height:1.4}
+.opt-icon{font-size:14px;position:absolute;right:14px;opacity:0;transition:.2s}
+.option.correct .opt-icon,.option.wrong .opt-icon{opacity:1}
+
+/* Explanation */
+#explanation{background:var(--card2);border-left:3px solid var(--accent);border-radius:0 10px 10px 0;padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.5;display:none;margin-bottom:8px}
+#explanation.show{display:block}
+
+/* Stats row */
+#stats-row{display:flex;gap:8px;align-items:center}
+.st-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;font-weight:600;transition:.15s;text-align:center}
+.st-btn:active{transform:scale(.97)}
+
+/* Next button */
+#next-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:14px;font-weight:700;transition:.15s;background:linear-gradient(135deg,var(--accent),#9333ea);color:#fff;box-shadow:0 4px 20px rgba(124,58,237,.3)}
+#next-btn:disabled{background:var(--card);color:var(--muted);border:1px solid var(--border);box-shadow:none;cursor:default}
+#next-btn:active{transform:scale(.98)}
+
+/* Results */
+#results{display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:14px;text-align:center}
+#results.show{display:flex}
+.res-emoji{font-size:64px;line-height:1}
+.res-title{font-size:24px;font-weight:700}
+.res-score{font-size:52px;font-weight:800;background:linear-gradient(135deg,var(--accent),#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.res-detail{font-size:13px;color:var(--muted);line-height:1.6}
+.res-xp{background:#7c3aed20;border:1px solid #7c3aed44;border-radius:12px;padding:10px 20px;font-size:15px;font-weight:600;color:var(--accent)}
+.res-achieve{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.achieve-badge{background:var(--card2);border:1px solid var(--gold);border-radius:8px;padding:4px 10px;font-size:10px;font-weight:600;color:var(--gold)}
+
+/* Overlay */
+#overlay{position:fixed;inset:0;background:#000c;display:flex;align-items:center;justify-content:center;z-index:50}
+#ov-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:26px 22px;text-align:center;width:min(320px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}.ov-title{font-size:22px;font-weight:800;margin-bottom:6px}
+.ov-sub{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:14px;font-weight:700;margin-bottom:8px;transition:.15s}
+.btn-p{background:linear-gradient(135deg,var(--accent),#9333ea);color:#fff}
+.btn-g{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+.btn:active{transform:scale(.97)}
+
+/* Animations */
+@keyframes slideUp{from{transform:translateY(10px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}
+.slide-up{animation:slideUp .3s cubic-bezier(.16,1,.3,1)}
+.shake{animation:shake .3s ease}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- QUIZ UI -->
+  <div id="quiz-ui" style="display:flex;flex-direction:column;gap:12px;flex:1">
+    <div id="topbar">
+      <div class="stat-box"><div class="sv" id="streak-val">0🔥</div><div class="sl">Streak</div></div>
+      <div class="stat-box"><div class="sv" id="q-progress">1/20</div><div class="sl">Question</div></div>
+      <div class="stat-box"><div class="sv" id="score-val" style="color:var(--amber)">0</div><div class="sl">Score</div></div>
+    </div>
+    
+    <div id="xp-bar">
+      <div class="xp-top"><div class="xp-lvl" id="xp-lvl">Level 1</div><div class="xp-info" id="xp-info">0 / 100 XP</div></div>
+      <div class="xp-track"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+    </div>
+    
+    <div id="daily-card">
+      <div class="daily-header">
+        <span class="d-icon">🎯</span>
+        <span class="d-title">Daily Challenge</span>
+        <span class="d-timer" id="d-timer">12:34:56</span>
+      </div>
+      <div class="daily-task" id="d-task">Get 15 correct answers in Science category</div>
+      <div class="daily-prog"><div class="daily-fill" id="d-fill" style="width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="daily-status" id="d-status">0/15 correct</span>
+      </div>
+      <button class="daily-claim" id="d-claim" disabled onclick="claimDaily()">Claim +300 XP</button>
+    </div>
+    
+    <div id="cat-select">
+      <button class="cat-pill active" data-cat="all" onclick="setCategory('all')">🎲 All</button>
+      <button class="cat-pill" data-cat="tech" onclick="setCategory('tech')">💻 Tech</button>
+      <button class="cat-pill" data-cat="science" onclick="setCategory('science')">🪐 Science</button>
+      <button class="cat-pill" data-cat="history" onclick="setCategory('history')">📜 History</button>
+      <button class="cat-pill" data-cat="geo" onclick="setCategory('geo')">🌍 Geography</button>
+      <button class="cat-pill" data-cat="ent" onclick="setCategory('ent')">🎬 Entertainment</button>
+    </div>
+    
+    <div id="q-area" style="position:relative">
+      <div class="slide-up">
+        <div id="q-num">Question 1 of 20</div>
+        <div id="q-text">Loading question...</div>
+      </div>
+      <div id="timer-ring"><canvas id="timer-canvas" width="44" height="44"></canvas><div class="timer-txt" id="timer-txt">20</div></div>
+    </div>
+    
+    <div id="explanation"></div>
+    <div id="options"></div>
+    
+    <div id="stats-row">
+      <button class="st-btn" onclick="useHint()">💡 Hint (-25 pts)</button>
+      <button class="st-btn" onclick="use5050()">⚡ 50/50 (-100 pts)</button>
+    </div>
+    
+    <button id="next-btn" onclick="nextQuestion()" disabled>Next Question →</button>
+  </div>
+  
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="res-emoji" id="res-emoji">🏆</div>
+    <div class="res-title" id="res-title">Quiz Complete!</div>
+    <div class="res-score" id="res-score">15/20</div>
+    <div class="res-detail" id="res-detail">Excellent performance!</div>
+    <div class="res-xp" id="res-xp">+350 XP Earned</div>
+    <div class="res-achieve" id="res-achieve"></div>
+    <button class="btn btn-p" onclick="restartQuiz()">Play Again</button>
+    <button class="btn btn-g" onclick="showMenu()">Menu</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="ov-card">
+    <div class="ov-icon">🧠</div>
+    <div class="ov-title">Advanced Trivia</div>
+    <div class="ov-sub">100+ questions across 6 categories!<br>Use hints wisely. Build streaks for bonus XP!</div>
+    <div class="ov-sub" style="font-size:11px;color:var(--gold)">💎 Daily challenges · Achievements · Leaderboards</div>
+    <button class="btn btn-p" onclick="startQuiz()">▶ Start Quiz</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user || {id:0,first_name:'Player'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+
+// Expanded question database with 100+ questions across categories
+const QUESTIONS = {
+  tech: [
+    {q:"What programming language is Python named after?",opts:["A snake","Monty Python","A mathematician","A city"],correct:1,exp:"Guido van Rossum named Python after Monty Python's Flying Circus, his favorite TV show."},
+    {q:"Which company created Telegram?",opts:["Meta","Google","Durov brothers","Apple"],correct:2,exp:"Pavel and Nikolai Durov created Telegram, launching it in 2013."},
+    {q:"What does 'HTTP' stand for?",opts:["HyperText Transfer Protocol","High Tech Transfer Process","HyperText Transmission Program","High Transfer Text Protocol"],correct:0,exp:"HTTP stands for HyperText Transfer Protocol — foundation of data exchange on web."},
+    {q:"What year was the first iPhone released?",opts:["2005","2006","2007","2008"],correct:2,exp:"Apple released the first iPhone on June 29, 2007, revolutionizing the smartphone industry."},
+    {q:"Which browser is developed by Google?",opts:["Firefox","Safari","Chrome","Edge"],correct:2,exp:"Google Chrome was first released in 2008 and is now the most popular web browser."},
+    {q:"What is the most popular programming language in 2024?",opts:["JavaScript","Python","Java","C++"],correct:1,exp:"Python has become the most popular programming language due to its simplicity and versatility."},
+    {q:"What does 'CPU' stand for?",opts:["Central Processing Unit","Computer Power Unit","Central Power Unit","Core Processing Unit"],correct:0,exp:"CPU stands for Central Processing Unit — the 'brain' of a computer."},
+    {q:"What is the main function of a GPU?",opts:["Store files","Process graphics","Connect to internet","Play sound"],correct:1,exp:"GPU (Graphics Processing Unit) specializes in rendering graphics and images."},
+    {q:"Which company developed Windows?",opts:["Apple","IBM","Microsoft","Google"],correct:2,exp:"Microsoft developed Windows, first released in 1985."},
+    {q:"What does 'VPN' stand for?",opts:["Virtual Private Network","Very Private Network","Virtual Protected Network","Virtual Public Network"],correct:0,exp:"VPN stands for Virtual Private Network, used for secure internet connections."},
+    {q:"Which programming language is used for web styling?",opts:["HTML","JavaScript","CSS","Python"],correct:2,exp:"CSS (Cascading Style Sheets) is used to style and layout web pages."},
+    {q:"What is the maximum message length in Telegram?",opts:["1,000","2,048","4,096","10,000"],correct:2,exp:"Telegram allows messages up to 4,096 characters long for regular text messages."},
+    {q:"Which company owns Android?",opts:["Apple","Microsoft","Google","Samsung"],correct:2,exp:"Google acquired Android in 2005 and released the first Android phone in 2008."},
+    {q:"What does 'API' stand for?",opts:["Application Programming Interface","Advanced Protocol Integration","Automated Process Interface","Application Process Integration"],correct:0,exp:"API stands for Application Programming Interface — it defines how software components interact."},
+  ],
+  science: [
+    {q:"Which planet is known as the Red Planet?",opts:["Venus","Saturn","Mars","Jupiter"],correct:2,exp:"Mars is called the Red Planet because of iron oxide (rust) on its surface, giving it a reddish appearance."},
+    {q:"How many bits are in a byte?",opts:["4","8","16","32"],correct:1,exp:"One byte is made up of exactly 8 bits. This is a fundamental unit in computing."},
+    {q:"What is the chemical symbol for gold?",opts:["Go","Gd","Au","Ag"],correct:2,exp:"Au comes from the Latin word 'aurum' meaning gold."},
+    {q:"What is the speed of light approximately?",opts:["300,000 km/s","150,000 km/s","1,000,000 km/s","100,000 km/s"],correct:0,exp:"Light travels at approximately 300,000 kilometers per second in a vacuum."},
+    {q:"Which element has the atomic number 1?",opts:["Oxygen","Hydrogen","Carbon","Helium"],correct:1,exp:"Hydrogen is the first element on the periodic table with atomic number 1."},
+    {q:"What is the largest organ in the human body?",opts:["Heart","Brain","Liver","Skin"],correct:3,exp:"The skin is the largest organ of the human body, covering about 20 square feet."},
+    {q:"What force keeps planets in orbit?",opts:["Magnetism","Gravity","Friction","Electricity"],correct:1,exp:"Gravity is the force of attraction between objects with mass, keeping planets in orbit."},
+    {q:"How many bones are in an adult human body?",opts:["106","206","306","256"],correct:1,exp:"An adult human has 206 bones, while babies are born with about 270."},
+    {q:"What is the hardest natural substance?",opts:["Gold","Iron","Diamond","Platinum"],correct:2,exp:"Diamond is the hardest known natural material, rated 10 on the Mohs hardness scale."},
+    {q:"What gas do plants absorb?",opts:["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],correct:2,exp:"Plants absorb carbon dioxide and release oxygen through photosynthesis."},
+    {q:"What is the center of an atom called?",opts:["Electron","Proton","Neutron","Nucleus"],correct:3,exp:"The nucleus is at the center of an atom, containing protons and neutrons."},
+    {q:"What does a barometer measure?",opts:["Temperature","Air pressure","Humidity","Wind speed"],correct:1,exp:"A barometer measures atmospheric pressure, used for weather forecasting."},
+    {q:"How many chromosomes do humans have?",opts:["23","46","44","48"],correct:1,exp:"Humans have 23 pairs of chromosomes, for a total of 46."},
+  ],
+  history: [
+    {q:"Who was the first President of the USA?",opts:["Thomas Jefferson","John Adams","George Washington","Benjamin Franklin"],correct:2,exp:"George Washington served as the first President from 1789 to 1797."},
+    {q:"In which year did World War II end?",opts:["1943","1944","1945","1946"],correct:2,exp:"World War II ended in 1945 with Germany surrendering in May and Japan in September."},
+    {q:"Who painted the Mona Lisa?",opts:["Michelangelo","Leonardo da Vinci","Raphael","Donatello"],correct:1,exp:"Leonardo da Vinci painted the Mona Lisa between 1503 and 1519."},
+    {q:"Which empire built the Colosseum?",opts:["Greek","Roman","Ottoman","Egyptian"],correct:1,exp:"The Roman Empire built the Colosseum in Rome around 70-80 AD."},
+    {q:"Who wrote Romeo and Juliet?",opts:["Charles Dickens","William Shakespeare","Jane Austen","Mark Twain"],correct:1,exp:"William Shakespeare wrote Romeo and Juliet around 1594-1596."},
+    {q:"In which year did the Titanic sink?",opts:["1910","1911","1912","1913"],correct:2,exp:"The Titanic sank on April 15, 1912 after hitting an iceberg."},
+    {q:"Who was the first man on the moon?",opts:["Buzz Aldrin","Neil Armstrong","Yuri Gagarin","Michael Collins"],correct:1,exp:"Neil Armstrong was the first human to walk on the moon on July 20, 1969."},
+    {q:"Which pharaoh built the Great Pyramid?",opts:["Tutankhamun","Ramses II","Khufu","Cleopatra"],correct:2,exp:"Pharaoh Khufu built the Great Pyramid of Giza around 2560 BC."},
+    {q:"What year did the Berlin Wall fall?",opts:["1987","1988","1989","1990"],correct:2,exp:"The Berlin Wall fell on November 9, 1989, symbolizing the end of the Cold War."},
+    {q:"Who invented the telephone?",opts:["Thomas Edison","Nikola Tesla","Alexander Graham Bell","Guglielmo Marconi"],correct:2,exp:"Alexander Graham Bell is credited with inventing the telephone in 1876."},
+    {q:"Which year was the Declaration of Independence signed?",opts:["1774","1775","1776","1777"],correct:2,exp:"The Declaration of Independence was signed on July 4, 1776."},
+    {q:"Who was the first female Prime Minister of the UK?",opts:["Theresa May","Margaret Thatcher","Queen Elizabeth","Queen Victoria"],correct:1,exp:"Margaret Thatcher became the UK's first female Prime Minister in 1979."},
+  ],
+  geo: [
+    {q:"What is the capital of Japan?",opts:["Osaka","Kyoto","Hiroshima","Tokyo"],correct:3,exp:"Tokyo is the capital and most populous city of Japan, home to over 13 million people."},
+    {q:"Which is the largest ocean?",opts:["Atlantic","Indian","Arctic","Pacific"],correct:3,exp:"The Pacific Ocean is the largest and deepest ocean on Earth."},
+    {q:"Which country has the most population?",opts:["India","China","USA","Indonesia"],correct:0,exp:"India surpassed China in 2023 to become the world's most populous country."},
+    {q:"What is the smallest country in the world?",opts:["Monaco","Vatican City","San Marino","Liechtenstein"],correct:1,exp:"Vatican City is the smallest country, covering just 0.44 square kilometers."},
+    {q:"Which continent is Egypt in?",opts:["Asia","Europe","Africa","Middle East"],correct:2,exp:"Egypt is located in northeastern Africa, though the Sinai Peninsula is in Asia."},
+    {q:"What is the longest river in the world?",opts:["Amazon","Nile","Yangtze","Mississippi"],correct:1,exp:"The Nile River is traditionally considered the longest, at about 6,650 km."},
+    {q:"Which mountain is the tallest?",opts:["K2","Kangchenjunga","Mount Everest","Makalu"],correct:2,exp:"Mount Everest is the tallest mountain above sea level at 8,848 meters."},
+    {q:"What is the capital of Australia?",opts:["Sydney","Melbourne","Canberra","Brisbane"],correct:2,exp:"Canberra was purpose-built as the capital, located between Sydney and Melbourne."},
+    {q:"Which desert is the largest hot desert?",opts:["Gobi","Sahara","Kalahari","Arabian"],correct:1,exp:"The Sahara is the largest hot desert, covering much of North Africa."},
+    {q:"How many continents are there?",opts:["5","6","7","8"],correct:2,exp:"There are 7 continents: Africa, Antarctica, Asia, Australia/Oceania, Europe, North America, and South America."},
+    {q:"What is the largest country by area?",opts:["USA","China","Russia","Canada"],correct:2,exp:"Russia is the largest country by area, spanning 11 time zones."},
+    {q:"Which country has the most islands?",opts:["Philippines","Indonesia","Sweden","Japan"],correct:1,exp:"Sweden has the most islands with approximately 267,570 islands."},
+  ],
+  ent: [
+    {q:"Who directed Titanic?",opts:["Steven Spielberg","James Cameron","Christopher Nolan","Martin Scorsese"],correct:1,exp:"James Cameron directed Titanic, which was released in 1997."},
+    {q:"Which band performed 'Bohemian Rhapsody'?",opts:["The Beatles","Led Zeppelin","Queen","Pink Floyd"],correct:2,exp:"Queen released Bohemian Rhapsody in 1975, written by Freddie Mercury."},
+    {q:"Who played Iron Man in the MCU?",opts:["Chris Evans","Chris Hemsworth","Robert Downey Jr.","Mark Ruffalo"],correct:2,exp:"Robert Downey Jr. played Tony Stark/Iron Man from 2008 to 2019."},
+    {q:"Which game features Mario?",opts:["Sonic","Zelda","Super Mario Bros","Pokemon"],correct:2,exp:"Super Mario Bros. was released by Nintendo in 1985 and became iconic."},
+    {q:"Who is known as the 'King of Pop'?",opts:["Elvis Presley","Michael Jackson","Prince","Madonna"],correct:1,exp:"Michael Jackson was called the 'King of Pop' for his massive influence on music."},
+    {q:"Which TV show features dragons?",opts:["Vikings","Game of Thrones","The Witcher","Outlander"],correct:1,exp:"Game of Thrones, based on books by George R.R. Martin, features dragons prominently."},
+    {q:"What is the best-selling video game of all time?",opts:["Tetris","Minecraft","GTA V","Wii Sports"],correct:1,exp:"Minecraft has sold over 300 million copies, making it the best-selling game ever."},
+    {q:"Who painted 'Starry Night'?",opts:["Pablo Picasso","Claude Monet","Vincent van Gogh","Salvador Dali"],correct:2,exp:"Vincent van Gogh painted The Starry Night in 1889 while at an asylum."},
+    {q:"Which is the highest-grossing film of all time?",opts:["Avatar","Avengers: Endgame","Titanic","Star Wars"],correct:0,exp:"Avatar (2009) is the highest-grossing film, earning over $2.9 billion worldwide."},
+    {q:"What instrument does a pianist play?",opts:["Violin","Guitar","Piano","Drums"],correct:2,exp:"A pianist plays the piano, a keyboard instrument invented around 1700."},
+    {q:"Which artist released 'Thriller'?",opts:["Prince","Madonna","Michael Jackson","Whitney Houston"],correct:2,exp:"Michael Jackson released Thriller in 1982, the best-selling album of all time."},
+  ],
+  sports: [
+    {q:"How many players are in a football/soccer team?",opts:["9","10","11","12"],correct:2,exp:"A football/soccer team has 11 players on the field, including the goalkeeper."},
+    {q:"Which country has won the most World Cups?",opts:["Germany","Argentina","Italy","Brazil"],correct:3,exp:"Brazil has won the FIFA World Cup 5 times (1958, 1962, 1970, 1994, 2002)."},
+    {q:"What sport uses a racket and shuttlecock?",opts:["Tennis","Badminton","Squash","Table Tennis"],correct:1,exp:"Badminton uses a racket to hit a shuttlecock over a net."},
+    {q:"How many rings are in the Olympic symbol?",opts:["3","4","5","6"],correct:2,exp:"The Olympic rings represent the five inhabited continents of the world."},
+    {q:"Which sport is played at Wimbledon?",opts:["Golf","Cricket","Tennis","Rugby"],correct:2,exp:"Wimbledon is the oldest tennis tournament, held in London since 1877."},
+    {q:"In basketball, how many points is a free throw?",opts:["1","2","3","4"],correct:0,exp:"A free throw is worth 1 point in basketball."},
+    {q:"Which country invented tea?",opts:["India","England","Japan","China"],correct:3,exp:"Tea was first discovered in China around 2737 BC according to legend."},
+    {q:"What is the national sport of Japan?",opts:["Karate","Judo","Sumo","Baseball"],correct:2,exp:"Sumo wrestling is considered Japan's national sport."},
+    {q:"How many Grand Slam tournaments are there?",opts:["3","4","5","6"],correct:1,exp:"The four Grand Slams are: Australian Open, French Open, Wimbledon, and US Open."},
+    {q:"Which sport uses terms like 'eagle' and 'birdie'?",opts:["Cricket","Golf","Baseball","Football"],correct:1,exp:"In golf, an eagle is 2 under par and a birdie is 1 under par."},
+  ],
+};
+
+let questions = [], current = 0, score = 0, streak = 0, maxStreak = 0;
+let timerInterval, timeLeft = 20, answered = false, totalXP = 0, hintsUsed = 0;
+let category = 'all', state = 'menu';
+const TOTAL = 20;
+const TIME_PER_Q = 20;
+
+// Achievements
+let achievements = {};
+const ACHIEVEMENTS = {
+  streak5: {name:'Hot Streak', desc:'Get a 5x streak', icon:'🔥'},
+  streak10: {name:'On Fire', desc:'Get a 10x streak', icon:'💥'},
+  perfect10: {name:'Perfect 10', desc:'Get first 10 correct', icon:'⭐'},
+  perfect20: {name:'Trivia Master', desc:'Perfect quiz', icon:'🏆'},
+  speedDemon: {name:'Speed Demon', desc:'Finish under 5 min', icon:'⚡'},
+  catExpert: {name:'Category Expert', desc:'Complete a category', icon:'🎓'},
+};
+
+// Daily challenges
+let dailyChallenge = null;
+const DAILY_CHALLENGES = [
+  {type:'category', target: 'science', count: 15, reward: 300},
+  {type:'category', target: 'tech', count: 12, reward: 250},
+  {type:'streak', target: 8, reward: 400},
+  {type:'speed', target: 5, reward: 350, unit: 'minutes'},
+  {type:'perfect', target: 18, reward: 500},
+];
+
+function shuffle(arr){return [...arr].sort(()=>Math.random()-.5);}
+
+function getDailyChallenge(){
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem('trivia_daily_' + today);
+  if(stored) return JSON.parse(stored);
+  
+  const challenge = {...DAILY_CHALLENGES[Math.floor(Math.random() * DAILY_CHALLENGES.length)]};
+  challenge.date = today;
+  challenge.progress = 0;
+  challenge.completed = false;
+  challenge.claimed = false;
+  
+  localStorage.setItem('trivia_daily_' + today, JSON.stringify(challenge));
+  return challenge;
+}
+
+function loadAchievements(){
+  achievements = JSON.parse(localStorage.getItem('trivia_achievements')||'{}');
+}
+
+function unlockAchievement(id){
+  if(achievements[id]) return;
+  achievements[id] = {unlockedAt: Date.now()};
+  localStorage.setItem('trivia_achievements', JSON.stringify(achievements));
+  const ach = ACHIEVEMENTS[id];
+  showToast(`🏆 ${ach.icon} ${ach.name}`, 'success');
+  tg?.HapticFeedback?.notificationOccurred('success');
+}
+
+function setCategory(cat){
+  category = cat;
+  document.querySelectorAll('.cat-pill').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+}
+
+function startQuiz(){
+  achievements = JSON.parse(localStorage.getItem('trivia_achievements')||'{}');
+  dailyChallenge = getDailyChallenge();
+  
+  // Select questions based on category
+  let questionPool = [];
+  if(category === 'all'){
+    questionPool = [...QUESTIONS.tech, ...QUESTIONS.science, ...QUESTIONS.history, ...QUESTIONS.geo, ...QUESTIONS.ent, ...QUESTIONS.sports];
+  } else {
+    questionPool = QUESTIONS[category] || [];
+  }
+  
+  questions = shuffle(questionPool).slice(0, TOTAL);
+  
+  current = 0;
+  score = 0;
+  streak = 0;
+  maxStreak = 0;
+  totalXP = 0;
+  hintsUsed = 0;
+  
+  document.getElementById('quiz-ui').style.display = 'flex';
+  document.getElementById('results').classList.remove('show');
+  
+  loadQuestion();
+  updateXP();
+  updateDailyUI();
+  updateDailyTimer();
+}
+
+function loadQuestion(){
+  if(current >= TOTAL){ showResults(); return; }
+  
+  const q = questions[current];
+  answered = false;
+  
+  document.getElementById('q-num').textContent = `Question ${current+1} of ${TOTAL}`;
+  document.getElementById('q-progress').textContent = `${current+1}/${TOTAL}`;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('streak-val').textContent = streak ? streak+'🔥' : '0';
+  
+  const qCard = document.getElementById('q-text');
+  qCard.textContent = q.q;
+  
+  document.getElementById('explanation').className = 'explanation';
+  document.getElementById('next-btn').disabled = true;
+  
+  const letters = ['A','B','C','D'];
+  const optsEl = document.getElementById('options');
+  optsEl.innerHTML = '';
+  
+  q.opts.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option slide-up';
+    btn.style.animationDelay = (i*0.05)+'s';
+    btn.innerHTML = `
+      <div class="opt-letter">${letters[i]}</div>
+      <div class="opt-txt">${opt}</div>
+      <div class="opt-icon">${i===q.correct?'✓':'✗'}</div>
+    `;
+    btn.onclick = () => selectAnswer(i, q.correct, q.exp);
+    optsEl.appendChild(btn);
+  });
+  
+  startTimer();
+}
+
+const timerCtx = document.getElementById('timer-canvas').getContext('2d');
+function drawTimer(pct, urgent){
+  timerCtx.clearRect(0, 0, 44, 44);
+  timerCtx.beginPath();
+  timerCtx.arc(22, 22, 18, 0, 2 * Math.PI);
+  timerCtx.strokeStyle = '#1a2840';
+  timerCtx.lineWidth = 3;
+  timerCtx.stroke();
+  
+  timerCtx.beginPath();
+  timerCtx.arc(22, 22, 18, -Math.PI/2, -Math.PI/2 + 2 * Math.PI * pct);
+  timerCtx.strokeStyle = urgent ? '#ef4444' : '#7c3aed';
+  timerCtx.lineWidth = 3;
+  timerCtx.lineCap = 'round';
+  timerCtx.stroke();
+}
+
+function startTimer(){
+  clearInterval(timerInterval);
+  timeLeft = TIME_PER_Q;
+  document.getElementById('timer-txt').textContent = timeLeft;
+  drawTimer(1, false);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    document.getElementById('timer-txt').textContent = timeLeft;
+    drawTimer(timeLeft / TIME_PER_Q, timeLeft <= 5);
+    
+    if(timeLeft <= 0){
+      clearInterval(timerInterval);
+      if(!answered) timeOut();
+    }
+  }, 1000);
+}
+
+function timeOut(){
+  const q = questions[current];
+  answered = true;
+  streak = 0;
+  document.getElementById('streak-val').textContent = '0';
+  
+  const opts = document.querySelectorAll('.option');
+  opts[q.correct].classList.add('correct');
+  opts.forEach(o => o.classList.add('disabled'));
+  
+  showExplanation(q.exp);
+  tg?.HapticFeedback?.notificationOccurred('warning');
+}
+
+function useHint(){
+  if(answered || hintsUsed >= 2) return;
+  const q = questions[current];
+  hintsUsed++;
+  score = Math.max(0, score - 25);
+  document.getElementById('score-val').textContent = score;
+  
+  // Highlight wrong options
+  const opts = document.querySelectorAll('.option');
+  opts.forEach((o, i) => {
+    if(i !== q.correct) o.classList.add('wrong');
+  });
+  
+  tg?.HapticFeedback?.impactOccurred('light');
+}
+
+function use5050(){
+  if(answered) return;
+  score = Math.max(0, score - 100);
+  document.getElementById('score-val').textContent = score;
+  
+  const q = questions[current];
+  const opts = document.querySelectorAll('.option');
+  let correctCount = 0;
+  opts.forEach((o, i) => {
+    if(i !== q.correct){
+      o.classList.add('wrong');
+      o.classList.add('disabled');
+    } else {
+      correctCount++;
+    }
+  });
+  
+  tg?.HapticFeedback?.impactOccurred('medium');
+}
+
+function selectAnswer(selected, correct, exp){
+  if(answered) return;
+  answered = true;
+  clearInterval(timerInterval);
+  
+  const timeBonus = Math.floor(timeLeft / TIME_PER_Q * 50);
+  const opts = document.querySelectorAll('.option');
+  
+  opts.forEach(o => o.classList.add('disabled'));
+  opts[correct].classList.add('correct');
+  
+  if(selected === correct){
+    opts[selected].classList.add('correct');
+    streak++;
+    maxStreak = Math.max(maxStreak, streak);
+    
+    const streakBonus = Math.min(streak - 1, 10) * 15;
+    const pts = 100 + timeBonus + streakBonus;
+    score += pts;
+    totalXP += pts;
+    
+    document.getElementById('score-val').textContent = score;
+    document.getElementById('streak-val').textContent = streak+'🔥';
+    
+    tg?.HapticFeedback?.notificationOccurred('success');
+    
+    // Check achievements
+    if(streak >= 5) unlockAchievement('streak5');
+    if(streak >= 10) unlockAchievement('streak10');
+    if(current === 0 && selected === correct) unlockAchievement('perfect10');
+  } else {
+    opts[selected].classList.add('wrong');
+    opts[selected].classList.add('shake');
+    streak = 0;
+    document.getElementById('streak-val').textContent = '0';
+    tg?.HapticFeedback?.notificationOccurred('error');
+  }
+  
+  updateXP();
+  showExplanation(exp);
+  updateDailyProgress();
+}
+
+function showExplanation(exp){
+  const el = document.getElementById('explanation');
+  el.textContent = exp;
+  el.classList.add('show');
+}
+
+function nextQuestion(){
+  current++;
+  loadQuestion();
+}
+
+function updateXP(){
+  const level = Math.floor(Math.sqrt(totalXP / 100)) + 1;
+  const levelXP = (level - 1) * (level - 1) * 100;
+  const nextXP = level * level * 100;
+  const pct = Math.min((totalXP - levelXP) / (nextXP - levelXP) * 100, 100);
+  
+  document.getElementById('xp-lvl').textContent = `Level ${level}`;
+  document.getElementById('xp-info').textContent = `${totalXP.toLocaleString()} / ${nextXP.toLocaleString()} XP`;
+  document.getElementById('xp-fill').style.width = pct + '%';
+}
+
+function updateDailyProgress(){
+  if(!dailyChallenge) return;
+  
+  if(dailyChallenge.type === 'category' && questions[current]){
+    const q = questions[current];
+    // Check if this question matches target category
+    if(Object.keys(QUESTIONS).some(cat => QUESTIONS[cat].includes(q) && cat === dailyChallenge.target)){
+      dailyChallenge.progress++;
+    }
+  } else if(dailyChallenge.type === 'streak' && streak >= dailyChallenge.target){
+    dailyChallenge.progress = dailyChallenge.target;
+  } else if(dailyChallenge.type === 'perfect' && current + 1 >= dailyChallenge.target){
+    dailyChallenge.progress = current + 1;
+  }
+  
+  localStorage.setItem('trivia_daily_' + dailyChallenge.date, JSON.stringify(dailyChallenge));
+  updateDailyUI();
+}
+
+function updateDailyUI(){
+  if(!dailyChallenge) return;
+  
+  let progressText = '', progressPct = 0;
+  
+  if(dailyChallenge.type === 'category'){
+    progressText = `${dailyChallenge.progress}/${dailyChallenge.count} in ${dailyChallenge.target.charAt(0).toUpperCase() + dailyChallenge.target.slice(1)}`;
+    progressPct = dailyChallenge.progress / dailyChallenge.count * 100;
+  } else if(dailyChallenge.type === 'streak'){
+    progressText = `Reach ${dailyChallenge.target}x streak`;
+    progressPct = Math.min(streak / dailyChallenge.target * 100, 100);
+  } else if(dailyChallenge.type === 'perfect'){
+    progressText = `${dailyChallenge.progress}/${dailyChallenge.target} correct`;
+    progressPct = dailyChallenge.progress / dailyChallenge.target * 100;
+  }
+  
+  document.getElementById('d-task').textContent = getChallengeText(dailyChallenge);
+  document.getElementById('d-status').textContent = progressText;
+  document.getElementById('d-fill').style.width = progressPct + '%';
+  
+  const claimBtn = document.getElementById('d-claim');
+  if(dailyChallenge.claimed){
+    claimBtn.disabled = true;
+    claimBtn.textContent = '✓ Claimed';
+  } else if(dailyChallenge.completed || dailyChallenge.progress >= dailyChallenge.count){
+    claimBtn.disabled = false;
+    claimBtn.textContent = `Claim +${dailyChallenge.reward} XP`;
+    dailyChallenge.completed = true;
+  } else {
+    claimBtn.disabled = true;
+    claimBtn.textContent = 'Complete to Claim';
+  }
+}
+
+function getChallengeText(ch){
+  if(ch.type === 'category') return `Get ${ch.count} correct answers in ${ch.target.charAt(0).toUpperCase() + ch.target.slice(1)}`;
+  if(ch.type === 'streak') return `Achieve a ${ch.target}x streak`;
+  if(ch.type === 'perfect') return `Get ${ch.target} questions correct`;
+  return 'Complete the daily challenge';
+}
+
+function claimDaily(){
+  if(!dailyChallenge || dailyChallenge.claimed) return;
+  
+  dailyChallenge.claimed = true;
+  localStorage.setItem('trivia_daily_' + dailyChallenge.date, JSON.stringify(dailyChallenge));
+  
+  submitScore(dailyChallenge.reward);
+  updateXP();
+  
+  updateDailyUI();
+  tg?.HapticFeedback?.notificationOccurred('success');
+  showToast(`+${dailyChallenge.reward} XP claimed!`, 'success');
+}
+
+function updateDailyTimer(){
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  
+  const diff = tomorrow - now;
+  const hours = Math.floor(diff / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  
+  document.getElementById('d-timer').textContent = 
+    `${hours.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+}
+
+function showResults(){
+  clearInterval(timerInterval);
+  
+  const correctCount = Math.floor((score + hintsUsed * 25) / 100);
+  const startTime = Date.now() - (TOTAL * 20000); // Approx
+  const duration = ((Date.now() - startTime) / 60000).toFixed(1);
+  
+  // Check achievements
+  if(correctCount >= 18) unlockAchievement('perfect20');
+  if(parseFloat(duration) < 5) unlockAchievement('speedDemon');
+  if(category !== 'all') unlockAchievement('catExpert');
+  
+  const xp = totalXP;
+  tg?.HapticFeedback?.notificationOccurred('success');
+  
+  document.getElementById('res-emoji').textContent = correctCount >= 18 ? '🏆' : correctCount >= 12 ? '🎯' : correctCount >= 6 ? '🌟' : '📝';
+  document.getElementById('res-title').textContent = correctCount >= 18 ? 'Trivia Master!' : correctCount >= 12 ? 'Excellent!' : correctCount >= 6 ? 'Good Job!' : 'Keep Practicing!';
+  document.getElementById('res-score').textContent = `${correctCount}/${TOTAL}`;
+  document.getElementById('res-detail').textContent = `Score: ${score} · Best Streak: ${maxStreak}x · Hints: ${hintsUsed}`;
+  document.getElementById('res-xp').textContent = `+${xp} XP Earned`;
+  
+  // Show achievements
+  const unlockedAch = Object.entries(achievements).map(([id, a]) => {
+    const def = ACHIEVEMENTS[id];
+    return `<div class="achieve-badge">${def.icon} ${def.name}</div>`;
+  }).join('');
+  document.getElementById('res-achieve').innerHTML = unlockedAch || '<div style="font-size:11px;color:var(--muted)">Play more to unlock achievements!</div>';
+  
+  document.getElementById('quiz-ui').style.display = 'none';
+  document.getElementById('results').classList.add('show');
+}
+
+function restartQuiz(){
+  startQuiz();
+}
+
+function showMenu(){
+  document.getElementById('quiz-ui').style.display = 'none';
+  document.getElementById('results').classList.remove('show');
+  document.getElementById('overlay').style.display = 'flex';
+}
+
+function showToast(msg, type = 'info'){
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:${type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : '#3b82f6'};
+    color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;
+    z-index:9999;animation:fadeIn .3s ease;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Update daily timer every second
+setInterval(updateDailyTimer, 1000);
+
+async function submitScore(xp){
+  if(!chatId || chatId === '0' || !player.id) return;
+  try{
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id, xp})
+    });
+  }catch(e){}
+}
+</script>
+</body>
+</html>

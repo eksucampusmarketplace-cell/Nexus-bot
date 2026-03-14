@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Nexus Kitchen</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--accent:#f97316;--gold:#f59e0b;--green:#22c55e;--red:#ef4444;--purple:#7c3aed}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+#app{display:flex;flex-direction:column;height:100dvh;gap:8px;padding:10px 12px}
+
+/* Top bar */
+#topbar{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 12px;flex-shrink:0}
+.ts{display:flex;align-items:center;gap:4px;min-width:70px}
+.tv{font-size:16px;font-weight:800}.tl{font-size:9px;color:var(--muted);margin-left:2px}
+#timer-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:0 12px}
+#timer-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--red));border-radius:3px;transition:width .1s linear}
+
+/* Orders section */
+#orders-bar{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 10px;flex-shrink:0}
+#orders-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+#orders-scroll{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+#orders-scroll::-webkit-scrollbar{display:none}
+.order-card{flex-shrink:0;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:6px 8px;min-width:95px;position:relative;transition:.2s}
+.order-card.urgent{border-color:var(--red);animation:urgentPulse .5s ease infinite alternate}
+@keyframes urgentPulse{from{border-color:var(--red);}to{border-color:var(--red)40;}}
+.oc-name{font-size:11px;font-weight:700;margin-bottom:3px}
+.oc-items{font-size:17px;letter-spacing:1px}
+.oc-timer{width:100%;height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden}
+.oc-fill{height:100%;background:var(--green);border-radius:2px;transition:width .5s linear}
+.oc-reward{font-size:10px;color:var(--gold);margin-top:2px;font-weight:600}
+
+/* Kitchen stations */
+#kitchen{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;overflow:hidden}
+.station{background:var(--card);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;padding:8px;transition:.15s}
+.station:active{transform:scale(.95)}
+.station.cooking{border-color:var(--accent)}
+.station.done{border-color:var(--green);animation:donePulse .4s ease infinite alternate}
+@keyframes donePulse{from{border-color:var(--green);}to{border-color:var(--green)40;}}
+.st-icon{font-size:36px;margin-bottom:4px}
+.st-name{font-size:10px;font-weight:700;color:var(--muted)}
+.st-item{font-size:28px;margin:4px 0}
+.st-bar{width:80%;height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:6px}
+.st-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:3px}
+.st-badge{position:absolute;top:6px;right:8px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px}
+.badge-cook{background:var(--accent)30;color:var(--accent)}
+.badge-done{background:var(--green)30;color:var(--green)}
+
+/* Tray */
+#tray{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 12px;flex-shrink:0;min-height:70px;display:flex;flex-direction:column;gap:4px}
+#tray-label{font-size:10px;color:var(--muted)}
+#tray-items{display:flex;flex-wrap:wrap;gap:6px}
+.tray-item{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:22px;cursor:pointer;transition:.15s}
+.tray-item:active{transform:scale(.9)}
+
+/* Overlay */
+#overlay{position:fixed;inset:0;background:#000d;display:flex;align-items:center;justify-content:center;z-index:50}
+#ov-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 24px;text-align:center;width:min(320px,88vw)}
+.oi{font-size:56px;margin-bottom:8px}.ot{font-size:22px;font-weight:800;margin-bottom:6px}
+.os{font-size:13px;color:var(--muted);margin-bottom:12px;line-height:1.6}
+.oscore{font-size:40px;font-weight:800;color:var(--gold);margin:6px 0}
+.oxp{font-size:14px;font-weight:600;color:var(--purple);margin-bottom:20px}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;margin-bottom:8px;transition:.15s}
+.btn-p{background:linear-gradient(135deg,var(--accent),var(--red));color:#fff}
+.btn-g{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+.btn:active{transform:scale(.97)}
+
+/* Toast */
+#toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 20px;font-size:14px;font-weight:700;z-index:30;opacity:0;transition:opacity .2s;white-space:nowrap}
+
+/* Level badge */
+#level-badge{position:absolute;top:8px;left:8px;background:var(--purple);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;color:#fff}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="ts">💰<span class="tv" id="t-gold">0</span><span class="tl">gold</span></div>
+    <div id="timer-bar"><div id="timer-fill" style="width:100%"></div></div>
+    <div class="ts">😊<span class="tv" id="t-happy" style="color:var(--green)">100</span><span class="tl">%sat</span></div>
+    <div class="ts">⭐<span class="tv" id="t-score">0</span><span class="tl">score</span></div>
+  </div>
+  
+  <div id="orders-bar">
+    <div id="orders-label">📋 Customer Orders</div>
+    <div id="orders-scroll"></div>
+  </div>
+  
+  <div id="kitchen">
+    <div class="station" id="st-grill" onclick="tapStation('grill')">
+      <div class="st-icon">🔥</div>
+      <div class="st-name">Grill</div>
+      <div id="st-grill-item" class="st-item"></div>
+      <div class="st-bar" id="st-grill-bar" style="display:none"><div class="st-fill" id="st-grill-fill" style="width:0%"></div></div>
+    </div>
+    <div class="station" id="st-fryer" onclick="tapStation('fryer')">
+      <div class="st-icon">🫕</div>
+      <div class="st-name">Fryer</div>
+      <div id="st-fryer-item" class="st-item"></div>
+      <div class="st-bar" id="st-fryer-bar" style="display:none"><div class="st-fill" id="st-fryer-fill" style="width:0%"></div></div>
+    </div>
+    <div class="station" id="st-prep" onclick="tapStation('prep')">
+      <div class="st-icon">🔪</div>
+      <div class="st-name">Prep</div>
+      <div id="st-prep-item" class="st-item"></div>
+      <div class="st-bar" id="st-prep-bar" style="display:none"><div class="st-fill" id="st-prep-fill" style="width:0%"></div></div>
+    </div>
+    <div class="station" id="st-plate" onclick="tapStation('plate')">
+      <div class="st-icon">🍽</div>
+      <div class="st-name">Plate & Serve</div>
+      <div id="st-plate-items" style="font-size:20px;letter-spacing:1px;margin:4px 0;min-height:28px;"></div>
+      <div id="st-plate-hint" style="font-size:9px;color:var(--muted)">Collect items & serve</div>
+    </div>
+  </div>
+  
+  <div id="tray">
+    <div id="tray-label">🍴 Ready items:</div>
+    <div id="tray-items-row"></div>
+  </div>
+  
+  <div id="level-badge" style="display:none">Level 1</div>
+  <div id="toast"></div>
+</div>
+
+<div id="overlay">
+  <div id="ov-card">
+    <div class="oi">👨‍🍳</div>
+    <div class="ot">Nexus Kitchen</div>
+    <div class="os">Cook & serve orders before time runs out!<br>Tap stations to cook, then plate & serve!</div>
+    <div class="os" style="font-size:11px;color:var(--gold)">💡 Pro tip: Cook multiple items at once!</div>
+    <button class="btn btn-p" onclick="startGame()">▶ Open Kitchen!</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user || {id:0,first_name:'Chef'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+
+// Food items & recipes
+const ITEMS = {
+  '🥩': {name:'Steak',   station:'grill',time:3500},
+  '🍗': {name:'Chicken', station:'grill',time:3000},
+  '🥚': {name:'Egg',     station:'grill',time:2000},
+  '🍟': {name:'Fries',   station:'fryer',time:3200},
+  '🫔': {name:'Wrap',    station:'fryer',time:2500},
+  '🧅': {name:'Bacon',   station:'grill',time:2800},
+  '🧅': {name:'Onion',   station:'prep', time:1500},
+  '🥬': {name:'Lettuce', station:'prep', time:1000},
+  '🍅': {name:'Tomato',  station:'prep', time:1000},
+  '🧀': {name:'Cheese',  station:'prep', time:1200},
+};
+
+const RECIPES = [
+  {name:'Burger',   e:'🍔', items:['🥩','🥬','🍅'], reward:25, time:18, level:1},
+  {name:'Steak Box',e:'🥩', items:['🥩','🍟'],    reward:20, time:15, level:1},
+  {name:'Chicken',  e:'🍗', items:['🍗','🥬','🍟'],   reward:22, time:16, level:1},
+  {name:'Omelette', e:'🍳', items:['🥚','🧅','🍅'],   reward:15, time:12, level:1},
+  {name:'Wrap',     e:'🫔', items:['🫔','🥩','🥬'],    reward:28, time:20, level:2},
+  {name:'Salad',    e:'🥗', items:['🥬','🍅','🧅'],   reward:12, time:10, level:1},
+  {name:'Feast',    e:'🍱', items:['🥩','🍟','🥬','🍅','🧅'],reward:40, time:25, level:3},
+  {name:'Bacon Wrap',e:'🫔', items:['🫔','🧅','🥬'],   reward:30, time:22, level:2},
+];
+
+const NAMES = ['Alex','Mia','Sam','Jake','Sara','Tom','Kim','Zoe','Max','Luna','Leo'];
+
+let orders = [], stations = {}, trayItems = [], score = 0, gold = 0, satisfaction = 100;
+let timeLeft = 90, level = 1, totalServed = 0, bestLevel = 0;
+let state = 'menu', frame = 0, orderTimer = 0, gameTimer = null, orderInterval = 5000;
+let achievements = {};
+
+bestLevel = parseInt(localStorage.getItem('nk_best_level')||'0');
+achievements = JSON.parse(localStorage.getItem('nk_achievements')||'{}');
+
+function initStations(){
+  stations = {
+    grill:  {id:'grill',  item:null, progress:0, total:0, done:false},
+    fryer:  {id:'fryer',  item:null, progress:0, total:0, done:false},
+    prep:   {id:'prep',   item:null, progress:0, total:0, done:false},
+  };
+}
+
+function spawnOrder(){
+  if(orders.length >= 4) return;
+  const availableRecipes = RECIPES.filter(r => r.level <= level);
+  const recipe = availableRecipes[Math.floor(Math.random() * availableRecipes.length)];
+  const name = NAMES[Math.floor(Math.random() * NAMES.length)];
+  const urgency = 1 + Math.random() * 0.5; // Time multiplier
+  
+  orders.push({
+    id: 'o' + Date.now() + Math.random(),
+    recipe,
+    name,
+    timeLeft: recipe.time * urgency,
+    totalTime: recipe.time * urgency,
+    urgent: recipe.time * urgency < 12,
+    levelReq: recipe.level
+  });
+  renderOrders();
+  tg?.HapticFeedback?.selectionChanged();
+}
+
+function renderOrders(){
+  document.getElementById('orders-scroll').innerHTML = orders.map(o => {
+    const pct = Math.max(0, o.timeLeft / o.totalTime * 100);
+    const urgent = pct < 30 || o.urgent;
+    return `
+      <div class="order-card${urgent?' urgent':''}">
+        <div class="oc-name">${o.name} ${o.levelReq > 1 ? `⭐${o.levelReq}` : ''}</div>
+        <div class="oc-items">${o.recipe.items.join('')}</div>
+        <div class="oc-timer"><div class="oc-fill" style="width:${pct}%;background:${urgent?'#ef4444':pct>60?'#22c55e':'#f59e0b'}"></div></div>
+        <div class="oc-reward">🪙${o.recipe.reward}</div>
+      </div>
+    `;
+  }).join('') || '<div style="font-size:11px;color:var(--muted);padding:4px">No orders yet...</div>';
+}
+
+function tapStation(stationId){
+  if(state !== 'playing') return;
+  if(stationId === 'plate'){ servePlate(); return; }
+  
+  const st = stations[stationId];
+  if(st.done){
+    // Collect done item
+    trayItems.push(st.item);
+    st.item = null;
+    st.done = false;
+    st.progress = 0;
+    renderTray();
+    updateStation(stationId);
+    tg?.HapticFeedback?.impactOccurred('light');
+    return;
+  }
+  
+  if(st.item) return; // Busy
+
+  // Find next needed item for any order
+  const needed = findNeededItem(stationId);
+  if(!needed){ showToast('No orders need this!', 'warning'); return; }
+  
+  st.item = needed;
+  st.total = ITEMS[needed].time;
+  st.progress = 0;
+  st.done = false;
+  tg?.HapticFeedback?.impactOccurred('medium');
+  updateStation(stationId);
+}
+
+function findNeededItem(stationId){
+  for(const o of orders){
+    for(const itemE of o.recipe.items){
+      const def = ITEMS[itemE];
+      if(def && def.station === stationId && !trayItems.includes(itemE)){
+        return itemE;
+      }
+    }
+  }
+  // Just cook any item for this station
+  const possible = Object.entries(ITEMS).filter(([e, d]) => d.station === stationId).map(([e]) => e);
+  return possible.length ? possible[0] : null;
+}
+
+function servePlate(){
+  if(trayItems.length === 0){ showToast('Tray is empty!', 'warning'); return; }
+  
+  // Find matching order
+  const match = orders.find(o => {
+    const orderItems = o.recipe.items;
+    return orderItems.every(i => trayItems.includes(i)) && 
+           trayItems.every(i => orderItems.includes(i));
+  });
+  
+  if(match){
+    // Calculate bonus based on time left
+    const timeBonus = Math.floor((match.timeLeft / match.totalTime) * match.recipe.reward * 0.5);
+    const earned = match.recipe.reward + timeBonus;
+    gold += earned;
+    score += earned * 2;
+    totalServed++;
+    
+    document.getElementById('t-gold').textContent = gold;
+    document.getElementById('t-score').textContent = score;
+    
+    orders = orders.filter(o => o.id !== match.id);
+    trayItems = [];
+    
+    renderOrders();
+    renderTray();
+    updatePlate();
+    
+    showToast(`✅ ${match.recipe.name}! +${earned}🪙`, 'success');
+    tg?.HapticFeedback?.notificationOccurred('success');
+    
+    // Check for level up
+    checkLevelUp();
+    
+    // Achievements
+    if(totalServed >= 10) unlockAchievement('serve10', 'First 10 Orders!');
+    if(totalServed >= 50) unlockAchievement('serve50', 'Chef Pro!');
+    if(totalServed >= 100) unlockAchievement('serve100', 'Kitchen Master!');
+  } else {
+    showToast('❌ Wrong combo!', 'error');
+    satisfaction = Math.max(0, satisfaction - 5);
+    document.getElementById('t-happy').textContent = satisfaction;
+    document.getElementById('t-happy').style.color = satisfaction > 70 ? 'var(--green)' : satisfaction > 40 ? 'var(--gold)' : 'var(--red)';
+    trayItems = [];
+    renderTray();
+    updatePlate();
+    tg?.HapticFeedback?.notificationOccurred('warning');
+  }
+}
+
+function checkLevelUp(){
+  const newLevel = Math.floor(totalServed / 10) + 1;
+  if(newLevel > level){
+    level = newLevel;
+    document.getElementById('level-badge').textContent = `Level ${level}`;
+    document.getElementById('level-badge').style.display = 'block';
+    showToast(`🎉 Level Up! Now at Level ${level}`, 'success');
+    tg?.HapticFeedback?.notificationOccurred('success');
+    
+    // Reduce order interval for difficulty
+    orderInterval = Math.max(3000, 5000 - level * 200);
+  }
+}
+
+function renderTray(){
+  const row = document.getElementById('tray-items-row');
+  row.innerHTML = trayItems.map(i => 
+    `<div class="tray-item" onclick="removeTrayItem('${i}')">${i}</div>`
+  ).join('');
+  updatePlate();
+}
+
+function removeTrayItem(item){
+  const idx = trayItems.indexOf(item);
+  if(idx >= 0) trayItems.splice(idx, 1);
+  renderTray();
+}
+
+function updatePlate(){
+  document.getElementById('st-plate-items').textContent = trayItems.join('');
+  document.getElementById('st-plate-hint').textContent = trayItems.length > 0 ? 'Tap to serve!' : 'Collect items & serve';
+}
+
+function updateStation(id){
+  const st = stations[id];
+  const el = document.getElementById('st-' + id);
+  const itemEl = document.getElementById('st-' + id + '-item');
+  const barEl = document.getElementById('st-' + id + '-bar');
+  const fillEl = document.getElementById('st-' + id + '-fill');
+  const badge = el.querySelector('.st-badge');
+  if(badge) badge.remove();
+  
+  if(st.item){
+    itemEl.textContent = st.item;
+    barEl.style.display = 'block';
+    fillEl.style.width = (st.progress / st.total * 100) + '%';
+    el.classList.toggle('cooking', !st.done);
+    el.classList.toggle('done', st.done);
+    
+    if(st.done){
+      const b = document.createElement('div');
+      b.className = 'st-badge badge-done';
+      b.textContent = 'TAP!';
+      el.appendChild(b);
+    } else {
+      const b = document.createElement('div');
+      b.className = 'st-badge badge-cook';
+      b.textContent = Math.ceil((st.total - st.progress) / 1000) + 's';
+      el.appendChild(b);
+    }
+  } else {
+    itemEl.textContent = '';
+    barEl.style.display = 'none';
+    el.classList.remove('cooking', 'done');
+  }
+}
+
+let lastTs = 0;
+function update(ts){
+  requestAnimationFrame(update);
+  if(state !== 'playing') return;
+  const dt = ts - lastTs;
+  lastTs = ts;
+  if(dt > 200) return; // Tab was hidden
+
+  // Cook stations
+  Object.values(stations).forEach(st => {
+    if(st.item && !st.done){
+      st.progress = Math.min(st.total, st.progress + dt);
+      if(st.progress >= st.total){
+        st.done = true;
+        tg?.HapticFeedback?.impactOccurred('light');
+      }
+      updateStation(st.id);
+    }
+  });
+
+  // Order timers
+  orderTimer += dt;
+  if(orderTimer >= orderInterval){ 
+    orderTimer = 0; 
+    spawnOrder(); 
+  }
+
+  orders.forEach(o => {
+    o.timeLeft = Math.max(0, o.timeLeft - dt / 1000);
+    o.urgent = o.timeLeft / o.totalTime < 0.3;
+    
+    if(o.timeLeft <= 0){
+      // Order expired
+      orders = orders.filter(x => x.id !== o.id);
+      satisfaction = Math.max(0, satisfaction - 10);
+      document.getElementById('t-happy').textContent = satisfaction;
+      document.getElementById('t-happy').style.color = satisfaction > 70 ? 'var(--green)' : satisfaction > 40 ? 'var(--gold)' : 'var(--red)';
+      showToast('😤 Order lost!', 'error');
+      tg?.HapticFeedback?.notificationOccurred('warning');
+      
+      // Check game over
+      if(satisfaction <= 0){
+        endGame();
+        return;
+      }
+    }
+  });
+  if(frame++ % 30 === 0) renderOrders();
+}
+
+function tick(){
+  if(state !== 'playing') return;
+  timeLeft--;
+  document.getElementById('timer-fill').style.width = (timeLeft / 90 * 100) + '%';
+  
+  if(timeLeft <= 10 && timeLeft % 2 === 0){
+    tg?.HapticFeedback?.impactOccurred('light');
+  }
+  
+  if(timeLeft <= 0){
+    endGame();
+  }
+}
+
+function startGame(){
+  state = 'playing';
+  frame = 0;
+  orderTimer = 0;
+  score = 0;
+  gold = 0;
+  satisfaction = 100;
+  timeLeft = 90;
+  level = 1;
+  totalServed = 0;
+  orderInterval = 5000;
+  orders = [];
+  trayItems = [];
+  
+  initStations();
+  
+  document.getElementById('t-gold').textContent = '0';
+  document.getElementById('t-score').textContent = '0';
+  document.getElementById('t-happy').textContent = '100';
+  document.getElementById('t-happy').style.color = 'var(--green)';
+  document.getElementById('timer-fill').style.width = '100%';
+  document.getElementById('level-badge').textContent = 'Level 1';
+  document.getElementById('level-badge').style.display = 'block';
+  document.getElementById('overlay').style.display = 'none';
+  
+  ['grill', 'fryer', 'prep'].forEach(updateStation);
+  renderOrders();
+  renderTray();
+  
+  spawnOrder();
+  setTimeout(spawnOrder, 2000);
+  setTimeout(spawnOrder, 4000);
+  
+  if(gameTimer) clearInterval(gameTimer);
+  gameTimer = setInterval(tick, 1000);
+  
+  lastTs = performance.now();
+}
+
+function endGame(){
+  state = 'over';
+  clearInterval(gameTimer);
+  
+  if(level > bestLevel){
+    bestLevel = level;
+    localStorage.setItem('nk_best_level', bestLevel);
+  }
+  
+  const xp = Math.floor(score / 20);
+  tg?.HapticFeedback?.notificationOccurred(score > 500 ? 'success' : 'error');
+  
+  const ov = document.getElementById('ov-card');
+  ov.innerHTML = `
+    <div class="oi">${score > 500 ? '👨‍🍳' : score > 200 ? '🍽' : '😅'}</div>
+    <div class="ot">${score > 500 ? 'Master Chef!' : score > 200 ? 'Good cooking!' : 'Burnt it all!'}</div>
+    <div class="oscore">${score}</div>
+    <div class="os">Level ${level} · Best: ${bestLevel} · Served: ${totalServed}</div>
+    <div class="os">Earned 🪙${gold} · Satisfaction: ${satisfaction}%</div>
+    <div class="oxp">+${xp} XP Earned</div>
+    <div class="os" style="font-size:11px">🏆 Achievements: ${Object.keys(achievements).length}</div>
+    <button class="btn btn-p" onclick="startGame()">▶ Cook Again</button>
+  `;
+  document.getElementById('overlay').style.display = 'flex';
+  submitScore(xp);
+}
+
+function showToast(msg, type = 'info'){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.color = type === 'success' ? 'var(--green)' : type === 'warning' ? 'var(--gold)' : type === 'error' ? 'var(--red)' : 'var(--text)';
+  el.style.opacity = '1';
+  el.style.background = type === 'success' ? 'var(--green)20' : type === 'warning' ? 'var(--gold)20' : type === 'error' ? 'var(--red)20' : 'var(--card)';
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => el.style.opacity = '0', 1500);
+}
+
+let toastTimeout;
+
+function unlockAchievement(id, name){
+  if(achievements[id]) return;
+  achievements[id] = {name, unlockedAt: Date.now()};
+  localStorage.setItem('nk_achievements', JSON.stringify(achievements));
+  showToast(`🏆 Achievement: ${name}`, 'success');
+  tg?.HapticFeedback?.notificationOccurred('success');
+}
+
+requestAnimationFrame(update);
+
+async function submitScore(xp){
+  if(!chatId || chatId === '0' || !player.id) return;
+  try{
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id, xp})
+    });
+  }catch(e){}
+}
+</script>
+</body>
+</html>

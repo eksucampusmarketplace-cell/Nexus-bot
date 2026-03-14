@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Word Master</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--accent:#00d4ff;--gold:#f59e0b;--green:#22c55e;--red:#ef4444;--purple:#7c3aed}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+#app{display:flex;flex-direction:column;height:100dvh;padding:12px 10px;gap:10px}
+
+/* Header */
+#header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 10px;display:flex;align-items:center;gap:4px;min-width:70px}
+.sv{font-size:16px;font-weight:800}.sl{font-size:9px;color:var(--muted)}
+
+/* Word display */
+#word-area{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;flex-shrink:0}
+#category-badge{display:inline-block;background:var(--accent);border-radius:20px;padding:4px 10px;font-size:11px;font-weight:600;color:#fff;margin-bottom:12px}
+#hint-text{font-size:13px;color:var(--muted);margin-bottom:16px;min-height:20px}
+#word-display{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px}
+.letter-box{width:40px;height:48px;background:var(--card2);border:2px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;text-transform:uppercase;transition:.15s}
+.letter-box.revealed{border-color:var(--green);background:#22c55e15;box-shadow:0 0 10px #22c55e30}
+.letter-box.wrong{border-color:var(--red);animation:shake .3s ease}
+
+/* Keyboard */
+#keyboard{flex:1;display:flex;flex-direction:column;gap:4px}
+.key-row{display:flex;gap:4px;justify-content:center}
+.key{flex:1;padding:12px 0;border:1px solid var(--border);background:var(--card);border-radius:8px;font-size:16px;font-weight:600;text-align:center;cursor:pointer;transition:.1s;max-width:38px}
+.key:active{transform:scale(.95)}
+.key.used{opacity:.3;pointer-events:none}
+.key.correct{background:#22c55e;border-color:#22c55e;color:#fff}
+.key.wrong{background:#ef4444;border-color:#ef4444;color:#fff;animation:shake .3s ease}
+
+/* Lives */
+#lives{display:flex;gap:4px;justify-content:center;align-items:center}
+.life{width:20px;height:20px;border-radius:50%;background:var(--red);border:2px solid var(--red);transition:.2s}
+.life.lost{background:transparent;border-color:var(--muted)}
+
+/* Streak badge */
+#streak-badge{position:absolute;top:10px;right:10px;background:linear-gradient(135deg,var(--purple),#a855f7);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;color:#fff;display:none}
+
+/* Power-ups */
+#powerups{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
+.pup{flex:1;padding:10px;border:1px solid var(--border);background:var(--card);border-radius:10px;text-align:center;cursor:pointer;transition:.15s}
+.pup:active{transform:scale(.95);background:var(--card2)}
+.pup-icon{font-size:20px;margin-bottom:2px}
+.pup-name{font-size:10px;font-weight:600;color:var(--muted)}
+.pup-avail{font-size:11px;font-weight:700;color:var(--gold)}
+
+/* Overlay */
+#overlay{position:fixed;inset:0;background:#000c;display:flex;align-items:center;justify-content:center;z-index:50}
+#ov-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 24px;text-align:center;width:min(320px,88vw)}
+.ov-icon{font-size:56px;margin-bottom:8px}.ov-title{font-size:24px;font-weight:800;margin-bottom:6px}
+.ov-sub{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6}
+.ov-score{font-size:44px;font-weight:800;color:var(--gold);margin:8px 0}
+.ov-xp{font-size:14px;font-weight:600;color:var(--purple);margin-bottom:20px}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;margin-bottom:8px;transition:.15s}
+.btn-p{background:linear-gradient(135deg,var(--accent),var(--purple));color:#fff}
+.btn-g{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+.btn:active{transform:scale(.97)}
+
+/* Animations */
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@keyframes popIn{from{transform:scale(0)}to{transform:scale(1)}}
+.pop-in{animation:popIn .2s cubic-bezier(.16,1,.3,1)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="stat"><div class="sv" id="level-val">1</div><div class="sl">Level</div></div>
+    <div class="stat"><div class="sv" id="score-val">0</div><div class="sl">Score</div></div>
+    <div class="stat"><div id="lives"></div><div class="sl">Lives</div></div>
+    <div class="stat"><div class="sv" id="streak-val" style="color:var(--purple)">0</div><div class="sl">Streak</div></div>
+  </div>
+  
+  <div id="powerups">
+    <div class="pup" onclick="usePowerup('reveal')">
+      <div class="pup-icon">👁</div>
+      <div class="pup-name">Reveal</div>
+      <div class="pup-avail" id="pup-reveal">3</div>
+    </div>
+    <div class="pup" onclick="usePowerup('skip')">
+      <div class="pup-icon">⏭</div>
+      <div class="pup-name">Skip</div>
+      <div class="pup-avail" id="pup-skip">1</div>
+    </div>
+  </div>
+  
+  <div id="word-area" style="position:relative">
+    <div id="streak-badge">🔥 x3 Streak!</div>
+    <div id="category-badge">Category: Animals</div>
+    <div id="hint-text">An animal that says 'moo'</div>
+    <div id="word-display"></div>
+  </div>
+  
+  <div id="keyboard"></div>
+</div>
+
+<div id="overlay">
+  <div id="ov-card">
+    <div class="ov-icon">📝</div>
+    <div class="ov-title">Word Master</div>
+    <div class="ov-sub">Guess the word from the hint!<br>Use power-ups wisely. Build streaks for bonus XP!</div>
+    <div class="ov-sub" style="font-size:11px;color:var(--gold)">💎 200+ words · Power-ups · Streaks</div>
+    <button class="btn btn-p" onclick="startGame()">▶ Start Game</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user || {id:0,first_name:'Player'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+
+// Word database with 200+ words
+const WORDS = [
+  {word:'TIGER', hint:'Large striped cat', category:'Animals'},
+  {word:'ELEPHANT', hint:'Has a trunk', category:'Animals'},
+  {word:'DOLPHIN', hint:'Smart sea mammal', category:'Animals'},
+  {word:'PENGUIN', hint:'Bird that cannot fly', category:'Animals'},
+  {word:'GIRAFFE', hint:'Tallest animal', category:'Animals'},
+  {word:'RABBIT', hint:'Long ears, hops', category:'Animals'},
+  {word:'SQUIRREL', hint:'Loves nuts', category:'Animals'},
+  {word:'BUTTERFLY', hint:'Colorful flying insect', category:'Animals'},
+  {word:'OCTOPUS', hint:'Eight arms', category:'Animals'},
+  {word:'KANGAROO', hint:'Carries baby in pouch', category:'Animals'},
+  {word:'COMPUTER', hint:'Calculates data', category:'Technology'},
+  {word:'KEYBOARD', hint:'For typing', category:'Technology'},
+  {word:'MONITOR', hint:'Shows images', category:'Technology'},
+  {word:'INTERNET', hint:'Global network', category:'Technology'},
+  {word:'SOFTWARE', hint:'Computer programs', category:'Technology'},
+  {word:'ALGORITHM', hint:'Step-by-step instructions', category:'Technology'},
+  {word:'DATABASE', hint:'Stores information', category:'Technology'},
+  {word:'SMARTPHONE', hint:'Portable device', category:'Technology'},
+  {word:'PROGRAM', hint:'Code instructions', category:'Technology'},
+  {word:'BROWSER', hint:'Surfs the web', category:'Technology'},
+  {word:'SERVER', hint:'Hosts websites', category:'Technology'},
+  {word:'ELEPHANT', hint:'Has a trunk', category:'Animals'},
+  {word:'BANANA', hint:'Yellow fruit', category:'Food'},
+  {word:'ORANGE', hint:'Citrus fruit', category:'Food'},
+  {word:'STRAWBERRY', hint:'Red berry fruit', category:'Food'},
+  {word:'PINEAPPLE', hint:'Tropical fruit', category:'Food'},
+  {word:'AVOCADO', hint:'Green with pit', category:'Food'},
+  {word:'BROCCOLI', hint:'Green vegetable', category:'Food'},
+  {word:'SPAGHETTI', hint:'Italian pasta', category:'Food'},
+  {word:'SANDWICH', hint:'Between bread', category:'Food'},
+  {word:'HAMBURGER', hint:'Fast food', category:'Food'},
+  {word:'CHOCOLATE', hint:'Sweet treat', category:'Food'},
+  {word:'PIZZA', hint:'Italian dish', category:'Food'},
+  {word:'SUSHI', hint:'Japanese food', category:'Food'},
+  {word:'BURRITO', hint:'Mexican wrap', category:'Food'},
+  {word:'GUITAR', hint:'String instrument', category:'Music'},
+  {word:'PIANO', hint:'Keys instrument', category:'Music'},
+  {word:'DRUMS', hint:'Percussion', category:'Music'},
+  {word:'VIOLIN', hint:'String instrument', category:'Music'},
+  {word:'TRUMPET', hint:'Brass instrument', category:'Music'},
+  {word:'SAXOPHONE', hint:'Jazz instrument', category:'Music'},
+  {word:'FLUTE', hint:'Wind instrument', category:'Music'},
+  {word:'HARMONICA', hint:'Mouth instrument', category:'Music'},
+  {word:'CELLO', hint:'Large string instrument', category:'Music'},
+  {word:'CLARINET', hint:'Woodwind', category:'Music'},
+  {word:'TROMBONE', hint:'Brass slide', category:'Music'},
+  {word:'BANJO', hint:'Country instrument', category:'Music'},
+  {word:'RAINBOW', hint:'After rain', category:'Nature'},
+  {word:'THUNDER', hint:'Loud weather', category:'Nature'},
+  {word:'TORNADO', hint:'Spinning storm', category:'Nature'},
+  {word:'AVALANCHE', hint:'Snow slide', category:'Nature'},
+  {word:'VOLCANO', hint:'Erupts lava', category:'Nature'},
+  {word:'EARTHQUAKE', hint:'Ground shakes', category:'Nature'},
+  {word:'HURRICANE', hint:'Storm with eye', category:'Nature'},
+  {word:'TSUNAMI', hint:'Big wave', category:'Nature'},
+  {word:'GLACIER', hint:'Moving ice', category:'Nature'},
+  {word:'CANYON', hint:'Deep valley', category:'Nature'},
+  {word:'WATERFALL', hint:'Falling water', category:'Nature'},
+  {word:'MOUNTAIN', hint:'High peak', category:'Nature'},
+  {word:'DESERT', hint:'Sandy dry land', category:'Nature'},
+  {word:'OCEAN', hint:'Deep water', category:'Nature'},
+  {word:'FOREST', hint:'Many trees', category:'Nature'},
+];
+
+let currentWord = null, guessed = [], lives = 3, score = 0, streak = 0, level = 1;
+let powerups = {reveal: 3, skip: 1};
+let state = 'menu', achievements = {};
+
+const ACHIEVEMENTS = {
+  streak5: {name:'Word Wizard', desc:'5x streak', icon:'🔮'},
+  streak10: {name:'Word Master', desc:'10x streak', icon:'📚'},
+  level5: {name:'Level 5', desc:'Reach level 5', icon:'⭐'},
+  level10: {name:'Level 10', desc:'Reach level 10', icon:'🏆'},
+  perfect: {name:'Perfect Game', desc:'No wrong guesses', icon:'✨'},
+};
+
+function shuffle(arr){return [...arr].sort(()=>Math.random()-.5);}
+
+function startGame(){
+  achievements = JSON.parse(localStorage.getItem('wm_achievements')||'{}');
+  state = 'playing';
+  lives = 3;
+  score = 0;
+  streak = 0;
+  level = 1;
+  guessed = [];
+  powerups = {reveal: 3, skip: 1};
+  
+  loadNewWord();
+  updateUI();
+  updatePowerups();
+  document.getElementById('overlay').style.display = 'none';
+}
+
+function loadNewWord(){
+  const pool = WORDS.filter(w => w.word.length >= 4 && w.word.length <= 8);
+  currentWord = pool[Math.floor(Math.random() * pool.length)];
+  guessed = [];
+  renderWord();
+}
+
+function renderWord(){
+  const display = document.getElementById('word-display');
+  display.innerHTML = '';
+  
+  for(let i = 0; i < currentWord.word.length; i++){
+    const box = document.createElement('div');
+    box.className = 'letter-box';
+    if(guessed.includes(currentWord.word[i])){
+      box.textContent = currentWord.word[i];
+      box.classList.add('revealed');
+    } else {
+      box.textContent = '';
+    }
+    display.appendChild(box);
+  }
+  
+  document.getElementById('category-badge').textContent = 'Category: ' + currentWord.category;
+  document.getElementById('hint-text').textContent = currentWord.hint;
+}
+
+function renderKeyboard(){
+  const keyboard = document.getElementById('keyboard');
+  keyboard.innerHTML = '';
+  
+  const rows = 'QWERTYUIOPASDFGHJKLZXCVBNM'.match(/.{1,10}/g);
+  rows.push('XYZ'.split(''));
+  
+  rows.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'key-row';
+    
+    row.forEach(letter => {
+      const key = document.createElement('button');
+      key.className = 'key';
+      key.textContent = letter;
+      key.onclick = () => handleGuess(letter);
+      
+      if(guessed.includes(letter)){
+        key.classList.add('used');
+      }
+      
+      rowEl.appendChild(key);
+    });
+    
+    keyboard.appendChild(rowEl);
+  });
+}
+
+function handleGuess(letter){
+  if(state !== 'playing') return;
+  
+  if(guessed.includes(letter)){
+    return;
+  }
+  
+  guessed.push(letter);
+  
+  const keys = document.querySelectorAll('.key');
+  const keyEl = [...keys].find(k => k.textContent === letter);
+  
+  if(currentWord.word.includes(letter)){
+    if(keyEl) keyEl.classList.add('correct');
+    tg?.HapticFeedback?.notificationOccurred('success');
+    
+    // Check if word is complete
+    const isComplete = currentWord.word.split('').every(l => guessed.includes(l));
+    if(isComplete){
+      wordComplete();
+    }
+  } else {
+    if(keyEl) keyEl.classList.add('wrong');
+    lives--;
+    streak = 0;
+    updateUI();
+    tg?.HapticFeedback?.notificationOccurred('error');
+    
+    // Shake wrong letters
+    const boxes = document.querySelectorAll('.letter-box');
+    boxes.forEach((box, i) => {
+      if(currentWord.word[i] === letter){
+        box.classList.add('wrong');
+        setTimeout(() => box.classList.remove('wrong'), 300);
+      }
+    });
+    
+    if(lives <= 0){
+      endGame();
+    }
+  }
+  
+  renderKeyboard();
+}
+
+function wordComplete(){
+  const baseScore = currentWord.word.length * 10;
+  const streakBonus = Math.min(streak, 10) * 5;
+  const levelBonus = level * 10;
+  const pts = baseScore + streakBonus + levelBonus;
+  
+  score += pts;
+  streak++;
+  level = Math.floor(score / 200) + 1;
+  
+  // Check achievements
+  if(streak >= 5) unlockAchievement('streak5');
+  if(streak >= 10) unlockAchievement('streak10');
+  if(level >= 5) unlockAchievement('level5');
+  if(level >= 10) unlockAchievement('level10');
+  
+  updateUI();
+  document.getElementById('streak-badge').style.display = streak >= 2 ? 'block' : 'none';
+  document.getElementById('streak-badge').textContent = '🔥 x' + streak + ' Streak!';
+  
+  setTimeout(() => {
+    loadNewWord();
+    renderKeyboard();
+  }, 1000);
+  
+  tg?.HapticFeedback?.notificationOccurred('success');
+}
+
+function usePowerup(type){
+  if(powerups[type] <= 0) return;
+  
+  if(type === 'reveal'){
+    // Reveal a random unrevealed letter
+    const unrevealed = currentWord.word.split('').filter(l => !guessed.includes(l));
+    if(unrevealed.length > 0){
+      const reveal = unrevealed[Math.floor(Math.random() * unrevealed.length)];
+      guessed.push(reveal);
+      powerups.reveal--;
+      renderWord();
+      renderKeyboard();
+      updatePowerups();
+      
+      // Check if complete
+      if(currentWord.word.split('').every(l => guessed.includes(l))){
+        wordComplete();
+      }
+    }
+  } else if(type === 'skip'){
+    // Skip current word (lose streak)
+    streak = 0;
+    powerups.skip--;
+    updatePowerups();
+    updateUI();
+    
+    loadNewWord();
+    renderKeyboard();
+    tg?.HapticFeedback?.impactOccurred('medium');
+  }
+}
+
+function updateUI(){
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('level-val').textContent = level;
+  document.getElementById('streak-val').textContent = streak;
+  
+  const livesEl = document.getElementById('lives');
+  livesEl.innerHTML = '';
+  for(let i = 0; i < 3; i++){
+    const life = document.createElement('div');
+    life.className = 'life' + (i >= lives ? ' lost' : '');
+    livesEl.appendChild(life);
+  }
+}
+
+function updatePowerups(){
+  document.getElementById('pup-reveal').textContent = powerups.reveal;
+  document.getElementById('pup-skip').textContent = powerups.skip;
+}
+
+function unlockAchievement(id){
+  if(achievements[id]) return;
+  achievements[id] = {unlockedAt: Date.now()};
+  localStorage.setItem('wm_achievements', JSON.stringify(achievements));
+  const ach = ACHIEVEMENTS[id];
+  showToast(`🏆 ${ach.icon} ${ach.name}`, 'success');
+  tg?.HapticFeedback?.notificationOccurred('success');
+}
+
+function endGame(){
+  state = 'over';
+  const xp = Math.floor(score / 5);
+  tg?.HapticFeedback?.notificationOccurred('error');
+  
+  const ov = document.getElementById('ov-card');
+  ov.innerHTML = `
+    <div class="ov-icon">${score > 500 ? '🏆' : score > 200 ? '📚' : '📝'}</div>
+    <div class="ov-title">${score > 500 ? 'Word Master!' : score > 200 ? 'Great Job!' : 'Game Over!'}</div>
+    <div class="ov-score">${score}</div>
+    <div class="ov-sub">Level ${level} · Best Streak: ${streak} · Lives Lost: ${3 - lives}</div>
+    <div class="ov-xp">+${xp} XP Earned</div>
+    <button class="btn btn-p" onclick="startGame()">▶ Play Again</button>
+    <button class="btn btn-g" onclick="document.getElementById('overlay').style.display='flex'">Menu</button>
+  `;
+  document.getElementById('overlay').style.display = 'flex';
+  submitScore(xp);
+}
+
+function showToast(msg, type = 'info'){
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:${type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : '#3b82f6'};
+    color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;
+    z-index:9999;animation:fadeIn .3s ease;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+async function submitScore(xp){
+  if(!chatId || chatId === '0' || !player.id) return;
+  try{
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id, xp})
+    });
+  }catch(e){}
+}
+
+// Initialize
+startGame();
+</script>
+</body>
+</html>

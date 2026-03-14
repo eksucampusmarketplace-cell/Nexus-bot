@@ -8,7 +8,6 @@ import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from telegram import Update
@@ -213,10 +212,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add GZip compression middleware to reduce outbound bandwidth
-# Compresses responses over 1000 bytes
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
 # Root redirect
 @app.get("/")
 async def root():
@@ -230,8 +225,17 @@ async def telegram_webhook(bot_token: str, request: Request):
         if app.bot.token == bot_token:
             target_app = app
             break
+    
+    # Fallback: try matching by bot_id (for webhooks set with bot_id only)
+    if not target_app:
+        try:
+            bot_id = int(bot_token)
+            target_app = registry_get(bot_id)
+        except ValueError:
+            pass
             
     if not target_app:
+        logger.warning(f"[WEBHOOK] No bot found for token/bot_id: {bot_token[:10]}...")
         return Response(status_code=404)
         
     data = await request.json()
@@ -240,15 +244,17 @@ async def telegram_webhook(bot_token: str, request: Request):
     return Response(status_code=200)
 
 # Serve Mini App static files
-if os.path.exists("/home/engine/project/miniapp"):
-    app.mount("/miniapp", StaticFiles(directory="/home/engine/project/miniapp"), name="miniapp")
+miniapp_path = os.path.join(os.path.dirname(__file__), "miniapp")
+if os.path.exists(miniapp_path):
+    app.mount("/miniapp", StaticFiles(directory=miniapp_path, html=True), name="miniapp")
 
 # Import and include API routers
 try:
-    from api.routes import auth, groups, bots, automod
+    from api.routes import auth, groups, bots, automod, events
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
     app.include_router(bots.router, prefix="/api/bots", tags=["bots"])
     app.include_router(automod.router, prefix="/api/automod", tags=["automod"])
+    app.include_router(events.router, tags=["events"])
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

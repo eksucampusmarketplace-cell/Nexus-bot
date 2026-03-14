@@ -33,7 +33,7 @@ import yt_dlp
 from pyrogram import Client
 from pytgcalls import PyTGCalls
 from pytgcalls.types.input_stream import AudioPiped
-from pytgcalls.types.input_stream.quality import MediumQualityAudio
+from pytgcalls.types.input_stream.quality import HighQualityAudio
 
 # Load config (same config.py as main bot)
 import sys
@@ -276,18 +276,6 @@ class MusicService:
         url      = job["url"]
         playnow  = job.get("playnow", False)
 
-        # Bandwidth optimization: Check download rate limit per group
-        limit_key = f"music:rate:{chat_id}:{bot_id}"
-        current = await self.redis.incr(limit_key)
-        if current == 1:
-            await self.redis.expire(limit_key, 3600)  # 1 hour window
-
-        if current > settings.MUSIC_DOWNLOADS_PER_HOUR:
-            return {
-                "ok": False,
-                "error": f"Download limit reached ({settings.MUSIC_DOWNLOADS_PER_HOUR}/hour). Please try again later."
-            }
-
         # Resolve track with retry + fallback chain
         track = await self._resolve_with_retry(url)
         if not track:
@@ -466,12 +454,12 @@ class MusicService:
             try:
                 await calls.join_group_call(
                     chat_id,
-                    AudioPiped(track["file_path"], MediumQualityAudio()),
+                    AudioPiped(track["file_path"], HighQualityAudio()),
                 )
             except Exception:
                 await calls.change_stream(
                     chat_id,
-                    AudioPiped(track["file_path"], MediumQualityAudio())
+                    AudioPiped(track["file_path"], HighQualityAudio())
                 )
 
             await self._update_status(chat_id, bot_id)

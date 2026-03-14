@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Spin the Wheel</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#0a0e1a;--card:#111827;--border:#1e2d45;
+    --text:#e8edf7;--muted:#6b7c99;
+    --accent:#00d4ff;--gold:#f59e0b;--green:#22c55e;
+    --r:14px;
+  }
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+  .app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:16px 12px;gap:12px}
+  
+  /* Header */
+  .header{width:100%;display:flex;align-items:center;justify-content:space-between}
+  .header-title{font-size:18px;font-weight:700;letter-spacing:-.3px}
+  .header-sub{font-size:12px;color:var(--muted)}
+  .xp-badge{background:linear-gradient(135deg,#f59e0b22,#f59e0b11);border:1px solid #f59e0b44;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:var(--gold)}
+
+  /* Wheel container */
+  .wheel-wrap{position:relative;display:flex;align-items:center;justify-content:center;flex:1;width:100%;max-height:360px}
+  canvas#wheel{display:block;filter:drop-shadow(0 0 40px rgba(0,212,255,0.15));max-width:100%;max-height:100%}
+  
+  /* Pointer */
+  .pointer{position:absolute;top:-2px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:12px solid transparent;border-right:12px solid transparent;border-top:28px solid var(--accent);filter:drop-shadow(0 0 8px var(--accent));z-index:10}
+  
+  /* Center pin */
+  .center-pin{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;background:var(--bg);border:3px solid var(--accent);box-shadow:0 0 12px var(--accent);z-index:10}
+
+  /* Result */
+  .result-area{width:100%;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 18px;display:flex;align-items:center;justify-content:space-between;min-height:58px}
+  .result-empty{font-size:13px;color:var(--muted)}
+  .result-content{display:flex;align-items:center;gap:12px}
+  .result-icon{font-size:28px;line-height:1}
+  .result-name{font-size:15px;font-weight:600}
+  .result-xp{font-size:12px;color:var(--gold);font-weight:500}
+  .result-badge{background:#22c55e20;color:var(--green);border:1px solid #22c55e44;border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;opacity:0;transition:.3s}
+  .result-badge.show{opacity:1}
+
+  /* Spin button */
+  .spin-btn{width:100%;padding:16px;border-radius:var(--r);border:none;cursor:pointer;font-size:16px;font-weight:700;letter-spacing:.3px;transition:.15s;position:relative;overflow:hidden}
+  .spin-btn:active{transform:scale(.98)}
+  .spin-btn.ready{background:linear-gradient(135deg,var(--accent),#0099cc);color:#000;box-shadow:0 4px 24px rgba(0,212,255,.3)}
+  .spin-btn.spinning{background:var(--card);color:var(--muted);border:1px solid var(--border);cursor:not-allowed}
+  .spin-btn.cooldown{background:var(--card);color:var(--muted);border:1px solid var(--border);cursor:not-allowed}
+  
+  /* Cooldown bar */
+  .cooldown-bar{width:100%;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+  .cooldown-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .1s linear}
+
+  /* Leaderboard */
+  .lb{width:100%;background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;max-height:120px;overflow-y:auto}
+  .lb-header{padding:8px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--border)}
+  .lb-row{display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid #ffffff06;font-size:13px}
+  .lb-row:last-child{border:none}
+  .lb-rank{width:20px;font-weight:700;color:var(--muted);font-size:12px}
+  .lb-rank.gold{color:#f59e0b}
+  .lb-name{flex:1;font-weight:500}
+  .lb-score{font-size:12px;color:var(--gold);font-weight:600}
+
+  @keyframes popIn{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.1)}100%{transform:scale(1);opacity:1}}
+  .pop{animation:popIn .4s cubic-bezier(.16,1,.3,1)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div>
+      <div class="header-title">🎡 Spin the Wheel</div>
+      <div class="header-sub" id="player-name">Loading...</div>
+    </div>
+    <div class="xp-badge" id="xp-total">0 XP</div>
+  </div>
+
+  <div class="wheel-wrap">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="320" height="320"></canvas>
+    <div class="center-pin"></div>
+  </div>
+
+  <div class="result-area" id="result-area">
+    <span class="result-empty">Spin to win XP, badges, and more!</span>
+    <div class="result-badge" id="result-badge">+XP</div>
+  </div>
+
+  <div class="cooldown-bar"><div class="cooldown-fill" id="cooldown-fill" style="width:100%"></div></div>
+  <button class="spin-btn ready" id="spin-btn" onclick="spin()">SPIN</button>
+
+  <div class="lb">
+    <div class="lb-header">Today's Leaders</div>
+    <div id="lb-body"></div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();tg.enableClosingConfirmation();}
+
+const player = tg?.initDataUnsafe?.user || {id:0,first_name:'Player',username:'player'};
+const chatId = new URLSearchParams(location.search).get('chat_id') || '0';
+
+// --- WHEEL CONFIG ---
+const SEGMENTS = [
+  {label:'10 XP',   xp:10,   color:'#1e3a5f', text:'#60a5fa', icon:'⭐'},
+  {label:'MISS',    xp:0,    color:'#1a1a2e', text:'#4b5563', icon:'💨'},
+  {label:'25 XP',   xp:25,   color:'#1e3a5f', text:'#60a5fa', icon:'⭐⭐'},
+  {label:'5 XP',    xp:5,    color:'#111827', text:'#6b7280', icon:'✨'},
+  {label:'50 XP',   xp:50,   color:'#1a2840', text:'#34d399', icon:'💎'},
+  {label:'MISS',    xp:0,    color:'#1a1a2e', text:'#4b5563', icon:'💨'},
+  {label:'100 XP',  xp:100,  color:'#2d1b4e', text:'#a78bfa', icon:'🔥'},
+  {label:'15 XP',   xp:15,   color:'#1e3a5f', text:'#60a5fa', icon:'⭐'},
+  {label:'JACKPOT', xp:500,  color:'#2d1f00', text:'#fbbf24', icon:'🎰'},
+  {label:'20 XP',   xp:20,   color:'#1e3a5f', text:'#60a5fa', icon:'⭐'},
+  {label:'MISS',    xp:0,    color:'#1a1a2e', text:'#4b5563', icon:'💨'},
+  {label:'75 XP',   xp:75,   color:'#1a2840', text:'#34d399', icon:'💎'},
+];
+const N = SEGMENTS.length;
+const ARC = (2*Math.PI)/N;
+
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const W = canvas.width;
+const CX = W/2, CY = W/2, R = W/2 - 8;
+
+let angle = 0;
+let spinning = false;
+let sessionXP = parseInt(localStorage.getItem('nexus_spin_xp')||'0');
+let lastSpin = parseInt(localStorage.getItem('nexus_last_spin')||'0');
+const COOLDOWN = 30000; // 30 seconds
+
+document.getElementById('player-name').textContent = player.first_name || 'Player';
+document.getElementById('xp-total').textContent = sessionXP + ' XP';
+
+function drawWheel(rot){
+  ctx.clearRect(0,0,W,W);
+  
+  // Outer glow ring
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(CX,CY,R+6,0,2*Math.PI);
+  ctx.strokeStyle='rgba(0,212,255,0.15)';
+  ctx.lineWidth=12;
+  ctx.stroke();
+  ctx.restore();
+  
+  // Segments
+  for(let i=0;i<N;i++){
+    const seg = SEGMENTS[i];
+    const startAngle = rot + i*ARC;
+    const endAngle = startAngle + ARC;
+    
+    // Fill
+    ctx.beginPath();
+    ctx.moveTo(CX,CY);
+    ctx.arc(CX,CY,R,startAngle,endAngle);
+    ctx.closePath();
+    ctx.fillStyle=seg.color;
+    ctx.fill();
+    
+    // Border
+    ctx.beginPath();
+    ctx.moveTo(CX,CY);
+    ctx.arc(CX,CY,R,startAngle,endAngle);
+    ctx.closePath();
+    ctx.strokeStyle='#0a0e1a';
+    ctx.lineWidth=1.5;
+    ctx.stroke();
+    
+    // Text
+    ctx.save();
+    ctx.translate(CX,CY);
+    ctx.rotate(startAngle + ARC/2);
+    ctx.textAlign='right';
+    ctx.fillStyle=seg.text;
+    ctx.font=`bold ${seg.xp>=100?10:11}px -apple-system,sans-serif`;
+    ctx.fillText(seg.label, R-12, 4);
+    ctx.font='13px serif';
+    ctx.fillText(seg.icon, R-12, -8);
+    ctx.restore();
+  }
+  
+  // Rim
+  ctx.beginPath();
+  ctx.arc(CX,CY,R,0,2*Math.PI);
+  ctx.strokeStyle='rgba(0,212,255,0.25)';
+  ctx.lineWidth=2;
+  ctx.stroke();
+  
+  // Inner circle
+  ctx.beginPath();
+  ctx.arc(CX,CY,28,0,2*Math.PI);
+  ctx.fillStyle='#0a0e1a';
+  ctx.fill();
+  ctx.strokeStyle='rgba(0,212,255,0.4)';
+  ctx.lineWidth=2;
+  ctx.stroke();
+}
+
+drawWheel(angle);
+
+function getWinner(finalAngle){
+  // Pointer is at top (−π/2). Normalize angle so 0 = top.
+  let normalized = ((-finalAngle - Math.PI/2) % (2*Math.PI) + 2*Math.PI) % (2*Math.PI);
+  let idx = Math.floor(normalized / ARC);
+  return SEGMENTS[idx % N];
+}
+
+function easeOut(t){return 1-Math.pow(1-t,4);}
+
+async function spin(){
+  if(spinning) return;
+  const now = Date.now();
+  const elapsed = now - lastSpin;
+  if(elapsed < COOLDOWN){
+    const rem = Math.ceil((COOLDOWN-elapsed)/1000);
+    document.getElementById('spin-btn').textContent = `Wait ${rem}s`;
+    return;
+  }
+  
+  spinning = true;
+  const btn = document.getElementById('spin-btn');
+  btn.className = 'spin-btn spinning';
+  btn.textContent = 'Spinning...';
+  
+  // Weighted random — jackpot is rare
+  const weights = SEGMENTS.map(s => s.xp===500 ? 1 : s.xp===0 ? 15 : s.xp>=75 ? 3 : s.xp>=50 ? 5 : 10);
+  const total = weights.reduce((a,b)=>a+b,0);
+  let r = Math.random()*total, chosen=0;
+  for(let i=0;i<weights.length;i++){r-=weights[i];if(r<=0){chosen=i;break;}}
+  
+  // Target angle: land on chosen segment center
+  const targetSegAngle = -(chosen * ARC + ARC/2) - Math.PI/2;
+  const spins = 6 + Math.random()*3; // 6-9 full rotations
+  const targetTotal = angle - (angle % (2*Math.PI)) + spins*2*Math.PI + targetSegAngle;
+  const duration = 4000 + Math.random()*800;
+  const startAngle = angle;
+  const startTime = performance.now();
+  
+  // Haptic
+  tg?.HapticFeedback?.impactOccurred('medium');
+  
+  function frame(now){
+    const t = Math.min((now-startTime)/duration,1);
+    const eased = easeOut(t);
+    angle = startAngle + (targetTotal-startAngle)*eased;
+    drawWheel(angle);
+    if(t<1){requestAnimationFrame(frame);}
+    else{
+      angle = targetTotal;
+      drawWheel(angle);
+      onSpinEnd(SEGMENTS[chosen]);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function onSpinEnd(seg){
+  spinning = false;
+  lastSpin = Date.now();
+  localStorage.setItem('nexus_last_spin', lastSpin);
+  
+  tg?.HapticFeedback?.notificationOccurred(seg.xp>0?'success':'warning');
+  
+  const area = document.getElementById('result-area');
+  const badge = document.getElementById('result-badge');
+  
+  if(seg.xp > 0){
+    sessionXP += seg.xp;
+    localStorage.setItem('nexus_spin_xp', sessionXP);
+    document.getElementById('xp-total').textContent = sessionXP + ' XP';
+    
+    area.innerHTML = `
+      <div class="result-content pop">
+        <div class="result-icon">${seg.icon}</div>
+        <div>
+          <div class="result-name">${seg.label}</div>
+          <div class="result-xp">+${seg.xp} XP earned</div>
+        </div>
+      </div>
+      <div class="result-badge show">+${seg.xp} XP</div>
+    `;
+    submitScore(seg.xp);
+    updateLeaderboard(player.first_name, sessionXP);
+    if(seg.xp>=100) tg?.HapticFeedback?.notificationOccurred('success');
+  } else {
+    area.innerHTML = `
+      <div class="result-content pop">
+        <div class="result-icon">💨</div>
+        <div>
+          <div class="result-name">Miss!</div>
+          <div class="result-xp">Better luck next time</div>
+        </div>
+      </div>
+    `;
+  }
+  
+  startCooldown();
+}
+
+function startCooldown(){
+  const btn = document.getElementById('spin-btn');
+  const fill = document.getElementById('cooldown-fill');
+  const start = Date.now();
+  
+  function tick(){
+    const elapsed = Date.now() - start;
+    const pct = Math.min(elapsed/COOLDOWN*100,100);
+    fill.style.width = pct+'%';
+    if(elapsed < COOLDOWN){
+      const rem = Math.ceil((COOLDOWN-elapsed)/1000);
+      btn.className='spin-btn cooldown';
+      btn.textContent=`Wait ${rem}s`;
+      requestAnimationFrame(tick);
+    } else {
+      btn.className='spin-btn ready';
+      btn.textContent='SPIN';
+      fill.style.width='100%';
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+// Leaderboard (local storage for demo, replace with API)
+function updateLeaderboard(name, xp){
+  const key = 'nexus_lb';
+  let lb = JSON.parse(localStorage.getItem(key)||'[]');
+  const existing = lb.findIndex(e=>e.name===name);
+  if(existing>=0){lb[existing].xp=Math.max(lb[existing].xp,xp);}
+  else{lb.push({name,xp});}
+  lb.sort((a,b)=>b.xp-a.xp);
+  lb=lb.slice(0,5);
+  localStorage.setItem(key,JSON.stringify(lb));
+  renderLB(lb);
+}
+
+function renderLB(lb){
+  const body = document.getElementById('lb-body');
+  const medals = ['🥇','🥈','🥉'];
+  body.innerHTML = lb.map((e,i)=>`
+    <div class="lb-row">
+      <div class="lb-rank ${i===0?'gold':''}">${medals[i]||i+1}</div>
+      <div class="lb-name">${e.name}</div>
+      <div class="lb-score">${e.xp} XP</div>
+    </div>
+  `).join('');
+}
+
+// Init leaderboard
+const initLB = JSON.parse(localStorage.getItem('nexus_lb')||'[]');
+if(initLB.length===0){
+  updateLeaderboard(player.first_name, sessionXP);
+} else {
+  renderLB(initLB);
+}
+
+// Check cooldown on load
+const elapsed = Date.now() - lastSpin;
+if(elapsed < COOLDOWN){
+  startCooldown();
+  const btn = document.getElementById('spin-btn');
+  btn.className='spin-btn cooldown';
+  const fill = document.getElementById('cooldown-fill');
+  fill.style.width=(elapsed/COOLDOWN*100)+'%';
+}
+
+async function submitScore(xp){
+  if(!chatId || chatId==='0' || !player.id) return;
+  try {
+    await fetch(`/api/groups/${chatId}/xp`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id, xp})
+    });
+  } catch(e){}
+}
+</script>
+</body>
+</html>

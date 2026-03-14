@@ -8,15 +8,9 @@ import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from telegram import Update
-
-# Rate limiting imports
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
 
 from config import settings
 from db.client import db
@@ -358,24 +352,7 @@ async def lifespan(app: FastAPI):
     await db.disconnect()
     logger.info("[SHUTDOWN] Complete")
 
-# Initialize rate limiter with Redis if available, else in-memory
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["100/minute"],  # Default: 100 requests per minute per IP
-)
-
 fastapi_app = FastAPI(title="Nexus Bot API", lifespan=lifespan)
-
-# Add rate limiter to app state
-fastapi_app.state.limiter = limiter
-fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# Add GZip compression for responses > 1KB to reduce bandwidth
-fastapi_app.add_middleware(
-    GZipMiddleware,
-    minimum_size=1024,  # Only compress responses larger than 1KB
-    compresslevel=6,    # Good balance between speed and compression
-)
 
 fastapi_app.add_middleware(
     CORSMiddleware,
@@ -399,6 +376,9 @@ from api.routes import automod as automod_router
 from api.routes.scheduler import router as scheduler_router
 from api.routes.log_channel import router as log_channel_router
 from api.routes.webhooks import router as webhooks_router
+from api.routes.games import router as games_router
+from api.routes.backup import router as backup_router
+from api.routes.roles import router as roles_router
 
 fastapi_app.include_router(groups.router)
 fastapi_app.include_router(members.router)
@@ -426,44 +406,19 @@ fastapi_app.include_router(scheduler_router)
 fastapi_app.include_router(log_channel_router)
 fastapi_app.include_router(reports_router)
 fastapi_app.include_router(webhooks_router)
+fastapi_app.include_router(games_router)
+fastapi_app.include_router(backup_router)
+fastapi_app.include_router(roles_router)
 
-# Serve miniapp static files with CDN-friendly caching
+# Serve miniapp static files
 miniapp_dir = os.path.join(os.path.dirname(__file__), "miniapp")
 if os.path.exists(miniapp_dir):
-    from fastapi.staticfiles import StaticFiles
-    from starlette.staticfiles import StaticFiles as StarletteStaticFiles
-    from starlette.responses import FileResponse
-    from starlette.requests import Request
-    
-    class CachedStaticFiles(StarletteStaticFiles):
-        """Static files with proper cache headers for CDN optimization."""
-        
-        async def get_response(self, path: str, scope):
-            response = await super().get_response(path, scope)
-            
-            # Add cache headers for static assets
-            if path.endswith(('.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2')):
-                # Cache static assets for 1 year (immutable files with hash in filename)
-                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-                response.headers["CDN-Cache-Control"] = "public, max-age=31536000, immutable"
-            elif path.endswith('.html'):
-                # Cache HTML for 1 minute (short cache for HTML that might change)
-                response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
-            else:
-                # Default cache for other files
-                response.headers["Cache-Control"] = "public, max-age=3600"
-            
-            # Enable CORS for CDN
-            response.headers["Access-Control-Allow-Origin"] = "*"
-            
-            return response
-    
-    fastapi_app.mount("/miniapp", CachedStaticFiles(directory=miniapp_dir, html=True), name="miniapp")
+    fastapi_app.mount("/miniapp", StaticFiles(directory=miniapp_dir, html=True), name="miniapp")
 
 # Serve webapp static files (for legacy React version)
 webapp_dir = os.path.join(os.path.dirname(__file__), "webapp")
 if os.path.exists(webapp_dir):
-    fastapi_app.mount("/webapp", CachedStaticFiles(directory=webapp_dir, html=True), name="webapp")
+    fastapi_app.mount("/webapp", StaticFiles(directory=webapp_dir, html=True), name="webapp")
 
 
 @fastapi_app.get("/favicon.ico")

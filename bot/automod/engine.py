@@ -48,7 +48,7 @@ from db.ops.automod import (
 from bot.automod.penalties import apply_penalty, PenaltyType
 from bot.automod.detectors import (
     detect_content_type, detect_unofficial_telegram,
-    is_in_time_window
+    is_in_time_window, detect_spam_pattern, detect_message_frequency
 )
 from api.routes.events import push_event
 from bot.logging.log_channel import log_event
@@ -167,7 +167,40 @@ async def check_message(
         await _push_sse(context, chat, user, result)
         return result
 
-    # ── 5. Unofficial Telegram detection ──────────────────────────────────
+    # ── 5. Spam Pattern Detection ─────────────────────────────────────────
+    if msg.text or msg.caption:
+        text = msg.text or msg.caption or ''
+        
+        # Check spam patterns
+        is_spam, reason = detect_spam_pattern(text)
+        if is_spam:
+            result = AutomodResult(
+                violated=True, rule_key="spam_pattern",
+                penalty=settings.get("default_penalty", "delete"),
+                reason=f"Matched spam pattern"
+            )
+            await _enforce(msg, user, chat, context, settings, result, 0)
+            await _push_sse(context, chat, user, result)
+            return result
+        
+        # Check message frequency (flood detection)
+        is_flooding, msg_count = detect_message_frequency(
+            user.id, chat.id,
+            window_sec=settings.get("flood_window_sec", 10),
+            threshold=settings.get("flood_threshold", 8)
+        )
+        if is_flooding:
+            result = AutomodResult(
+                violated=True, rule_key="flood",
+                penalty="mute",
+                reason=f"Rapid message frequency detected ({msg_count} msgs)"
+            )
+            await _enforce(msg, user, chat, context, settings, result, 
+                          settings.get("flood_mute_minutes", 5))
+            await _push_sse(context, chat, user, result)
+            return result
+
+    # ── 6. Unofficial Telegram detection ──────────────────────────────────
     if settings.get("unofficial_tg_lock") and msg.text:
         if detect_unofficial_telegram(msg):
             result = AutomodResult(
@@ -179,7 +212,7 @@ async def check_message(
             await _push_sse(context, chat, user, result)
             return result
 
-    # ── 6. Duplicate check ────────────────────────────────────────────────
+    # ── 7. Duplicate check ────────────────────────────────────────────────
     dup_limit  = settings.get("duplicate_limit", 0)
     dup_window = settings.get("duplicate_window_mins", 60)
     if dup_limit > 0 and msg.text:
@@ -201,7 +234,7 @@ async def check_message(
 
         await record_message_hash(db, chat.id, msg_hash, user.id)
 
-    # ── 7. Word/line/char count ───────────────────────────────────────────
+    # ── 8. Word/line/char count ───────────────────────────────────────────
     if msg.text:
         text       = msg.text
         word_count = len(text.split())
@@ -238,7 +271,7 @@ async def check_message(
                     )
                     return result
 
-    # ── 8. Necessary words ────────────────────────────────────────────────
+    # ── 9. Necessary words ────────────────────────────────────────────────
     if settings.get("necessary_words_active") and msg.text:
         nec_words = await get_necessary_words(db, chat.id)
         if nec_words:
@@ -255,7 +288,7 @@ async def check_message(
                 )
                 return result
 
-    # ── 9. REGEX check ────────────────────────────────────────────────────
+    # ── 10. REGEX check ───────────────────────────────────────────────────
     if settings.get("regex_active") and msg.text:
         patterns = await get_regex_patterns(db, chat.id)
         for p in patterns:

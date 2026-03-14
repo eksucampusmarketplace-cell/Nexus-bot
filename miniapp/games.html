@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Nexus Games</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--r:16px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow-x:hidden}
+.app{padding:16px 14px 24px;max-width:480px;margin:0 auto}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.header-left .title{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.header-left .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.player-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px}
+.avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#00d4ff);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.player-name{font-size:12px;font-weight:600}
+
+/* XP Bar */
+.xp-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
+.xp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.xp-level{font-size:13px;font-weight:700;color:#a855f7}
+.xp-val{font-size:12px;color:var(--muted)}
+.xp-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.xp-fill{height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+
+/* Section */
+.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 10px}
+
+/* Game cards */
+.games-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.game-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;text-decoration:none;display:block}
+.game-card:active{transform:scale(.97)}
+.game-card::before{content:'';position:absolute;inset:0;opacity:0;transition:.2s}
+.game-card:active::before{opacity:1}
+.game-card.spin::before{background:linear-gradient(135deg,#00d4ff10,#00d4ff05)}
+.game-card.trivia::before{background:linear-gradient(135deg,#7c3aed10,#7c3aed05)}
+.game-card.word::before{background:linear-gradient(135deg,#22c55e10,#22c55e05)}
+.game-card.snake::before{background:linear-gradient(135deg,#22c55e10,#22c55e05)}
+.game-icon{font-size:36px;margin-bottom:10px;display:block}
+.game-name{font-size:14px;font-weight:700;margin-bottom:3px}
+.game-desc{font-size:11px;color:var(--muted);line-height:1.4}
+.game-badge{position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+.badge-hot{background:#ef444420;color:#ef4444;border:1px solid #ef444440}
+.badge-new{background:#22c55e20;color:#22c55e;border:1px solid #22c55e40}
+.badge-xp{background:#f59e0b20;color:#f59e0b;border:1px solid #f59e0b40}
+.game-xp{font-size:11px;color:#f59e0b;font-weight:600;margin-top:6px}
+
+/* Leaderboard */
+.lb-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
+.lb-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.lb-title{font-size:14px;font-weight:700}
+.lb-period{font-size:11px;color:var(--muted)}
+.lb-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #0d1420}
+.lb-row:last-child{border:none}
+.lb-rank{width:20px;font-size:13px;font-weight:800}
+.lb-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#1e3a5f,#152030);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.lb-info{flex:1}
+.lb-name{font-size:13px;font-weight:600}
+.lb-games{font-size:11px;color:var(--muted)}
+.lb-score{font-size:13px;font-weight:700;color:#f59e0b}
+
+/* Back btn */
+.back-btn{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;margin-bottom:16px;background:none;border:none;padding:0}
+.back-btn:active{color:var(--text)}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.game-card{animation:fadeIn .3s ease both}
+.game-card:nth-child(1){animation-delay:.05s}
+.game-card:nth-child(2){animation-delay:.1s}
+.game-card:nth-child(3){animation-delay:.15s}
+.game-card:nth-child(4){animation-delay:.2s}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-left">
+      <div class="title">🎮 Games Hub</div>
+      <div class="sub">Play & earn XP for your profile</div>
+    </div>
+    <div class="player-pill">
+      <div class="avatar" id="avatar">?</div>
+      <div class="player-name" id="pname">Player</div>
+    </div>
+  </div>
+
+  <div class="xp-card">
+    <div class="xp-top">
+      <div class="xp-level" id="xp-level">Level 1</div>
+      <div class="xp-val" id="xp-val">0 / 100 XP</div>
+    </div>
+    <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
+  </div>
+
+  <div class="section-label">Choose a Game</div>
+
+  <div class="games-grid">
+    <a class="game-card spin" id="card-spin" href="javascript:void(0)">
+      <span class="game-badge badge-hot">HOT</span>
+      <span class="game-icon">🎡</span>
+      <div class="game-name">Spin the Wheel</div>
+      <div class="game-desc">Spin once every 30s for XP prizes</div>
+      <div class="game-xp">Up to 500 XP</div>
+    </a>
+    <a class="game-card trivia" id="card-trivia" href="javascript:void(0)">
+      <span class="game-badge badge-xp">+XP</span>
+      <span class="game-icon">🧠</span>
+      <div class="game-name">Trivia Quiz</div>
+      <div class="game-desc">10 questions, speed bonuses & streaks</div>
+      <div class="game-xp">Up to 400 XP</div>
+    </a>
+    <a class="game-card word" id="card-word" href="javascript:void(0)">
+      <span class="game-badge badge-new">NEW</span>
+      <span class="game-icon">📝</span>
+      <div class="game-name">Word Guess</div>
+      <div class="game-desc">Guess the 5-letter word in 6 tries</div>
+      <div class="game-xp">Up to 500 XP</div>
+    </a>
+    <a class="game-card snake" id="card-snake" href="javascript:void(0)">
+      <span class="game-icon">🐍</span>
+      <div class="game-name">Snake</div>
+      <div class="game-desc">Classic arcade, beat the leaderboard</div>
+      <div class="game-xp">Score × 0.5 XP</div>
+    </a>
+  </div>
+
+  <div class="section-label">Leaderboard</div>
+  <div class="lb-card">
+    <div class="lb-header">
+      <div class="lb-title">Top Players</div>
+      <div class="lb-period">This week</div>
+    </div>
+    <div id="lb-body">
+      <div class="lb-row" style="justify-content:center;padding:20px;color:#4a6080;font-size:13px">No scores yet — be the first!</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user||{id:0,first_name:'Player',username:'player'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+const BASE = location.pathname.replace('games.html','');
+
+// Player UI
+const initials = (player.first_name||'P').charAt(0).toUpperCase();
+document.getElementById('avatar').textContent = initials;
+document.getElementById('pname').textContent = player.first_name || 'Player';
+
+// XP
+const totalXP = parseInt(localStorage.getItem('nexus_total_xp')||'0') +
+  parseInt(localStorage.getItem('nexus_spin_xp')||'0');
+const level = Math.floor(Math.sqrt(totalXP/100))+1;
+const levelXP = (level-1)*(level-1)*100;
+const nextXP = level*level*100;
+const pct = Math.min((totalXP-levelXP)/(nextXP-levelXP)*100,100);
+document.getElementById('xp-level').textContent = `Level ${level}`;
+document.getElementById('xp-val').textContent = `${totalXP} / ${nextXP} XP`;
+setTimeout(()=>document.getElementById('xp-fill').style.width=pct+'%', 200);
+
+// Build game URLs
+function gameURL(game){
+  const params = new URLSearchParams({chat_id:chatId,user_id:player.id,name:player.first_name||'Player'});
+  return `${BASE}games/${game}.html?${params}`;
+}
+
+// Open game in Telegram Mini App popup or new page
+function openGame(game){
+  tg?.HapticFeedback?.impactOccurred('medium');
+  // Navigate to game page (same window in Mini App)
+  window.location.href = gameURL(game);
+}
+
+document.getElementById('card-spin').onclick  = ()=>openGame('spin-wheel');
+document.getElementById('card-trivia').onclick = ()=>openGame('trivia');
+document.getElementById('card-word').onclick   = ()=>openGame('wordguess');
+document.getElementById('card-snake').onclick  = ()=>openGame('snake');
+
+// Aggregate leaderboard from all game local storage
+function buildLeaderboard(){
+  const all = {};
+  
+  // Spin XP
+  const spinLB = JSON.parse(localStorage.getItem('nexus_lb')||'[]');
+  spinLB.forEach(e=>{ all[e.name]=(all[e.name]||0)+e.xp; });
+  
+  // Snake scores
+  const snakeLB = JSON.parse(localStorage.getItem('nexus_snake_lb')||'[]');
+  snakeLB.forEach(e=>{ all[e.name]=(all[e.name]||0)+Math.floor(e.score/10)*5; });
+  
+  return Object.entries(all)
+    .map(([name,xp])=>({name,xp}))
+    .sort((a,b)=>b.xp-a.xp)
+    .slice(0,5);
+}
+
+const lb = buildLeaderboard();
+if(lb.length > 0){
+  const medals = ['🥇','🥈','🥉'];
+  document.getElementById('lb-body').innerHTML = lb.map((e,i)=>`
+    <div class="lb-row">
+      <div class="lb-rank">${medals[i]||i+1}</div>
+      <div class="lb-avatar">${e.name.charAt(0).toUpperCase()}</div>
+      <div class="lb-info">
+        <div class="lb-name">${e.name}</div>
+        <div class="lb-games">All games combined</div>
+      </div>
+      <div class="lb-score">${e.xp} XP</div>
+    </div>
+  `).join('');
+}
+</script>
+</body>
+</html>

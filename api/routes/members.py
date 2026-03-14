@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request
 from api.auth import get_current_user
 from db.client import db
 import json
@@ -44,38 +44,18 @@ async def _fetch_admins_from_telegram(chat_id: int) -> list:
 
 
 @router.get("/members")
-async def list_members(
-    chat_id: int, 
-    page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(50, ge=1, le=100, description="Items per page"),
-    search: str = Query(None, description="Search by username or first_name"),
-    user: dict = Depends(get_current_user)
-):
+async def list_members(chat_id: int, user: dict = Depends(get_current_user)):
     """
-    Get paginated members list for a group.
+    Get members list for a group.
     Combines data from multiple sources: users table, boost records, and Telegram API.
     """
     members_map = {}
-    offset = (page - 1) * page_size
-
-    # Build search filter if provided
-    search_filter = ""
-    search_params = [chat_id]
-    if search:
-        search_filter = "AND (username ILIKE $2 OR first_name ILIKE $2)"
-        search_params.append(f"%{search}%")
 
     # 1. Get users from the users table (users who have sent messages)
     async with db.pool.acquire() as conn:
-        # Get total count for pagination
-        count_query = f"SELECT COUNT(*) FROM users WHERE chat_id = $1 {search_filter}"
-        total_count = await conn.fetchval(count_query, *search_params) or 0
-        
-        # Get paginated users
-        query_params = search_params + [page_size, offset]
         user_rows = await conn.fetch(
-            f"SELECT * FROM users WHERE chat_id = $1 {search_filter} ORDER BY last_seen DESC LIMIT ${len(search_params) + 1} OFFSET ${len(search_params) + 2}",
-            *query_params
+            "SELECT * FROM users WHERE chat_id = $1 ORDER BY last_seen DESC LIMIT 100",
+            chat_id
         )
         for r in user_rows:
             d = dict(r)
@@ -202,20 +182,7 @@ async def list_members(
     members_list = list(members_map.values())
     members_list.sort(key=lambda x: x.get('last_seen') or '1970-01-01', reverse=True)
 
-    # Calculate pagination metadata
-    total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
-    
-    return {
-        "members": members_list,
-        "pagination": {
-            "page": page,
-            "page_size": page_size,
-            "total_count": total_count,
-            "total_pages": total_pages,
-            "has_next": page < total_pages,
-            "has_prev": page > 1
-        }
-    }
+    return members_list
 
 
 @router.get("/members/events")

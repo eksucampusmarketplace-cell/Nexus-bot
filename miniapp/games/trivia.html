@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Trivia Quiz</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#5a7090;--accent:#7c3aed;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--r:14px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;height:100dvh;padding:16px 14px;gap:14px}
+
+/* Progress */
+.progress-row{display:flex;align-items:center;gap:10px}
+.progress-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),#a855f7);border-radius:3px;transition:width .4s cubic-bezier(.16,1,.3,1)}
+.q-count{font-size:12px;color:var(--muted);font-weight:500;min-width:40px;text-align:right}
+
+/* Score + timer row */
+.stats-row{display:flex;align-items:center;justify-content:space-between}
+.stat-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 14px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px}
+.stat-val{font-size:18px;font-weight:700}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stat-score .stat-val{color:#a855f7}
+.stat-streak .stat-val{color:var(--amber)}
+.timer-ring{position:relative;width:52px;height:52px}
+.timer-ring canvas{position:absolute;top:0;left:0}
+.timer-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:700;color:var(--text)}
+
+/* Category badge */
+.cat-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:var(--card2);border:1px solid var(--border);border-radius:20px;font-size:11px;color:var(--muted);font-weight:500}
+
+/* Question */
+.question-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;flex-shrink:0}
+.question-text{font-size:16px;font-weight:600;line-height:1.5;color:var(--text)}
+
+/* Options */
+.options{display:flex;flex-direction:column;gap:8px;flex:1}
+.option{width:100%;padding:14px 16px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer;transition:.15s;text-align:left;font-size:14px;font-weight:500;color:var(--text);display:flex;align-items:center;gap:12px;position:relative;overflow:hidden}
+.option:active{transform:scale(.99)}
+.option-letter{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--muted);flex-shrink:0;transition:.15s}
+.option.selected{border-color:var(--accent);background:#7c3aed15}
+.option.selected .option-letter{background:var(--accent);border-color:var(--accent);color:#fff}
+.option.correct{border-color:var(--green);background:#22c55e15}
+.option.correct .option-letter{background:var(--green);border-color:var(--green);color:#fff}
+.option.wrong{border-color:var(--red);background:#ef444415}
+.option.wrong .option-letter{background:var(--red);border-color:var(--red);color:#fff}
+.option.disabled{cursor:default;pointer-events:none}
+.option-text{flex:1;line-height:1.4}
+.option-icon{font-size:16px;position:absolute;right:14px;opacity:0;transition:.2s}
+.option.correct .option-icon,.option.wrong .option-icon{opacity:1}
+
+/* Action */
+.next-btn{width:100%;padding:15px;border-radius:var(--r);border:none;cursor:pointer;font-size:15px;font-weight:700;transition:.15s;background:linear-gradient(135deg,var(--accent),#9333ea);color:#fff;box-shadow:0 4px 20px rgba(124,58,237,.3)}
+.next-btn:disabled{background:var(--card);color:var(--muted);border:1px solid var(--border);box-shadow:none;cursor:default}
+.next-btn:active{transform:scale(.98)}
+
+/* Explanation */
+.explanation{background:var(--card2);border-left:3px solid var(--accent);border-radius:0 var(--r) var(--r) 0;padding:10px 14px;font-size:13px;color:var(--muted);line-height:1.5;display:none}
+.explanation.show{display:block}
+
+/* Results screen */
+.results{display:none;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:16px;text-align:center}
+.results.show{display:flex}
+.results-emoji{font-size:64px;line-height:1}
+.results-title{font-size:24px;font-weight:700}
+.results-score{font-size:48px;font-weight:800;background:linear-gradient(135deg,var(--accent),#e879f9);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.results-detail{font-size:14px;color:var(--muted);line-height:1.6}
+.results-xp{background:#7c3aed20;border:1px solid #7c3aed44;border-radius:12px;padding:12px 24px;font-size:16px;font-weight:600;color:#a855f7}
+.restart-btn{width:100%;padding:15px;border-radius:var(--r);border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,var(--accent),#9333ea);color:#fff}
+
+/* Animations */
+@keyframes slideUp{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.slide-up{animation:slideUp .3s cubic-bezier(.16,1,.3,1)}
+.shake{animation:shake .3s ease}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <!-- QUIZ UI -->
+  <div id="quiz-ui" style="display:flex;flex-direction:column;gap:14px;flex:1">
+    <div class="progress-row">
+      <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
+      <div class="q-count" id="q-count">1 / 10</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box stat-score"><div class="stat-val" id="score-val">0</div><div class="stat-label">Score</div></div>
+      <div class="timer-ring"><canvas id="timer-canvas" width="52" height="52"></canvas><div class="timer-text" id="timer-text">15</div></div>
+      <div class="stat-box stat-streak"><div class="stat-val" id="streak-val">0🔥</div><div class="stat-label">Streak</div></div>
+    </div>
+    <div><span class="cat-badge" id="cat-badge">📚 General</span></div>
+    <div class="question-card slide-up" id="question-card">
+      <div class="question-text" id="question-text">Loading question...</div>
+    </div>
+    <div class="explanation" id="explanation"></div>
+    <div class="options" id="options"></div>
+    <button class="next-btn" id="next-btn" onclick="nextQuestion()" disabled>Next Question →</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+    <div class="results-emoji" id="res-emoji">🏆</div>
+    <div class="results-title" id="res-title">Quiz Complete!</div>
+    <div class="results-score" id="res-score">8/10</div>
+    <div class="results-detail" id="res-detail">Excellent!</div>
+    <div class="results-xp" id="res-xp">+200 XP Earned</div>
+    <button class="restart-btn" onclick="restartQuiz()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user || {id:0,first_name:'Player'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+
+const QUESTIONS = [
+  {q:"What programming language is Python named after?",opts:["A snake","Monty Python","A mathematician","A city"],correct:1,cat:"💻 Tech",exp:"Guido van Rossum named Python after Monty Python's Flying Circus, his favorite TV show."},
+  {q:"Which company created Telegram?",opts:["Meta","Google","Durov brothers","Apple"],correct:2,cat:"💬 Telegram",exp:"Pavel and Nikolai Durov created Telegram, launching it in 2013."},
+  {q:"What does 'HTTP' stand for?",opts:["HyperText Transfer Protocol","High Tech Transfer Process","HyperText Transmission Program","High Transfer Text Protocol"],correct:0,cat:"💻 Tech",exp:"HTTP stands for HyperText Transfer Protocol — the foundation of data exchange on the web."},
+  {q:"Which data structure uses LIFO ordering?",opts:["Queue","Stack","Array","Tree"],correct:1,cat:"💻 Tech",exp:"A Stack uses Last-In, First-Out (LIFO) ordering. Think of a stack of plates."},
+  {q:"What year was the first iPhone released?",opts:["2005","2006","2007","2008"],correct:2,cat:"📱 Tech History",exp:"Apple released the first iPhone on June 29, 2007, revolutionizing the smartphone industry."},
+  {q:"What is the capital of Japan?",opts:["Osaka","Kyoto","Hiroshima","Tokyo"],correct:3,cat:"🌍 Geography",exp:"Tokyo is the capital and most populous city of Japan, home to over 13 million people."},
+  {q:"How many bits are in a byte?",opts:["4","8","16","32"],correct:1,cat:"💻 Tech",exp:"One byte is made up of exactly 8 bits. This is a fundamental unit in computing."},
+  {q:"What does 'API' stand for?",opts:["Application Programming Interface","Advanced Protocol Integration","Automated Process Interface","Application Process Integration"],correct:0,cat:"💻 Tech",exp:"API stands for Application Programming Interface — it defines how software components interact."},
+  {q:"Which planet is known as the Red Planet?",opts:["Venus","Saturn","Mars","Jupiter"],correct:2,cat:"🪐 Science",exp:"Mars is called the Red Planet because of iron oxide (rust) on its surface, giving it a reddish appearance."},
+  {q:"What is the maximum message length in Telegram?",opts:["1,000","2,048","4,096","10,000"],correct:2,cat:"💬 Telegram",exp:"Telegram allows messages up to 4,096 characters long for regular text messages."},
+];
+
+let questions = [], current = 0, score = 0, streak = 0, maxStreak = 0;
+let timerInterval, timeLeft = 15, answered = false, totalXP = 0;
+const TOTAL = 10;
+
+function shuffle(arr){return [...arr].sort(()=>Math.random()-.5);}
+
+function startQuiz(){
+  questions = shuffle(QUESTIONS).slice(0, TOTAL);
+  current = 0; score = 0; streak = 0; totalXP = 0;
+  document.getElementById('quiz-ui').style.display = 'flex';
+  document.getElementById('results').classList.remove('show');
+  loadQuestion();
+}
+
+function loadQuestion(){
+  if(current >= TOTAL){ showResults(); return; }
+  const q = questions[current];
+  answered = false;
+  
+  document.getElementById('progress').style.width = (current/TOTAL*100)+'%';
+  document.getElementById('q-count').textContent = `${current+1} / ${TOTAL}`;
+  document.getElementById('score-val').textContent = score;
+  document.getElementById('streak-val').textContent = streak ? streak+'🔥' : '0';
+  document.getElementById('cat-badge').textContent = q.cat;
+  
+  const qCard = document.getElementById('question-card');
+  qCard.classList.remove('slide-up');
+  void qCard.offsetWidth;
+  qCard.classList.add('slide-up');
+  document.getElementById('question-text').textContent = q.q;
+  
+  document.getElementById('explanation').className = 'explanation';
+  document.getElementById('next-btn').disabled = true;
+  
+  const letters = ['A','B','C','D'];
+  const optsEl = document.getElementById('options');
+  optsEl.innerHTML = '';
+  q.opts.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'option slide-up';
+    btn.style.animationDelay = (i*0.06)+'s';
+    btn.innerHTML = `
+      <div class="option-letter">${letters[i]}</div>
+      <div class="option-text">${opt}</div>
+      <div class="option-icon">${i===q.correct?'✓':'✗'}</div>
+    `;
+    btn.onclick = () => selectAnswer(i, q.correct, q.exp);
+    optsEl.appendChild(btn);
+  });
+  
+  startTimer();
+}
+
+const timerCtx = document.getElementById('timer-canvas').getContext('2d');
+function drawTimer(pct, urgent){
+  const c = document.getElementById('timer-canvas');
+  timerCtx.clearRect(0,0,52,52);
+  timerCtx.beginPath();
+  timerCtx.arc(26,26,22,0,2*Math.PI);
+  timerCtx.strokeStyle = '#1a2840';
+  timerCtx.lineWidth = 4;
+  timerCtx.stroke();
+  timerCtx.beginPath();
+  timerCtx.arc(26,26,22,-Math.PI/2,-Math.PI/2+2*Math.PI*pct);
+  timerCtx.strokeStyle = urgent ? '#ef4444' : '#7c3aed';
+  timerCtx.lineWidth = 4;
+  timerCtx.lineCap = 'round';
+  timerCtx.stroke();
+}
+
+function startTimer(){
+  clearInterval(timerInterval);
+  timeLeft = 15;
+  document.getElementById('timer-text').textContent = timeLeft;
+  drawTimer(1, false);
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    document.getElementById('timer-text').textContent = timeLeft;
+    drawTimer(timeLeft/15, timeLeft<=5);
+    if(timeLeft<=0){
+      clearInterval(timerInterval);
+      if(!answered) timeOut();
+    }
+  }, 1000);
+}
+
+function timeOut(){
+  const q = questions[current];
+  answered = true;
+  streak = 0;
+  document.getElementById('streak-val').textContent = '0';
+  const opts = document.querySelectorAll('.option');
+  opts[q.correct].classList.add('correct');
+  opts.forEach(o=>o.classList.add('disabled'));
+  showExplanation(q.exp);
+  tg?.HapticFeedback?.notificationOccurred('warning');
+}
+
+function selectAnswer(selected, correct, exp){
+  if(answered) return;
+  answered = true;
+  clearInterval(timerInterval);
+  
+  const timeBonus = Math.floor(timeLeft/15*50);
+  const opts = document.querySelectorAll('.option');
+  
+  opts.forEach(o=>o.classList.add('disabled'));
+  opts[correct].classList.add('correct');
+  
+  if(selected === correct){
+    opts[selected].classList.add('correct');
+    streak++;
+    maxStreak = Math.max(maxStreak, streak);
+    const pts = 100 + timeBonus + Math.min(streak-1,4)*20;
+    score += pts;
+    totalXP += pts;
+    document.getElementById('score-val').textContent = score;
+    document.getElementById('streak-val').textContent = streak+'🔥';
+    tg?.HapticFeedback?.notificationOccurred('success');
+  } else {
+    opts[selected].classList.add('wrong');
+    opts[selected].classList.add('shake');
+    streak = 0;
+    document.getElementById('streak-val').textContent = '0';
+    tg?.HapticFeedback?.notificationOccurred('error');
+  }
+  
+  showExplanation(exp);
+  document.getElementById('next-btn').disabled = false;
+  
+  const isLast = current === TOTAL - 1;
+  document.getElementById('next-btn').textContent = isLast ? 'See Results 🎯' : 'Next Question →';
+}
+
+function showExplanation(text){
+  const el = document.getElementById('explanation');
+  el.textContent = '💡 ' + text;
+  el.classList.add('show');
+}
+
+function nextQuestion(){
+  current++;
+  loadQuestion();
+}
+
+function showResults(){
+  document.getElementById('quiz-ui').style.display = 'none';
+  const res = document.getElementById('results');
+  res.classList.add('show');
+  
+  const pct = score / (TOTAL * 150) * 100;
+  let emoji = '😅', title = 'Keep Practicing!';
+  if(pct > 80){ emoji = '🏆'; title = 'Brilliant!'; }
+  else if(pct > 60){ emoji = '🎉'; title = 'Great Job!'; }
+  else if(pct > 40){ emoji = '👍'; title = 'Good Effort!'; }
+  
+  document.getElementById('res-emoji').textContent = emoji;
+  document.getElementById('res-title').textContent = title;
+  document.getElementById('res-score').textContent = score + ' pts';
+  document.getElementById('res-detail').textContent = `Max streak: ${maxStreak} 🔥  ·  Time bonuses earned`;
+  document.getElementById('res-xp').textContent = `+${Math.round(totalXP/10)*10} XP Earned`;
+  
+  tg?.HapticFeedback?.notificationOccurred('success');
+  submitScore(Math.round(totalXP/10)*10);
+}
+
+function restartQuiz(){ startQuiz(); }
+
+async function submitScore(xp){
+  if(!chatId||chatId==='0'||!player.id) return;
+  try {
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id,xp})
+    });
+  } catch(e){}
+}
+
+startQuiz();
+</script>
+</body>
+</html>

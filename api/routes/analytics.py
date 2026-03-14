@@ -1,36 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query
 from api.auth import get_current_user
 from db.client import db
 from datetime import datetime, timedelta
-from slowapi import Limiter
-from slowapi.util import get_remote_address
 
 router = APIRouter(prefix="/api/groups")
 
-# Rate limiter instance - will be set by main app
-limiter = Limiter(key_func=get_remote_address)
-
-
-def _compact_date(date_str: str) -> str:
-    """Convert YYYY-MM-DD to MMDD to save bandwidth."""
-    if date_str and len(date_str) >= 10:
-        return date_str[5:7] + date_str[8:10]  # MM-DD -> MMDD
-    return date_str
-
-
-def _minify_response(data: dict) -> dict:
-    """Remove null values and empty arrays to reduce payload size."""
-    if isinstance(data, dict):
-        return {k: _minify_response(v) for k, v in data.items() 
-                if v is not None and v != [] and v != {}}
-    if isinstance(data, list):
-        return [_minify_response(item) for item in data]
-    return data
-
 @router.get("/{chat_id}/analytics")
-@limiter.limit("30/minute")  # Limit analytics requests to 30 per minute per IP
-async def group_analytics(request: Request, chat_id: int, user: dict = Depends(get_current_user)):
+async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:
         # Get current member count from groups table
         group_row = await conn.fetchrow(
@@ -137,21 +113,29 @@ async def group_analytics(request: Request, chat_id: int, user: dict = Depends(g
         if not modules:
             modules = [{"name": "no_activity", "actions": 0}]
 
-    # Minify and compact response to reduce bandwidth
-    response_data = _minify_response({
-        "activity": [{"d": _compact_date(a["date"]), "m": a["messages"]} for a in activity],
-        "growth": [{"d": _compact_date(g["date"]), "j": g["joins"], "l": g["leaves"]} for g in growth],
-        "modules": modules
-    })
-    
-    return JSONResponse(
-        content=response_data,
-        headers={"Content-Encoding": "identity"}  # Allow gzip if configured
-    )
+        # Peak hours analysis (for heatmap)
+        hour_rows = await conn.fetch("""
+            SELECT EXTRACT(hour FROM created_at) as hour,
+                   COUNT(*) as count
+            FROM member_events
+            WHERE chat_id = $1
+              AND created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY EXTRACT(hour FROM created_at)
+        """, chat_id)
+
+        peak_hours = [0] * 24
+        for row in hour_rows:
+            peak_hours[int(row['hour'])] = row['count']
+
+    return {
+        "activity": activity,
+        "growth": growth,
+        "modules": modules,
+        "peak_hours": peak_hours
+    }
 
 @router.get("/{chat_id}/analytics/heatmap")
-@limiter.limit("20/minute")  # Limit heatmap requests to 20 per minute per IP
-async def sentiment_heatmap(request: Request, chat_id: int, user: dict = Depends(get_current_user)):
+async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:
         # Get activity by day/hour from member_events
         heatmap_rows = await conn.fetch("""
@@ -186,17 +170,12 @@ async def sentiment_heatmap(request: Request, chat_id: int, user: dict = Depends
 
 
 @router.get("/{chat_id}/member-stats")
-@limiter.limit("30/minute")  # Limit member stats requests to 30 per minute per IP
 async def member_stats(
-    request: Request,
     chat_id: int,
     limit: int = Query(10, ge=1, le=50),
     user: dict = Depends(get_current_user),
 ):
-    """Return top members by message count along with trust score stats.
-    
-    Optimized for bandwidth: returns compact field names and excludes nulls.
-    """
+    """Return top members by message count along with trust score stats."""
     async with db.pool.acquire() as conn:
         rows = await conn.fetch(
             """SELECT user_id, username, first_name,
@@ -225,26 +204,11 @@ async def member_stats(
             "SELECT COUNT(*) FROM users WHERE chat_id = $1 AND trust_score <= 30", chat_id
         ) or 0
 
-    # Compact field names to reduce payload size
-    compact_members = []
-    for r in rows:
-        member = {
-            "id": r["user_id"],
-            "u": r["username"],
-            "n": r["first_name"],
-            "mc": r["message_count"],
-            "ts": r["trust_score"],
-            "rc": r["report_count"],
-            "wc": r["warn_count"],
-        }
-        # Remove null values
-        compact_members.append({k: v for k, v in member.items() if v is not None})
-
-    return JSONResponse(content={
-        "tm": compact_members,  # top_members
-        "s": {  # summary
-            "tt": total_members,  # total_tracked
-            "at": round(float(avg_trust), 1),  # avg_trust
-            "lt": low_trust_count,  # low_trust_count
+    return {
+        "top_members": [dict(r) for r in rows],
+        "summary": {
+            "total_tracked": total_members,
+            "avg_trust_score": round(float(avg_trust), 1),
+            "low_trust_count": low_trust_count,
         },
-    })
+    }

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Word Guess</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#080c18;--card:#0f1620;--border:#1a2840;
+  --text:#e8edf7;--muted:#5a7090;
+  --green:#22c55e;--green-bg:#22c55e18;
+  --amber:#f59e0b;--amber-bg:#f59e0b18;
+  --gray:#374151;--gray-bg:#37415118;
+  --accent:#00d4ff;--r:8px
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:12px;gap:10px}
+
+/* Header */
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.header-right{display:flex;gap:8px;align-items:center}
+.xp-pill{background:#00d4ff15;border:1px solid #00d4ff30;border-radius:20px;padding:4px 10px;font-size:12px;color:var(--accent);font-weight:600}
+.lives{font-size:14px;letter-spacing:2px}
+
+/* Grid */
+.grid{display:flex;flex-direction:column;gap:5px;flex:1;justify-content:center}
+.grid-row{display:flex;gap:5px}
+.tile{width:52px;height:52px;border:2px solid var(--border);border-radius:var(--r);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;letter-spacing:-.5px;text-transform:uppercase;transition:.05s;color:var(--text);position:relative;overflow:hidden}
+.tile.filled{border-color:#4b5563}
+.tile.correct{background:var(--green);border-color:var(--green);color:#fff}
+.tile.present{background:var(--amber);border-color:var(--amber);color:#000}
+.tile.absent{background:var(--gray);border-color:var(--gray);color:#9ca3af}
+@keyframes flip{0%{transform:scaleY(1)}50%{transform:scaleY(0)}100%{transform:scaleY(1)}}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.12)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}10%,50%,90%{transform:translateX(-6px)}30%,70%{transform:translateX(6px)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-12px)}60%{transform:translateY(-6px)}}
+@keyframes slideUp{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+.shake{animation:shake .5s ease}
+.bounce-in{animation:bounce .5s ease}
+
+/* Keyboard */
+.keyboard{width:100%;display:flex;flex-direction:column;gap:6px;align-items:center}
+.kb-row{display:flex;gap:4px;justify-content:center}
+.key{min-width:32px;height:44px;background:#1a2840;border:none;border-radius:6px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:.1s;text-transform:uppercase;padding:0 4px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.key:active{transform:scale(.95)}
+.key.wide{min-width:48px;font-size:11px}
+.key.correct{background:var(--green);color:#fff}
+.key.present{background:var(--amber);color:#000}
+.key.absent{background:#1f2937;color:#4b5563}
+
+/* Toast */
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-10px);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;opacity:0;transition:.2s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Result overlay */
+.result-overlay{position:fixed;inset:0;background:#000a;backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:100;opacity:0;pointer-events:none;transition:.3s}
+.result-overlay.show{opacity:1;pointer-events:all}
+.result-card{background:#0f1620;border:1px solid #1a2840;border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,90vw);animation:slideUp .4s cubic-bezier(.16,1,.3,1)}
+.result-icon{font-size:56px;line-height:1;margin-bottom:8px}
+.result-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.result-word{font-size:14px;color:var(--muted);margin-bottom:16px}
+.result-word strong{color:var(--text);text-transform:uppercase;letter-spacing:.1em}
+.result-xp{font-size:28px;font-weight:800;color:var(--accent);margin-bottom:4px}
+.result-xp-label{font-size:12px;color:var(--muted);margin-bottom:20px}
+.play-again{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,var(--accent),#0099cc);color:#000}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">WORDGUESS</div>
+    <div class="header-right">
+      <span class="lives" id="lives">❤️❤️❤️❤️❤️❤️</span>
+      <span class="xp-pill" id="xp-pill">0 XP</span>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="keyboard" id="keyboard"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="result-overlay" id="result">
+  <div class="result-card">
+    <div class="result-icon" id="r-icon">🎉</div>
+    <div class="result-title" id="r-title">You got it!</div>
+    <div class="result-word" id="r-word">The word was <strong>NEXUS</strong></div>
+    <div class="result-xp" id="r-xp">+150 XP</div>
+    <div class="result-xp-label">Added to your profile</div>
+    <button class="play-again" onclick="newGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+
+const WORDS = [
+  'NEXUS','ADMIN','MUSIC','CLONE','GROUP','MEDIA','TOKEN','RULES','FLOOD','BLOCK',
+  'GUARD','PROXY','REDIS','CACHE','QUEUE','ROUTE','DEBUG','GRANT','PURGE','MUTED',
+  'STAFF','NINJA','BRAVE','CRISP','DEPOT','EPOCH','FLAME','GROVE','HELIX','IMAGE',
+  'JUICE','KNACK','LEMON','MAPLE','NOVEL','OCEAN','PEARL','QUILL','RADAR','SWIFT',
+  'TIGER','ULTRA','VAPOR','WALTZ','XENON','YACHT','ZEBRA','ATLAS','BLAZE','COMET',
+  'DRONE','EMBER','FROST','GLYPH','HASTE','IRONY','JEWEL','KARMA','LUNAR','MAGMA',
+];
+
+const ROWS = 6, COLS = 5;
+let target = '', guesses = [], currentGuess = '', gameOver = false, sessionXP = 0;
+let keyStates = {};
+
+function pickWord(){ return WORDS[Math.floor(Math.random()*WORDS.length)]; }
+
+function buildGrid(){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for(let r=0;r<ROWS;r++){
+    const row = document.createElement('div');
+    row.className = 'grid-row';
+    row.id = 'row-'+r;
+    for(let c=0;c<COLS;c++){
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.id = `tile-${r}-${c}`;
+      row.appendChild(tile);
+    }
+    grid.appendChild(row);
+  }
+}
+
+function buildKeyboard(){
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  const rows = [
+    ['Q','W','E','R','T','Y','U','I','O','P'],
+    ['A','S','D','F','G','H','J','K','L'],
+    ['ENTER','Z','X','C','V','B','N','M','⌫']
+  ];
+  rows.forEach(row=>{
+    const rowEl = document.createElement('div');
+    rowEl.className = 'kb-row';
+    row.forEach(k=>{
+      const btn = document.createElement('button');
+      btn.className = 'key' + (k.length>1?' wide':'');
+      btn.textContent = k;
+      btn.id = 'key-'+k;
+      btn.onclick = () => handleKey(k);
+      rowEl.appendChild(btn);
+    });
+    kb.appendChild(rowEl);
+  });
+}
+
+function handleKey(k){
+  if(gameOver) return;
+  if(k==='ENTER'){ submitGuess(); return; }
+  if(k==='⌫'){ currentGuess=currentGuess.slice(0,-1); updateCurrentRow(); return; }
+  if(currentGuess.length<COLS && /^[A-Z]$/.test(k)){
+    currentGuess+=k;
+    updateCurrentRow();
+    const tile = document.getElementById(`tile-${guesses.length}-${currentGuess.length-1}`);
+    tile.style.animation='none';
+    void tile.offsetWidth;
+    tile.style.animation='pop .1s ease';
+    tg?.HapticFeedback?.selectionChanged();
+  }
+}
+
+function updateCurrentRow(){
+  const r = guesses.length;
+  for(let c=0;c<COLS;c++){
+    const tile = document.getElementById(`tile-${r}-${c}`);
+    tile.textContent = currentGuess[c] || '';
+    tile.className = 'tile' + (currentGuess[c]?' filled':'');
+  }
+}
+
+function submitGuess(){
+  if(currentGuess.length < COLS){ showToast('Not enough letters'); shakeRow(guesses.length); return; }
+  if(!WORDS.includes(currentGuess)){ showToast('Not in word list'); shakeRow(guesses.length); return; }
+  
+  const result = evaluate(currentGuess, target);
+  const r = guesses.length;
+  
+  result.forEach((state, c) => {
+    setTimeout(()=>{
+      const tile = document.getElementById(`tile-${r}-${c}`);
+      tile.style.animation = 'flip .4s ease';
+      setTimeout(()=>{ tile.className = `tile ${state}`; }, 200);
+      tg?.HapticFeedback?.selectionChanged();
+    }, c * 80);
+  });
+  
+  currentGuess.split('').forEach((letter, i) => {
+    const state = result[i];
+    const cur = keyStates[letter];
+    if(cur==='correct') return;
+    if(cur==='present' && state==='absent') return;
+    keyStates[letter] = state;
+    setTimeout(()=>{
+      const key = document.getElementById('key-'+letter);
+      if(key) key.className = `key ${state}`;
+    }, COLS*80+200);
+  });
+  
+  guesses.push(currentGuess);
+  currentGuess = '';
+  
+  const won = result.every(s=>s==='correct');
+  const lost = guesses.length >= ROWS && !won;
+  
+  updateLives();
+  
+  setTimeout(()=>{
+    if(won){ endGame(true); }
+    else if(lost){ endGame(false); }
+  }, COLS*80+400);
+}
+
+function evaluate(guess, target){
+  const result = Array(COLS).fill('absent');
+  const tArr = target.split('');
+  const gArr = guess.split('');
+  const used = Array(COLS).fill(false);
+  
+  gArr.forEach((l,i)=>{ if(l===tArr[i]){result[i]='correct';used[i]=true;} });
+  gArr.forEach((l,i)=>{
+    if(result[i]==='correct') return;
+    const j = tArr.findIndex((t,ti)=>t===l&&!used[ti]);
+    if(j>=0){ result[i]='present'; used[j]=true; }
+  });
+  return result;
+}
+
+function shakeRow(r){
+  const row = document.getElementById('row-'+r);
+  row.style.animation='none';
+  void row.offsetWidth;
+  row.style.animation='shake .5s ease';
+  tg?.HapticFeedback?.notificationOccurred('error');
+}
+
+function updateLives(){
+  const remaining = ROWS - guesses.length;
+  document.getElementById('lives').textContent = '❤️'.repeat(remaining) + (remaining<ROWS?'🖤'.repeat(ROWS-remaining):'');
+}
+
+function showToast(msg, dur=1800){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), dur);
+}
+
+function endGame(won){
+  gameOver = true;
+  const attempt = guesses.length;
+  const xpMap = {1:500,2:400,3:300,4:200,5:150,6:100};
+  const xp = won ? (xpMap[attempt]||50) : 0;
+  sessionXP += xp;
+  document.getElementById('xp-pill').textContent = sessionXP+' XP';
+  
+  if(won){
+    for(let c=0;c<COLS;c++){
+      setTimeout(()=>{
+        const tile = document.getElementById(`tile-${attempt-1}-${c}`);
+        tile.style.animation='none';
+        void tile.offsetWidth;
+        tile.style.animation='bounce .5s ease';
+      }, c*80);
+    }
+    tg?.HapticFeedback?.notificationOccurred('success');
+  } else {
+    tg?.HapticFeedback?.notificationOccurred('error');
+  }
+  
+  setTimeout(()=>{
+    document.getElementById('r-icon').textContent = won ? ['🎉','🏆','🌟','✨','🎯','👏'][Math.floor(Math.random()*6)] : '😔';
+    document.getElementById('r-title').textContent = won ? ['Brilliant!','Amazing!','Great!','Good Job!','Phew!','Lucky!'][attempt-1] : 'So close!';
+    document.getElementById('r-word').innerHTML = won ? `Solved in <strong>${attempt} ${attempt===1?'try':'tries'}</strong>!` : `The word was <strong>${target}</strong>`;
+    document.getElementById('r-xp').textContent = won ? `+${xp} XP` : 'No XP this time';
+    document.getElementById('result').classList.add('show');
+    if(xp>0) submitScore(xp);
+  }, 800);
+}
+
+function newGame(){
+  document.getElementById('result').classList.remove('show');
+  gameOver = false;
+  guesses = [];
+  currentGuess = '';
+  keyStates = {};
+  target = pickWord();
+  buildGrid();
+  buildKeyboard();
+  updateLives();
+}
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Enter') handleKey('ENTER');
+  else if(e.key === 'Backspace') handleKey('⌫');
+  else if(/^[a-zA-Z]$/.test(e.key)) handleKey(e.key.toUpperCase());
+});
+
+async function submitScore(xp){
+  if(!chatId||chatId==='0'||!player.id) return;
+  try {
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id,xp})
+    });
+  } catch(e){}
+}
+
+newGame();
+</script>
+</body>
+</html>

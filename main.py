@@ -305,9 +305,11 @@ try:
     # Routes with full paths defined in the router (no prefix needed)
     app.include_router(automod.router, tags=["automod"])
     app.include_router(events.router, tags=["events"])
-    app.include_router(me.router, tags=["me"])
     app.include_router(scheduler.router, tags=["scheduler"])
     app.include_router(log_channel.router, tags=["log_channel"])
+
+    # Routes that need prefix
+    app.include_router(me.router, prefix="/api/me", tags=["me"])
 
     # Group-related routes with internal prefixes (prefix already defined in router)
     app.include_router(members.router)  # prefix="/api/groups/{chat_id}"

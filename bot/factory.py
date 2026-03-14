@@ -117,6 +117,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         unban_handler,
         unlock_handler,
         unmute_handler,
+        unpin_handler,
         unwarn_handler,
         warn_handler,
         warns_handler,

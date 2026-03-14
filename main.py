@@ -362,6 +362,18 @@ fastapi_app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add security middleware for input validation and rate limiting
+from api.middleware import RateLimitMiddleware, InputValidationMiddleware, SecurityHeadersMiddleware
+
+# Security headers middleware (add first)
+fastapi_app.middleware("http")(SecurityHeadersMiddleware())
+
+# Rate limiting middleware
+fastapi_app.middleware("http")(RateLimitMiddleware())
+
+# Input validation middleware
+fastapi_app.middleware("http")(InputValidationMiddleware())
+
 # Routes
 from api.routes import groups, members, debug, bots, music, modules, analytics, channels, text_config, me, member_stats, events, bots_messages, broadcast
 from api.routes.reports import router as reports_router

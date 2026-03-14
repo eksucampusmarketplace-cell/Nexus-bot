@@ -6,6 +6,8 @@
  * the Telegram initData auth header is always sent.
  */
 
+import { validateInput, sanitizeText } from './inputSanitizer.js';
+
 /**
  * Returns auth headers using Telegram WebApp initData.
  * Falls back to x-init-data header (legacy) when Authorization is not available.
@@ -23,7 +25,7 @@ export function authHeaders() {
 }
 
 /**
- * Authenticated fetch wrapper.
+ * Authenticated fetch wrapper with input validation.
  * Throws on non-2xx responses with the error body as message.
  *
  * @param {string} path - API path (e.g. "/api/me")
@@ -31,6 +33,23 @@ export function authHeaders() {
  * @returns {Promise<any>} - parsed JSON response
  */
 export async function apiFetch(path, options = {}) {
+  // Validate and sanitize request body if present
+  if (options.body && typeof options.body !== "string") {
+    // Recursively validate body
+    const validationResult = validateRequestBody(options.body);
+
+    if (!validationResult.isValid) {
+      const error = new Error(
+        `Invalid input: ${validationResult.error}`
+      );
+      error.validationDetails = validationResult.details;
+      throw error;
+    }
+
+    // Sanitize body
+    options.body = sanitizeRequestBody(options.body);
+  }
+
   const mergedHeaders = {
     ...authHeaders(),
     ...(options.headers || {}),
@@ -68,4 +87,64 @@ export async function apiFetch(path, options = {}) {
   } catch (_) {
     return text;
   }
+}
+
+/**
+ * Validate request body recursively
+ */
+function validateRequestBody(body, path = "body") {
+  if (typeof body === 'string') {
+    const result = validateInput(body, {
+      maxLength: 10000,
+      allowHTML: false,
+      checkSQL: true,
+      checkXSS: true,
+      checkCommand: true,
+      checkSpam: true,
+      checkKeywords: true,
+    });
+
+    if (!result.isValid) {
+      return {
+        isValid: false,
+        error: `${path}: ${result.error}`,
+        details: result.details
+      };
+    }
+  } else if (typeof body === 'object' && body !== null) {
+    for (const [key, value] of Object.entries(body)) {
+      const result = validateRequestBody(value, `${path}.${key}`);
+      if (!result.isValid) {
+        return result;
+      }
+    }
+  } else if (Array.isArray(body)) {
+    for (let i = 0; i < body.length; i++) {
+      const result = validateRequestBody(body[i], `${path}[${i}]`);
+      if (!result.isValid) {
+        return result;
+      }
+    }
+  }
+
+  return { isValid: true, error: '', details: {} };
+}
+
+/**
+ * Sanitize request body recursively
+ */
+function sanitizeRequestBody(body) {
+  if (typeof body === 'string') {
+    return sanitizeText(body);
+  } else if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+    const sanitized = {};
+    for (const [key, value] of Object.entries(body)) {
+      sanitized[key] = sanitizeRequestBody(value);
+    }
+    return sanitized;
+  } else if (Array.isArray(body)) {
+    return body.map(item => sanitizeRequestBody(item));
+  }
+
+  return body;
 }

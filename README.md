@@ -13,6 +13,7 @@ A powerful group management bot with an integrated Telegram Mini App for easy co
 - **Channel Management**: Link your group to a channel and post/schedule messages directly from Nexus.
 - **Trust Score**: Automated behavioral analysis to grant or restrict user permissions.
 - **Privacy**: Comprehensive GDPR-compliant privacy policy with `/privacy` command.
+- **Security**: Comprehensive input sanitization and protection against SQL injection, XSS, command injection, and spam.
 
 ## 🛠️ Setup Guide
 

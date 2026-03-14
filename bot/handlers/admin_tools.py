@@ -30,6 +30,7 @@ from telegram.constants import ParseMode
 from config import settings
 from bot.utils.permissions import is_admin, command_enabled
 from bot.utils.format import format_user
+from bot.utils.input_sanitizer import validate_input, sanitize_text
 from db.ops.groups import get_group, update_group_settings
 from db.ops.logs import log_action
 
@@ -49,6 +50,29 @@ async def cmd_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     message = " ".join(context.args)
+    
+    # Validate and sanitize input
+    is_valid, error_msg, _ = validate_input(
+        message,
+        max_length=1000,
+        allow_html=True,  # Allow HTML for formatting
+        check_sql=True,
+        check_xss=False,  # Allow HTML for announcements
+        check_command=True,
+        check_spam=True,
+        check_keywords=False  # Allow most keywords in announcements
+    )
+    
+    if not is_valid:
+        await update.message.reply_text(
+            f"❌ {error_msg}\n"
+            f"Please use appropriate language and avoid suspicious patterns."
+        )
+        log.warning(f"[ADMIN_CMD] Announcement blocked | chat={update.effective_chat.id} | reason={error_msg}")
+        return
+    
+    # Sanitize message
+    message = sanitize_text(message, allow_html=True)
     
     # Send announcement with special formatting
     announcement = (
@@ -178,6 +202,31 @@ async def cmd_addfilter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyword = " ".join(context.args).lower()
     chat_id = update.effective_chat.id
     
+    # Validate filter keyword
+    is_valid, error_msg, _ = validate_input(
+        keyword,
+        max_length=100,
+        allow_html=False,
+        check_sql=True,
+        check_xss=True,
+        check_command=True,
+        check_spam=False,
+        check_keywords=False
+    )
+    
+    if not is_valid:
+        await update.message.reply_text(
+            f"❌ Invalid filter keyword: {error_msg}"
+        )
+        return
+    
+    # Sanitize keyword
+    keyword = sanitize_text(keyword, allow_html=False).strip()
+    
+    if not keyword:
+        await update.message.reply_text("❌ Filter keyword cannot be empty")
+        return
+    
     group = await get_group(chat_id)
     if not group:
         await update.message.reply_text("❌ Group not found")
@@ -220,6 +269,27 @@ async def cmd_delfilter(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyword = " ".join(context.args).lower()
     chat_id = update.effective_chat.id
+    
+    # Validate filter keyword
+    is_valid, error_msg, _ = validate_input(
+        keyword,
+        max_length=100,
+        allow_html=False,
+        check_sql=True,
+        check_xss=True,
+        check_command=True,
+        check_spam=False,
+        check_keywords=False
+    )
+    
+    if not is_valid:
+        await update.message.reply_text(
+            f"❌ Invalid filter keyword: {error_msg}"
+        )
+        return
+    
+    # Sanitize keyword
+    keyword = sanitize_text(keyword, allow_html=False).strip()
     
     group = await get_group(chat_id)
     if not group:

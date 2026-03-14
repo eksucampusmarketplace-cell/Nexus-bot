@@ -108,7 +108,6 @@ class InputValidationMiddleware:
             "/api/groups/",
             "/api/bots",
             "/api/analytics",
-            "/api/music/status",
             "/health",
         }
 

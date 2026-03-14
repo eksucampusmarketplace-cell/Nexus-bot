@@ -37,41 +37,12 @@ class Settings(BaseSettings):
     ALERT_ON_NEW_CLONES: bool = True  # Post new clone registrations
     ALERT_ON_DEAD_CLONES: bool = True  # Post when clone token becomes invalid
 
-    # ── Music Settings ───────────────────────────────────────────────────────
-    MUSIC_WORKER_COUNT: int = 1
-    # How many userbot accounts the MAIN BOT uses for music
-    # Each account can stream in multiple groups via PyTGCalls
-    # Clone bots always use exactly 1 (their own account)
-
-    MUSIC_MAX_QUEUE: int = 50
-    MUSIC_MAX_DURATION: int = 3600  # seconds — reject tracks over 1hr
-    MUSIC_IDLE_TIMEOUT: int = 180  # seconds — leave VC after idle
-    MUSIC_DEFAULT_VOLUME: int = 100  # 0–200
-    MUSIC_DOWNLOAD_DIR: str = "/tmp/nexus_music"
-    # Temp dir for downloaded audio before streaming
-    # Files deleted immediately after streaming begins
-
-    # Pyrogram API credentials for userbot authentication
-    PYROGRAM_API_ID: Optional[int] = None
-    PYROGRAM_API_HASH: Optional[str] = None
-
-    # ── Redis & Music Service ─────────────────────────────────────────────
+    # ── Redis Configuration ──────────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379"
-    MUSIC_JOB_TTL: int = 3600  # seconds
-    MUSIC_SERVICE_TIMEOUT: int = 10  # seconds
-    MUSIC_MAX_RETRIES: int = 3
-    MUSIC_YTDLP_VERSION: str = "2024.12.6"
 
     # ── Memory Management ──────────────────────────────────────────────────
-    PYROGRAM_MAX_ACTIVE: int = 10
-    LAZY_UNLOAD_TIMEOUT: int = 1800
     MEMORY_WARN_MB: int = 800
     MEMORY_CRITICAL_MB: int = 1200
-
-    # ── Music System Configuration ──────────────────────────────────────────
-    MUSIC_ROTATION_DEFAULT: str = "manual"  # manual, round_robin, least_used, random
-    MUSIC_HEALTH_CHECK_INTERVAL: int = 300  # seconds between automatic health checks
-    PYTGCALLS_ENABLED: bool = True  # Set to False to disable pytgcalls startup
 
     # ── Stars Economy ──────────────────────────────────────────────────────
     REFERRAL_BONUS_STARS: int = 100

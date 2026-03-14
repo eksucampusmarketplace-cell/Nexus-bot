@@ -24,7 +24,16 @@ export const useStore = createStore((set, get) => ({
   // ── Active Group ───────────────────────────────────────────
   activeChatId: null,
   activeGroup: null,
-  setActiveChatId: (chatId) => set({ activeChatId: chatId }),
+  setActiveChatId: (chatId) => {
+    set({ activeChatId: chatId });
+    // Also update activeGroup when chatId changes
+    const state = get();
+    const groups = state.groups || [];
+    const group = groups.find(g => String(g.chat_id) === String(chatId));
+    if (group) {
+      set({ activeGroup: group });
+    }
+  },
   setActiveGroup: (group) => set({ activeGroup: group }),
   
   // ── Navigation ──────────────────────────────────────────────

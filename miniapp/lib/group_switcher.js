@@ -31,22 +31,59 @@ export class GroupSwitcher {
       this._store.setState({ userContext: data });
     } catch (e) {
       console.error('[GroupSwitcher] Failed to load /api/me:', e.message);
+      // Show error in group switcher
+      this._renderError('Failed to load groups');
+      return;
     }
+    
+    // Support multiple API response formats
+    // groups (old format), admin_groups/mod_groups (new format), or fallback to empty
     this._groups = [
       ...(data.admin_groups || []),
-      ...(data.mod_groups   || []),
+      ...(data.mod_groups || []),
+      ...(data.groups || []),
     ];
+    
+    // Remove duplicates by chat_id
+    const seen = new Set();
+    this._groups = this._groups.filter(g => {
+      if (seen.has(g.chat_id)) return false;
+      seen.add(g.chat_id);
+      return true;
+    });
+    
     this._store.setState({ 
       groups: this._groups,
       bot_info: data.bot_info,
-      userContext: data.user
+      userContext: data.user || data
     });
+    
     const saved = sessionStorage.getItem('active_group');
-    this._active = this._groups.find(g => g.chat_id == saved)
+    this._active = this._groups.find(g => String(g.chat_id) === String(saved))
                 || this._groups[0]
                 || null;
     this._render();
-    if (this._active) this._store.getState().setActiveChatId(this._active.chat_id);
+    if (this._active) {
+      this._store.getState().setActiveChatId(this._active.chat_id);
+      this._store.setState({ activeGroup: this._active });
+    }
+  }
+
+  _renderError(message) {
+    if (this._el) this._el.remove();
+    const wrap = document.createElement('div');
+    wrap.style.cssText = `
+      display:flex;align-items:center;gap:var(--sp-2);
+      padding:var(--sp-2) var(--sp-3);
+      border-radius:var(--r-lg);border:1px solid var(--border);
+      background:var(--bg-input);
+      min-width:0;
+      color:var(--text-muted);
+      font-size:var(--text-sm);
+    `;
+    wrap.innerHTML = `<span>⚠️ ${message}</span>`;
+    this._el = wrap;
+    this._container.insertBefore(wrap, this._container.firstChild);
   }
 
   _render() {
@@ -60,6 +97,7 @@ export class GroupSwitcher {
       min-width:0;max-width:200px;
       transition:background var(--dur-fast);
       position:relative;
+      flex-shrink:0;
     `;
     wrap.onmouseenter = () => wrap.style.background = 'var(--bg-hover)';
     wrap.onmouseleave = () => wrap.style.background = 'var(--bg-input)';
@@ -73,11 +111,18 @@ export class GroupSwitcher {
         </span>
         <span style="color:var(--text-muted);font-size:12px">▾</span>
       `;
+      wrap.onclick = () => this._openDropdown(wrap);
+    } else if (this._groups.length === 0) {
+      wrap.innerHTML = `
+        <span style="font-size:18px">💬</span>
+        <span style="color:var(--text-muted);font-size:var(--text-sm);white-space:nowrap;">No groups available</span>
+      `;
+      wrap.style.cursor = 'default';
     } else {
-      wrap.innerHTML = `<span style="color:var(--text-muted);font-size:var(--text-sm)">No groups</span>`;
+      wrap.innerHTML = `<span style="color:var(--text-muted);font-size:var(--text-sm)">Select group</span>`;
+      wrap.onclick = () => this._openDropdown(wrap);
     }
 
-    wrap.onclick = () => this._openDropdown(wrap);
     this._el = wrap;
     this._container.insertBefore(wrap, this._container.firstChild);
   }
@@ -145,7 +190,15 @@ export class GroupSwitcher {
     this._active = group;
     sessionStorage.setItem('active_group', group.chat_id);
     this._store.getState().setActiveChatId(group.chat_id);
+    this._store.setState({ activeGroup: group });
     this._render();
     showToast(`Switched to ${group.title}`, 'info', 2000);
+    
+    // Trigger a page refresh to reload data for new group
+    const activePage = this._store.getState().activePage;
+    if (activePage && activePage !== 'dashboard') {
+      // Reload current page data
+      window.dispatchEvent(new CustomEvent('group-changed', { detail: group }));
+    }
   }
 }

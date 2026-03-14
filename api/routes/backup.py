@@ -5,11 +5,12 @@ Backup & Restore system for group configurations.
 Export and import all group settings as JSON.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from datetime import datetime
 from api.auth import get_current_user
 from db.client import db
+from bot.utils.input_sanitizer import validate_multiple_inputs
 
 router = APIRouter(prefix="/api/groups")
 
@@ -99,14 +100,56 @@ async def export_backup(chat_id: int, user: dict = Depends(get_current_user)):
 
 
 @router.post("/{chat_id}/restore")
-async def import_backup(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
+async def import_backup(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
     """
     Restore group configuration from exported JSON.
     Only restores compatible settings, preserves member data.
     """
+    body = await request.json()
+    
     # Validate version
     if body.get('version') != '1.0':
         raise HTTPException(400, "Unsupported backup version. Expected 1.0")
+    
+    # Validate and sanitize input fields
+    # Define validation rules for different fields
+    validation_rules = {
+        'version': {'max_length': 10, 'check_sql': True, 'check_xss': False, 'check_command': True},
+        'exported_at': {'max_length': 50, 'check_sql': True, 'check_xss': True, 'check_command': True},
+        'chat_id': {'max_length': 20, 'check_sql': True, 'check_xss': True, 'check_command': True},
+    }
+    
+    # Extract string fields for validation
+    inputs_to_validate = {}
+    if 'version' in body:
+        inputs_to_validate['version'] = str(body.get('version'))
+    if 'exported_at' in body:
+        inputs_to_validate['exported_at'] = str(body.get('exported_at'))
+    if 'chat_id' in body:
+        inputs_to_validate['chat_id'] = str(body.get('chat_id'))
+    
+    # Validate inputs
+    is_valid, errors = validate_multiple_inputs(inputs_to_validate, validation_rules)
+    
+    if not is_valid:
+        raise HTTPException(
+            400,
+            f"Invalid backup data: {', '.join(f'{k}: {v[\"message\"]}' for k, v in errors.items())}"
+        )
+    
+    # Additional security: Check for malicious JSON structure
+    if 'group' in body and isinstance(body['group'], dict):
+        group_data = body['group']
+        if 'settings' in group_data:
+            # Ensure settings is a dict
+            if not isinstance(group_data['settings'], dict):
+                raise HTTPException(400, "Invalid settings format in backup")
+    
+    if 'automod' in body and isinstance(body['automod'], dict):
+        # Validate automod settings structure
+        for key in ['settings', 'locks', 'penalties', 'time_windows']:
+            if key in body['automod'] and not isinstance(body['automod'][key], dict):
+                raise HTTPException(400, f"Invalid {key} format in automod settings")
     
     async with db.pool.acquire() as conn:
         # Verify group exists

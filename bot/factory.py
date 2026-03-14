@@ -202,6 +202,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("deletepost",   delete_post_handler,   filters=GROUP))
 
     # ── Moderation commands (groups only) ─────────────────────────────────
+    from bot.handlers.commands import purgeme_handler
+    
     app.add_handler(CommandHandler("warn",    warn_handler,    filters=GROUP))
     app.add_handler(CommandHandler("unwarn",  unwarn_handler,  filters=GROUP))
     app.add_handler(CommandHandler("warns",   warns_handler,   filters=GROUP))
@@ -211,6 +213,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("unmute",  unmute_handler,  filters=GROUP))
     app.add_handler(CommandHandler("kick",    kick_handler,    filters=GROUP))
     app.add_handler(CommandHandler("purge",   purge_handler,   filters=GROUP))
+    app.add_handler(CommandHandler("purgeme", purgeme_handler, filters=GROUP))
     app.add_handler(CommandHandler("lock",    lock_handler,    filters=GROUP))
     app.add_handler(CommandHandler("unlock",  unlock_handler,  filters=GROUP))
     app.add_handler(CommandHandler("pin",     pin_handler,     filters=GROUP))

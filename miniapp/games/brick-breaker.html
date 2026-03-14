@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Brick Breaker</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#060810;overflow:hidden;user-select:none;-webkit-tap-highlight-color:transparent;font-family:-apple-system,sans-serif}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh}
+.hud{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#0a0e18;border-bottom:1px solid #1a2030;flex-shrink:0}
+.hud-val{font-size:20px;font-weight:800;color:#e8edf7}
+.hud-lbl{font-size:10px;color:#4a6080;text-transform:uppercase;letter-spacing:.06em}
+.lives-row{display:flex;gap:4px;font-size:16px}
+canvas{display:block;touch-action:none;flex:1}
+
+.overlay{position:fixed;inset:0;background:#000b;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ov-card{background:#0a0e18;border:1px solid #1a2030;border-radius:20px;padding:28px 24px;text-align:center;width:min(280px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;color:#e8edf7;margin-bottom:4px}
+.ov-score{font-size:40px;font-weight:800;color:#3b82f6;margin:8px 0}
+.ov-sub{font-size:13px;color:#4a6080;margin-bottom:6px}
+.ov-xp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hud">
+    <div><div class="hud-val" id="score">0</div><div class="hud-lbl">Score</div></div>
+    <div class="lives-row" id="lives">❤️❤️❤️</div>
+    <div><div class="hud-val" id="level">1</div><div class="hud-lbl">Level</div></div>
+  </div>
+  <canvas id="c"></canvas>
+</div>
+
+<div class="overlay" id="start-ov">
+  <div class="ov-card">
+    <div class="ov-icon">🧱</div>
+    <div class="ov-title">Brick Breaker</div>
+    <div style="font-size:13px;color:#4a6080;margin:8px 0 20px">Slide to move the paddle and break all the bricks!</div>
+    <button class="ov-btn" onclick="startGame()">Play</button>
+  </div>
+</div>
+<div class="overlay" id="over-ov" style="display:none">
+  <div class="ov-card">
+    <div class="ov-icon" id="ov-icon">💥</div>
+    <div class="ov-title" id="ov-title">Game Over</div>
+    <div class="ov-score" id="ov-score">0</div>
+    <div class="ov-sub" id="ov-sub"></div>
+    <div class="ov-xp" id="ov-xp">+0 XP</div>
+    <button class="ov-btn" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+
+const c=document.getElementById('c');
+const ctx=c.getContext('2d');
+function resize(){c.width=window.innerWidth;c.height=window.innerHeight-50;}
+resize();
+
+const W=c.width,H=c.height;
+const ROWS=5,COLS=8,BW=Math.floor((W-20)/COLS)-4,BH=20,BGAP=4;
+const PADDLE_W=80,PADDLE_H=12,BALL_R=8;
+const BCOLORS=['#ef4444','#f97316','#f59e0b','#22c55e','#3b82f6'];
+
+let paddle,ball,bricks,score,lvl,lives,running,raf,best=parseInt(localStorage.getItem('bb_best')||'0');
+
+function initLevel(){
+  const startX=(W-COLS*(BW+BGAP)+BGAP)/2;
+  bricks=[];
+  for(let r=0;r<ROWS;r++) for(let c2=0;c2<COLS;c2++)
+    bricks.push({x:startX+c2*(BW+BGAP),y:40+r*(BH+BGAP),w:BW,h:BH,hp:ROWS-r,color:BCOLORS[r],alive:true});
+  const spd=3+lvl*0.4;
+  ball={x:W/2,y:H-100,vx:(Math.random()-.5)*spd*2,vy:-spd,r:BALL_R};
+  if(Math.abs(ball.vx)<1) ball.vx=spd;
+}
+
+function startGame(){
+  document.getElementById('start-ov').style.display='none';
+  document.getElementById('over-ov').style.display='none';
+  score=0;lvl=1;lives=3;running=true;
+  paddle={x:W/2-PADDLE_W/2,y:H-40,w:PADDLE_W,h:PADDLE_H};
+  updateHUD();
+  initLevel();
+  raf=requestAnimationFrame(loop);
+}
+
+function updateHUD(){
+  document.getElementById('score').textContent=score;
+  document.getElementById('level').textContent=lvl;
+  document.getElementById('lives').textContent='❤️'.repeat(lives)+'🖤'.repeat(3-lives);
+}
+
+function drawBrick(b){
+  ctx.fillStyle=b.color;
+  ctx.beginPath();ctx.roundRect(b.x,b.y,b.w,b.h,4);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.15)';
+  ctx.beginPath();ctx.roundRect(b.x+3,b.y+2,b.w-6,6,2);ctx.fill();
+  if(b.hp>1){
+    ctx.fillStyle='rgba(0,0,0,0.4)';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(b.hp,b.x+b.w/2,b.y+b.h/2);
+  }
+}
+
+function loop(){
+  if(!running) return;
+  ctx.fillStyle='#060810';ctx.fillRect(0,0,W,H);
+
+  const pg=ctx.createLinearGradient(paddle.x,0,paddle.x+paddle.w,0);
+  pg.addColorStop(0,'#1d4ed8');pg.addColorStop(.5,'#3b82f6');pg.addColorStop(1,'#1d4ed8');
+  ctx.fillStyle=pg;ctx.beginPath();ctx.roundRect(paddle.x,paddle.y,paddle.w,paddle.h,6);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.2)';ctx.beginPath();ctx.roundRect(paddle.x+6,paddle.y+2,paddle.w-12,4,2);ctx.fill();
+
+  const bg=ctx.createRadialGradient(ball.x-2,ball.y-2,1,ball.x,ball.y,ball.r);
+  bg.addColorStop(0,'#fff');bg.addColorStop(1,'#60a5fa');
+  ctx.fillStyle=bg;ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(59,130,246,0.3)';ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r+4,0,Math.PI*2);ctx.fill();
+
+  bricks.forEach(b=>{if(b.alive)drawBrick(b);});
+
+  ball.x+=ball.vx;ball.y+=ball.vy;
+  if(ball.x-ball.r<0){ball.x=ball.r;ball.vx=Math.abs(ball.vx);}
+  if(ball.x+ball.r>W){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx);}
+  if(ball.y-ball.r<0){ball.y=ball.r;ball.vy=Math.abs(ball.vy);}
+
+  if(ball.vy>0&&ball.y+ball.r>=paddle.y&&ball.y+ball.r<=paddle.y+paddle.h&&ball.x>paddle.x&&ball.x<paddle.x+paddle.w){
+    ball.vy=-Math.abs(ball.vy);
+    ball.vx=((ball.x-paddle.x-paddle.w/2)/(paddle.w/2))*5;
+    tg?.HapticFeedback?.impactOccurred('light');
+  }
+
+  bricks.forEach(b=>{
+    if(!b.alive) return;
+    if(ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){
+      b.hp--;
+      if(b.hp<=0){b.alive=false;score+=10*(lvl);document.getElementById('score').textContent=score;}
+      const fromLeft=ball.x<b.x||ball.x>b.x+b.w;
+      if(fromLeft)ball.vx*=-1;else ball.vy*=-1;
+      tg?.HapticFeedback?.selectionChanged();
+    }
+  });
+
+  if(ball.y-ball.r>H){
+    lives--;updateHUD();
+    if(lives<=0){gameOver();return;}
+    tg?.HapticFeedback?.notificationOccurred('error');
+    ball={x:W/2,y:paddle.y-20,vx:ball.vx,vy:-Math.abs(ball.vy),r:BALL_R};
+  }
+
+  if(bricks.every(b=>!b.alive)){
+    lvl++;updateHUD();
+    tg?.HapticFeedback?.notificationOccurred('success');
+    initLevel();
+  }
+
+  raf=requestAnimationFrame(loop);
+}
+
+function gameOver(){
+  running=false;cancelAnimationFrame(raf);
+  if(score>best){best=score;localStorage.setItem('bb_best',best);}
+  tg?.HapticFeedback?.notificationOccurred('error');
+  const xp=Math.floor(score/4);
+  document.getElementById('ov-icon').textContent=lvl>3?'🏆':score>200?'🧱':'💥';
+  document.getElementById('ov-title').textContent=lvl>3?'Brick Master!':score>200?'Good Game!':'Game Over';
+  document.getElementById('ov-score').textContent=score;
+  document.getElementById('ov-sub').textContent=`Level ${lvl} · Best: ${best}`;
+  document.getElementById('ov-xp').textContent=`+${xp} XP Earned`;
+  document.getElementById('over-ov').style.display='flex';
+  submitScore(xp);
+  saveLeaderboard(score,xp);
+}
+
+function saveLeaderboard(score,xp){
+  const lb=JSON.parse(localStorage.getItem('nexus_brick_lb')||'[]');
+  lb.push({name:player.first_name||'Player',score,xp,date:Date.now()});
+  lb.sort((a,b)=>b.score-a.score);
+  localStorage.setItem('nexus_brick_lb',JSON.stringify(lb.slice(0,10)));
+}
+
+let dragging=false,lastX=0;
+c.addEventListener('touchstart',e=>{dragging=true;lastX=e.touches[0].clientX;},{passive:true});
+c.addEventListener('touchmove',e=>{
+  if(!dragging) return;
+  const dx=e.touches[0].clientX-lastX;
+  lastX=e.touches[0].clientX;
+  paddle.x=Math.max(0,Math.min(W-paddle.w,paddle.x+dx));
+},{passive:true});
+c.addEventListener('touchend',()=>dragging=false,{passive:true});
+c.addEventListener('mousemove',e=>{
+  const r=c.getBoundingClientRect();
+  paddle.x=Math.max(0,Math.min(W-paddle.w,e.clientX-r.left-paddle.w/2));
+});
+
+async function submitScore(xp){
+  if(!chatId||!player.id||xp<=0) return;
+  try{await fetch(`/api/groups/${chatId}/xp`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},body:JSON.stringify({user_id:player.id,xp})});}catch(e){}
+}
+</script>
+</body>
+</html>

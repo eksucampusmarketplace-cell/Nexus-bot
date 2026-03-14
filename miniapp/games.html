@@ -3,51 +3,80 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Nexus Games</title>
+<title>Nexus Games Hub</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--r:16px}
+:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--r:16px;--gold:#f59e0b;--green:#22c55e;--red:#ef4444;--blue:#3b82f6;--purple:#a855f7;--cyan:#00d4ff;--accent:#00d4ff}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow-x:hidden}
 .app{padding:16px 14px 24px;max-width:480px;margin:0 auto}
 
 /* Header */
-.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-.header-left .title{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.header-left .title{font-size:22px;font-weight:800;letter-spacing:-.3px}
 .header-left .sub{font-size:12px;color:var(--muted);margin-top:2px}
 .player-pill{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:6px 12px}
-.avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#00d4ff);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
 .player-name{font-size:12px;font-weight:600}
+
+/* Stats cards */
+.stats-row{display:flex;gap:10px;margin-bottom:16px}
+.stat-card{flex:1;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;text-align:center}
+.stat-val{font-size:20px;font-weight:800}
+.stat-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.stat-xp .stat-val{color:var(--gold)}
+.stat-streak .stat-val{color:var(--red)}
+.stat-games .stat-val{color:var(--green)}
 
 /* XP Bar */
 .xp-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:16px}
 .xp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.xp-level{font-size:13px;font-weight:700;color:#a855f7}
+.xp-level{font-size:13px;font-weight:700;color:var(--purple)}
 .xp-val{font-size:12px;color:var(--muted)}
 .xp-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
-.xp-fill{height:100%;background:linear-gradient(90deg,#7c3aed,#a855f7);border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+.xp-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--cyan));border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+
+/* Daily Challenge */
+.daily-card{background:linear-gradient(135deg,#1a0a2e22,#0f1620);border:1px solid var(--purple);border-radius:var(--r);padding:14px 16px;margin-bottom:20px;position:relative;overflow:hidden}
+.daily-card::before{content:'';position:absolute;top:0;right:0;width:100px;height:100px;background:radial-gradient(circle at top right,var(--purple)20%,transparent 70%);opacity:.2}
+.daily-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;position:relative}
+.daily-icon{font-size:20px}
+.daily-title{font-size:14px;font-weight:700}
+.daily-timer{font-size:11px;color:var(--muted);margin-left:auto;background:var(--card2);padding:3px 8px;border-radius:20px}
+.daily-task{font-size:13px;color:var(--text);margin-bottom:10px;position:relative}
+.daily-progress{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px}
+.daily-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--gold));border-radius:4px;transition:width .5s ease}
+.daily-status{font-size:11px;color:var(--muted);position:relative}
+.daily-reward{font-size:12px;font-weight:700;color:var(--gold);position:relative}
+.daily-claim{width:100%;padding:12px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--purple),var(--blue));color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:10px;transition:.2s}
+.daily-claim:disabled{opacity:.5;cursor:not-allowed;background:var(--border)}
+.daily-claim:active:not(:disabled){transform:scale(.98)}
 
 /* Section */
-.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 10px}
+.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
 
 /* Game cards */
 .games-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
-.game-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;text-decoration:none;display:block}
+.game-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;cursor:pointer;transition:.2s;position:relative;overflow:hidden;text-decoration:none;display:flex;flex-direction:column;height:100%}
 .game-card:active{transform:scale(.97)}
 .game-card::before{content:'';position:absolute;inset:0;opacity:0;transition:.2s}
-.game-card:active::before{opacity:1}
-.game-card.spin::before{background:linear-gradient(135deg,#00d4ff10,#00d4ff05)}
-.game-card.trivia::before{background:linear-gradient(135deg,#7c3aed10,#7c3aed05)}
-.game-card.word::before{background:linear-gradient(135deg,#22c55e10,#22c55e05)}
-.game-card.snake::before{background:linear-gradient(135deg,#22c55e10,#22c55e05)}
-.game-icon{font-size:36px;margin-bottom:10px;display:block}
-.game-name{font-size:14px;font-weight:700;margin-bottom:3px}
-.game-desc{font-size:11px;color:var(--muted);line-height:1.4}
-.game-badge{position:absolute;top:10px;right:10px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px}
+.game-card:hover::before{opacity:.1}
+.game-icon{font-size:32px;margin-bottom:8px;display:block}
+.game-name{font-size:13px;font-weight:700;margin-bottom:3px}
+.game-desc{font-size:10px;color:var(--muted);line-height:1.4;flex:1}
+.game-xp{font-size:10px;color:var(--gold);font-weight:600;margin-top:6px}
+.game-badge{position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;padding:2px 6px;border-radius:20px}
 .badge-hot{background:#ef444420;color:#ef4444;border:1px solid #ef444440}
 .badge-new{background:#22c55e20;color:#22c55e;border:1px solid #22c55e40}
 .badge-xp{background:#f59e0b20;color:#f59e0b;border:1px solid #f59e0b40}
-.game-xp{font-size:11px;color:#f59e0b;font-weight:600;margin-top:6px}
+.badge-daily{background:#a855f720;color:#a855f7;border:1px solid #a855f740}
+
+/* Leaderboard tabs */
+.lb-tabs{display:flex;gap:6px;margin-bottom:12px}
+.lb-tab{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.lb-tab.active{background:var(--card2);color:var(--text);border-color:var(--purple)}
+.lb-tab:active{transform:scale(.98)}
 
 /* Leaderboard */
 .lb-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px}
@@ -56,12 +85,28 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .lb-period{font-size:11px;color:var(--muted)}
 .lb-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #0d1420}
 .lb-row:last-child{border:none}
-.lb-rank{width:20px;font-size:13px;font-weight:800}
+.lb-row.you{background:var(--card2)}
+.lb-rank{width:20px;font-size:13px;font-weight:800;text-align:center}
 .lb-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#1e3a5f,#152030);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
-.lb-info{flex:1}
-.lb-name{font-size:13px;font-weight:600}
+.lb-avatar.gold{background:linear-gradient(135deg,#f59e0b,#d97706);color:#000}
+.lb-avatar.silver{background:linear-gradient(135deg,#9ca3af,#6b7280);color:#000}
+.lb-avatar.bronze{background:linear-gradient(135deg,#b45309,#92400e);color:#fff}
+.lb-info{flex:1;min-width:0}
+.lb-name{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lb-games{font-size:11px;color:var(--muted)}
-.lb-score{font-size:13px;font-weight:700;color:#f59e0b}
+.lb-score{font-size:13px;font-weight:700;color:var(--gold)}
+
+/* Streak popup */
+.streak-popup{position:fixed;inset:0;background:#000c;backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;z-index:100}
+.streak-popup.show{display:flex}
+.streak-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,88vw);animation:popIn .4s cubic-bezier(.16,1,.3,1)}
+.streak-flames{font-size:64px;margin-bottom:8px;animation:flame .5s ease infinite alternate}
+.streak-count{font-size:48px;font-weight:800;color:var(--red);margin-bottom:4px}
+.streak-label{font-size:16px;font-weight:600;margin-bottom:16px}
+.streak-bonus{font-size:14px;color:var(--gold);margin-bottom:20px}
+.streak-ok{width:100%;padding:14px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--red),#dc2626);color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+@keyframes popIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes flame{from{transform:scale(1)}to{transform:scale(1.1)}}
 
 /* Back btn */
 .back-btn{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;margin-bottom:16px;background:none;border:none;padding:0}
@@ -69,10 +114,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .game-card{animation:fadeIn .3s ease both}
-.game-card:nth-child(1){animation-delay:.05s}
-.game-card:nth-child(2){animation-delay:.1s}
-.game-card:nth-child(3){animation-delay:.15s}
-.game-card:nth-child(4){animation-delay:.2s}
+.game-card:nth-child(1){animation-delay:.05s}.game-card:nth-child(2){animation-delay:.1s}.game-card:nth-child(3){animation-delay:.15s}.game-card:nth-child(4){animation-delay:.2s}
+.game-card:nth-child(5){animation-delay:.25s}.game-card:nth-child(6){animation-delay:.3s}.game-card:nth-child(7){animation-delay:.35s}.game-card:nth-child(8){animation-delay:.4s}
 </style>
 </head>
 <body>
@@ -80,7 +123,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   <div class="header">
     <div class="header-left">
       <div class="title">🎮 Games Hub</div>
-      <div class="sub">Play & earn XP for your profile</div>
+      <div class="sub">Play daily, earn XP, climb ranks</div>
     </div>
     <div class="player-pill">
       <div class="avatar" id="avatar">?</div>
@@ -88,6 +131,23 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     </div>
   </div>
 
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card stat-xp">
+      <div class="stat-val" id="total-xp">0</div>
+      <div class="stat-label">Total XP</div>
+    </div>
+    <div class="stat-card stat-streak">
+      <div class="stat-val" id="streak-count">0🔥</div>
+      <div class="stat-label">Day Streak</div>
+    </div>
+    <div class="stat-card stat-games">
+      <div class="stat-val" id="games-played">0</div>
+      <div class="stat-label">Games Today</div>
+    </div>
+  </div>
+
+  <!-- XP Bar -->
   <div class="xp-card">
     <div class="xp-top">
       <div class="xp-level" id="xp-level">Level 1</div>
@@ -96,47 +156,176 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     <div class="xp-bar"><div class="xp-fill" id="xp-fill" style="width:0%"></div></div>
   </div>
 
-  <div class="section-label">Choose a Game</div>
+  <!-- Daily Challenge -->
+  <div class="daily-card" id="daily-card">
+    <div class="daily-header">
+      <span class="daily-icon">🎯</span>
+      <span class="daily-title">Daily Challenge</span>
+      <span class="daily-timer" id="daily-timer">12:34:56</span>
+    </div>
+    <div class="daily-task" id="daily-task">Play 3 games today</div>
+    <div class="daily-progress"><div class="daily-fill" id="daily-fill" style="width:0%"></div></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="daily-status" id="daily-status">0/3 completed</span>
+      <span class="daily-reward" id="daily-reward">🏆 +200 XP</span>
+    </div>
+    <button class="daily-claim" id="daily-claim" disabled onclick="claimDaily()">Claim Reward</button>
+  </div>
 
+  <div class="section-label">Featured Games</div>
   <div class="games-grid">
-    <a class="game-card spin" id="card-spin" href="javascript:void(0)">
+    <a class="game-card" id="card-spin" style="--gcolor:#00d4ff">
       <span class="game-badge badge-hot">HOT</span>
       <span class="game-icon">🎡</span>
       <div class="game-name">Spin the Wheel</div>
-      <div class="game-desc">Spin once every 30s for XP prizes</div>
+      <div class="game-desc">Spin every 30s for XP prizes</div>
       <div class="game-xp">Up to 500 XP</div>
     </a>
-    <a class="game-card trivia" id="card-trivia" href="javascript:void(0)">
+    <a class="game-card" id="card-trivia">
       <span class="game-badge badge-xp">+XP</span>
       <span class="game-icon">🧠</span>
       <div class="game-name">Trivia Quiz</div>
-      <div class="game-desc">10 questions, speed bonuses & streaks</div>
-      <div class="game-xp">Up to 400 XP</div>
+      <div class="game-desc">50+ questions with streak bonuses</div>
+      <div class="game-xp">Up to 600 XP</div>
     </a>
-    <a class="game-card word" id="card-word" href="javascript:void(0)">
+    <a class="game-card" id="card-word">
       <span class="game-badge badge-new">NEW</span>
       <span class="game-icon">📝</span>
       <div class="game-name">Word Guess</div>
-      <div class="game-desc">Guess the 5-letter word in 6 tries</div>
+      <div class="game-desc">100+ words to solve</div>
       <div class="game-xp">Up to 500 XP</div>
     </a>
-    <a class="game-card snake" id="card-snake" href="javascript:void(0)">
+    <a class="game-card" id="card-snake">
       <span class="game-icon">🐍</span>
       <div class="game-name">Snake</div>
-      <div class="game-desc">Classic arcade, beat the leaderboard</div>
+      <div class="game-desc">Classic arcade action</div>
       <div class="game-xp">Score × 0.5 XP</div>
     </a>
   </div>
 
-  <div class="section-label">Leaderboard</div>
+  <div class="section-label">Quick Games</div>
+  <div class="games-grid">
+    <a class="game-card" id="card-tap">
+      <span class="game-badge badge-hot">FAST</span>
+      <span class="game-icon">⚡</span>
+      <div class="game-name">Tap Rush</div>
+      <div class="game-desc">Rapid color matching</div>
+      <div class="game-xp">Speed = bonus</div>
+    </a>
+    <a class="game-card" id="card-memory">
+      <span class="game-icon">🧠</span>
+      <div class="game-name">Memory Flash</div>
+      <div class="game-desc">Remember the pattern</div>
+      <div class="game-xp">Pattern XP</div>
+    </a>
+    <a class="game-card" id="card-reaction">
+      <span class="game-icon">⏱️</span>
+      <div class="game-name">Reaction Timer</div>
+      <div class="game-desc">Test your reflexes</div>
+      <div class="game-xp">Speed bonus</div>
+    </a>
+    <a class="game-card" id="card-hol">
+      <span class="game-icon">🃏</span>
+      <div class="game-name">Higher or Lower</div>
+      <div class="game-desc">Card guessing game</div>
+      <div class="game-xp">Streak multipliers</div>
+    </a>
+  </div>
+
+  <div class="section-label">Puzzle Games</div>
+  <div class="games-grid">
+    <a class="game-card" id="card-2048">
+      <span class="game-badge badge-new">NEW</span>
+      <span class="game-icon">🔢</span>
+      <div class="game-name">2048</div>
+      <div class="game-desc">Merge tiles to reach 2048</div>
+      <div class="game-xp">Score based</div>
+    </a>
+    <a class="game-card" id="card-mines">
+      <span class="game-icon">💣</span>
+      <div class="game-name">Minesweeper</div>
+      <div class="game-desc">Clear the field safely</div>
+      <div class="game-xp">Difficulty bonus</div>
+    </a>
+    <a class="game-card" id="card-emoji">
+      <span class="game-icon">🎭</span>
+      <div class="game-name">Emoji Guess</div>
+      <div class="game-desc">Decode emoji combos</div>
+      <div class="game-xp">30+ puzzles</div>
+    </a>
+    <a class="game-card" id="card-colorsort">
+      <span class="game-icon">🧪</span>
+      <div class="game-name">Color Sort</div>
+      <div class="game-desc">Sort colored balls</div>
+      <div class="game-xp">Level based</div>
+    </a>
+  </div>
+
+  <div class="section-label">Arcade Games</div>
+  <div class="games-grid">
+    <a class="game-card" id="card-flappy">
+      <span class="game-badge badge-hot">TREND</span>
+      <span class="game-icon">🐦</span>
+      <div class="game-name">Flappy Bird</div>
+      <div class="game-desc">Fly through pipes</div>
+      <div class="game-xp">Per pipe ×8</div>
+    </a>
+    <a class="game-card" id="card-aim">
+      <span class="game-icon">🎯</span>
+      <div class="game-name">Aim Trainer</div>
+      <div class="game-desc">Precision clicking</div>
+      <div class="game-xp">Accuracy bonus</div>
+    </a>
+    <a class="game-card" id="card-brick">
+      <span class="game-icon">🧱</span>
+      <div class="game-name">Brick Breaker</div>
+      <div class="game-desc">Classic breakout</div>
+      <div class="game-xp">Score based</div>
+    </a>
+    <a class="game-card" id="card-blackjack">
+      <span class="game-icon">🃏</span>
+      <div class="game-name">Blackjack</div>
+      <div class="game-desc">Beat the dealer</div>
+      <div class="game-xp">Win = 2× bet</div>
+    </a>
+  </div>
+
+  <div class="section-label">Survival Games</div>
+  <div class="games-grid">
+    <a class="game-card" id="card-redlight">
+      <span class="game-badge badge-daily">DAILY</span>
+      <span class="game-icon">🚦</span>
+      <div class="game-name">Red Light</div>
+      <div class="game-desc">Don't move on red!</div>
+      <div class="game-xp">Survival bonus</div>
+    </a>
+  </div>
+
+  <div class="section-label">Leaderboards</div>
+  <div class="lb-tabs">
+    <button class="lb-tab active" onclick="switchTab('global')">🏆 Global</button>
+    <button class="lb-tab" onclick="switchTab('daily')">📅 Today</button>
+    <button class="lb-tab" onclick="switchTab('weekly')">📊 Week</button>
+  </div>
   <div class="lb-card">
     <div class="lb-header">
-      <div class="lb-title">Top Players</div>
-      <div class="lb-period">This week</div>
+      <div class="lb-title" id="lb-title">Top Players</div>
+      <div class="lb-period" id="lb-period">All Time</div>
     </div>
     <div id="lb-body">
-      <div class="lb-row" style="justify-content:center;padding:20px;color:#4a6080;font-size:13px">No scores yet — be the first!</div>
+      <div class="lb-row" style="justify-content:center;padding:20px;color:#4a6080;font-size:13px">Loading leaderboard...</div>
     </div>
+  </div>
+</div>
+
+<!-- Streak Popup -->
+<div class="streak-popup" id="streak-popup">
+  <div class="streak-card">
+    <div class="streak-flames">🔥</div>
+    <div class="streak-count" id="popup-streak">5</div>
+    <div class="streak-label">Day Streak!</div>
+    <div class="streak-bonus" id="popup-bonus">+25% XP Bonus Active</div>
+    <button class="streak-ok" onclick="closeStreakPopup()">Keep it up! 🔥</button>
   </div>
 </div>
 
@@ -152,16 +341,169 @@ const initials = (player.first_name||'P').charAt(0).toUpperCase();
 document.getElementById('avatar').textContent = initials;
 document.getElementById('pname').textContent = player.first_name || 'Player';
 
-// XP
-const totalXP = parseInt(localStorage.getItem('nexus_total_xp')||'0') +
-  parseInt(localStorage.getItem('nexus_spin_xp')||'0');
-const level = Math.floor(Math.sqrt(totalXP/100))+1;
-const levelXP = (level-1)*(level-1)*100;
-const nextXP = level*level*100;
-const pct = Math.min((totalXP-levelXP)/(nextXP-levelXP)*100,100);
-document.getElementById('xp-level').textContent = `Level ${level}`;
-document.getElementById('xp-val').textContent = `${totalXP} / ${nextXP} XP`;
-setTimeout(()=>document.getElementById('xp-fill').style.width=pct+'%', 200);
+// Daily challenges data
+const DAILY_TASKS = [
+  {id:1,task:'Play 3 different games',target:3,unit:'games',reward:200},
+  {id:2,task:'Score 500+ in any game',target:500,unit:'points',reward:300},
+  {id:3,task:'Play 5 games total',target:5,unit:'games',reward:250},
+  {id:4,task:'Win a game of Word Guess',target:1,unit:'win',reward:400},
+  {id:5,task:'Score 1000+ XP from games',target:1000,unit:'xp',reward:500},
+  {id:6,task:'Play Trivia Quiz',target:1,unit:'play',reward:150},
+  {id:7,task:'Get a 3+ game streak',target:3,unit:'streak',reward:350}
+];
+
+// Get today's challenge
+function getDailyChallenge() {
+  const today = new Date().toDateString();
+  const stored = localStorage.getItem('nexus_daily_' + today);
+  if (stored) return JSON.parse(stored);
+  
+  // Generate new daily challenge
+  const task = DAILY_TASKS[Math.floor(Math.random() * DAILY_TASKS.length)];
+  const challenge = {...task, progress: 0, completed: false, claimed: false, date: today};
+  localStorage.setItem('nexus_daily_' + today, JSON.stringify(challenge));
+  return challenge;
+}
+
+// Update daily progress
+function updateDailyProgress(type, amount = 1) {
+  const challenge = getDailyChallenge();
+  if (challenge.completed) return;
+  
+  let shouldUpdate = false;
+  if (challenge.unit === 'games' && type === 'game_played') shouldUpdate = true;
+  if (challenge.unit === 'points' && type === 'score') shouldUpdate = true;
+  if (challenge.unit === 'xp' && type === 'xp') shouldUpdate = true;
+  if (challenge.unit === 'win' && type === 'win') shouldUpdate = true;
+  if (challenge.unit === 'play' && type === 'play_' + challenge.task.toLowerCase().split(' ')[1]) shouldUpdate = true;
+  if (challenge.unit === 'streak' && type === 'streak') shouldUpdate = true;
+  
+  if (shouldUpdate) {
+    challenge.progress = Math.min(challenge.progress + amount, challenge.target);
+    if (challenge.progress >= challenge.target) challenge.completed = true;
+    localStorage.setItem('nexus_daily_' + new Date().toDateString(), JSON.stringify(challenge));
+    renderDailyChallenge();
+  }
+}
+
+// Render daily challenge
+function renderDailyChallenge() {
+  const challenge = getDailyChallenge();
+  document.getElementById('daily-task').textContent = challenge.task;
+  document.getElementById('daily-status').textContent = `${challenge.progress}/${challenge.target} ${challenge.unit}`;
+  document.getElementById('daily-fill').style.width = (challenge.progress/challenge.target*100) + '%';
+  document.getElementById('daily-reward').textContent = `🏆 +${challenge.reward} XP`;
+  
+  const claimBtn = document.getElementById('daily-claim');
+  if (challenge.claimed) {
+    claimBtn.disabled = true;
+    claimBtn.textContent = '✓ Claimed';
+  } else if (challenge.completed) {
+    claimBtn.disabled = false;
+    claimBtn.textContent = 'Claim Reward 🎁';
+  } else {
+    claimBtn.disabled = true;
+    claimBtn.textContent = 'Complete to Claim';
+  }
+}
+
+// Claim daily reward
+function claimDaily() {
+  const challenge = getDailyChallenge();
+  if (!challenge.completed || challenge.claimed) return;
+  
+  challenge.claimed = true;
+  localStorage.setItem('nexus_daily_' + new Date().toDateString(), JSON.stringify(challenge));
+  
+  // Award XP
+  submitScore(challenge.reward);
+  
+  // Update UI
+  renderDailyChallenge();
+  tg?.HapticFeedback?.notificationOccurred('success');
+  
+  // Show toast
+  showToast(`+${challenge.reward} XP claimed!`, 'success');
+}
+
+// Countdown timer
+function updateDailyTimer() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  
+  const diff = tomorrow - now;
+  const hours = Math.floor(diff / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  
+  document.getElementById('daily-timer').textContent = 
+    `${hours.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+}
+
+// Streak tracking
+function getStreakData() {
+  return JSON.parse(localStorage.getItem('nexus_streak') || '{"count":0,"lastDate":null,"bonus":1}');
+}
+
+function updateStreak() {
+  const today = new Date().toDateString();
+  const data = getStreakData();
+  
+  if (data.lastDate === today) return data;
+  
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  if (data.lastDate === yesterday.toDateString()) {
+    data.count++;
+  } else if (data.lastDate !== today) {
+    data.count = 1;
+  }
+  
+  data.lastDate = today;
+  data.bonus = Math.min(1 + (data.count * 0.05), 2); // Up to 2x bonus
+  
+  localStorage.setItem('nexus_streak', JSON.stringify(data));
+  
+  // Show streak popup if streak > 1
+  if (data.count > 1) {
+    showStreakPopup(data);
+  }
+  
+  return data;
+}
+
+function showStreakPopup(data) {
+  document.getElementById('popup-streak').textContent = data.count;
+  document.getElementById('popup-bonus').textContent = `+${Math.round((data.bonus-1)*100)}% XP Bonus Active`;
+  document.getElementById('streak-popup').classList.add('show');
+  tg?.HapticFeedback?.notificationOccurred('success');
+}
+
+function closeStreakPopup() {
+  document.getElementById('streak-popup').classList.remove('show');
+}
+
+// XP and Stats
+function loadStats() {
+  const totalXP = parseInt(localStorage.getItem('nexus_total_xp')||'0');
+  const gamesPlayed = parseInt(localStorage.getItem('nexus_games_today_' + new Date().toDateString())||'0');
+  const streakData = updateStreak();
+  
+  const level = Math.floor(Math.sqrt(totalXP/100))+1;
+  const levelXP = (level-1)*(level-1)*100;
+  const nextXP = level*level*100;
+  const pct = Math.min((totalXP-levelXP)/(nextXP-levelXP)*100,100);
+  
+  document.getElementById('total-xp').textContent = totalXP.toLocaleString();
+  document.getElementById('streak-count').textContent = streakData.count + '🔥';
+  document.getElementById('games-played').textContent = gamesPlayed;
+  document.getElementById('xp-level').textContent = `Level ${level}`;
+  document.getElementById('xp-val').textContent = `${totalXP.toLocaleString()} / ${nextXP.toLocaleString()} XP`;
+  document.getElementById('xp-fill').style.width = pct+'%';
+}
 
 // Build game URLs
 function gameURL(game){
@@ -169,51 +511,180 @@ function gameURL(game){
   return `${BASE}games/${game}.html?${params}`;
 }
 
-// Open game in Telegram Mini App popup or new page
-function openGame(game){
+// Open game
+function openGame(game, trackAs = null){
   tg?.HapticFeedback?.impactOccurred('medium');
-  // Navigate to game page (same window in Mini App)
+  
+  // Track games played today
+  const today = new Date().toDateString();
+  const key = 'nexus_games_today_' + today;
+  const count = parseInt(localStorage.getItem(key)||'0') + 1;
+  localStorage.setItem(key, count);
+  
+  // Update daily progress
+  updateDailyProgress('game_played');
+  if (trackAs) updateDailyProgress('play_' + trackAs);
+  
+  // Navigate
   window.location.href = gameURL(game);
 }
 
-document.getElementById('card-spin').onclick  = ()=>openGame('spin-wheel');
-document.getElementById('card-trivia').onclick = ()=>openGame('trivia');
-document.getElementById('card-word').onclick   = ()=>openGame('wordguess');
-document.getElementById('card-snake').onclick  = ()=>openGame('snake');
+// Setup game cards
+document.getElementById('card-spin').onclick = ()=>openGame('spin-wheel');
+document.getElementById('card-trivia').onclick = ()=>openGame('trivia', 'trivia');
+document.getElementById('card-word').onclick = ()=>openGame('wordguess');
+document.getElementById('card-snake').onclick = ()=>openGame('snake');
+document.getElementById('card-tap').onclick = ()=>openGame('tap-rush');
+document.getElementById('card-memory').onclick = ()=>openGame('memory-flash');
+document.getElementById('card-reaction').onclick = ()=>openGame('reaction-timer');
+document.getElementById('card-hol').onclick = ()=>openGame('higher-lower');
+document.getElementById('card-2048').onclick = ()=>openGame('2048');
+document.getElementById('card-mines').onclick = ()=>openGame('minesweeper');
+document.getElementById('card-emoji').onclick = ()=>openGame('emoji-guess');
+document.getElementById('card-colorsort').onclick = ()=>openGame('color-sort');
+document.getElementById('card-flappy').onclick = ()=>openGame('flappy');
+document.getElementById('card-aim').onclick = ()=>openGame('aim-trainer');
+document.getElementById('card-brick').onclick = ()=>openGame('brick-breaker');
+document.getElementById('card-blackjack').onclick = ()=>openGame('blackjack');
+document.getElementById('card-redlight').onclick = ()=>openGame('redlight');
 
-// Aggregate leaderboard from all game local storage
-function buildLeaderboard(){
-  const all = {};
+// Leaderboard tabs
+let currentTab = 'global';
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
   
-  // Spin XP
-  const spinLB = JSON.parse(localStorage.getItem('nexus_lb')||'[]');
-  spinLB.forEach(e=>{ all[e.name]=(all[e.name]||0)+e.xp; });
+  const titles = {global:'🏆 Global', daily:'📅 Today', weekly:'📊 Week'};
+  const periods = {global:'All Time', daily:'Today', weekly:'This Week'};
+  document.getElementById('lb-title').textContent = titles[tab];
+  document.getElementById('lb-period').textContent = periods[tab];
   
-  // Snake scores
-  const snakeLB = JSON.parse(localStorage.getItem('nexus_snake_lb')||'[]');
-  snakeLB.forEach(e=>{ all[e.name]=(all[e.name]||0)+Math.floor(e.score/10)*5; });
-  
-  return Object.entries(all)
-    .map(([name,xp])=>({name,xp}))
-    .sort((a,b)=>b.xp-a.xp)
-    .slice(0,5);
+  renderLeaderboard();
 }
 
-const lb = buildLeaderboard();
-if(lb.length > 0){
+// Aggregate leaderboard from all games
+function buildLeaderboardData() {
+  const scores = {};
+  
+  // Load from all game leaderboards
+  const games = ['spin','snake','trivia','wordguess','tap','memory','reaction','hol','2048','mines','emoji','colorsort','flappy','aim','brick','blackjack','redlight'];
+  
+  games.forEach(game => {
+    const lb = JSON.parse(localStorage.getItem(`nexus_${game}_lb`)||'[]');
+    lb.forEach(e => {
+      if (!scores[e.name]) scores[e.name] = {name:e.name,xp:0,games:0};
+      scores[e.name].xp += e.xp || 0;
+      scores[e.name].games++;
+    });
+  });
+  
+  // Also add daily XP tracking
+  const today = new Date().toDateString();
+  const todayXP = JSON.parse(localStorage.getItem('nexus_today_xp_' + today)||'{}');
+  Object.entries(todayXP).forEach(([name,xp]) => {
+    if (!scores[name]) scores[name] = {name,xp:0,games:0};
+    scores[name].xp += xp;
+  });
+  
+  return Object.values(scores).sort((a,b)=>b.xp-a.xp);
+}
+
+function renderLeaderboard() {
+  let lb = buildLeaderboardData();
+  
+  // Filter by tab
+  if (currentTab === 'daily') {
+    // Show only today's scores
+    const today = new Date().toDateString();
+    const todayData = JSON.parse(localStorage.getItem('nexus_today_xp_' + today)||'{}');
+    lb = Object.entries(todayData).map(([name,xp])=>({name,xp,games:1})).sort((a,b)=>b.xp-a.xp);
+  }
+  
+  if (lb.length === 0) {
+    document.getElementById('lb-body').innerHTML = '<div class="lb-row" style="justify-content:center;padding:20px;color:#4a6080;font-size:13px">No scores yet — be the first!</div>';
+    return;
+  }
+  
   const medals = ['🥇','🥈','🥉'];
-  document.getElementById('lb-body').innerHTML = lb.map((e,i)=>`
-    <div class="lb-row">
-      <div class="lb-rank">${medals[i]||i+1}</div>
-      <div class="lb-avatar">${e.name.charAt(0).toUpperCase()}</div>
-      <div class="lb-info">
-        <div class="lb-name">${e.name}</div>
-        <div class="lb-games">All games combined</div>
+  const playerName = player.first_name || 'Player';
+  
+  document.getElementById('lb-body').innerHTML = lb.slice(0,10).map((e,i)=>{
+    const isYou = e.name === playerName;
+    const avatarClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+    return `
+      <div class="lb-row ${isYou?'you':''}">
+        <div class="lb-rank">${medals[i]||i+1}</div>
+        <div class="lb-avatar ${avatarClass}">${e.name.charAt(0).toUpperCase()}</div>
+        <div class="lb-info">
+          <div class="lb-name">${e.name}${isYou?' (You)':''}</div>
+          <div class="lb-games">${e.games||1} games played</div>
+        </div>
+        <div class="lb-score">${e.xp.toLocaleString()} XP</div>
       </div>
-      <div class="lb-score">${e.xp} XP</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
+
+// Submit XP to server
+async function submitScore(xp){
+  if(!chatId||chatId==='0'||!player.id) return;
+  
+  // Apply streak bonus
+  const streakData = getStreakData();
+  const bonusXP = Math.floor(xp * (streakData.bonus - 1));
+  const totalXP = xp + bonusXP;
+  
+  // Track locally
+  const currentTotal = parseInt(localStorage.getItem('nexus_total_xp')||'0');
+  localStorage.setItem('nexus_total_xp', currentTotal + totalXP);
+  
+  // Track today's XP
+  const today = new Date().toDateString();
+  const todayKey = 'nexus_today_xp_' + today;
+  const todayData = JSON.parse(localStorage.getItem(todayKey)||'{}');
+  todayData[player.first_name||'Player'] = (todayData[player.first_name||'Player']||0) + totalXP;
+  localStorage.setItem(todayKey, JSON.stringify(todayData));
+  
+  // Update daily progress
+  updateDailyProgress('xp', totalXP);
+  
+  // Reload stats
+  loadStats();
+  
+  try {
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id,xp:totalXP})
+    });
+  } catch(e){}
+}
+
+// Toast notification
+function showToast(message, type='info') {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:${type==='success'?'#22c55e':type==='error'?'#ef4444':'#3b82f6'};
+    color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;
+    z-index:9999;animation:fadeIn .3s ease;
+  `;
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(), 3000);
+}
+
+// Initialize
+setInterval(updateDailyTimer, 1000);
+updateDailyTimer();
+renderDailyChallenge();
+loadStats();
+renderLeaderboard();
+
+// Expose submitScore globally for games
+window.submitScore = submitScore;
+window.updateDailyProgress = updateDailyProgress;
 </script>
 </body>
 </html>

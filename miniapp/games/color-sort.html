@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Color Sort</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--r:14px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:14px;gap:10px}
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800}
+.stats{display:flex;gap:8px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:5px 12px;text-align:center}
+.stat-val{font-size:16px;font-weight:800}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase}
+
+.level-info{font-size:13px;color:var(--muted);text-align:center}
+.tubes-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+.tubes-grid{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-content:center}
+.tube{display:flex;flex-direction:column-reverse;align-items:center;cursor:pointer;gap:0;position:relative}
+.tube-body{width:44px;border-radius:0 0 22px 22px;border:2.5px solid #2a3a55;border-top:none;overflow:hidden;display:flex;flex-direction:column-reverse;transition:.2s;background:#0a0e1a}
+.tube-top{width:44px;height:10px;border-radius:8px 8px 0 0;border:2.5px solid #2a3a55;border-bottom:none;background:#0a0e1a}
+.tube.selected .tube-body,.tube.selected .tube-top{border-color:#00d4ff;box-shadow:0 0 12px #00d4ff44}
+.tube.completed .tube-body,.tube.completed .tube-top{border-color:#22c55e55}
+.ball{width:40px;height:28px;transition:.3s;flex-shrink:0}
+
+.btn-row{display:flex;gap:8px;width:100%}
+.act-btn{flex:1;padding:11px;border-radius:var(--r);border:1px solid var(--border);background:var(--card);font-size:13px;font-weight:700;color:var(--text);cursor:pointer;transition:.15s}
+.act-btn:active{transform:scale(.97)}
+
+.overlay{position:fixed;inset:0;background:#000b;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ov-card{background:#0f1620;border:1px solid #1a2840;border-radius:20px;padding:28px 24px;text-align:center;width:min(290px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.ov-level{font-size:40px;font-weight:800;color:#14b8a6;margin:8px 0}
+.ov-sub{font-size:13px;color:#4a6080;margin-bottom:6px}
+.ov-xp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#14b8a6,#0f766e);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">🧪 Color Sort</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val" id="level-val" style="color:#14b8a6">1</div><div class="stat-lbl">Level</div></div>
+      <div class="stat"><div class="stat-val" id="moves-val">0</div><div class="stat-lbl">Moves</div></div>
+    </div>
+  </div>
+  <div class="level-info" id="level-info">Sort each color into its own tube</div>
+  <div class="tubes-wrap"><div class="tubes-grid" id="tubes-grid"></div></div>
+  <div class="btn-row">
+    <button class="act-btn" onclick="undoMove()">↩ Undo</button>
+    <button class="act-btn" onclick="initLevel()">↺ Restart</button>
+  </div>
+</div>
+
+<div class="overlay" id="win-ov" style="display:none">
+  <div class="ov-card">
+    <div class="ov-icon">🏆</div>
+    <div class="ov-title">Level Complete!</div>
+    <div class="ov-level" id="ov-level">Level 1</div>
+    <div class="ov-sub" id="ov-moves">Solved in 12 moves</div>
+    <div class="ov-xp" id="ov-xp">+100 XP</div>
+    <button class="ov-btn" onclick="nextLevel()">Next Level →</button>
+  </div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+
+const COLORS=['#ef4444','#3b82f6','#22c55e','#f59e0b','#a855f7','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
+const TUBE_H=4;
+let level=1,tubes=[],selected=-1,moves=0,history=[];
+
+function levelConfig(lvl){
+  const colors=Math.min(4+Math.floor((lvl-1)/2),10);
+  return{colors,empties:Math.min(2+Math.floor((lvl-1)/4),4)};
+}
+
+function initLevel(){
+  document.getElementById('win-ov').style.display='none';
+  const cfg=levelConfig(level);
+  moves=0;selected=-1;history=[];
+  document.getElementById('moves-val').textContent='0';
+  document.getElementById('level-val').textContent=level;
+  document.getElementById('level-info').textContent=`Level ${level} — ${cfg.colors} colors, ${cfg.empties} empty tubes`;
+
+  const balls=[];
+  for(let c=0;c<cfg.colors;c++) for(let b=0;b<TUBE_H;b++) balls.push(c);
+  for(let i=balls.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[balls[i],balls[j]]=[balls[j],balls[i]];}
+  tubes=[];
+  for(let t=0;t<cfg.colors;t++) tubes.push(balls.slice(t*TUBE_H,(t+1)*TUBE_H));
+  for(let e=0;e<cfg.empties;e++) tubes.push([]);
+  render();
+}
+
+function render(){
+  const cfg=levelConfig(level);
+  const grid=document.getElementById('tubes-grid');
+  grid.innerHTML='';
+  const tubeH=Math.min(160,Math.floor((window.innerHeight-280)/1));
+
+  tubes.forEach((tube,ti)=>{
+    const wrap=document.createElement('div');
+    wrap.className='tube'+(ti===selected?' selected':isComplete(ti)?' completed':'');
+    wrap.onclick=()=>clickTube(ti);
+
+    const top=document.createElement('div');
+    top.className='tube-top';
+
+    const body=document.createElement('div');
+    body.className='tube-body';
+    body.style.height=tubeH+'px';
+
+    tube.forEach(colorIdx=>{
+      const ball=document.createElement('div');
+      ball.className='ball';
+      ball.style.background=COLORS[colorIdx];
+      body.appendChild(ball);
+    });
+
+    wrap.appendChild(top);
+    wrap.appendChild(body);
+    grid.appendChild(wrap);
+  });
+}
+
+function isComplete(ti){
+  const t=tubes[ti];
+  return t.length===TUBE_H&&t.every(c=>c===t[0]);
+}
+
+function clickTube(ti){
+  if(selected===-1){
+    if(tubes[ti].length===0) return;
+    selected=ti;render();return;
+  }
+  if(selected===ti){selected=-1;render();return;}
+  const from=tubes[selected],to=tubes[ti];
+  if(to.length>=TUBE_H){selected=-1;render();return;}
+  const topColor=from[from.length-1];
+  if(to.length>0&&to[to.length-1]!==topColor){selected=-1;render();return;}
+  let count=0;
+  for(let i=from.length-1;i>=0&&from[i]===topColor;i--) count++;
+  const space=TUBE_H-to.length;
+  const pour=Math.min(count,space);
+  history.push(tubes.map(t=>[...t]));
+  for(let p=0;p<pour;p++) to.push(from.pop());
+  moves++;
+  document.getElementById('moves-val').textContent=moves;
+  selected=-1;
+  tg?.HapticFeedback?.impactOccurred('light');
+  render();
+  checkWin();
+}
+
+function undoMove(){
+  if(!history.length) return;
+  tubes=history.pop();
+  selected=-1;moves=Math.max(0,moves-1);
+  document.getElementById('moves-val').textContent=moves;
+  render();
+}
+
+function checkWin(){
+  const cfg=levelConfig(level);
+  const sortedTubes=tubes.filter(t=>t.length>0);
+  if(sortedTubes.every(t=>isComplete(tubes.indexOf(t)))||tubes.filter(t=>t.length===TUBE_H&&t.every(c=>c===t[0])).length===cfg.colors){
+    tg?.HapticFeedback?.notificationOccurred('success');
+    const xp=Math.max(50,200-moves*5+level*20);
+    document.getElementById('ov-level').textContent=`Level ${level}`;
+    document.getElementById('ov-moves').textContent=`Solved in ${moves} moves`;
+    document.getElementById('ov-xp').textContent=`+${xp} XP Earned`;
+    document.getElementById('win-ov').style.display='flex';
+    submitScore(xp);
+    saveLeaderboard(level,moves,xp);
+  }
+}
+
+function saveLeaderboard(level,moves,xp){
+  const lb=JSON.parse(localStorage.getItem('nexus_colorsort_lb')||'[]');
+  lb.push({name:player.first_name||'Player',level,moves,xp,date:Date.now()});
+  lb.sort((a,b)=>b.level-a.level||a.moves-b.moves);
+  localStorage.setItem('nexus_colorsort_lb',JSON.stringify(lb.slice(0,10)));
+}
+
+function nextLevel(){
+  level++;initLevel();
+}
+
+async function submitScore(xp){
+  if(!chatId||!player.id||xp<=0) return;
+  try{await fetch(`/api/groups/${chatId}/xp`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},body:JSON.stringify({user_id:player.id,xp})});}catch(e){}
+}
+
+initLevel();
+</script>
+</body>
+</html>

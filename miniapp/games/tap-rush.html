@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tap Rush</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--r:14px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:16px 14px;gap:12px}
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800}
+.stats{display:flex;gap:10px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 14px;text-align:center}
+.stat-val{font-size:18px;font-weight:800}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+/* Target color strip */
+.target-strip{width:100%;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px;display:flex;align-items:center;justify-content:space-between}
+.target-label{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.target-color{width:56px;height:56px;border-radius:12px;border:3px solid #fff3;transition:.3s;box-shadow:0 0 20px currentColor}
+
+/* Timer bar */
+.timer-wrap{width:100%}
+.timer-bar{width:100%;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.timer-fill{height:100%;border-radius:4px;transition:width .1s linear,background .3s}
+
+/* Circle grid */
+.circle-grid{flex:1;width:100%;position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-content:center}
+.circle{aspect-ratio:1;border-radius:50%;cursor:pointer;transition:transform .08s,opacity .15s;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:3px solid transparent;position:relative;overflow:hidden}
+.circle:active{transform:scale(.88)}
+.circle.correct{animation:correct-pop .3s ease}
+.circle.wrong{animation:wrong-shake .3s ease}
+@keyframes correct-pop{0%{transform:scale(1)}40%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes wrong-shake{0%,100%{transform:translate(0)}25%{transform:translate(-5px)}75%{transform:translate(5px)}}
+@keyframes fadeIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+.circle-new{animation:fadeIn .2s ease}
+
+/* Multiplier */
+.mult{text-align:center;font-size:13px;font-weight:700;color:#f59e0b;min-height:20px}
+
+/* Overlay */
+.overlay{position:fixed;inset:0;background:#000b;backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:50}
+.ov-card{background:#0f1620;border:1px solid #1a2840;border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.ov-score{font-size:42px;font-weight:800;color:#00d4ff;margin:8px 0}
+.ov-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+.ov-xp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#00d4ff,#0099cc);color:#000}
+.ov-btn:active{transform:scale(.98)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">⚡ Tap Rush</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val" id="score">0</div><div class="stat-lbl">Score</div></div>
+      <div class="stat"><div class="stat-val" id="best">0</div><div class="stat-lbl">Best</div></div>
+    </div>
+  </div>
+
+  <div class="target-strip">
+    <div>
+      <div class="target-label">Tap this color</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px" id="target-name">—</div>
+    </div>
+    <div class="target-color" id="target-swatch"></div>
+  </div>
+
+  <div class="timer-wrap">
+    <div class="timer-bar"><div class="timer-fill" id="timer-fill" style="width:100%;background:#00d4ff"></div></div>
+  </div>
+
+  <div class="mult" id="mult"></div>
+  <div class="circle-grid" id="grid"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ov-card">
+    <div class="ov-icon">⚡</div>
+    <div class="ov-title">Tap Rush</div>
+    <div style="font-size:13px;color:#4a6080;margin:8px 0 20px">Tap circles matching the target color before time runs out!</div>
+    <button class="ov-btn" onclick="startGame()">Play</button>
+  </div>
+</div>
+
+<div class="overlay" id="over-overlay" style="display:none">
+  <div class="ov-card">
+    <div class="ov-icon" id="ov-icon">💥</div>
+    <div class="ov-title" id="ov-title">Game Over</div>
+    <div class="ov-score" id="ov-score">0</div>
+    <div class="ov-sub" id="ov-sub">Score</div>
+    <div class="ov-xp" id="ov-xp">+0 XP</div>
+    <button class="ov-btn" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+
+const COLORS=[
+  {name:'Red',   hex:'#ef4444',dark:'#991b1b'},
+  {name:'Blue',  hex:'#3b82f6',dark:'#1e40af'},
+  {name:'Green', hex:'#22c55e',dark:'#15803d'},
+  {name:'Purple',hex:'#a855f7',dark:'#7e22ce'},
+  {name:'Orange',hex:'#f97316',dark:'#c2410c'},
+  {name:'Pink',  hex:'#ec4899',dark:'#be185d'},
+  {name:'Teal',  hex:'#14b8a6',dark:'#0f766e'},
+  {name:'Amber', hex:'#f59e0b',dark:'#b45309'},
+];
+
+let score=0,streak=0,lives=3,running=false,targetColor,timeLeft,timerRAF;
+let best=parseInt(localStorage.getItem('taprush_best')||'0');
+document.getElementById('best').textContent=best;
+
+function pickTarget(){
+  targetColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+  document.getElementById('target-swatch').style.background=targetColor.hex;
+  document.getElementById('target-swatch').style.color=targetColor.hex;
+  document.getElementById('target-name').textContent=targetColor.name;
+}
+
+function buildGrid(){
+  const grid=document.getElementById('grid');
+  grid.innerHTML='';
+  const correctCount=Math.floor(Math.random()*3)+1;
+  const total=12;
+  const indices=new Set();
+  while(indices.size<correctCount) indices.add(Math.floor(Math.random()*total));
+
+  for(let i=0;i<total;i++){
+    const isCorrect=indices.has(i);
+    const color=isCorrect?targetColor:COLORS.filter(c=>c!==targetColor)[Math.floor(Math.random()*(COLORS.length-1))];
+    const div=document.createElement('div');
+    div.className='circle circle-new';
+    div.style.background=color.hex;
+    div.style.borderColor=color.dark;
+    div.dataset.correct=isCorrect?'1':'0';
+    div.onclick=()=>tapCircle(div,isCorrect);
+    grid.appendChild(div);
+  }
+}
+
+function tapCircle(el,correct){
+  if(!running) return;
+  tg?.HapticFeedback?.impactOccurred(correct?'medium':'heavy');
+  if(correct){
+    streak++;
+    const mult=Math.min(Math.floor(streak/5)+1,5);
+    score+=10*mult;
+    document.getElementById('score').textContent=score;
+    document.getElementById('mult').textContent=mult>1?`${mult}x MULTIPLIER 🔥`:'';
+    el.classList.add('correct');
+    setTimeout(()=>{
+      el.style.opacity='0';
+      setTimeout(()=>{
+        const newColor=COLORS[Math.floor(Math.random()*COLORS.length)];
+        el.style.background=newColor.hex;
+        el.style.borderColor=newColor.dark;
+        el.dataset.correct=newColor===targetColor?'1':'0';
+        el.onclick=()=>tapCircle(el,newColor===targetColor);
+        el.classList.remove('correct');
+        el.style.opacity='1';
+        el.classList.add('circle-new');
+      },150);
+    },100);
+    if(score%50===0) pickTarget();
+    if(score%30===0) timeLeft=Math.min(timeLeft+1.5,10);
+  } else {
+    streak=0;
+    document.getElementById('mult').textContent='';
+    el.classList.add('wrong');
+    timeLeft=Math.max(0,timeLeft-2);
+    setTimeout(()=>el.classList.remove('wrong'),300);
+    tg?.HapticFeedback?.notificationOccurred('error');
+  }
+}
+
+let lastTS=0;
+function timerTick(ts){
+  if(!running) return;
+  const dt=(ts-lastTS)/1000;
+  lastTS=ts;
+  timeLeft=Math.max(0,timeLeft-dt);
+  const pct=timeLeft/10*100;
+  const fill=document.getElementById('timer-fill');
+  fill.style.width=pct+'%';
+  fill.style.background=pct>50?'#22c55e':pct>25?'#f59e0b':'#ef4444';
+  if(timeLeft<=0){endGame();}
+  else timerRAF=requestAnimationFrame(timerTick);
+}
+
+function startGame(){
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('over-overlay').style.display='none';
+  score=0;streak=0;running=true;timeLeft=10;
+  document.getElementById('score').textContent='0';
+  document.getElementById('mult').textContent='';
+  pickTarget();
+  buildGrid();
+  lastTS=performance.now();
+  timerRAF=requestAnimationFrame(timerTick);
+}
+
+function endGame(){
+  running=false;
+  cancelAnimationFrame(timerRAF);
+  tg?.HapticFeedback?.notificationOccurred('error');
+  if(score>best){best=score;localStorage.setItem('taprush_best',best);document.getElementById('best').textContent=best;}
+  const xp=Math.floor(score/5);
+  document.getElementById('ov-icon').textContent=score>200?'🏆':score>100?'🎯':'💥';
+  document.getElementById('ov-title').textContent=score>200?'Blazing!':score>100?'Fast!':'Too slow!';
+  document.getElementById('ov-score').textContent=score;
+  document.getElementById('ov-sub').textContent=`Best: ${best} pts`;
+  document.getElementById('ov-xp').textContent=`+${xp} XP Earned`;
+  document.getElementById('over-overlay').style.display='flex';
+  submitScore(xp);
+  saveLeaderboard(score,xp);
+}
+
+function saveLeaderboard(score,xp){
+  const lb=JSON.parse(localStorage.getItem('nexus_tap_lb')||'[]');
+  lb.push({name:player.first_name||'Player',score,xp,date:Date.now()});
+  lb.sort((a,b)=>b.score-a.score);
+  localStorage.setItem('nexus_tap_lb',JSON.stringify(lb.slice(0,10)));
+}
+
+async function submitScore(xp){
+  if(!chatId||!player.id||xp<=0) return;
+  try{await fetch(`/api/groups/${chatId}/xp`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},body:JSON.stringify({user_id:player.id,xp})});}catch(e){}
+}
+</script>
+</body>
+</html>

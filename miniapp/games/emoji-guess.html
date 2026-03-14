@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Emoji Guess</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--r:14px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:16px 14px;gap:12px}
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800}
+.stats{display:flex;gap:8px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 14px;text-align:center}
+.stat-val{font-size:18px;font-weight:800}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase}
+
+/* Emoji display */
+.emoji-card{width:100%;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.emoji-display{font-size:clamp(48px,15vw,80px);line-height:1.1;letter-spacing:4px}
+.emoji-hint{font-size:12px;color:var(--muted)}
+
+/* Progress bar */
+.prog-bar{width:100%;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.prog-fill{height:100%;border-radius:3px;background:#f59e0b;transition:width .3s}
+
+/* Options grid */
+.options{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;flex:1;align-content:start}
+.opt-btn{padding:12px 10px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer;transition:.15s;text-align:left;font-size:13px;font-weight:500;color:var(--text);line-height:1.3}
+.opt-btn:active{transform:scale(.97)}
+.opt-btn.correct{background:#22c55e20;border-color:#22c55e;color:#22c55e}
+.opt-btn.wrong{background:#ef444420;border-color:#ef4444;color:#ef4444}
+.opt-btn.disabled{pointer-events:none}
+
+/* Score flash */
+.score-flash{width:100%;text-align:center;font-size:16px;font-weight:700;min-height:28px;transition:.3s}
+
+/* Category */
+.cat-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:var(--border);border-radius:20px;font-size:11px;color:var(--muted);font-weight:600}
+
+/* Timer ring */
+.timer-ring{position:relative;width:48px;height:48px;flex-shrink:0}
+.timer-ring canvas{position:absolute;top:0;left:0}
+.timer-num{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:15px;font-weight:700}
+
+.overlay{position:fixed;inset:0;background:#000b;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ov-card{background:#0f1620;border:1px solid #1a2840;border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.ov-score{font-size:40px;font-weight:800;color:#f59e0b;margin:8px 0}
+.ov-sub{font-size:13px;color:#4a6080;margin-bottom:6px}
+.ov-xp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#f59e0b,#d97706);color:#000}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">🎭 Emoji Guess</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="timer-ring"><canvas id="tc" width="48" height="48"></canvas><div class="timer-num" id="timer-num">15</div></div>
+      <div class="stats">
+        <div class="stat"><div class="stat-val" id="score-val" style="color:#f59e0b">0</div><div class="stat-lbl">Score</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="prog-bar"><div class="prog-fill" id="prog" style="width:0%"></div></div>
+  <div class="emoji-card">
+    <div class="cat-pill" id="cat-pill">🎬 Movie</div>
+    <div class="emoji-display" id="emoji-display">🤔</div>
+    <div class="emoji-hint" id="hint">Guess what this represents!</div>
+  </div>
+  <div class="score-flash" id="score-flash"></div>
+  <div class="options" id="options"></div>
+</div>
+
+<div class="overlay" id="start-ov">
+  <div class="ov-card">
+    <div class="ov-icon">🎭</div>
+    <div class="ov-title">Emoji Guess</div>
+    <div style="font-size:13px;color:#4a6080;margin:8px 0 20px">Decode emoji combos — movies, phrases, games & more. 15 rounds, 15 seconds each!</div>
+    <button class="ov-btn" onclick="startGame()">Let's Play!</button>
+  </div>
+</div>
+<div class="overlay" id="over-ov" style="display:none">
+  <div class="ov-card">
+    <div class="ov-icon" id="ov-icon">🎭</div>
+    <div class="ov-title" id="ov-title">Game Over</div>
+    <div class="ov-score" id="ov-score">0</div>
+    <div class="ov-sub" id="ov-sub"></div>
+    <div class="ov-xp" id="ov-xp">+0 XP</div>
+    <button class="ov-btn" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+
+const PUZZLES=[
+  {emoji:'🦁👑',answer:'The Lion King',cat:'🎬 Movie',opts:['The Lion King','Jungle Book','Madagascar','Bambi']},
+  {emoji:'🕷️🕸️👦',answer:'Spider-Man',cat:'🦸 Hero',opts:['Spider-Man','Batman','Ant-Man','Daredevil']},
+  {emoji:'🧊❄️👸',answer:'Frozen',cat:'🎬 Movie',opts:['Frozen','Snow White','Elsa','Narnia']},
+  {emoji:'🍕🐢🥋',answer:'Ninja Turtles',cat:'🎮 Game',opts:['Ninja Turtles','Kung Fu Panda','Turtles','Karate Kid']},
+  {emoji:'⚡🧙\u200d♂️📚',answer:'Harry Potter',cat:'📚 Book',opts:['Harry Potter','Merlin','Gandalf','Percy Jackson']},
+  {emoji:'🎵🌊🧜\u200d♀️',answer:'The Little Mermaid',cat:'🎬 Movie',opts:['The Little Mermaid','Moana','Aquaman','Finding Nemo']},
+  {emoji:'🤖👾🕹️',answer:'Pac-Man',cat:'🎮 Game',opts:['Pac-Man','Space Invaders','Donkey Kong','Tetris']},
+  {emoji:'🐍⬆️⬇️',answer:'Snakes and Ladders',cat:'🎲 Game',opts:['Snakes and Ladders','Snake','Jenga','Ludo']},
+  {emoji:'🌙🌟⭐🚀',answer:'Star Wars',cat:'🎬 Movie',opts:['Star Wars','Star Trek','Interstellar','Gravity']},
+  {emoji:'🦇👨\u200d💼🌃',answer:'Batman',cat:'🦸 Hero',opts:['Batman','Dracula','The Dark Knight','Iron Man']},
+  {emoji:'🍄🔴⭐',answer:'Super Mario',cat:'🎮 Game',opts:['Super Mario','Toad','Mario Kart','Donkey Kong']},
+  {emoji:'🏰🐉💎',answer:'Dungeons & Dragons',cat:'🎲 Game',opts:['Dungeons & Dragons','Skyrim','World of Warcraft','Zelda']},
+  {emoji:'🦊🌲🌿',answer:'The Fox and the Hound',cat:'🎬 Movie',opts:['The Fox and the Hound','Zootopia','Robin Hood','Bambi']},
+  {emoji:'⚽🏆🌍',answer:'FIFA World Cup',cat:'⚽ Sport',opts:['FIFA World Cup','Champions League','Copa America','Euro Cup']},
+  {emoji:'🎪🎭🃏🤡',answer:'IT',cat:'👻 Horror',opts:['IT','Joker','Carnival','Circus']},
+  {emoji:'🚂🧙✉️🦉',answer:'Harry Potter',cat:'📚 Book',opts:['Harry Potter','Lord of the Rings','Chronicles of Narnia','Percy Jackson']},
+  {emoji:'🍎💻🎵',answer:'Apple Music',cat:'📱 App',opts:['Apple Music','Spotify','iTunes','Shazam']},
+  {emoji:'🐘🍺🎺',answer:'Dumbo',cat:'🎬 Movie',opts:['Dumbo','Babar','Elephant','Fantasia']},
+  {emoji:'🕐⏰💣',answer:'24',cat:'📺 TV Show',opts:['24','Prison Break','Lost','Heroes']},
+  {emoji:'💃🌹🇪🇸',answer:'Flamenco',cat:'💃 Dance',opts:['Flamenco','Salsa','Tango','Samba']},
+  {emoji:'🦕🦖🌴',answer:'Jurassic Park',cat:'🎬 Movie',opts:['Jurassic Park','Dinosaur','Godzilla','King Kong']},
+  {emoji:'🎯🎰💰',answer:'Casino',cat:'🎲 Game',opts:['Casino','Poker','Blackjack','Roulette']},
+  {emoji:'🎅🎄🎁',answer:'Christmas',cat:'🎉 Holiday',opts:['Christmas','Santa','Winter','New Year']},
+  {emoji:'🎃👻🍬',answer:'Halloween',cat:'🎉 Holiday',opts:['Halloween','Spooky','October','Trick or Treat']},
+  {emoji:'🌸🗻⛩️',answer:'Japan',cat:'🌍 Country',opts:['Japan','China','Korea','Thailand']},
+  {emoji:'🗽🍎🌆',answer:'New York',cat:'🌍 City',opts:['New York','Chicago','Boston','LA']},
+  {emoji:'🗼🥖🍷',answer:'France',cat:'🌍 Country',opts:['France','Italy','Spain','Germany']},
+  {emoji:'🦁⚽🏴󠁧󠁢󠁥󠁮󠁧󠁿',answer:'England',cat:'⚽ Football',opts:['England','Lions','UK','Britain']},
+  {emoji:'🦅🇺🇸🏈',answer:'USA',cat:'🌍 Country',opts:['USA','America','Eagles','States']},
+  {emoji:'🦘🇦🇺🏄',answer:'Australia',cat:'🌍 Country',opts:['Australia','Kangaroo','Sydney','Aussie']},
+  {emoji:'🍔🍟🥤',answer:'Fast Food',cat:'🍔 Food',opts:['Fast Food','Burger King','McDonald\'s','KFC']},
+  {emoji:'☕🥐🥖',answer:'Breakfast',cat:'🍔 Food',opts:['Breakfast','Brunch','Coffee','Cafe']},
+  {emoji:'🎂🎈🎉',answer:'Birthday',cat:'🎉 Event',opts:['Birthday','Party','Celebration','Anniversary']},
+  {emoji:'👰🤵💒',answer:'Wedding',cat:'🎉 Event',opts:['Wedding','Marriage','Bride','Groom']},
+  {emoji:'👶🍼🚼',answer:'Baby',cat:'👶 Life',opts:['Baby','Infant','Newborn','Child']},
+  {emoji:'🎓📜🎉',answer:'Graduation',cat:'🎉 Event',opts:['Graduation','School','College','Diploma']},
+  {emoji:'💼✈️🏨',answer:'Business Trip',cat:'💼 Work',opts:['Business Trip','Vacation','Travel','Work']},
+  {emoji:'🧘‍♀️🧘‍♂️🕉️',answer:'Yoga',cat:'💪 Fitness',opts:['Yoga','Meditation','Pilates','Stretching']},
+  {emoji:'🏋️‍♂️💪🥩',answer:'Gym',cat:'💪 Fitness',opts:['Gym','Fitness','Workout','Exercise']},
+  {emoji:'🏃‍♂️🏃‍♀️🏅',answer:'Marathon',cat:'🏃 Running',opts:['Marathon','Running','Race','Sprint']},
+  {emoji:'🚴‍♂️🚴‍♀️🏔️',answer:'Cycling',cat:'🚴 Sport',opts:['Cycling','Biking','Tour de France','Spinning']},
+  {emoji:'🏊‍♂️🏊‍♀️🏊',answer:'Swimming',cat:'🏊 Sport',opts:['Swimming','Diving','Water Polo','Surfing']},
+  {emoji:'⛷️🏂🎿',answer:'Skiing',cat:'⛷️ Sport',opts:['Skiing','Snowboarding','Winter Sports','Alpine']},
+  {emoji:'🎾🏸🏓',answer:'Racket Sports',cat:'🎾 Sport',opts:['Racket Sports','Tennis','Badminton','Ping Pong']},
+  {emoji:'🥊🥋🤼',answer:'Martial Arts',cat:'🥊 Sport',opts:['Martial Arts','Boxing','Karate','Judo']},
+  {emoji:'🏹🎯🥇',answer:'Archery',cat:'🏹 Sport',opts:['Archery','Shooting','Bow and Arrow','Target']},
+  {emoji:'⛳🏌️‍♂️🏌️‍♀️',answer:'Golf',cat:'⛳ Sport',opts:['Golf','Mini Golf','Putting','Hole in One']},
+  {emoji:'🏓🏓🏓',answer:'Ping Pong',cat:'🏓 Sport',opts:['Ping Pong','Table Tennis','Paddle','Net']},
+  {emoji:'🎳🎳🎳',answer:'Bowling',cat:'🎳 Sport',opts:['Bowling','Strikes','Pins','Alley']},
+  {emoji:'🎮🕹️👾',answer:'Video Games',cat:'🎮 Tech',opts:['Video Games','Arcade','Console','Gaming']},
+  {emoji:'📱💻⌚',answer:'Technology',cat:'📱 Tech',opts:['Technology','Devices','Gadgets','Electronics']},
+  {emoji:'🤖🦾🦿',answer:'Robotics',cat:'🤖 Tech',opts:['Robotics','AI','Automation','Machines']},
+  {emoji:'🚀🛰️👨‍🚀',answer:'Space',cat:'🚀 Science',opts:['Space','NASA','Astronaut','Rocket']},
+  {emoji:'🔬🧪👨‍🔬',answer:'Science',cat:'🔬 Science',opts:['Science','Chemistry','Biology','Physics']},
+  {emoji:'🧬🧫🔭',answer:'Biology',cat:'🧬 Science',opts:['Biology','DNA','Cells','Genetics']},
+  {emoji:'⚛️🔭🌌',answer:'Astronomy',cat:'🌌 Science',opts:['Astronomy','Telescope','Stars','Galaxy']},
+  {emoji:'⛏️💎⛰️',answer:'Mining',cat:'⛏️ Industry',opts:['Mining','Gems','Ores','Cave']},
+  {emoji:'🌾🚜🌽',answer:'Farming',cat:'🌾 Industry',opts:['Farming','Agriculture','Crops','Harvest']},
+  {emoji:'🏭🏗️⚙️',answer:'Factory',cat:'🏭 Industry',opts:['Factory','Manufacturing','Industry','Production']},
+  {emoji:'⚡💡🔌',answer:'Electricity',cat:'⚡ Science',opts:['Electricity','Power','Energy','Light']},
+  {emoji:'🔥💨💧',answer:'Elements',cat:'🔥 Science',opts:['Elements','Fire','Air','Water']},
+  {emoji:'🌊🌪️🌈',answer:'Weather',cat:'🌈 Nature',opts:['Weather','Storm','Rainbow','Climate']},
+  {emoji:'🌋🌎🌍',answer:'Earth',cat:'🌍 Science',opts:['Earth','Planet','World','Globe']},
+  {emoji:'🦋🐛🌺',answer:'Metamorphosis',cat:'🦋 Nature',opts:['Metamorphosis','Butterfly','Caterpillar','Change']},
+  {emoji:'🐝🍯🌻',answer:'Beekeeping',cat:'🐝 Nature',opts:['Beekeeping','Honey','Pollination','Hive']},
+  {emoji:'🦉🌙🦇',answer:'Nocturnal',cat:'🦉 Nature',opts:['Nocturnal','Night','Owl','Bat']},
+  {emoji:'🐺🌕🐑',answer:'Werewolf',cat:'🐺 Myth',opts:['Werewolf','Wolf','Full Moon','Sheep']},
+  {emoji:'🧛‍♂️🧛‍♀️🩸',answer:'Vampire',cat:'🧛 Myth',opts:['Vampire','Dracula','Blood','Fangs']},
+  {emoji:'🧟‍♂️🧟‍♀️🧠',answer:'Zombie',cat:'🧟 Horror',opts:['Zombie','Undead','Brains','Apocalypse']},
+  {emoji:'👻🏚️🔦',answer:'Haunted House',cat:'👻 Horror',opts:['Haunted House','Ghost','Scary','Halloween']},
+  {emoji:'🧞‍♂️🧞‍♀️✨',answer:'Genie',cat:'🧞 Fantasy',opts:['Genie','Wish','Magic Lamp','Aladdin']},
+  {emoji:'🧚‍♀️🧚‍♂️🌸',answer:'Fairy',cat:'🧚 Fantasy',opts:['Fairy','Pixie','Magic','Enchanted']},
+  {emoji:'🐉🏰⚔️',answer:'Dragon',cat:'🐉 Fantasy',opts:['Dragon','Knight','Castle','Medieval']},
+  {emoji:'🧙‍♀️🧙‍♂️🔮',answer:'Wizard',cat:'🧙 Fantasy',opts:['Wizard','Witch','Magic','Spell']},
+  {emoji:'🧝‍♀️🧝‍♂️🌲',answer:'Elf',cat:'🧝 Fantasy',opts:['Elf','Elves','Forest','Rivendell']},
+  {emoji:'🧜‍♂️🧜‍♀️🌊',answer:'Merman/Mermaid',cat:'🧜 Fantasy',opts:['Merman','Mermaid','Merfolk','Atlantis']},
+  {emoji:'🦸‍♀️🦸‍♂️💥',answer:'Superhero',cat:'🦸 Fantasy',opts:['Superhero','Hero','Superpowers','Comics']},
+  {emoji:'🦹‍♀️🦹‍♂️😈',answer:'Supervillain',cat:'🦹 Fantasy',opts:['Supervillain','Villain','Evil','Bad Guy']},
+  {emoji:'👽🛸🌌',answer:'Alien',cat:'👽 Sci-Fi',opts:['Alien','UFO','Extraterrestrial','Space']},
+  {emoji:'🤖👽🌍',answer:'Robot Invasion',cat:'🤖 Sci-Fi',opts:['Robot Invasion','AI Takeover','Terminator','Matrix']},
+  {emoji:'⏰🔄🔄',answer:'Time Loop',cat:'⏰ Sci-Fi',opts:['Time Loop','Groundhog Day','Déjà vu','Repeat']},
+  {emoji:'🚗🕒⬅️',answer:'Time Travel',cat:'🚗 Sci-Fi',opts:['Time Travel','Back to the Future','DeLorean','Past']},
+  {emoji:'🧠💾🤖',answer:'AI',cat:'🧠 Tech',opts:['AI','Artificial Intelligence','Machine Learning','Neural Net']},
+  {emoji:'🔐🗝️💰',answer:'Treasure',cat:'🔐 Adventure',opts:['Treasure','Pirate','Gold','Chest']},
+  {emoji:'🗺️🧭✈️',answer:'Adventure',cat:'🗺️ Life',opts:['Adventure','Explorer','Journey','Quest']},
+  {emoji:'🎒🏕️🔥',answer:'Camping',cat:'🏕️ Activity',opts:['Camping','Outdoors','Fire','Tent']},
+  {emoji:'🏖️🌴☀️',answer:'Beach',cat:'🏖️ Place',opts:['Beach','Tropical','Vacation','Summer']},
+  {emoji:'🏔️❄️⛷️',answer:'Mountain',cat:'🏔️ Nature',opts:['Mountain','Alpine','Peak','Climbing']},
+  {emoji:'🏜️🐪🌵',answer:'Desert',cat:'🏜️ Nature',opts:['Desert','Sahara','Oasis','Sand']},
+  {emoji:'🌲🐻🏕️',answer:'Forest',cat:'🌲 Nature',opts:['Forest','Woods','Wildlife','Nature']},
+  {emoji:'🌊🏄‍♂️🏄‍♀️',answer:'Surfing',cat:'🏄 Sport',opts:['Surfing','Waves','Beach','Board']},
+  {emoji:'🐠🐟🐡',answer:'Aquarium',cat:'🐠 Nature',opts:['Aquarium','Fish','Ocean','Tank']},
+  {emoji:'🦓🦒🦁',answer:'Safari',cat:'🦁 Nature',opts:['Safari','Africa','Wildlife','Zoo']},
+  {emoji:'🎡🎢🎠',answer:'Amusement Park',cat:'🎢 Place',opts:['Amusement Park','Carnival','Fair','Rides']},
+  {emoji:'🎪🎭🎨',answer:'Circus',cat:'🎪 Entertainment',opts:['Circus','Carnival','Show','Performance']},
+  {emoji:'🎬🎥🎞️',answer:'Cinema',cat:'🎬 Entertainment',opts:['Cinema','Movies','Film','Theater']},
+  {emoji:'🎤🎧🎶',answer:'Concert',cat:'🎶 Entertainment',opts:['Concert','Live Music','Gig','Performance']},
+  {emoji:'🎨🖼️🖌️',answer:'Art Gallery',cat:'🎨 Art',opts:['Art Gallery','Museum','Painting','Exhibition']},
+  {emoji:'📚🏛️📖',answer:'Library',cat:'📚 Place',opts:['Library','Books','Reading','Study']},
+  {emoji:'🏥🚑💉',answer:'Hospital',cat:'🏥 Place',opts:['Hospital','Doctor','Medicine','Emergency']},
+  {emoji:'🏫📚✏️',answer:'School',cat:'🏫 Place',opts:['School','Education','Learning','Classroom']},
+  {emoji:'🏠🏡🏘️',answer:'Neighborhood',cat:'🏠 Place',opts:['Neighborhood','Houses','Community','Street']},
+  {emoji:'🏬🛍️💳',answer:'Shopping Mall',cat:'🏬 Place',opts:['Shopping Mall','Stores','Retail','Boutique']},
+  {emoji:'🍽️👨‍🍳🍷',answer:'Restaurant',cat:'🍽️ Place',opts:['Restaurant','Dining','Cafe','Bistro']},
+  {emoji:'☕🥐📖',answer:'Coffee Shop',cat:'☕ Place',opts:['Coffee Shop','Cafe','Latte','Espresso']},
+  {emoji:'🍕🍔🌮',answer:'Fast Food',cat:'🍕 Food',opts:['Fast Food','Pizza','Burger','Taco']},
+  {emoji:'🍣🍱🥢',answer:'Sushi',cat:'🍣 Food',opts:['Sushi','Japanese','Raw Fish','Rolls']},
+  {emoji:'🍝🍷🇮🇹',answer:'Italian Food',cat:'🍝 Food',opts:['Italian Food','Pasta','Pizza','Risotto']},
+  {emoji:'🌮🌯🥑',answer:'Mexican Food',cat:'🌮 Food',opts:['Mexican Food','Tacos','Burrito','Guacamole']},
+  {emoji:'🍜🥟🍚',answer:'Chinese Food',cat:'🍜 Food',opts:['Chinese Food','Noodles','Dumplings','Rice']},
+  {emoji:'🥗🥑🥒',answer:'Salad',cat:'🥗 Food',opts:['Salad','Healthy','Vegetables','Greens']},
+  {emoji:'🍰🧁🍦',answer:'Dessert',cat:'🍰 Food',opts:['Dessert','Cake','Sweet','Ice Cream']},
+  {emoji:'🍫🍬🍭',answer:'Candy',cat:'🍬 Food',opts:['Candy','Sweets','Chocolate','Sugar']},
+  {emoji:'🥂🍾🎉',answer:'Champagne',cat:'🥂 Drink',opts:['Champagne','Celebration','Bubbly','Toast']}
+];
+
+const TOTAL=15;
+let questions,current,score,streak,maxStreak,timeLeft,timerInt,answered;
+
+function shuffle(a){return[...a].sort(()=>Math.random()-.5);}
+
+const tc=document.getElementById('tc').getContext('2d');
+function drawTimer(pct,urgent){
+  tc.clearRect(0,0,48,48);
+  tc.beginPath();tc.arc(24,24,20,0,Math.PI*2);tc.strokeStyle='#1a2840';tc.lineWidth=4;tc.stroke();
+  tc.beginPath();tc.arc(24,24,20,-Math.PI/2,-Math.PI/2+Math.PI*2*pct);
+  tc.strokeStyle=urgent?'#ef4444':'#f59e0b';tc.lineWidth=4;tc.lineCap='round';tc.stroke();
+}
+
+function loadQuestion(){
+  if(current>=TOTAL){showOver();return;}
+  const q=questions[current];
+  answered=false;
+  document.getElementById('prog').style.width=(current/TOTAL*100)+'%';
+  document.getElementById('cat-pill').textContent=q.cat;
+  document.getElementById('emoji-display').textContent=q.emoji;
+  document.getElementById('hint').textContent=`Round ${current+1} of ${TOTAL}`;
+  document.getElementById('score-flash').textContent='';
+  document.getElementById('score-flash').style.color='';
+
+  const opts=shuffle(q.opts);
+  const optEl=document.getElementById('options');
+  optEl.innerHTML='';
+  opts.forEach(opt=>{
+    const b=document.createElement('button');
+    b.className='opt-btn';
+    b.textContent=opt;
+    b.onclick=()=>answer(opt,q.answer,b,opts,q);
+    optEl.appendChild(b);
+  });
+
+  clearInterval(timerInt);timeLeft=15;
+  drawTimer(1,false);document.getElementById('timer-num').textContent=15;
+  timerInt=setInterval(()=>{
+    timeLeft--;
+    drawTimer(timeLeft/15,timeLeft<=5);
+    document.getElementById('timer-num').textContent=timeLeft;
+    if(timeLeft<=0){clearInterval(timerInt);timeOut(q);}
+  },1000);
+}
+
+function answer(selected,correct,btn,allOpts,q){
+  if(answered) return;
+  answered=true;clearInterval(timerInt);
+  const tb=Math.floor(timeLeft/15*50);
+  document.querySelectorAll('.opt-btn').forEach(b=>{b.classList.add('disabled');if(b.textContent===correct)b.classList.add('correct');});
+  if(selected===correct){
+    streak++;maxStreak=Math.max(maxStreak,streak);
+    const mult=Math.min(Math.floor(streak/3)+1,4);
+    const pts=100+tb+(streak>1?(streak-1)*20:0);
+    score+=pts*mult;
+    document.getElementById('score-val').textContent=score;
+    btn.classList.add('correct');
+    document.getElementById('score-flash').textContent=`✓ +${pts*mult} pts ${mult>1?'('+mult+'x)':''}`;
+    document.getElementById('score-flash').style.color='#22c55e';
+    tg?.HapticFeedback?.notificationOccurred('success');
+  } else {
+    streak=0;btn.classList.add('wrong');
+    document.getElementById('score-flash').textContent=`✗ Answer: ${correct}`;
+    document.getElementById('score-flash').style.color='#ef4444';
+    tg?.HapticFeedback?.notificationOccurred('error');
+  }
+  setTimeout(()=>{current++;loadQuestion();},1100);
+}
+
+function timeOut(q){
+  if(answered) return;
+  answered=true;streak=0;
+  document.querySelectorAll('.opt-btn').forEach(b=>{b.classList.add('disabled');if(b.textContent===q.answer)b.classList.add('correct');});
+  document.getElementById('score-flash').textContent=`⏱ Time up! Answer: ${q.answer}`;
+  document.getElementById('score-flash').style.color='#f59e0b';
+  tg?.HapticFeedback?.notificationOccurred('warning');
+  setTimeout(()=>{current++;loadQuestion();},1200);
+}
+
+function startGame(){
+  document.getElementById('start-ov').style.display='none';
+  document.getElementById('over-ov').style.display='none';
+  questions=shuffle(PUZZLES).slice(0,TOTAL);
+  current=0;score=0;streak=0;maxStreak=0;
+  document.getElementById('score-val').textContent='0';
+  loadQuestion();
+}
+
+function showOver(){
+  clearInterval(timerInt);
+  const xp=Math.round(score/8);
+  document.getElementById('ov-icon').textContent=score>1200?'🏆':score>800?'🎭':'😅';
+  document.getElementById('ov-title').textContent=score>1200?'Emoji Master!':score>800?'Great Guesser!':'Keep Practicing!';
+  document.getElementById('ov-score').textContent=score+' pts';
+  document.getElementById('ov-sub').textContent=`Best streak: ${maxStreak} 🔥`;
+  document.getElementById('ov-xp').textContent=`+${xp} XP Earned`;
+  document.getElementById('over-ov').style.display='flex';
+  submitScore(xp);
+  saveLeaderboard(score,xp);
+}
+
+function saveLeaderboard(score,xp){
+  const lb=JSON.parse(localStorage.getItem('nexus_emoji_lb')||'[]');
+  lb.push({name:player.first_name||'Player',score,xp,date:Date.now()});
+  lb.sort((a,b)=>b.score-a.score);
+  localStorage.setItem('nexus_emoji_lb',JSON.stringify(lb.slice(0,10)));
+}
+
+async function submitScore(xp){
+  if(!chatId||!player.id||xp<=0) return;
+  try{await fetch(`/api/groups/${chatId}/xp`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},body:JSON.stringify({user_id:player.id,xp})});}catch(e){}
+}
+</script>
+</body>
+</html>

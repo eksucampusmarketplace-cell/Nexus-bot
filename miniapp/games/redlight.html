@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Red Light Green Light</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:-apple-system,sans-serif;overflow:hidden;user-select:none;background:#080c18;color:#e8edf7}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:16px;gap:14px}
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800}
+.stats{display:flex;gap:8px}
+.stat{background:#0f1620;border:1px solid #1a2840;border-radius:10px;padding:6px 14px;text-align:center}
+.stat-val{font-size:18px;font-weight:800}.stat-lbl{font-size:10px;color:#4a6080;text-transform:uppercase}
+.track{width:100%;background:#0f1620;border:1px solid #1a2840;border-radius:16px;padding:12px 14px}
+.track-bg{width:100%;height:56px;position:relative;border-radius:8px;background:#0a0e1a;overflow:hidden}
+.finish{position:absolute;right:12px;top:0;height:100%;width:3px;background:linear-gradient(to bottom,transparent,#22c55e,transparent)}
+.pdot{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;background:#3b82f6;border:3px solid #60a5fa;display:flex;align-items:center;justify-content:center;font-size:16px;transition:left .1s}
+.pct-lbl{font-size:11px;color:#4a6080;text-align:center;margin-top:5px}
+.light-area{display:flex;flex-direction:column;align-items:center;gap:8px}
+.lbox{width:110px;height:110px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:50px;transition:.3s;border:4px solid transparent}
+.lbox.green{background:#22c55e18;border-color:#22c55e;box-shadow:0 0 36px #22c55e44}
+.lbox.red{background:#ef444418;border-color:#ef4444;box-shadow:0 0 36px #ef444444}
+.llbl{font-size:20px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.lsub{font-size:12px;color:#4a6080}
+.tap-area{flex:1;width:100%;border-radius:16px;background:#0f1620;border:1px solid #1a2840;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:32px;transition:.1s}
+.tap-area:active{transform:scale(.99);background:#141d2b}
+.tap-lbl{font-size:16px;font-weight:700;margin-left:8px}
+.overlay{position:fixed;inset:0;background:#000b;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ocard{background:#0f1620;border:1px solid #1a2840;border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,88vw)}
+.oico{font-size:52px;margin-bottom:8px}.otit{font-size:22px;font-weight:800;margin-bottom:4px}
+.oscr{font-size:40px;font-weight:800;color:#22c55e;margin:8px 0}.osub{font-size:13px;color:#4a6080;margin-bottom:6px}
+.oxp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.obtn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">🚦 Red Light</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val" id="sv" style="color:#22c55e">0</div><div class="stat-lbl">Steps</div></div>
+      <div class="stat"><div class="stat-val" id="rv">1</div><div class="stat-lbl">Round</div></div>
+    </div>
+  </div>
+  <div class="track">
+    <div class="track-bg"><div class="finish"></div><div class="pdot" id="pdot" style="left:8px">🚶</div></div>
+    <div class="pct-lbl" id="pct">0% to finish</div>
+  </div>
+  <div class="light-area">
+    <div class="lbox green" id="lbox">🟢</div>
+    <div class="llbl" id="llbl" style="color:#22c55e">GREEN LIGHT</div>
+    <div class="lsub" id="lsub">Tap fast to move!</div>
+  </div>
+  <div class="tap-area" id="ta" onclick="handleTap()">👣<span class="tap-lbl">TAP TO MOVE</span></div>
+</div>
+<div class="overlay" id="sov"><div class="ocard"><div class="oico">🚦</div><div class="otit">Red Light, Green Light</div><div style="font-size:13px;color:#4a6080;margin:8px 0 20px">Tap on GREEN to advance. Tap on RED = eliminated!</div><button class="obtn" onclick="startGame()">Ready?</button></div></div>
+<div class="overlay" id="oov" style="display:none"><div class="ocard"><div class="oico" id="oico">🔴</div><div class="otit" id="otit">Eliminated!</div><div class="oscr" id="oscr">0</div><div class="osub" id="osub"></div><div class="oxp" id="oxp">+0 XP</div><button class="obtn" onclick="startGame()">Try Again</button></div></div>
+<script>
+const tg=window.Telegram?.WebApp;if(tg){tg.expand();tg.ready();}
+const pu=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+let light='green',prog=0,score=0,round=1,running=false,lt,gone=false;
+function setLight(l){
+  light=l;
+  const box=document.getElementById('lbox'),lbl=document.getElementById('llbl'),sub=document.getElementById('lsub'),ta=document.getElementById('ta');
+  if(l==='green'){box.className='lbox green';box.textContent='🟢';lbl.textContent='GREEN LIGHT';lbl.style.color='#22c55e';sub.textContent='Tap fast to move!';ta.style.borderColor='#22c55e50';tg?.HapticFeedback?.impactOccurred('medium');}
+  else{box.className='lbox red';box.textContent='🔴';lbl.textContent='RED LIGHT';lbl.style.color='#ef4444';sub.textContent='FREEZE! Do NOT tap!';ta.style.borderColor='#ef444450';tg?.HapticFeedback?.notificationOccurred('warning');}
+}
+function sched(){
+  if(!running)return;
+  setLight('green');
+  lt=setTimeout(()=>{setLight('red');lt=setTimeout(()=>sched(),1500+Math.random()*2000);},2000+Math.random()*3000);
+}
+function handleTap(){
+  if(!running||gone)return;
+  if(light==='red'){elim();return;}
+  prog=Math.min(100,prog+3+(round-1));score++;
+  document.getElementById('sv').textContent=score;
+  const tw=document.querySelector('.track-bg').offsetWidth-50;
+  document.getElementById('pdot').style.left=Math.floor(prog/100*tw+8)+'px';
+  document.getElementById('pct').textContent=prog+'% to finish';
+  tg?.HapticFeedback?.selectionChanged();
+  if(prog>=100)winRound();
+}
+function winRound(){
+  clearTimeout(lt);running=false;tg?.HapticFeedback?.notificationOccurred('success');round++;
+  document.getElementById('rv').textContent=round;
+  if(round>5){const xp=score*5;setResult('🏆','You survived!',score+' steps','All 5 rounds!',xp);submitScore(xp);}
+  else{prog=0;document.getElementById('pdot').style.left='8px';document.getElementById('pct').textContent='0% to finish';setTimeout(()=>{running=true;sched();},800);}
+}
+function elim(){
+  running=false;gone=true;clearTimeout(lt);tg?.HapticFeedback?.notificationOccurred('error');
+  document.getElementById('pdot').textContent='💀';document.getElementById('pdot').style.background='#ef4444';
+  const xp=Math.floor(score*2);setTimeout(()=>{setResult('🔴','Eliminated!',score+' steps','Tapped on RED!',xp);submitScore(xp);},600);
+}
+function setResult(ico,tit,scr,sub,xp){
+  document.getElementById('oico').textContent=ico;document.getElementById('otit').textContent=tit;
+  document.getElementById('oscr').textContent=scr;document.getElementById('osub').textContent=sub;
+  document.getElementById('oxp').textContent='+'+xp+' XP';document.getElementById('oov').style.display='flex';
+}
+function startGame(){
+  document.getElementById('sov').style.display='none';document.getElementById('oov').style.display='none';
+  prog=0;score=0;round=1;running=true;gone=false;
+  document.getElementById('sv').textContent='0';document.getElementById('rv').textContent='1';
+  document.getElementById('pdot').textContent='🚶';document.getElementById('pdot').style.background='#3b82f6';
+  document.getElementById('pdot').style.left='8px';document.getElementById('pct').textContent='0% to finish';
+  document.getElementById('ta').style.borderColor='';clearTimeout(lt);sched();
+}
+async function submitScore(xp){
+  if(!chatId||!pu.id||xp<=0)return;
+  try{await fetch('/api/groups/'+chatId+'/xp',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'tma '+(tg?.initData||'')},body:JSON.stringify({user_id:pu.id,xp})});}catch(e){}
+}
+</script>
+</body>
+</html>

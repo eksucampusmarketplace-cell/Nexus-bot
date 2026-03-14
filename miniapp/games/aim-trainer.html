@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Aim Trainer</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#080c18;overflow:hidden;user-select:none;font-family:-apple-system,sans-serif}
+.app{display:flex;flex-direction:column;height:100dvh;color:#e8edf7}
+.hud{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#0f1620;border-bottom:1px solid #1a2840;flex-shrink:0}
+.hud-stat{text-align:center}
+.hud-val{font-size:20px;font-weight:800}
+.hud-lbl{font-size:10px;color:#4a6080;text-transform:uppercase;letter-spacing:.06em}
+.timer-bar-wrap{padding:0 16px 0;height:6px;background:#0f1620}
+.timer-bar{height:100%;border-radius:3px;transition:width .1s linear,background .3s}
+canvas#aim{display:block;flex:1;cursor:crosshair;touch-action:none}
+
+.overlay{position:fixed;inset:0;background:#000c;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ov-card{background:#0f1620;border:1px solid #1a2840;border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;color:#e8edf7;margin-bottom:4px}
+.ov-big{font-size:42px;font-weight:900;color:#ef4444;margin:8px 0}
+.ov-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.ov-stat{background:#080c18;border-radius:10px;padding:10px;text-align:center}
+.ov-stat-val{font-size:18px;font-weight:800}
+.ov-stat-lbl{font-size:10px;color:#4a6080;text-transform:uppercase;letter-spacing:.06em}
+.ov-xp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#ef4444,#b91c1c);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hud">
+    <div class="hud-stat"><div class="hud-val" id="hits">0</div><div class="hud-lbl">Hits</div></div>
+    <div class="hud-stat"><div class="hud-val" id="accuracy" style="color:#22c55e">100%</div><div class="hud-lbl">Accuracy</div></div>
+    <div class="hud-stat"><div class="hud-val" id="streak-val">0🔥</div><div class="hud-lbl">Streak</div></div>
+    <div class="hud-stat"><div class="hud-val" id="score-val" style="color:#f59e0b">0</div><div class="hud-lbl">Score</div></div>
+  </div>
+  <div class="timer-bar-wrap"><div class="timer-bar" id="timer-bar" style="width:100%;background:#22c55e"></div></div>
+  <canvas id="aim"></canvas>
+</div>
+
+<div class="overlay" id="start-ov">
+  <div class="ov-card">
+    <div class="ov-icon">🎯</div>
+    <div class="ov-title">Aim Trainer</div>
+    <div style="font-size:13px;color:#4a6080;margin:8px 0 20px">Tap the targets as fast as you can. Smaller = more points. 30 seconds!</div>
+    <button class="ov-btn" onclick="startGame()" style="background:linear-gradient(135deg,#ef4444,#b91c1c)">Start Training</button>
+  </div>
+</div>
+<div class="overlay" id="over-ov" style="display:none">
+  <div class="ov-card">
+    <div class="ov-icon" id="ov-icon">🎯</div>
+    <div class="ov-title" id="ov-title">Results</div>
+    <div class="ov-big" id="ov-score">0</div>
+    <div class="ov-stats">
+      <div class="ov-stat"><div class="ov-stat-val" id="ov-hits" style="color:#22c55e">0</div><div class="ov-stat-lbl">Hits</div></div>
+      <div class="ov-stat"><div class="ov-stat-val" id="ov-miss" style="color:#ef4444">0</div><div class="ov-stat-lbl">Misses</div></div>
+      <div class="ov-stat"><div class="ov-stat-val" id="ov-acc">100%</div><div class="ov-stat-lbl">Accuracy</div></div>
+      <div class="ov-stat"><div class="ov-stat-val" id="ov-streak" style="color:#f59e0b">0</div><div class="ov-stat-lbl">Best Streak</div></div>
+    </div>
+    <div class="ov-xp" id="ov-xp">+0 XP</div>
+    <button class="ov-btn" onclick="startGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+
+const canvas=document.getElementById('aim');
+const ctx=canvas.getContext('2d');
+function resize(){canvas.width=canvas.clientWidth;canvas.height=canvas.clientHeight;}
+resize();
+
+const DURATION=30;
+let targets=[],score=0,hits=0,misses=0,streak=0,maxStreak=0,timeLeft=DURATION,running=false,raf,lastTS,timerRAF;
+
+function randTarget(){
+  const minR=20,maxR=45;
+  const r=minR+Math.random()*(maxR-minR);
+  const margin=r+10;
+  return{
+    x:margin+Math.random()*(canvas.width-2*margin),
+    y:margin+Math.random()*(canvas.height-2*margin),
+    r,maxLife:2+Math.random()*2,life:0,
+    pts:Math.round(100*(maxR-r)/(maxR-minR)+20)
+  };
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#080c18';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle='#0f1620';ctx.lineWidth=1;
+  for(let x=0;x<canvas.width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke();}
+  for(let y=0;y<canvas.height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+
+  targets.forEach(t=>{
+    const age=t.life/t.maxLife;
+    const alpha=age<0.2?age/0.2:age>0.7?(1-age)/0.3:1;
+    const scale=age<0.1?age/0.1:1;
+    ctx.save();ctx.globalAlpha=alpha;ctx.translate(t.x,t.y);ctx.scale(scale,scale);
+    ctx.beginPath();ctx.arc(0,0,t.r,0,Math.PI*2);
+    ctx.strokeStyle='#ef4444';ctx.lineWidth=3;ctx.stroke();
+    const pulseR=t.r*(1-age*0.3);
+    ctx.beginPath();ctx.arc(0,0,pulseR,0,Math.PI*2);
+    ctx.fillStyle=`rgba(239,68,68,${0.15+Math.sin(age*Math.PI*4)*0.05})`;ctx.fill();
+    ctx.beginPath();ctx.arc(0,0,5,0,Math.PI*2);ctx.fillStyle='#ef4444';ctx.fill();
+    ctx.strokeStyle='#ef444488';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(-t.r,0);ctx.lineTo(t.r,0);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,-t.r);ctx.lineTo(0,t.r);ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function gameLoop(ts){
+  if(!running) return;
+  const dt=(ts-lastTS)/1000;lastTS=ts;
+  targets.forEach(t=>t.life=Math.min(t.life+dt,t.maxLife));
+  targets=targets.filter(t=>t.life<t.maxLife);
+  while(targets.length<3) targets.push(randTarget());
+  draw();
+  raf=requestAnimationFrame(gameLoop);
+}
+
+function timerLoop(ts){
+  if(!running) return;
+  timeLeft=Math.max(0,DURATION-(ts-startTS)/1000);
+  const pct=timeLeft/DURATION*100;
+  const bar=document.getElementById('timer-bar');
+  bar.style.width=pct+'%';
+  bar.style.background=pct>50?'#22c55e':pct>25?'#f59e0b':'#ef4444';
+  if(timeLeft<=0){endGame();return;}
+  timerRAF=requestAnimationFrame(timerLoop);
+}
+
+let startTS;
+function startGame(){
+  document.getElementById('start-ov').style.display='none';
+  document.getElementById('over-ov').style.display='none';
+  resize();
+  targets=[];score=0;hits=0;misses=0;streak=0;maxStreak=0;running=true;
+  ['hits','accuracy','streak-val','score-val'].forEach(id=>document.getElementById(id).textContent=id==='accuracy'?'100%':id==='streak-val'?'0🔥':'0');
+  startTS=performance.now();lastTS=startTS;
+  raf=requestAnimationFrame(gameLoop);
+  timerRAF=requestAnimationFrame(timerLoop);
+}
+
+function tap(x,y){
+  if(!running) return;
+  let hit=false;
+  for(let i=targets.length-1;i>=0;i--){
+    const t=targets[i];
+    const dist=Math.hypot(x-t.x,y-t.y);
+    if(dist<=t.r){
+      hits++;streak++;maxStreak=Math.max(maxStreak,streak);
+      const mult=Math.min(Math.floor(streak/5)+1,4);
+      score+=t.pts*mult;
+      targets.splice(i,1);
+      tg?.HapticFeedback?.impactOccurred('light');
+      document.getElementById('hits').textContent=hits;
+      document.getElementById('score-val').textContent=score;
+      document.getElementById('streak-val').textContent=streak+'🔥';
+      document.getElementById('accuracy').textContent=Math.round(hits/(hits+misses)*100)+'%';
+      hit=true;break;
+    }
+  }
+  if(!hit){misses++;streak=0;document.getElementById('streak-val').textContent='0';document.getElementById('accuracy').textContent=Math.round(hits/(hits+misses)*100)+'%';tg?.HapticFeedback?.impactOccurred('rigid');}
+}
+
+canvas.addEventListener('touchstart',e=>{e.preventDefault();const r=canvas.getBoundingClientRect();Array.from(e.changedTouches).forEach(t=>tap(t.clientX-r.left,t.clientY-r.top));},{passive:false});
+canvas.addEventListener('mousedown',e=>{const r=canvas.getBoundingClientRect();tap(e.clientX-r.left,e.clientY-r.top);});
+
+function endGame(){
+  running=false;cancelAnimationFrame(raf);cancelAnimationFrame(timerRAF);
+  tg?.HapticFeedback?.notificationOccurred('success');
+  const acc=hits+misses>0?Math.round(hits/(hits+misses)*100):0;
+  const xp=Math.floor(score/15);
+  document.getElementById('ov-icon').textContent=acc>80?'🎯':acc>60?'👍':'🙈';
+  document.getElementById('ov-title').textContent=acc>80?'Sharpshooter!':acc>60?'Good Aim!':'Keep Training!';
+  document.getElementById('ov-score').textContent=score;
+  document.getElementById('ov-hits').textContent=hits;
+  document.getElementById('ov-miss').textContent=misses;
+  document.getElementById('ov-acc').textContent=acc+'%';
+  document.getElementById('ov-streak').textContent=maxStreak;
+  document.getElementById('ov-xp').textContent=`+${xp} XP Earned`;
+  document.getElementById('over-ov').style.display='flex';
+  submitScore(xp);
+  saveLeaderboard(score,xp,acc);
+}
+
+function saveLeaderboard(score,xp,acc){
+  const lb=JSON.parse(localStorage.getItem('nexus_aim_lb')||'[]');
+  lb.push({name:player.first_name||'Player',score,xp,accuracy:acc,date:Date.now()});
+  lb.sort((a,b)=>b.score-a.score);
+  localStorage.setItem('nexus_aim_lb',JSON.stringify(lb.slice(0,10)));
+}
+
+async function submitScore(xp){
+  if(!chatId||!player.id||xp<=0) return;
+  try{await fetch(`/api/groups/${chatId}/xp`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},body:JSON.stringify({user_id:player.id,xp})});}catch(e){}
+}
+</script>
+</body>
+</html>

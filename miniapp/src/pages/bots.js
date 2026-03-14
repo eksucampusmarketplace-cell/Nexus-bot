@@ -22,6 +22,11 @@ export async function renderBotsPage(container) {
     grid.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--sp-4);';
     
     bots.forEach(bot => {
+      // Primary bot has unlimited group limit, clones have limits
+      const isPrimary = bot.is_primary === true;
+      const groupLimit = isPrimary ? 'Unlimited' : `${bot.group_limit || 1} limit`;
+      const primaryBadge = isPrimary ? Badge('Primary', 'accent').outerHTML : '';
+
       const botCard = Card({
         title: bot.display_name,
         subtitle: `@${bot.username}`,
@@ -31,9 +36,13 @@ export async function renderBotsPage(container) {
               <span style="color: var(--text-muted);">Status:</span>
               <span>${Badge(bot.status, bot.status === 'active' ? 'success' : 'danger').outerHTML}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: var(--text-sm);">
+            <div style="display: flex; justify-content: space-between; font-size: var(--text-sm;">
               <span style="color: var(--text-muted);">Groups:</span>
-              <span>${bot.group_limit || 1} limit</span>
+              <span>${groupLimit}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: var(--text-sm;">
+              <span style="color: var(--text-muted);">Type:</span>
+              <span>${primaryBadge || Badge('Clone', 'default').outerHTML}</span>
             </div>
           </div>
         `,

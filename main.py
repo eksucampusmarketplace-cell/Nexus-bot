@@ -276,6 +276,7 @@ try:
     from api.routes import (
         auth,
         automod,
+        backup,
         bots,
         broadcast,
         channel_gate,
@@ -316,6 +317,7 @@ try:
     app.include_router(members.router)  # prefix="/api/groups/{chat_id}"
     app.include_router(messages.router)  # prefix="/api/groups/{chat_id}/messages"
     app.include_router(roles.router)  # prefix="/api/groups"
+    app.include_router(backup.router)  # prefix="/api/groups"
     app.include_router(reports.router)  # prefix="/api/groups/{chat_id}/reports"
     app.include_router(webhooks.router)  # prefix="/api/groups"
     app.include_router(text_config.router)  # prefix="/api/groups"

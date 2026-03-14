@@ -64,3 +64,80 @@ async def bulk_update_settings(chat_id: int, request: Request):
 async def group_logs(chat_id: int, user: dict = Depends(get_current_user)):
     logs = await get_recent_logs(chat_id)
     return logs
+
+
+@router.get("/{chat_id}/leaderboard")
+async def group_leaderboard(chat_id: int, limit: int = 20, user: dict = Depends(get_current_user)):
+    """Get leaderboard for a group (top members by XP/message count)."""
+    async with db.pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT
+                user_id,
+                first_name,
+                username,
+                message_count,
+                trust_score
+            FROM users
+            WHERE chat_id = $1
+            ORDER BY message_count DESC
+            LIMIT $2
+        """, chat_id, limit)
+
+    leaderboard = []
+    for row in rows:
+        # Approximate XP from message count (10 XP per message)
+        xp = (row['message_count'] or 0) * 10
+        # Approximate level from XP (simple formula)
+        level = max(1, int((xp / 1000) ** 0.5)) if xp > 0 else 1
+
+        # Determine badges (simplified)
+        badges = []
+        if xp >= 10000:
+            badges.append('first_1000')
+        if xp >= 5000:
+            badges.append('level_10')
+        if xp >= 1000:
+            badges.append('level_5')
+        if xp >= 500:
+            badges.append('first_100')
+
+        leaderboard.append({
+            'user_id': row['user_id'],
+            'first_name': row['first_name'] or 'User',
+            'username': row['username'],
+            'xp': xp,
+            'level': level,
+            'badges': badges
+        })
+
+    return {'chat_id': chat_id, 'leaderboard': leaderboard}
+
+
+@router.get("/{chat_id}/member-stats")
+async def group_member_stats(chat_id: int, limit: int = 20, user: dict = Depends(get_current_user)):
+    """Get member statistics for a group."""
+    async with db.pool.acquire() as conn:
+        rows = await conn.fetch("""
+            SELECT
+                user_id,
+                first_name,
+                username,
+                message_count,
+                trust_score
+            FROM users
+            WHERE chat_id = $1
+            ORDER BY message_count DESC
+            LIMIT $2
+        """, chat_id, limit)
+
+    members = []
+    for row in rows:
+        members.append({
+            'user_id': row['user_id'],
+            'first_name': row['first_name'] or 'User',
+            'username': row['username'],
+            'message_count': row['message_count'] or 0,
+            'trust_score': row['trust_score'] or 50
+        })
+
+    return {'chat_id': chat_id, 'top_members': members}

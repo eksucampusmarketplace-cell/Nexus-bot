@@ -361,13 +361,16 @@
       <div id="page-bots" class="page"></div>
       <div id="page-automod" class="page"></div>
       <div id="page-members" class="page"></div>
+      <div id="page-gamification" class="page"></div>
+      <div id="page-roles" class="page"></div>
       <div id="page-music" class="page"></div>
       <div id="page-commands" class="page"></div>
       <div id="page-modules" class="page"></div>
       <div id="page-analytics" class="page"></div>
+      <div id="page-webhooks" class="page"></div>
+      <div id="page-backup" class="page"></div>
       <div id="page-settings" class="page"></div>
       <div id="page-logs" class="page"></div>
-      <div id="page-webhooks" class="page"></div>
     </div>
 
     <!-- Bottom Nav (mobile) -->
@@ -481,11 +484,14 @@
         { id: 'commands', label: 'Commands', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>' },
         { id: 'automod', label: 'AutoMod', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
         { id: 'members', label: 'Members', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
+        { id: 'gamification', label: 'Leaderboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>' },
+        { id: 'roles', label: 'Roles', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' },
         { id: 'music', label: 'Music', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },
         { id: 'modules', label: 'Modules', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
         { id: 'analytics', label: 'Analytics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' },
         { id: 'webhooks', label: 'Integrations', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' },
         { id: 'broadcast', label: 'Broadcast', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8z"/><path d="M22 12l-4-4v8l4-4z"/></svg>' },
+        { id: 'backup', label: 'Backup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' },
         { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>' },
         { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
       ];
@@ -555,6 +561,15 @@
         case 'analytics':
           await renderAnalyticsPage(container);
           break;
+        case 'gamification':
+          await renderGamificationPage(container);
+          break;
+        case 'roles':
+          await renderRolesPage(container);
+          break;
+        case 'backup':
+          await renderBackupPage(container);
+          break;
         case 'settings':
           await renderSettings(container);
           break;
@@ -568,6 +583,189 @@
           await renderBroadcastPage(container);
           break;
       }
+    }
+
+    async function renderGamificationPage(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      
+      container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
+      if (!chatId) {
+        container.appendChild(EmptyState({ icon: '🏆', title: 'Select a group', description: 'Choose a group to view the leaderboard.' }));
+        return;
+      }
+      
+      try {
+        const data = await apiFetch(`/api/groups/${chatId}/leaderboard?limit=20`);
+        
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
+        header.innerHTML = `
+          <div>
+            <h2 style="font-size:20px;font-weight:700;margin:0;">🏆 Leaderboard</h2>
+            <p style="color:var(--text-muted);font-size:13px;margin:4px 0 0;">Top members by XP</p>
+          </div>
+          <a href="games.html?chat_id=${chatId}" class="btn btn-primary" style="text-decoration:none;">🎮 Play Games</a>
+        `;
+        container.appendChild(header);
+        
+        if (!data.leaderboard || data.leaderboard.length === 0) {
+          container.appendChild(EmptyState({ icon: '🎮', title: 'No XP yet', description: 'Play games to earn XP and climb the leaderboard!' }));
+          return;
+        }
+        
+        const medals = ['🥇', '🥈', '🥉'];
+        const list = document.createElement('div');
+        list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+        
+        data.leaderboard.forEach((user, i) => {
+          const badges = user.badges || [];
+          const badgesHtml = badges.map(b => {
+            const badgeMap = {
+              'first_100': '💯', 'first_1000': '🏆', 'streak_7': '🔥', 
+              'streak_30': '⚡', 'level_5': '📈', 'level_10': '👑', 'level_25': '🔱'
+            };
+            return `<span style="margin-left:2px;">${badgeMap[b] || '🏅'}</span>`;
+          }).join('');
+          
+          const row = document.createElement('div');
+          row.style.cssText = `
+            display:flex;align-items:center;gap:var(--sp-3);
+            padding:var(--sp-3);background:var(--card);
+            border:1px solid var(--border);border-radius:var(--r-lg);
+          `;
+          row.innerHTML = `
+            <div style="font-size:20px;width:32px;text-align:center;font-weight:700;">${medals[i] || i + 1}</div>
+            <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#00d4ff);display:flex;align-items:center;justify-content:center;font-weight:700;">${(user.first_name || 'U').charAt(0).toUpperCase()}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${user.first_name || 'User'} ${badgesHtml}</div>
+              <div style="font-size:12px;color:var(--text-muted);">Level ${user.level || 1} • ${user.xp || 0} XP</div>
+            </div>
+          `;
+          list.appendChild(row);
+        });
+        
+        container.appendChild(list);
+      } catch (err) {
+        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: err.message }));
+      }
+    }
+
+    async function renderRolesPage(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      
+      container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
+      if (!chatId) {
+        container.appendChild(EmptyState({ icon: '👑', title: 'Select a group', description: 'Choose a group to manage roles.' }));
+        return;
+      }
+      
+      try {
+        const data = await apiFetch(`/api/groups/${chatId}/roles`);
+        
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
+        header.innerHTML = `
+          <div>
+            <h2 style="font-size:20px;font-weight:700;margin:0;">👑 Roles</h2>
+            <p style="color:var(--text-muted);font-size:13px;margin:4px 0 0;">Custom roles and permissions</p>
+          </div>
+        `;
+        container.appendChild(header);
+        
+        if (!data.roles || data.roles.length === 0) {
+          container.appendChild(EmptyState({ icon: '👑', title: 'No roles yet', description: 'Create custom roles to grant specific permissions to members.' }));
+          return;
+        }
+        
+        const list = document.createElement('div');
+        list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+        
+        data.roles.forEach(role => {
+          const perms = Object.entries(role.permissions || {}).filter(([k,v]) => v).map(([k]) => k).slice(0, 3);
+          const row = document.createElement('div');
+          row.style.cssText = `
+            display:flex;align-items:center;gap:var(--sp-3);
+            padding:var(--sp-3);background:var(--card);
+            border:1px solid var(--border);border-radius:var(--r-lg);
+          `;
+          row.innerHTML = `
+            <div style="width:12px;height:12px;border-radius:50%;background:${role.color || '#64748b'};"></div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:14px;">${role.name}</div>
+              <div style="font-size:12px;color:var(--text-muted);">${perms.length > 0 ? perms.join(', ') : 'No permissions'}</div>
+            </div>
+          `;
+          list.appendChild(row);
+        });
+        
+        container.appendChild(list);
+      } catch (err) {
+        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: err.message }));
+      }
+    }
+
+    async function renderBackupPage(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      
+      container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
+      if (!chatId) {
+        container.appendChild(EmptyState({ icon: '💾', title: 'Select a group', description: 'Choose a group to backup/restore settings.' }));
+        return;
+      }
+      
+      const card = Card({
+        title: '💾 Backup & Restore',
+        subtitle: 'Export and import group configuration',
+        children: `
+          <div style="display:flex;flex-direction:column;gap:var(--sp-4);">
+            <div>
+              <h4 style="margin:0 0 var(--sp-2);font-size:14px;">Export Backup</h4>
+              <p style="font-size:13px;color:var(--text-muted);margin:0 0 var(--sp-3);">Download all group settings as a JSON file.</p>
+              <a href="/api/groups/${chatId}/backup" target="_blank" class="btn btn-primary" style="text-decoration:none;display:inline-block;">📥 Download Backup</a>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:var(--sp-4);">
+              <h4 style="margin:0 0 var(--sp-2);font-size:14px;">Restore from Backup</h4>
+              <p style="font-size:13px;color:var(--text-muted);margin:0 0 var(--sp-3);">Upload a backup JSON file to restore settings.</p>
+              <div style="display:flex;gap:var(--sp-2);">
+                <input type="file" id="backup-file" accept=".json" style="flex:1;" />
+                <button class="btn btn-secondary" onclick="restoreBackup()">📤 Restore</button>
+              </div>
+            </div>
+          </div>
+        `
+      });
+      container.appendChild(card);
+      
+      window.restoreBackup = async () => {
+        const fileInput = document.getElementById('backup-file');
+        if (!fileInput.files || !fileInput.files[0]) {
+          showToast('Please select a file', 'error');
+          return;
+        }
+        
+        try {
+          const text = await fileInput.files[0].text();
+          const data = JSON.parse(text);
+          
+          await apiFetch(`/api/groups/${chatId}/restore`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+          });
+          
+          showToast('Backup restored successfully!', 'success');
+        } catch (err) {
+          showToast(err.message || 'Failed to restore', 'error');
+        }
+      };
     }
 
     async function renderDashboard(container) {

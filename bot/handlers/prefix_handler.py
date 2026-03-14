@@ -2,6 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from telegram.constants import ParseMode
+from bot.utils.rate_limiter import command_limiter, format_wait_time
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,15 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def prefix_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
+        return
+
+    # Rate limit check
+    user_id = str(update.effective_user.id)
+    if not command_limiter.allow(user_id):
+        wait_time = command_limiter.get_reset_time(user_id)
+        await update.message.reply_text(
+            f'⚠️ Slow down! Too many commands. Try again in {format_wait_time(wait_time)}.'
+        )
         return
 
     text = update.message.text or ""

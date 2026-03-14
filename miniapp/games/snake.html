@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Snake</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#060a14;--card:#0d1420;--border:#152030;--text:#e8edf7;--muted:#4a6080;--accent:#22c55e;--r:12px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:12px;gap:10px}
+
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--accent)}
+.score-row{display:flex;gap:10px}
+.score-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 14px;text-align:center}
+.score-val{font-size:18px;font-weight:800;color:var(--accent)}
+.score-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+canvas#game{border-radius:var(--r);border:1px solid var(--border);display:block;background:#060a14}
+
+/* D-pad */
+.dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:4px}
+.dpad-btn{background:var(--card);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;transition:.1s;color:var(--text)}
+.dpad-btn:active{background:#152030;transform:scale(.93)}
+.dpad-center{background:transparent;border:none;cursor:default}
+.dpad-empty{opacity:0;pointer-events:none}
+
+/* Overlay */
+.overlay{position:fixed;inset:0;background:#000c;backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:50}
+.overlay-card{background:#0d1420;border:1px solid #152030;border-radius:20px;padding:28px 24px;text-align:center;width:min(280px,85vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:4px}
+.ov-score{font-size:36px;font-weight:800;color:var(--accent);margin:8px 0}
+.ov-best{font-size:13px;color:var(--muted);margin-bottom:16px}
+.ov-xp{font-size:14px;font-weight:600;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,var(--accent),#16a34a);color:#000;margin-bottom:8px}
+.ov-btn:active{transform:scale(.98)}
+.ov-btn-ghost{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+
+/* Leaderboard inside overlay */
+.lb{width:100%;background:#080e18;border-radius:10px;overflow:hidden;margin-top:4px}
+.lb-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #152030;font-size:13px}
+.lb-row:last-child{border:none}
+.lb-rank{width:20px;font-size:12px;font-weight:700;color:var(--muted)}
+.lb-name{flex:1;font-weight:500}
+.lb-score{font-size:12px;font-weight:600;color:var(--accent)}
+
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">🐍 SNAKE</div>
+    <div class="score-row">
+      <div class="score-box"><div class="score-val" id="score">0</div><div class="score-lbl">Score</div></div>
+      <div class="score-box"><div class="score-val" id="best">0</div><div class="score-lbl">Best</div></div>
+    </div>
+  </div>
+  
+  <canvas id="game"></canvas>
+  
+  <div class="dpad">
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="up">↑</div>
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="left">←</div>
+    <div class="dpad-btn dpad-center">●</div>
+    <div class="dpad-btn" id="right">→</div>
+    <div class="dpad-empty"></div>
+    <div class="dpad-btn" id="down">↓</div>
+    <div class="dpad-empty"></div>
+  </div>
+</div>
+
+<!-- Start overlay -->
+<div class="overlay" id="start-overlay">
+  <div class="overlay-card">
+    <div class="ov-icon">🐍</div>
+    <div class="ov-title">Snake</div>
+    <div style="font-size:13px;color:#4a6080;margin:8px 0 20px">Eat food to grow. Don't hit walls or yourself!</div>
+    <button class="ov-btn" onclick="startGame()">Play</button>
+  </div>
+</div>
+
+<!-- Game over overlay -->
+<div class="overlay" id="over-overlay" style="display:none">
+  <div class="overlay-card">
+    <div class="ov-icon" id="ov-icon">💀</div>
+    <div class="ov-title" id="ov-title">Game Over</div>
+    <div class="ov-score" id="ov-score">0</div>
+    <div class="ov-best" id="ov-best">Best: 0</div>
+    <div class="ov-xp" id="ov-xp">+0 XP Earned</div>
+    <div class="lb" id="ov-lb"></div>
+    <button class="ov-btn" onclick="restartGame()" style="margin-top:16px">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas(){
+  const app = document.querySelector('.app');
+  const avail = app.clientHeight - 44 - 10 - 10*3 - 52*3 - 20;
+  const size = Math.min(app.clientWidth - 24, avail, 340);
+  canvas.width = canvas.height = size;
+}
+resizeCanvas();
+
+const CELL = 20;
+const COLS = Math.floor(canvas.width / CELL);
+const ROWS = Math.floor(canvas.height / CELL);
+const CW = canvas.width, CH = canvas.height;
+
+let snake, dir, nextDir, food, specialFood, score, best, running, animFrame, speed;
+let bestScore = parseInt(localStorage.getItem('nexus_snake_best')||'0');
+document.getElementById('best').textContent = bestScore;
+
+const COLORS = {
+  bg:'#060a14', grid:'#0a1020',
+  snake_head:'#22c55e', snake_body:'#16a34a', snake_eye:'#dcfce7',
+  food:'#ef4444', food_glow:'#ef444440',
+  special:'#f59e0b', special_glow:'#f59e0b40',
+  wall:'#152030'
+};
+
+function initGame(){
+  const mx = Math.floor(COLS/2), my = Math.floor(ROWS/2);
+  snake = [{x:mx,y:my},{x:mx-1,y:my},{x:mx-2,y:my}];
+  dir = {x:1,y:0};
+  nextDir = {x:1,y:0};
+  score = 0;
+  speed = 180;
+  specialFood = null;
+  placeFood();
+  document.getElementById('score').textContent = '0';
+}
+
+function placeFood(){
+  do { food = {x:Math.floor(Math.random()*COLS), y:Math.floor(Math.random()*ROWS)}; }
+  while(snake.some(s=>s.x===food.x&&s.y===food.y));
+}
+
+function placeSpecial(){
+  do { specialFood = {x:Math.floor(Math.random()*COLS), y:Math.floor(Math.random()*ROWS), timer:80}; }
+  while(snake.some(s=>s.x===specialFood.x&&s.y===specialFood.y) || (food.x===specialFood.x&&food.y===specialFood.y));
+}
+
+let lastTime = 0;
+function gameLoop(ts){
+  if(!running) return;
+  const dt = ts - lastTime;
+  if(dt >= speed){
+    lastTime = ts;
+    update();
+  }
+  draw();
+  animFrame = requestAnimationFrame(gameLoop);
+}
+
+function update(){
+  dir = nextDir;
+  const head = {x:snake[0].x+dir.x, y:snake[0].y+dir.y};
+  
+  if(head.x<0||head.x>=COLS||head.y<0||head.y>=ROWS){ gameOver(); return; }
+  if(snake.some(s=>s.x===head.x&&s.y===head.y)){ gameOver(); return; }
+  
+  snake.unshift(head);
+  
+  if(head.x===food.x&&head.y===food.y){
+    score += 10;
+    tg?.HapticFeedback?.impactOccurred('light');
+    placeFood();
+    speed = Math.max(80, speed - 3);
+    document.getElementById('score').textContent = score;
+    if(score % 50 === 0 && !specialFood) placeSpecial();
+  } else if(specialFood && head.x===specialFood.x&&head.y===specialFood.y){
+    score += 50;
+    tg?.HapticFeedback?.impactOccurred('heavy');
+    specialFood = null;
+    document.getElementById('score').textContent = score;
+  } else {
+    snake.pop();
+  }
+  
+  if(specialFood){
+    specialFood.timer--;
+    if(specialFood.timer<=0) specialFood = null;
+  }
+}
+
+let foodPulse = 0;
+function draw(){
+  ctx.fillStyle = COLORS.bg;
+  ctx.fillRect(0,0,CW,CH);
+  
+  ctx.strokeStyle = COLORS.grid;
+  ctx.lineWidth = .3;
+  for(let x=0;x<COLS;x++) for(let y=0;y<ROWS;y++){
+    ctx.strokeRect(x*CELL,y*CELL,CELL,CELL);
+  }
+  
+  foodPulse = (foodPulse+.08)%(Math.PI*2);
+  
+  if(specialFood){
+    const sx = specialFood.x*CELL+CELL/2, sy = specialFood.y*CELL+CELL/2;
+    const puls = .5+Math.sin(foodPulse*2)*.2;
+    ctx.beginPath();
+    ctx.arc(sx,sy,CELL*0.6*puls,0,2*Math.PI);
+    ctx.fillStyle = COLORS.special_glow;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(sx,sy,CELL*0.38,0,2*Math.PI);
+    ctx.fillStyle = COLORS.special;
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('★', sx, sy);
+    const t = specialFood.timer/80;
+    ctx.beginPath();
+    ctx.arc(sx,sy,CELL*0.48,-Math.PI/2,-Math.PI/2+2*Math.PI*t);
+    ctx.strokeStyle = '#f59e0b80';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+  
+  const fx = food.x*CELL+CELL/2, fy = food.y*CELL+CELL/2;
+  const fp = .5+Math.sin(foodPulse)*.15;
+  ctx.beginPath();
+  ctx.arc(fx,fy,CELL*0.55*fp,0,2*Math.PI);
+  ctx.fillStyle = COLORS.food_glow;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(fx,fy,CELL*0.35,0,2*Math.PI);
+  ctx.fillStyle = COLORS.food;
+  ctx.fill();
+  
+  snake.forEach((seg, i) => {
+    const x = seg.x*CELL+1, y = seg.y*CELL+1, s = CELL-2;
+    const alpha = Math.max(0.4, 1 - i/snake.length*0.6);
+    
+    if(i===0){
+      ctx.fillStyle = COLORS.snake_head;
+      roundRect(ctx, x, y, s, s, 5);
+      ctx.fill();
+      const eyeOffX = dir.x===0 ? 3 : dir.x===1 ? s-6 : 2;
+      const eyeOffY = dir.y===0 ? 3 : dir.y===1 ? s-6 : 2;
+      ctx.fillStyle = COLORS.snake_eye;
+      ctx.beginPath(); ctx.arc(x+eyeOffX, y+4, 2, 0, 2*Math.PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+eyeOffX, y+s-5, 2, 0, 2*Math.PI); ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(x+eyeOffX+.5, y+4, 1, 0, 2*Math.PI); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+eyeOffX+.5, y+s-5, 1, 0, 2*Math.PI); ctx.fill();
+    } else {
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = COLORS.snake_body;
+      roundRect(ctx, x+1, y+1, s-2, s-2, 4);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  });
+}
+
+function roundRect(c, x, y, w, h, r){
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.lineTo(x+w-r,y);
+  c.quadraticCurveTo(x+w,y,x+w,y+r);
+  c.lineTo(x+w,y+h-r);
+  c.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  c.lineTo(x+r,y+h);
+  c.quadraticCurveTo(x,y+h,x,y+h-r);
+  c.lineTo(x,y+r);
+  c.quadraticCurveTo(x,y,x+r,y);
+  c.closePath();
+}
+
+function gameOver(){
+  running = false;
+  cancelAnimationFrame(animFrame);
+  tg?.HapticFeedback?.notificationOccurred('error');
+  
+  const xp = Math.floor(score/10)*5;
+  if(score > bestScore){
+    bestScore = score;
+    localStorage.setItem('nexus_snake_best', bestScore);
+    document.getElementById('best').textContent = bestScore;
+  }
+  
+  document.getElementById('ov-icon').textContent = score > 100 ? '🏆' : score > 50 ? '🎯' : '💀';
+  document.getElementById('ov-title').textContent = score > 100 ? 'Amazing Run!' : score > 50 ? 'Good Game!' : 'Game Over';
+  document.getElementById('ov-score').textContent = score;
+  document.getElementById('ov-best').textContent = 'Best: ' + bestScore;
+  document.getElementById('ov-xp').textContent = xp > 0 ? `+${xp} XP Earned` : 'No XP this time';
+  
+  updateLB(player.first_name, score);
+  document.getElementById('over-overlay').style.display = 'flex';
+  
+  if(xp > 0) submitScore(xp);
+}
+
+function updateLB(name, sc){
+  const key = 'nexus_snake_lb';
+  let lb = JSON.parse(localStorage.getItem(key)||'[]');
+  const ex = lb.findIndex(e=>e.name===name);
+  if(ex>=0){if(sc>lb[ex].score)lb[ex].score=sc;}
+  else lb.push({name,score:sc});
+  lb.sort((a,b)=>b.score-a.score);
+  lb=lb.slice(0,5);
+  localStorage.setItem(key,JSON.stringify(lb));
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('ov-lb').innerHTML = lb.map((e,i)=>`
+    <div class="lb-row">
+      <div class="lb-rank">${medals[i]||i+1}</div>
+      <div class="lb-name">${e.name}</div>
+      <div class="lb-score">${e.score}</div>
+    </div>
+  `).join('');
+}
+
+function startGame(){
+  document.getElementById('start-overlay').style.display = 'none';
+  initGame();
+  running = true;
+  lastTime = 0;
+  requestAnimationFrame(t=>{lastTime=t;animFrame=requestAnimationFrame(gameLoop);});
+}
+
+function restartGame(){
+  document.getElementById('over-overlay').style.display = 'none';
+  initGame();
+  running = true;
+  lastTime = 0;
+  requestAnimationFrame(t=>{lastTime=t;animFrame=requestAnimationFrame(gameLoop);});
+}
+
+const setDir = (x,y) => {
+  if(dir.x===-x&&dir.y===-y) return;
+  nextDir = {x,y};
+  tg?.HapticFeedback?.selectionChanged();
+};
+document.getElementById('up').addEventListener('touchstart',e=>{e.preventDefault();setDir(0,-1)},{passive:false});
+document.getElementById('down').addEventListener('touchstart',e=>{e.preventDefault();setDir(0,1)},{passive:false});
+document.getElementById('left').addEventListener('touchstart',e=>{e.preventDefault();setDir(-1,0)},{passive:false});
+document.getElementById('right').addEventListener('touchstart',e=>{e.preventDefault();setDir(1,0)},{passive:false});
+
+document.addEventListener('keydown',e=>{
+  const map = {ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
+  if(map[e.key]){e.preventDefault();setDir(...map[e.key]);}
+});
+
+let sx,sy;
+canvas.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
+canvas.addEventListener('touchend',e=>{
+  const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<20) return;
+  if(Math.abs(dx)>Math.abs(dy)) setDir(dx>0?1:-1,0);
+  else setDir(0,dy>0?1:-1);
+},{passive:true});
+
+async function submitScore(xp){
+  if(!chatId||chatId==='0'||!player.id) return;
+  try {
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id,xp})
+    });
+  } catch(e){}
+}
+
+initGame();
+draw();
+</script>
+</body>
+</html>

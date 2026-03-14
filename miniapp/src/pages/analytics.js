@@ -23,13 +23,7 @@ const store = useStore;
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// Analytics cache: 5 minutes (300000ms) to reduce bandwidth
-const ANALYTICS_CACHE_TTL = 300000;
-let lastAnalyticsData = null;
-let lastAnalyticsChatId = null;
-let lastAnalyticsTimestamp = 0;
-
-export async function renderAnalyticsPage(container, forceRefresh = false) {
+export async function renderAnalyticsPage(container) {
   const state = store.getState();
   const chatId = state.activeChatId;
 
@@ -45,19 +39,6 @@ export async function renderAnalyticsPage(container, forceRefresh = false) {
     return;
   }
 
-  // Check if we have cached data for this chat that is still valid
-  const now = Date.now();
-  const isCacheValid = !forceRefresh && 
-    lastAnalyticsChatId === chatId && 
-    lastAnalyticsData && 
-    (now - lastAnalyticsTimestamp) < ANALYTICS_CACHE_TTL;
-
-  if (isCacheValid) {
-    console.log('[Analytics] Using cached data');
-    _renderAnalyticsContent(container, chatId, lastAnalyticsData);
-    return;
-  }
-
   const loadingWrap = document.createElement('div');
   loadingWrap.style.cssText = 'display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-6) 0;color:var(--text-muted);font-size:var(--text-sm);';
   loadingWrap.innerHTML = '<span>Loading analytics…</span>';
@@ -67,15 +48,10 @@ export async function renderAnalyticsPage(container, forceRefresh = false) {
 
   try {
     [analytics, memberStats, reports] = await Promise.all([
-      apiFetch(`/api/groups/${chatId}/analytics`, {}, { ttl: ANALYTICS_CACHE_TTL }),
-      apiFetch(`/api/groups/${chatId}/member-stats`, {}, { ttl: ANALYTICS_CACHE_TTL }).catch(() => null),
-      apiFetch(`/api/groups/${chatId}/reports`, {}, { ttl: 60000 }).catch(() => ({ reports: [], count: 0 })),
+      apiFetch(`/api/groups/${chatId}/analytics`),
+      apiFetch(`/api/groups/${chatId}/member-stats`).catch(() => null),
+      apiFetch(`/api/groups/${chatId}/reports`).catch(() => ({ reports: [], count: 0 })),
     ]);
-    
-    // Cache the data
-    lastAnalyticsData = { analytics, memberStats, reports };
-    lastAnalyticsChatId = chatId;
-    lastAnalyticsTimestamp = now;
   } catch (err) {
     container.innerHTML = '';
     container.appendChild(EmptyState({
@@ -86,66 +62,14 @@ export async function renderAnalyticsPage(container, forceRefresh = false) {
     return;
   }
 
-  _renderAnalyticsContent(container, chatId, { analytics, memberStats, reports });
-}
-
-
-function _renderAnalyticsContent(container, chatId, data) {
-  const { analytics, memberStats, reports } = data;
   container.innerHTML = '';
-  
-  // Add refresh button at the top
-  const headerWrap = document.createElement('div');
-  headerWrap.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
-  
-  const titleWrap = document.createElement('div');
-  titleWrap.innerHTML = `
-    <h2 style="margin:0;font-size:var(--text-lg);color:var(--text-primary);">Analytics</h2>
-    <p style="margin:4px 0 0;font-size:var(--text-xs);color:var(--text-muted);">
-      Cached • <span id="analytics-cache-age">just now</span>
-    </p>
-  `;
-  
-  const refreshBtn = document.createElement('button');
-  refreshBtn.className = 'btn btn-secondary';
-  refreshBtn.style.cssText = 'padding:var(--sp-2) var(--sp-3);font-size:var(--text-sm);display:flex;align-items:center;gap:var(--sp-2);';
-  refreshBtn.innerHTML = '🔄 Refresh';
-  refreshBtn.onclick = () => {
-    refreshBtn.disabled = true;
-    refreshBtn.innerHTML = '⏳ Loading...';
-    // Clear cache and reload
-    lastAnalyticsData = null;
-    lastAnalyticsTimestamp = 0;
-    renderAnalyticsPage(container, true);
-  };
-  
-  headerWrap.appendChild(titleWrap);
-  headerWrap.appendChild(refreshBtn);
-  container.appendChild(headerWrap);
 
-  // Update cache age display
-  const updateCacheAge = () => {
-    if (!lastAnalyticsTimestamp) return;
-    const age = Date.now() - lastAnalyticsTimestamp;
-    const ageEl = document.getElementById('analytics-cache-age');
-    if (ageEl) {
-      if (age < 60000) ageEl.textContent = 'just now';
-      else if (age < 3600000) ageEl.textContent = Math.floor(age / 60000) + 'm ago';
-      else ageEl.textContent = Math.floor(age / 3600000) + 'h ago';
-    }
-  };
-  updateCacheAge();
-  setInterval(updateCacheAge, 60000);
+  const { activity = [], growth = [], modules: modActions = [] } = analytics || {};
 
-  // Support both compact API format (d/m/j/l) and legacy format (date/messages/joins/leaves)
-  const activity = analytics?.activity || analytics?.a || [];
-  const growth = analytics?.growth || analytics?.g || [];
-  const modActions = analytics?.modules || analytics?.mo || [];
-
-  const totalMessages = activity.reduce((s, d) => s + (d.m || d.messages || 0), 0);
-  const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.m || activity[activity.length - 1]?.messages || 0) : 0;
-  const totalJoins    = growth.reduce((s, d) => s + (d.j || d.joins || 0), 0);
-  const totalLeaves   = growth.reduce((s, d) => s + (d.l || d.leaves || 0), 0);
+  const totalMessages = activity.reduce((s, d) => s + (d.messages || 0), 0);
+  const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.messages || 0) : 0;
+  const totalJoins    = growth.reduce((s, d) => s + (d.joins || 0), 0);
+  const totalLeaves   = growth.reduce((s, d) => s + (d.leaves || 0), 0);
   const openReports   = reports?.count || 0;
 
   const summaryGrid = document.createElement('div');
@@ -161,16 +85,17 @@ function _renderAnalyticsContent(container, chatId, data) {
   container.appendChild(summaryGrid);
 
   container.appendChild(_buildActivityChart(activity));
+  if (analytics.peak_hours) {
+    container.appendChild(_buildPeakHoursChart(analytics.peak_hours));
+  }
   container.appendChild(_buildGrowthChart(growth));
   container.appendChild(_buildModActionsCard(modActions));
 
-  // Support both compact API format (tm) and legacy format (top_members)
-  const topMembers = memberStats?.tm || memberStats?.top_members;
-  if (topMembers && Array.isArray(topMembers)) {
-    container.appendChild(_buildLeaderboard(topMembers));
+  if (memberStats && Array.isArray(memberStats.top_members)) {
+    container.appendChild(_buildLeaderboard(memberStats.top_members));
   }
 
-  container.appendChild(_buildReportsInbox(chatId, reports?.reports || []));
+  container.appendChild(await _buildReportsInbox(chatId, reports?.reports || []));
 }
 
 
@@ -183,57 +108,114 @@ function _buildActivityChart(activity) {
 
   const card = Card({ title: '💬 Message Activity', subtitle: 'Last 14 days' });
 
-  const chartWrap = document.createElement('div');
-  chartWrap.style.cssText = 'overflow-x:auto;padding-top:var(--sp-2);';
+  const canvas = document.createElement('canvas');
+  canvas.id = 'activity-chart';
+  canvas.style.cssText = 'max-height: 220px; width: 100%;';
+  card.appendChild(canvas);
+  
+  // Load Chart.js from CDN if not already loaded
+  if (!window.Chart) {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4';
+    script.onload = () => renderActivityChart(canvas, last14);
+    document.head.appendChild(script);
+  } else {
+    renderActivityChart(canvas, last14);
+  }
 
-  const chart = document.createElement('div');
-  chart.style.cssText = `
-    display: flex;
-    align-items: flex-end;
-    gap: 4px;
-    height: 120px;
-    padding: 0 4px 4px;
+  wrap.appendChild(card);
+  return wrap;
+}
+
+function renderActivityChart(canvas, data) {
+  const labels = data.map(d => d.date.slice(5)); // MM-DD
+  const values = data.map(d => d.messages || 0);
+  
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Messages',
+        data: values,
+        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#00d4ff',
+        backgroundColor: 'rgba(0, 212, 255, 0.1)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 3,
+        pointBackgroundColor: '#00d4ff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { 
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a2840',
+          titleColor: '#e8edf7',
+          bodyColor: '#e8edf7',
+          borderColor: '#2a3850',
+          borderWidth: 1
+        }
+      },
+      scales: { 
+        x: { 
+          grid: { display: false },
+          ticks: { color: '#6b7c99', font: { size: 10 } }
+        },
+        y: {
+          grid: { color: '#1a2840' },
+          ticks: { color: '#6b7c99', font: { size: 10 } }
+        }
+      }
+    }
+  });
+}
+
+
+function _buildPeakHoursChart(peakHours) {
+  const wrap = document.createElement('div');
+  wrap.style.marginBottom = 'var(--sp-4)';
+
+  const card = Card({ title: '🔥 Peak Hours', subtitle: 'Activity by hour (24h)' });
+
+  const maxVal = Math.max(...peakHours, 1);
+  
+  const chartWrap = document.createElement('div');
+  chartWrap.style.cssText = 'overflow-x:auto;padding:var(--sp-2) 0;';
+
+  const grid = document.createElement('div');
+  grid.style.cssText = `
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    gap: 2px;
+    height: 60px;
+    min-width: 400px;
   `;
 
-  last14.forEach(day => {
-    const messageCount = day.m || day.messages || 0;
-    const dateStr = day.d || day.date;
-    const pct = messageCount / maxVal;
+  peakHours.forEach((count, hour) => {
+    const opacity = Math.max(0.1, count / maxVal);
     const col = document.createElement('div');
     col.style.cssText = `
-      flex: 1;
-      min-width: 18px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: default;
+      background: linear-gradient(to top, rgba(0, 212, 255, ${opacity}), rgba(0, 212, 255, ${opacity * 0.3}));
+      border-radius: 2px;
+      height: 100%;
+      position: relative;
     `;
-    const bar = document.createElement('div');
-    bar.style.cssText = `
-      width: 100%;
-      height: ${Math.max(4, Math.round(pct * 100))}px;
-      background: var(--accent);
-      border-radius: 3px 3px 0 0;
-      opacity: ${0.4 + pct * 0.6};
-      transition: opacity 0.2s;
-    `;
-    bar.title = `${dateStr}: ${messageCount} messages`;
-
-    const label = document.createElement('div');
-    // Parse compact date format (MMDD) or full date
-    const d = dateStr?.length === 4 
-      ? new Date(`${new Date().getFullYear()}-${dateStr.slice(0, 2)}-${dateStr.slice(2, 4)}`)
-      : new Date(dateStr);
-    label.textContent = DAY_LABELS[d.getDay() || 0].slice(0, 1);
-    label.style.cssText = 'font-size: 9px; color: var(--text-muted); writing-mode: horizontal-tb;';
-
-    col.appendChild(bar);
-    col.appendChild(label);
-    chart.appendChild(col);
+    col.title = `${hour}:00 - ${count} events`;
+    
+    if (hour % 6 === 0) {
+      const label = document.createElement('div');
+      label.textContent = `${hour}`;
+      label.style.cssText = 'position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--text-muted);';
+      col.appendChild(label);
+    }
+    
+    grid.appendChild(col);
   });
 
-  chartWrap.appendChild(chart);
+  chartWrap.appendChild(grid);
   card.appendChild(chartWrap);
   wrap.appendChild(card);
   return wrap;
@@ -276,21 +258,14 @@ function _buildGrowthChart(growth) {
   `;
   const tbody = document.createElement('tbody');
   last14.forEach(day => {
-    const joins = day.j || day.joins || 0;
-    const leaves = day.l || day.leaves || 0;
-    const dateStr = day.d || day.date;
-    const net = joins - leaves;
+    const net = (day.joins || 0) - (day.leaves || 0);
     const netColor = net > 0 ? '#4ade80' : net < 0 ? '#f87171' : 'var(--text-muted)';
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid var(--border)';
-    // Format date: MMDD -> MM-DD or show full date
-    const formattedDate = dateStr?.length === 4 
-      ? `${dateStr.slice(0, 2)}-${dateStr.slice(2, 4)}`
-      : dateStr?.slice(5) || '?';
     tr.innerHTML = `
-      <td style="padding:5px 4px;">${formattedDate}</td>
-      <td style="text-align:right;padding:5px 4px;color:#4ade80;">${joins}</td>
-      <td style="text-align:right;padding:5px 4px;color:#f87171;">${leaves}</td>
+      <td style="padding:5px 4px;">${day.date?.slice(5) || '?'}</td>
+      <td style="text-align:right;padding:5px 4px;color:#4ade80;">${day.joins || 0}</td>
+      <td style="text-align:right;padding:5px 4px;color:#f87171;">${day.leaves || 0}</td>
       <td style="text-align:right;padding:5px 4px;color:${netColor};font-weight:600;">${net > 0 ? '+' : ''}${net}</td>
     `;
     tbody.appendChild(tr);
@@ -366,11 +341,9 @@ function _buildLeaderboard(topMembers) {
   list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-top:var(--sp-2);';
 
   topMembers.slice(0, 10).forEach((m, i) => {
-    // Support both compact API format (n/u/mc/ts) and legacy format (first_name/username/message_count/trust_score)
-    const name = m.n || m.first_name || m.u || m.username || `User ${m.id || m.user_id}`;
-    const username = m.u || m.username;
-    const messages = m.mc || m.message_count || 0;
-    const trust = m.ts || m.trust_score || 50;
+    const name = m.first_name || m.username || `User ${m.user_id}`;
+    const messages = m.message_count || 0;
+    const trust = m.trust_score || 50;
     const trustColor = trust >= 86 ? '#4ade80' : trust >= 31 ? 'var(--text-muted)' : '#f87171';
 
     const row = document.createElement('div');
@@ -386,7 +359,7 @@ function _buildLeaderboard(topMembers) {
       <div style="flex:1;min-width:0;">
         <div style="font-size:var(--text-sm);font-weight:500;color:var(--text-primary);
                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-          ${name}${username ? ` <span style="color:var(--text-muted);font-weight:400;">@${username}</span>` : ''}
+          ${name}${m.username ? ` <span style="color:var(--text-muted);font-weight:400;">@${m.username}</span>` : ''}
         </div>
         <div style="font-size:var(--text-xs);color:var(--text-muted);">${messages.toLocaleString()} messages</div>
       </div>

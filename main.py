@@ -250,11 +250,12 @@ if os.path.exists(miniapp_path):
 
 # Import and include API routers
 try:
-    from api.routes import auth, groups, bots, automod, events
+    from api.routes import auth, groups, bots, automod, events, me
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
     app.include_router(bots.router, prefix="/api/bots", tags=["bots"])
     app.include_router(automod.router, prefix="/api/automod", tags=["automod"])
     app.include_router(events.router, tags=["events"])
+    app.include_router(me.router, prefix="/api/me", tags=["me"])
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

@@ -25,7 +25,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/bots", tags=["bots"])
+router = APIRouter(tags=["bots"])
 
 CLONE_RATE_LIMIT = 5
 

@@ -19,7 +19,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/me")
+router = APIRouter()
 
 
 async def get_user_telegram_status(bot, chat_id: int, user_id: int) -> str:

@@ -225,8 +225,17 @@ async def telegram_webhook(bot_token: str, request: Request):
         if app.bot.token == bot_token:
             target_app = app
             break
+    
+    # Fallback: try matching by bot_id (for webhooks set with bot_id only)
+    if not target_app:
+        try:
+            bot_id = int(bot_token)
+            target_app = registry_get(bot_id)
+        except ValueError:
+            pass
             
     if not target_app:
+        logger.warning(f"[WEBHOOK] No bot found for token/bot_id: {bot_token[:10]}...")
         return Response(status_code=404)
         
     data = await request.json()

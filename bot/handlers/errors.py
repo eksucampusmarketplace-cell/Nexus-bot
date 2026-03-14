@@ -8,6 +8,7 @@ to prevent webhook failures and improve user experience.
 """
 
 import logging
+import traceback
 from functools import wraps
 from typing import Callable, TypeVar, Any
 from telegram import Update
@@ -16,6 +17,37 @@ from telegram.ext import ContextTypes
 logger = logging.getLogger(__name__)
 
 T = TypeVar('T', bound=Callable)
+
+
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Global error handler for PTB Application.
+    
+    This handler catches unhandled exceptions from all handlers.
+    It logs the error with full traceback and attempts to notify the user.
+    
+    Usage:
+        app.add_error_handler(error_handler)
+    """
+    error_str = "".join(traceback.format_exception(
+        type(context.error), context.error, context.error.__traceback__
+    ))
+    logger.error(f"[GLOBAL ERROR] {error_str[:1000]}")
+    
+    # Try to notify user something went wrong
+    try:
+        if update and update.effective_message:
+            await update.effective_message.reply_text(
+                "❌ Something went wrong while processing your request.\n"
+                "Please try again later or contact support if the issue persists."
+            )
+        elif update and update.callback_query:
+            await update.callback_query.answer(
+                "❌ An error occurred. Please try again.",
+                show_alert=True
+            )
+    except Exception as notify_error:
+        logger.error(f"Failed to send error notification: {notify_error}")
 
 
 def safe_handler(handler_func: T) -> T:

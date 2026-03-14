@@ -31,11 +31,7 @@ log = logging.getLogger("newsletter")
 
 
 async def generate_newsletter(
-    pool,
-    chat_id: int,
-    bot_id: int,
-    week_start: date,
-    week_end: date
+    pool, chat_id: int, bot_id: int, week_start: date, week_end: date
 ) -> str:
     """
     Generate full newsletter text for a group.
@@ -48,12 +44,7 @@ async def generate_newsletter(
         # Format dates
         week_range = f"{week_start.strftime('%b %d')}–{week_end.strftime('%d, %Y')}"
 
-        lines = [
-            f"📰 Weekly Digest",
-            f"Week of {week_range}",
-            "━━━━━━━━━━━━━━━━━━━━━━",
-            ""
-        ]
+        lines = [f"📰 Weekly Digest", f"Week of {week_range}", "━━━━━━━━━━━━━━━━━━━━━━", ""]
 
         # Most Active Members
         top_active = stats.get("most_active", [])
@@ -68,7 +59,7 @@ async def generate_newsletter(
         if top_xp:
             lines.append("⭐ Top XP Earners This Week")
             for i, m in enumerate(top_xp[:3], 1):
-                level_info = f" (now Level {m.get('level', 1)})" if m.get('leveled_up') else ""
+                level_info = f" (now Level {m.get('level', 1)})" if m.get("leveled_up") else ""
                 lines.append(f"{i}. {m.get('name', 'Unknown')} — +{m.get('xp', 0)} XP{level_info}")
             lines.append("")
 
@@ -76,7 +67,7 @@ async def generate_newsletter(
         new_members = stats.get("new_members", [])
         if new_members:
             lines.append(f"👋 New Members ({len(new_members)})")
-            names = [m.get('name', 'Unknown') for m in new_members[:5]]
+            names = [m.get("name", "Unknown") for m in new_members[:5]]
             if len(new_members) > 5:
                 names.append(f"and {len(new_members) - 5} others")
             lines.append(", ".join(names))
@@ -97,8 +88,10 @@ async def generate_newsletter(
             lines.append("📊 Leaderboard")
             medals = ["👑", "⭐", "🌟"]
             for i, m in enumerate(leaderboard[:3], 1):
-                medal = medals[i-1] if i <= 3 else f"{i}."
-                lines.append(f"{medal} {m.get('name', 'Unknown')} — Lv.{m.get('level', 1)} — {m.get('xp', 0)} XP")
+                medal = medals[i - 1] if i <= 3 else f"{i}."
+                lines.append(
+                    f"{medal} {m.get('name', 'Unknown')} — Lv.{m.get('level', 1)} — {m.get('xp', 0)} XP"
+                )
             lines.append("")
 
         # Streak Highlights
@@ -119,12 +112,7 @@ async def generate_newsletter(
         return "📰 Weekly Digest\n\nStats temporarily unavailable."
 
 
-async def send_newsletter(
-    bot,
-    pool,
-    chat_id: int,
-    bot_id: int
-):
+async def send_newsletter(bot, pool, chat_id: int, bot_id: int):
     """
     Generate and send newsletter to group.
     Pin it if configured.
@@ -147,7 +135,8 @@ async def send_newsletter(
                 SELECT * FROM newsletter_config
                 WHERE chat_id=$1 AND bot_id=$2
                 """,
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
 
             pin_enabled = config["pin_newsletter"] if config else True
@@ -160,7 +149,8 @@ async def send_newsletter(
                 ORDER BY sent_at DESC
                 LIMIT 1
                 """,
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
 
             if prev and pin_enabled:
@@ -187,8 +177,10 @@ async def send_newsletter(
                     (chat_id, bot_id, message_id, stats_snapshot)
                 VALUES ($1, $2, $3, $4)
                 """,
-                chat_id, bot_id, msg.message_id,
-                {"week_start": week_start.isoformat(), "week_end": week_end.isoformat()}
+                chat_id,
+                bot_id,
+                msg.message_id,
+                {"week_start": week_start.isoformat(), "week_end": week_end.isoformat()},
             )
 
         log.info(f"[NEWSLETTER] Sent to chat {chat_id}")
@@ -197,13 +189,7 @@ async def send_newsletter(
         log.error(f"[NEWSLETTER] Error sending newsletter: {e}")
 
 
-async def get_week_stats(
-    pool,
-    chat_id: int,
-    bot_id: int,
-    week_start: date,
-    week_end: date
-) -> dict:
+async def get_week_stats(pool, chat_id: int, bot_id: int, week_start: date, week_end: date) -> dict:
     """
     Gather all stats for the week:
     - Most active by message count
@@ -220,7 +206,7 @@ async def get_week_stats(
         "new_members": [],
         "milestones": [],
         "leaderboard": [],
-        "streaks": []
+        "streaks": [],
     }
 
     try:
@@ -235,14 +221,15 @@ async def get_week_stats(
                 ORDER BY total_messages DESC
                 LIMIT 5
                 """,
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
 
             stats["most_active"] = [
                 {
                     "user_id": r["user_id"],
                     "name": f"User {r['user_id']}",
-                    "messages": r["total_messages"]
+                    "messages": r["total_messages"],
                 }
                 for r in active_rows
             ]
@@ -258,17 +245,14 @@ async def get_week_stats(
                 ORDER BY xp_earned DESC
                 LIMIT 5
                 """,
-                chat_id, bot_id,
+                chat_id,
+                bot_id,
                 datetime.combine(week_start, datetime.min.time(), tzinfo=timezone.utc),
-                datetime.combine(week_end, datetime.max.time(), tzinfo=timezone.utc)
+                datetime.combine(week_end, datetime.max.time(), tzinfo=timezone.utc),
             )
 
             stats["top_xp"] = [
-                {
-                    "user_id": r["user_id"],
-                    "name": f"User {r['user_id']}",
-                    "xp": r["xp_earned"]
-                }
+                {"user_id": r["user_id"], "name": f"User {r['user_id']}", "xp": r["xp_earned"]}
                 for r in xp_rows
             ]
 
@@ -281,7 +265,8 @@ async def get_week_stats(
                 ORDER BY level DESC, xp DESC
                 LIMIT 3
                 """,
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
 
             stats["leaderboard"] = [
@@ -289,7 +274,7 @@ async def get_week_stats(
                     "user_id": r["user_id"],
                     "name": f"User {r['user_id']}",
                     "xp": r["xp"],
-                    "level": r["level"]
+                    "level": r["level"],
                 }
                 for r in lb_rows
             ]
@@ -303,14 +288,15 @@ async def get_week_stats(
                 ORDER BY streak_days DESC
                 LIMIT 3
                 """,
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
 
             stats["streaks"] = [
                 {
                     "user_id": r["user_id"],
                     "name": f"User {r['user_id']}",
-                    "streak": r["streak_days"]
+                    "streak": r["streak_days"],
                 }
                 for r in streak_rows
             ]
@@ -331,7 +317,8 @@ async def get_newsletter_config(pool, chat_id: int, bot_id: int) -> dict:
                 SELECT * FROM newsletter_config
                 WHERE chat_id=$1 AND bot_id=$2
                 """,
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
 
             if row:
@@ -343,7 +330,7 @@ async def get_newsletter_config(pool, chat_id: int, bot_id: int) -> dict:
                     "include_leaderboard": row["include_leaderboard"],
                     "include_new_members": row["include_new_members"],
                     "include_milestones": row["include_milestones"],
-                    "custom_intro": row["custom_intro"]
+                    "custom_intro": row["custom_intro"],
                 }
 
             # Defaults
@@ -355,7 +342,7 @@ async def get_newsletter_config(pool, chat_id: int, bot_id: int) -> dict:
                 "include_leaderboard": True,
                 "include_new_members": True,
                 "include_milestones": True,
-                "custom_intro": None
+                "custom_intro": None,
             }
 
     except Exception as e:
@@ -368,25 +355,25 @@ async def get_newsletter_config(pool, chat_id: int, bot_id: int) -> dict:
             "include_leaderboard": True,
             "include_new_members": True,
             "include_milestones": True,
-            "custom_intro": None
+            "custom_intro": None,
         }
 
 
-async def update_newsletter_config(
-    pool,
-    chat_id: int,
-    bot_id: int,
-    **kwargs
-) -> bool:
+async def update_newsletter_config(pool, chat_id: int, bot_id: int, **kwargs) -> bool:
     """Update newsletter configuration."""
     try:
         async with pool.acquire() as conn:
             # Build dynamic query
             allowed_fields = [
-                "enabled", "send_day", "send_hour_utc",
-                "include_top_members", "include_leaderboard",
-                "include_new_members", "include_milestones",
-                "custom_intro", "pin_newsletter"
+                "enabled",
+                "send_day",
+                "send_hour_utc",
+                "include_top_members",
+                "include_leaderboard",
+                "include_new_members",
+                "include_milestones",
+                "custom_intro",
+                "pin_newsletter",
             ]
 
             fields = []
@@ -415,12 +402,7 @@ async def update_newsletter_config(
         return False
 
 
-async def get_newsletter_history(
-    pool,
-    chat_id: int,
-    bot_id: int,
-    limit: int = 10
-) -> list[dict]:
+async def get_newsletter_history(pool, chat_id: int, bot_id: int, limit: int = 10) -> list[dict]:
     """Get newsletter history for a group."""
     try:
         async with pool.acquire() as conn:
@@ -432,7 +414,9 @@ async def get_newsletter_history(
                 ORDER BY sent_at DESC
                 LIMIT $3
                 """,
-                chat_id, bot_id, limit
+                chat_id,
+                bot_id,
+                limit,
             )
 
             return [
@@ -440,7 +424,7 @@ async def get_newsletter_history(
                     "id": row["id"],
                     "sent_at": row["sent_at"].isoformat() if row["sent_at"] else None,
                     "message_id": row["message_id"],
-                    "stats": row["stats_snapshot"]
+                    "stats": row["stats_snapshot"],
                 }
                 for row in rows
             ]

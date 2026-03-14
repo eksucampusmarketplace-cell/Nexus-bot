@@ -33,15 +33,11 @@ BROADCAST_RATE_LIMIT_HOURS = 1
 def generate_invite_code(length: int = 8) -> str:
     """Generate a unique invite code."""
     alphabet = string.ascii_uppercase + string.digits
-    return ''.join(secrets.choice(alphabet) for _ in range(length))
+    return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
 async def create_network(
-    pool,
-    name: str,
-    description: str,
-    owner_user_id: int,
-    owner_bot_id: int
+    pool, name: str, description: str, owner_user_id: int, owner_bot_id: int
 ) -> dict:
     """
     Create a new network.
@@ -57,8 +53,7 @@ async def create_network(
 
                 # Check uniqueness
                 existing = await conn.fetchrow(
-                    "SELECT id FROM group_networks WHERE invite_code=$1",
-                    invite_code
+                    "SELECT id FROM group_networks WHERE invite_code=$1", invite_code
                 )
 
                 if not existing:
@@ -74,30 +69,23 @@ async def create_network(
                 VALUES ($1, $2, $3, $4, $5)
                 RETURNING id, invite_code
                 """,
-                name, description, owner_user_id, owner_bot_id, invite_code
+                name,
+                description,
+                owner_user_id,
+                owner_bot_id,
+                invite_code,
             )
 
-            log.info(
-                f"[NETWORK] Created network '{name}' by user {owner_user_id}"
-            )
+            log.info(f"[NETWORK] Created network '{name}' by user {owner_user_id}")
 
-            return {
-                "ok": True,
-                "network_id": row["id"],
-                "invite_code": row["invite_code"]
-            }
+            return {"ok": True, "network_id": row["id"], "invite_code": row["invite_code"]}
 
     except Exception as e:
         log.error(f"[NETWORK] Error creating network: {e}")
         return {"ok": False, "error": str(e)}
 
 
-async def join_network(
-    pool,
-    invite_code: str,
-    chat_id: int,
-    bot_id: int
-) -> tuple[bool, str]:
+async def join_network(pool, invite_code: str, chat_id: int, bot_id: int) -> tuple[bool, str]:
     """
     Join a network via invite code.
     Validates code exists and is valid.
@@ -113,7 +101,7 @@ async def join_network(
                 SELECT * FROM group_networks
                 WHERE invite_code=$1
                 """,
-                invite_code.upper()
+                invite_code.upper(),
             )
 
             if not network:
@@ -125,7 +113,8 @@ async def join_network(
                 SELECT * FROM network_members
                 WHERE network_id=$1 AND chat_id=$2
                 """,
-                network["id"], chat_id
+                network["id"],
+                chat_id,
             )
 
             if existing:
@@ -138,7 +127,9 @@ async def join_network(
                     (network_id, chat_id, bot_id, role)
                 VALUES ($1, $2, $3, 'member')
                 """,
-                network["id"], chat_id, bot_id
+                network["id"],
+                chat_id,
+                bot_id,
             )
 
             # Update member count
@@ -148,7 +139,7 @@ async def join_network(
                 SET member_count = member_count + 1
                 WHERE id=$1
                 """,
-                network["id"]
+                network["id"],
             )
 
             # Sync existing XP to network
@@ -157,7 +148,8 @@ async def join_network(
                 SELECT user_id, xp FROM member_xp
                 WHERE chat_id=$1 AND bot_id=$2
                 """,
-                chat_id, bot_id
+                chat_id,
+                bot_id,
             )
 
             for row in xp_rows:
@@ -172,12 +164,12 @@ async def join_network(
                         contributing_groups = network_xp.contributing_groups + 1,
                         last_updated = NOW()
                     """,
-                    network["id"], row["user_id"], row["xp"]
+                    network["id"],
+                    row["user_id"],
+                    row["xp"],
                 )
 
-            log.info(
-                f"[NETWORK] Chat {chat_id} joined network '{network['name']}'"
-            )
+            log.info(f"[NETWORK] Chat {chat_id} joined network '{network['name']}'")
 
             return True, f"Successfully joined network '{network['name']}'!"
 
@@ -186,11 +178,7 @@ async def join_network(
         return False, f"Error: {str(e)}"
 
 
-async def leave_network(
-    pool,
-    network_id: int,
-    chat_id: int
-) -> bool:
+async def leave_network(pool, network_id: int, chat_id: int) -> bool:
     """Remove group from network."""
     try:
         async with pool.acquire() as conn:
@@ -200,7 +188,8 @@ async def leave_network(
                 SELECT * FROM network_members
                 WHERE network_id=$1 AND chat_id=$2
                 """,
-                network_id, chat_id
+                network_id,
+                chat_id,
             )
 
             if not existing:
@@ -212,7 +201,8 @@ async def leave_network(
                 DELETE FROM network_members
                 WHERE network_id=$1 AND chat_id=$2
                 """,
-                network_id, chat_id
+                network_id,
+                chat_id,
             )
 
             # Update member count
@@ -222,7 +212,7 @@ async def leave_network(
                 SET member_count = member_count - 1
                 WHERE id=$1
                 """,
-                network_id
+                network_id,
             )
 
             log.info(f"[NETWORK] Chat {chat_id} left network {network_id}")
@@ -234,12 +224,7 @@ async def leave_network(
 
 
 async def broadcast_to_network(
-    pool,
-    bot,
-    network_id: int,
-    from_chat_id: int,
-    sent_by: int,
-    message_text: str
+    pool, bot, network_id: int, from_chat_id: int, sent_by: int, message_text: str
 ) -> int:
     """
     Send announcement to all groups in network.
@@ -264,7 +249,7 @@ async def broadcast_to_network(
                 ORDER BY sent_at DESC
                 LIMIT 1
                 """,
-                network_id
+                network_id,
             )
 
             if last_broadcast:
@@ -276,10 +261,7 @@ async def broadcast_to_network(
                     return 0
 
             # Get network info
-            network = await conn.fetchrow(
-                "SELECT * FROM group_networks WHERE id=$1",
-                network_id
-            )
+            network = await conn.fetchrow("SELECT * FROM group_networks WHERE id=$1", network_id)
 
             if not network:
                 return 0
@@ -290,7 +272,7 @@ async def broadcast_to_network(
                 SELECT chat_id FROM network_members
                 WHERE network_id=$1
                 """,
-                network_id
+                network_id,
             )
 
             # Get sender group name
@@ -314,15 +296,11 @@ async def broadcast_to_network(
             for member in members:
                 try:
                     await bot.send_message(
-                        chat_id=member["chat_id"],
-                        text=formatted_text,
-                        parse_mode="HTML"
+                        chat_id=member["chat_id"], text=formatted_text, parse_mode="HTML"
                     )
                     delivered += 1
                 except Exception as e:
-                    log.warning(
-                        f"[NETWORK] Failed to send to chat {member['chat_id']}: {e}"
-                    )
+                    log.warning(f"[NETWORK] Failed to send to chat {member['chat_id']}: {e}")
 
             # Log broadcast
             await conn.execute(
@@ -331,12 +309,14 @@ async def broadcast_to_network(
                     (network_id, from_chat_id, sent_by, message_text, delivered_to)
                 VALUES ($1, $2, $3, $4, $5)
                 """,
-                network_id, from_chat_id, sent_by, message_text, delivered
+                network_id,
+                from_chat_id,
+                sent_by,
+                message_text,
+                delivered,
             )
 
-            log.info(
-                f"[NETWORK] Broadcast sent to {delivered}/{len(members)} groups"
-            )
+            log.info(f"[NETWORK] Broadcast sent to {delivered}/{len(members)} groups")
             return delivered
 
     except Exception as e:
@@ -344,11 +324,7 @@ async def broadcast_to_network(
         return 0
 
 
-async def get_network_leaderboard(
-    pool,
-    network_id: int,
-    limit: int = 20
-) -> list[dict]:
+async def get_network_leaderboard(pool, network_id: int, limit: int = 20) -> list[dict]:
     """
     Unified leaderboard across all groups in network.
     Sums XP from all groups for each user.
@@ -365,7 +341,8 @@ async def get_network_leaderboard(
                 ORDER BY total_xp DESC
                 LIMIT $2
                 """,
-                network_id, limit
+                network_id,
+                limit,
             )
 
             return [
@@ -373,7 +350,7 @@ async def get_network_leaderboard(
                     "rank": row["rank"],
                     "user_id": row["user_id"],
                     "total_xp": row["total_xp"],
-                    "contributing_groups": row["contributing_groups"]
+                    "contributing_groups": row["contributing_groups"],
                 }
                 for row in rows
             ]
@@ -383,13 +360,7 @@ async def get_network_leaderboard(
         return []
 
 
-async def sync_xp_to_network(
-    pool,
-    network_id: int,
-    chat_id: int,
-    user_id: int,
-    xp_delta: int
-):
+async def sync_xp_to_network(pool, network_id: int, chat_id: int, user_id: int, xp_delta: int):
     """
     Called after every XP award if group is in a network.
     Updates network_xp for this user.
@@ -407,7 +378,9 @@ async def sync_xp_to_network(
                     total_xp = network_xp.total_xp + $3,
                     last_updated = NOW()
                 """,
-                network_id, user_id, xp_delta
+                network_id,
+                user_id,
+                xp_delta,
             )
 
     except Exception as e:
@@ -426,7 +399,7 @@ async def get_member_networks(pool, chat_id: int) -> list[dict]:
                 JOIN group_networks gn ON nm.network_id = gn.id
                 WHERE nm.chat_id=$1
                 """,
-                chat_id
+                chat_id,
             )
 
             return [
@@ -437,7 +410,7 @@ async def get_member_networks(pool, chat_id: int) -> list[dict]:
                     "invite_code": row["invite_code"],
                     "is_public": row["is_public"],
                     "member_count": row["member_count"],
-                    "role": row["role"]
+                    "role": row["role"],
                 }
                 for row in rows
             ]
@@ -451,10 +424,7 @@ async def get_network_details(pool, network_id: int) -> Optional[dict]:
     """Get detailed info about a network."""
     try:
         async with pool.acquire() as conn:
-            network = await conn.fetchrow(
-                "SELECT * FROM group_networks WHERE id=$1",
-                network_id
-            )
+            network = await conn.fetchrow("SELECT * FROM group_networks WHERE id=$1", network_id)
 
             if not network:
                 return None
@@ -465,7 +435,7 @@ async def get_network_details(pool, network_id: int) -> Optional[dict]:
                 FROM network_members
                 WHERE network_id=$1
                 """,
-                network_id
+                network_id,
             )
 
             return {
@@ -483,10 +453,10 @@ async def get_network_details(pool, network_id: int) -> Optional[dict]:
                         "chat_id": m["chat_id"],
                         "bot_id": m["bot_id"],
                         "role": m["role"],
-                        "joined_at": m["joined_at"].isoformat() if m["joined_at"] else None
+                        "joined_at": m["joined_at"].isoformat() if m["joined_at"] else None,
                     }
                     for m in members
-                ]
+                ],
             }
 
     except Exception as e:
@@ -494,11 +464,7 @@ async def get_network_details(pool, network_id: int) -> Optional[dict]:
         return None
 
 
-async def is_network_owner(
-    pool,
-    network_id: int,
-    user_id: int
-) -> bool:
+async def is_network_owner(pool, network_id: int, user_id: int) -> bool:
     """Check if user is the network owner."""
     try:
         async with pool.acquire() as conn:
@@ -507,7 +473,7 @@ async def is_network_owner(
                 SELECT owner_user_id FROM group_networks
                 WHERE id=$1
                 """,
-                network_id
+                network_id,
             )
 
             return row and row["owner_user_id"] == user_id

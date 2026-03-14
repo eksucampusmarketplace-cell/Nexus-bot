@@ -110,7 +110,7 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 user_id=user_id,
                 bot_id=context.bot.id,
                 amount=1,
-                reason="message"
+                reason="message",
             )
         )
     except Exception:

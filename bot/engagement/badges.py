@@ -32,22 +32,118 @@ log = logging.getLogger("badges")
 
 # Default badge definitions
 DEFAULT_BADGES = [
-    {"name": "Newcomer", "emoji": "🌱", "condition_type": "first_join", "condition_value": 1, "description": "First message in group"},
-    {"name": "Chatterbox", "emoji": "💬", "condition_type": "messages", "condition_value": 100, "description": "100 messages sent"},
-    {"name": "Active", "emoji": "🗣️", "condition_type": "messages", "condition_value": 500, "description": "500 messages sent"},
-    {"name": "Veteran", "emoji": "📣", "condition_type": "messages", "condition_value": 1000, "description": "1000 messages sent"},
-    {"name": "Rising Star", "emoji": "⭐", "condition_type": "level", "condition_value": 5, "description": "Reach level 5"},
-    {"name": "Star", "emoji": "🌟", "condition_type": "level", "condition_value": 10, "description": "Reach level 10"},
-    {"name": "Legend", "emoji": "💫", "condition_type": "level", "condition_value": 20, "description": "Reach level 20"},
-    {"name": "Elite", "emoji": "👑", "condition_type": "level", "condition_value": 50, "description": "Reach level 50"},
-    {"name": "On Fire", "emoji": "🔥", "condition_type": "streak", "condition_value": 7, "description": "7 day streak"},
-    {"name": "Dedicated", "emoji": "♾️", "condition_type": "streak", "condition_value": 30, "description": "30 day streak"},
-    {"name": "Diamond", "emoji": "💎", "condition_type": "streak", "condition_value": 100, "description": "100 day streak"},
-    {"name": "Helpful", "emoji": "👍", "condition_type": "rep", "condition_value": 10, "description": "Receive 10 rep"},
-    {"name": "Respected", "emoji": "🏆", "condition_type": "rep", "condition_value": 50, "description": "Receive 50 rep"},
-    {"name": "Gamer", "emoji": "🎮", "condition_type": "game_wins", "condition_value": 10, "description": "Win 10 games"},
-    {"name": "Champion", "emoji": "🎯", "condition_type": "game_wins", "condition_value": 50, "description": "Win 50 games"},
-    {"name": "Generous", "emoji": "🤝", "condition_type": "rep_given", "condition_value": 20, "description": "Give 20 rep to others"},
+    {
+        "name": "Newcomer",
+        "emoji": "🌱",
+        "condition_type": "first_join",
+        "condition_value": 1,
+        "description": "First message in group",
+    },
+    {
+        "name": "Chatterbox",
+        "emoji": "💬",
+        "condition_type": "messages",
+        "condition_value": 100,
+        "description": "100 messages sent",
+    },
+    {
+        "name": "Active",
+        "emoji": "🗣️",
+        "condition_type": "messages",
+        "condition_value": 500,
+        "description": "500 messages sent",
+    },
+    {
+        "name": "Veteran",
+        "emoji": "📣",
+        "condition_type": "messages",
+        "condition_value": 1000,
+        "description": "1000 messages sent",
+    },
+    {
+        "name": "Rising Star",
+        "emoji": "⭐",
+        "condition_type": "level",
+        "condition_value": 5,
+        "description": "Reach level 5",
+    },
+    {
+        "name": "Star",
+        "emoji": "🌟",
+        "condition_type": "level",
+        "condition_value": 10,
+        "description": "Reach level 10",
+    },
+    {
+        "name": "Legend",
+        "emoji": "💫",
+        "condition_type": "level",
+        "condition_value": 20,
+        "description": "Reach level 20",
+    },
+    {
+        "name": "Elite",
+        "emoji": "👑",
+        "condition_type": "level",
+        "condition_value": 50,
+        "description": "Reach level 50",
+    },
+    {
+        "name": "On Fire",
+        "emoji": "🔥",
+        "condition_type": "streak",
+        "condition_value": 7,
+        "description": "7 day streak",
+    },
+    {
+        "name": "Dedicated",
+        "emoji": "♾️",
+        "condition_type": "streak",
+        "condition_value": 30,
+        "description": "30 day streak",
+    },
+    {
+        "name": "Diamond",
+        "emoji": "💎",
+        "condition_type": "streak",
+        "condition_value": 100,
+        "description": "100 day streak",
+    },
+    {
+        "name": "Helpful",
+        "emoji": "👍",
+        "condition_type": "rep",
+        "condition_value": 10,
+        "description": "Receive 10 rep",
+    },
+    {
+        "name": "Respected",
+        "emoji": "🏆",
+        "condition_type": "rep",
+        "condition_value": 50,
+        "description": "Receive 50 rep",
+    },
+    {
+        "name": "Gamer",
+        "emoji": "🎮",
+        "condition_type": "game_wins",
+        "condition_value": 10,
+        "description": "Win 10 games",
+    },
+    {
+        "name": "Champion",
+        "emoji": "🎯",
+        "condition_type": "game_wins",
+        "condition_value": 50,
+        "description": "Win 50 games",
+    },
+    {
+        "name": "Generous",
+        "emoji": "🤝",
+        "condition_type": "rep_given",
+        "condition_value": 20,
+        "description": "Give 20 rep to others",
+    },
 ]
 
 
@@ -63,8 +159,13 @@ async def seed_default_badges(pool, bot_id: int, chat_id: int = None):
                     VALUES ($1, $2, $3, $4, $5, $6, $7)
                     ON CONFLICT DO NOTHING
                     """,
-                    bot_id, chat_id, badge["name"], badge["emoji"],
-                    badge["description"], badge["condition_type"], badge["condition_value"]
+                    bot_id,
+                    chat_id,
+                    badge["name"],
+                    badge["emoji"],
+                    badge["description"],
+                    badge["condition_type"],
+                    badge["condition_value"],
                 )
 
         log.info(f"[BADGES] Seeded default badges for bot {bot_id}")
@@ -74,12 +175,7 @@ async def seed_default_badges(pool, bot_id: int, chat_id: int = None):
 
 
 async def check_and_award_badges(
-    pool,
-    chat_id: int,
-    user_id: int,
-    bot_id: int,
-    trigger: str,
-    value: int = None
+    pool, chat_id: int, user_id: int, bot_id: int, trigger: str, value: int = None
 ) -> list[dict]:
     """
     Check if member qualifies for any new badges.
@@ -99,7 +195,9 @@ async def check_and_award_badges(
                 WHERE bot_id=$1 AND (chat_id=$2 OR chat_id IS NULL)
                 AND condition_type=$3
                 """,
-                bot_id, chat_id, _map_trigger_to_condition(trigger)
+                bot_id,
+                chat_id,
+                _map_trigger_to_condition(trigger),
             )
 
             # Get member's current stats
@@ -108,7 +206,9 @@ async def check_and_award_badges(
                 SELECT * FROM member_xp
                 WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
                 """,
-                chat_id, user_id, bot_id
+                chat_id,
+                user_id,
+                bot_id,
             )
 
             rep_row = await conn.fetchrow(
@@ -116,7 +216,9 @@ async def check_and_award_badges(
                 SELECT rep_score, total_given FROM member_reputation
                 WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
                 """,
-                chat_id, user_id, bot_id
+                chat_id,
+                user_id,
+                bot_id,
             )
 
             # Get existing badges
@@ -125,7 +227,9 @@ async def check_and_award_badges(
                 SELECT badge_id FROM member_badges
                 WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
                 """,
-                chat_id, user_id, bot_id
+                chat_id,
+                user_id,
+                bot_id,
             )
             existing_ids = {row["badge_id"] for row in existing}
 
@@ -135,11 +239,7 @@ async def check_and_award_badges(
 
                 # Check if condition is met
                 if _check_condition(
-                    badge["condition_type"],
-                    badge["condition_value"],
-                    member_row,
-                    rep_row,
-                    value
+                    badge["condition_type"], badge["condition_value"], member_row, rep_row, value
                 ):
                     # Award badge
                     await conn.execute(
@@ -148,19 +248,22 @@ async def check_and_award_badges(
                             (chat_id, user_id, bot_id, badge_id, earned_at)
                         VALUES ($1, $2, $3, $4, NOW())
                         """,
-                        chat_id, user_id, bot_id, badge["id"]
+                        chat_id,
+                        user_id,
+                        bot_id,
+                        badge["id"],
                     )
 
-                    new_badges.append({
-                        "id": badge["id"],
-                        "name": badge["name"],
-                        "emoji": badge["emoji"],
-                        "description": badge["description"]
-                    })
-
-                    log.info(
-                        f"[BADGES] Awarded '{badge['name']}' to user {user_id}"
+                    new_badges.append(
+                        {
+                            "id": badge["id"],
+                            "name": badge["name"],
+                            "emoji": badge["emoji"],
+                            "description": badge["description"],
+                        }
                     )
+
+                    log.info(f"[BADGES] Awarded '{badge['name']}' to user {user_id}")
 
         return new_badges
 
@@ -184,11 +287,7 @@ def _map_trigger_to_condition(trigger: str) -> str:
 
 
 def _check_condition(
-    condition_type: str,
-    condition_value: int,
-    member_row,
-    rep_row,
-    trigger_value: int = None
+    condition_type: str, condition_value: int, member_row, rep_row, trigger_value: int = None
 ) -> bool:
     """Check if condition is met based on member stats."""
     if condition_type == "messages":
@@ -216,12 +315,7 @@ def _check_condition(
     return False
 
 
-async def get_member_badges(
-    pool,
-    chat_id: int,
-    user_id: int,
-    bot_id: int
-) -> list[dict]:
+async def get_member_badges(pool, chat_id: int, user_id: int, bot_id: int) -> list[dict]:
     """Get all badges earned by a member."""
     try:
         async with pool.acquire() as conn:
@@ -233,7 +327,9 @@ async def get_member_badges(
                 WHERE mb.chat_id=$1 AND mb.user_id=$2 AND mb.bot_id=$3
                 ORDER BY mb.earned_at DESC
                 """,
-                chat_id, user_id, bot_id
+                chat_id,
+                user_id,
+                bot_id,
             )
 
             return [
@@ -243,7 +339,7 @@ async def get_member_badges(
                     "emoji": row["emoji"],
                     "description": row["description"],
                     "is_rare": row["is_rare"],
-                    "earned_at": row["earned_at"].isoformat() if row["earned_at"] else None
+                    "earned_at": row["earned_at"].isoformat() if row["earned_at"] else None,
                 }
                 for row in rows
             ]
@@ -254,21 +350,13 @@ async def get_member_badges(
 
 
 async def grant_badge_manually(
-    pool,
-    chat_id: int,
-    user_id: int,
-    bot_id: int,
-    badge_id: int,
-    granted_by: int
+    pool, chat_id: int, user_id: int, bot_id: int, badge_id: int, granted_by: int
 ) -> bool:
     """Admin manually awards a badge."""
     try:
         async with pool.acquire() as conn:
             # Check if badge exists
-            badge = await conn.fetchrow(
-                "SELECT id FROM badges WHERE id=$1",
-                badge_id
-            )
+            badge = await conn.fetchrow("SELECT id FROM badges WHERE id=$1", badge_id)
 
             if not badge:
                 return False
@@ -279,7 +367,10 @@ async def grant_badge_manually(
                 SELECT id FROM member_badges
                 WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3 AND badge_id=$4
                 """,
-                chat_id, user_id, bot_id, badge_id
+                chat_id,
+                user_id,
+                bot_id,
+                badge_id,
             )
 
             if existing:
@@ -291,7 +382,11 @@ async def grant_badge_manually(
                     (chat_id, user_id, bot_id, badge_id, earned_at, granted_by)
                 VALUES ($1, $2, $3, $4, NOW(), $5)
                 """,
-                chat_id, user_id, bot_id, badge_id, granted_by
+                chat_id,
+                user_id,
+                bot_id,
+                badge_id,
+                granted_by,
             )
 
             log.info(
@@ -313,7 +408,7 @@ async def create_custom_badge(
     description: str,
     condition_type: str,
     condition_value: int,
-    is_rare: bool = False
+    is_rare: bool = False,
 ) -> Optional[int]:
     """Create a custom badge for a group."""
     try:
@@ -326,8 +421,14 @@ async def create_custom_badge(
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 RETURNING id
                 """,
-                bot_id, chat_id, name, emoji, description,
-                condition_type, condition_value, is_rare
+                bot_id,
+                chat_id,
+                name,
+                emoji,
+                description,
+                condition_type,
+                condition_value,
+                is_rare,
             )
 
             if row:
@@ -340,11 +441,7 @@ async def create_custom_badge(
     return None
 
 
-async def get_all_badges(
-    pool,
-    bot_id: int,
-    chat_id: int = None
-) -> list[dict]:
+async def get_all_badges(pool, bot_id: int, chat_id: int = None) -> list[dict]:
     """Get all badges available (global + group-specific)."""
     try:
         async with pool.acquire() as conn:
@@ -359,7 +456,8 @@ async def get_all_badges(
                     GROUP BY b.id
                     ORDER BY b.condition_value, b.name
                     """,
-                    bot_id, chat_id
+                    bot_id,
+                    chat_id,
                 )
             else:
                 rows = await conn.fetch(
@@ -372,7 +470,7 @@ async def get_all_badges(
                     GROUP BY b.id
                     ORDER BY b.condition_value, b.name
                     """,
-                    bot_id
+                    bot_id,
                 )
 
             return [
@@ -384,7 +482,7 @@ async def get_all_badges(
                     "condition_type": row["condition_type"],
                     "condition_value": row["condition_value"],
                     "is_rare": row["is_rare"],
-                    "earned_count": row["earned_count"]
+                    "earned_count": row["earned_count"],
                 }
                 for row in rows
             ]

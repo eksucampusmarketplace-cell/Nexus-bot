@@ -218,10 +218,11 @@ const COMMAND_CATEGORIES = [
  * Render the Commands reference page
  * @param {HTMLElement} container - Container element to render into
  */
-export function renderCommandsPage(container) {
+export async function renderCommandsPage(container) {
   const chatId = store.getState().activeChatId;
   const settings = store.getState().settings || {};
 
+  // Ensure clean container
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 

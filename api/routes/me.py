@@ -87,13 +87,23 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     token_hash = hashlib.sha256(bot_app.bot.token.encode()).hexdigest()[:10]
 
     async with db.pool.acquire() as conn:
-        # Find all groups where this user appears in any of our tables
-        # Filter groups by the current bot
+        # Find all groups managed by this bot
+        # First get all groups for this bot
         all_groups = await conn.fetch("""
             SELECT chat_id, title, member_count, settings 
             FROM groups 
             WHERE bot_token_hash = $1
+            ORDER BY title
         """, token_hash)
+        
+        # If no groups found for this bot, try getting all groups (fallback for legacy)
+        if not all_groups:
+            all_groups = await conn.fetch("""
+                SELECT chat_id, title, member_count, settings 
+                FROM groups 
+                ORDER BY title
+                LIMIT 100
+            """)
 
     # Check Telegram status for each group
     admin_groups = []

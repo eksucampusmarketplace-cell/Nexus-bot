@@ -170,6 +170,7 @@ const AUTOMOD_SECTIONS = [
 export async function renderAutomodPage(container) {
   const chatId = store.getState().activeChatId;
 
+  // Always clear and reset container
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
@@ -204,6 +205,7 @@ export async function renderAutomodPage(container) {
 
   // Clear loading state
   container.innerHTML = '';
+  container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
   // Templates section
   const templatesCard = Card({

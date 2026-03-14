@@ -132,22 +132,22 @@ async def get_music_userbot_by_id(
         return dict(row) if row else None
 
 
-async def update_userbot_risk_fee(
+async def update_userbot_risk_free(
     pool: asyncpg.Pool,
     owner_bot_id: int,
     userbot_id: int,
-    risk_fee: int
+    risk_free: int
 ) -> Dict:
-    """Update risk fee for a userbot"""
+    """Update risk free for a userbot"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
             UPDATE music_userbots
-            SET risk_fee=$1
+            SET risk_free=$1
             WHERE owner_bot_id=$2 AND id=$3
             RETURNING *
             """,
-            risk_fee, owner_bot_id, userbot_id
+            risk_free, owner_bot_id, userbot_id
         )
         return dict(row) if row else None
 
@@ -158,7 +158,7 @@ async def ban_userbot(
     userbot_id: int,
     ban_reason: str = None
 ) -> Dict:
-    """Ban a userbot (for risk fee non-payment)"""
+    """Ban a userbot (for risk free non-payment)"""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """

@@ -530,8 +530,8 @@ function renderUserbotsList(container, userbots, botId) {
     const stats = document.createElement('div');
     stats.style.textAlign = 'right';
     stats.innerHTML = `
-      <div style="font-size: var(--text-xs); color: var(--text-muted);">Fee</div>
-      <div style="font-weight: var(--fw-semibold); color: var(--accent); font-size: var(--text-sm);">${ub.risk_fee || 0} ⭐</div>
+      <div style="font-size: var(--text-xs); color: var(--text-muted);">Risk Free</div>
+      <div style="font-weight: var(--fw-semibold); color: var(--accent); font-size: var(--text-sm);">${ub.risk_free || 0} ⭐</div>
     `;
     
     top.appendChild(info);
@@ -559,8 +559,8 @@ function renderUserbotsList(container, userbots, botId) {
     const feeBtn = document.createElement('button');
     feeBtn.className = 'btn btn-secondary';
     feeBtn.style.cssText = 'padding: 4px 8px; font-size: 11px;';
-    feeBtn.textContent = '💰 Fee';
-    feeBtn.onclick = () => window.editRiskFee(botId, ub.id, ub.risk_fee || 0);
+    feeBtn.textContent = '💰 Risk Free';
+    feeBtn.onclick = () => window.editRiskFree(botId, ub.id, ub.risk_free || 0);
     actions.appendChild(feeBtn);
 
     if (ub.is_banned) {
@@ -835,30 +835,30 @@ window.openUserbotGenerator = async function(botId) {
   renderTab(currentTab);
 };
 
-window.editRiskFee = async function(botId, userbotId, currentFee) {
-  const newFee = prompt('Enter risk fee amount (in Stars):', currentFee.toString());
-  if (newFee === null) return;
-  
+window.editRiskFree = async function(botId, userbotId, currentFree) {
+  const newFree = prompt('Enter risk free amount (in Stars):', currentFree.toString());
+  if (newFree === null) return;
+
   try {
-    await apiFetch(`/api/bots/${botId}/music/userbot/risk-fee`, {
+    await apiFetch(`/api/bots/${botId}/music/userbot/risk-free`, {
       method: 'PUT',
-      body: JSON.stringify({ userbot_id: userbotId, risk_fee: parseInt(newFee) || 0 })
+      body: JSON.stringify({ userbot_id: userbotId, risk_free: parseInt(newFree) || 0 })
     });
-    showToast('Risk fee updated!', 'success');
+    showToast('Risk free updated!', 'success');
     renderMusicPage(document.getElementById('page-music'));
   } catch (e) {
-    showToast('Failed to update risk fee', 'error');
+    showToast('Failed to update risk free', 'error');
   }
 };
 
 window.banUserbot = async function(botId, userbotId) {
-  const reason = prompt('Enter ban reason (optional):', 'Risk fee not paid');
+  const reason = prompt('Enter ban reason (optional):', 'Risk free not paid');
   if (reason === null) return;
-  
+
   try {
     await apiFetch(`/api/bots/${botId}/music/userbot/ban`, {
       method: 'POST',
-      body: JSON.stringify({ userbot_id: userbotId, ban_reason: reason || 'Risk fee not paid' })
+      body: JSON.stringify({ userbot_id: userbotId, ban_reason: reason || 'Risk free not paid' })
     });
     showToast('Userbot banned!', 'success');
     renderMusicPage(document.getElementById('page-music'));

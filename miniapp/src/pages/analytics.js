@@ -23,7 +23,13 @@ const store = useStore;
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export async function renderAnalyticsPage(container) {
+// Analytics cache: 5 minutes (300000ms) to reduce bandwidth
+const ANALYTICS_CACHE_TTL = 300000;
+let lastAnalyticsData = null;
+let lastAnalyticsChatId = null;
+let lastAnalyticsTimestamp = 0;
+
+export async function renderAnalyticsPage(container, forceRefresh = false) {
   const state = store.getState();
   const chatId = state.activeChatId;
 
@@ -39,6 +45,19 @@ export async function renderAnalyticsPage(container) {
     return;
   }
 
+  // Check if we have cached data for this chat that is still valid
+  const now = Date.now();
+  const isCacheValid = !forceRefresh && 
+    lastAnalyticsChatId === chatId && 
+    lastAnalyticsData && 
+    (now - lastAnalyticsTimestamp) < ANALYTICS_CACHE_TTL;
+
+  if (isCacheValid) {
+    console.log('[Analytics] Using cached data');
+    _renderAnalyticsContent(container, chatId, lastAnalyticsData);
+    return;
+  }
+
   const loadingWrap = document.createElement('div');
   loadingWrap.style.cssText = 'display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-6) 0;color:var(--text-muted);font-size:var(--text-sm);';
   loadingWrap.innerHTML = '<span>Loading analytics…</span>';
@@ -48,10 +67,15 @@ export async function renderAnalyticsPage(container) {
 
   try {
     [analytics, memberStats, reports] = await Promise.all([
-      apiFetch(`/api/groups/${chatId}/analytics`),
-      apiFetch(`/api/groups/${chatId}/member-stats`).catch(() => null),
-      apiFetch(`/api/groups/${chatId}/reports`).catch(() => ({ reports: [], count: 0 })),
+      apiFetch(`/api/groups/${chatId}/analytics`, {}, { ttl: ANALYTICS_CACHE_TTL }),
+      apiFetch(`/api/groups/${chatId}/member-stats`, {}, { ttl: ANALYTICS_CACHE_TTL }).catch(() => null),
+      apiFetch(`/api/groups/${chatId}/reports`, {}, { ttl: 60000 }).catch(() => ({ reports: [], count: 0 })),
     ]);
+    
+    // Cache the data
+    lastAnalyticsData = { analytics, memberStats, reports };
+    lastAnalyticsChatId = chatId;
+    lastAnalyticsTimestamp = now;
   } catch (err) {
     container.innerHTML = '';
     container.appendChild(EmptyState({
@@ -62,7 +86,56 @@ export async function renderAnalyticsPage(container) {
     return;
   }
 
+  _renderAnalyticsContent(container, chatId, { analytics, memberStats, reports });
+}
+
+
+function _renderAnalyticsContent(container, chatId, data) {
+  const { analytics, memberStats, reports } = data;
   container.innerHTML = '';
+  
+  // Add refresh button at the top
+  const headerWrap = document.createElement('div');
+  headerWrap.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
+  
+  const titleWrap = document.createElement('div');
+  titleWrap.innerHTML = `
+    <h2 style="margin:0;font-size:var(--text-lg);color:var(--text-primary);">Analytics</h2>
+    <p style="margin:4px 0 0;font-size:var(--text-xs);color:var(--text-muted);">
+      Cached • <span id="analytics-cache-age">just now</span>
+    </p>
+  `;
+  
+  const refreshBtn = document.createElement('button');
+  refreshBtn.className = 'btn btn-secondary';
+  refreshBtn.style.cssText = 'padding:var(--sp-2) var(--sp-3);font-size:var(--text-sm);display:flex;align-items:center;gap:var(--sp-2);';
+  refreshBtn.innerHTML = '🔄 Refresh';
+  refreshBtn.onclick = () => {
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '⏳ Loading...';
+    // Clear cache and reload
+    lastAnalyticsData = null;
+    lastAnalyticsTimestamp = 0;
+    renderAnalyticsPage(container, true);
+  };
+  
+  headerWrap.appendChild(titleWrap);
+  headerWrap.appendChild(refreshBtn);
+  container.appendChild(headerWrap);
+
+  // Update cache age display
+  const updateCacheAge = () => {
+    if (!lastAnalyticsTimestamp) return;
+    const age = Date.now() - lastAnalyticsTimestamp;
+    const ageEl = document.getElementById('analytics-cache-age');
+    if (ageEl) {
+      if (age < 60000) ageEl.textContent = 'just now';
+      else if (age < 3600000) ageEl.textContent = Math.floor(age / 60000) + 'm ago';
+      else ageEl.textContent = Math.floor(age / 3600000) + 'h ago';
+    }
+  };
+  updateCacheAge();
+  setInterval(updateCacheAge, 60000);
 
   // Support both compact API format (d/m/j/l) and legacy format (date/messages/joins/leaves)
   const activity = analytics?.activity || analytics?.a || [];
@@ -97,7 +170,7 @@ export async function renderAnalyticsPage(container) {
     container.appendChild(_buildLeaderboard(topMembers));
   }
 
-  container.appendChild(await _buildReportsInbox(chatId, reports?.reports || []));
+  container.appendChild(_buildReportsInbox(chatId, reports?.reports || []));
 }
 
 

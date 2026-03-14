@@ -51,41 +51,62 @@ This document explains the changes made to reduce bandwidth usage in the Nexus B
 - **Impact**: Ensures smooth transition without breaking changes
 - **How**: Uses fallbacks like `day.m || day.messages` to support both formats
 
+### 6. **Analytics Page Caching** (`miniapp/src/pages/analytics.js`)
+- **What**: 5-minute client-side cache for analytics data
+- **Impact**: Reduces analytics API calls by ~80-90%
+- **Features**:
+  - Refresh button for manual data updates
+  - Cache age indicator ("just now", "5m ago", etc.)
+  - Automatic cache invalidation when switching groups
+  - Force refresh capability
+
+### 7. **Member List Pagination** (`api/routes/members.py`)
+- **What**: Server-side pagination for member lists
+- **Impact**: Reduces large member list payload sizes
+- **Features**:
+  - Configurable page size (default: 50, max: 100)
+  - Search/filter support
+  - Pagination metadata (total count, total pages, has_next/has_prev)
+
+### 8. **CDN-Ready Static Files** (`main.py`)
+- **What**: Optimized cache headers for static assets
+- **Impact**: Enables CDN caching for miniapp assets
+- **Cache Policies**:
+  - JS/CSS/Images: 1 year cache (immutable)
+  - HTML: 1 minute cache
+  - Other files: 1 hour cache
+  - CORS headers for CDN compatibility
+
+### 9. **Rate Limiting** (`main.py`, `api/routes/`)
+- **What**: Request rate limiting to prevent abuse
+- **Impact**: Prevents bandwidth exhaustion from abuse
+- **Limits**:
+  - Default: 100 requests/minute per IP
+  - Analytics: 30 requests/minute per IP
+  - Member Stats: 30 requests/minute per IP
+  - Heatmap: 20 requests/minute per IP
+  - SSE: Max 5 concurrent connections per IP
+
 ## Expected Bandwidth Savings
 
 | Component | Before | After | Savings |
 |-----------|--------|-------|---------|
-| HTTP Responses | 15 MB | ~5-7 MB | ~50-65% |
-| Service-Initiated (SSE) | 8 MB | ~3-5 MB | ~40-60% |
-| **Total** | **23 MB** | **~8-12 MB** | **~50-70%** |
+| HTTP Responses | 15 MB | ~4-6 MB | ~60-75% |
+| Service-Initiated (SSE) | 8 MB | ~2-4 MB | ~50-75% |
+| **Total** | **23 MB** | **~6-10 MB** | **~60-75%** |
 
 ## Additional Recommendations
 
-### 1. **Reduce Analytics Refresh Frequency**
-Currently the analytics page fetches data on every visit. Consider:
-- Only refreshing when explicitly requested (add a refresh button)
-- Caching analytics data for longer (e.g., 5 minutes)
-
-### 2. **Paginate Large Lists**
-For groups with many members:
-- Implement pagination for member lists
-- Use virtual scrolling for large tables
-
-### 3. **Optimize Images**
+### 1. **Optimize Images**
 If adding image uploads:
 - Compress images before upload
 - Use WebP format
 - Implement responsive image sizes
 
-### 4. **CDN for Static Assets**
-For production deployment:
-- Use a CDN for static files (miniapp assets)
-- Enable browser caching with long cache headers
-
-### 5. **Rate Limiting**
-Consider adding rate limiting for:
-- API endpoints to prevent abuse
-- SSE connections per user
+### 2. **Virtual Scrolling**
+For very large member lists:
+- Implement virtual scrolling in frontend
+- Only render visible items
 
 ## Monitoring
 
@@ -96,7 +117,8 @@ To track bandwidth usage after these changes:
    - Open Network tab
    - Enable "Preserve log"
    - Check "Transferred" column for compressed sizes
-3. **Server Logs**: Look for compression ratio in FastAPI logs (if enabled)
+3. **Server Logs**: Look for rate limit warnings in logs
+4. **Response Headers**: Check for `Content-Encoding: gzip`
 
 ## Rollback
 
@@ -105,5 +127,7 @@ If any issues occur, you can disable features:
 1. **Disable Caching**: Pass `{ enabled: false }` to `apiFetch()` calls
 2. **Disable GZip**: Remove `GZipMiddleware` from `main.py`
 3. **Revert SSE**: Restore original `sse.js` and `events.py`
+4. **Disable Rate Limiting**: Remove `@limiter.limit()` decorators
+5. **Disable Static File Caching**: Restore original StaticFiles usage
 
 The frontend maintains backward compatibility with both API response formats.

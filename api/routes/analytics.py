@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from api.auth import get_current_user
 from db.client import db
 from datetime import datetime, timedelta
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 router = APIRouter(prefix="/api/groups")
+
+# Rate limiter instance - will be set by main app
+limiter = Limiter(key_func=get_remote_address)
 
 
 def _compact_date(date_str: str) -> str:
@@ -24,7 +29,8 @@ def _minify_response(data: dict) -> dict:
     return data
 
 @router.get("/{chat_id}/analytics")
-async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")  # Limit analytics requests to 30 per minute per IP
+async def group_analytics(request: Request, chat_id: int, user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:
         # Get current member count from groups table
         group_row = await conn.fetchrow(
@@ -144,7 +150,8 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
     )
 
 @router.get("/{chat_id}/analytics/heatmap")
-async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)):
+@limiter.limit("20/minute")  # Limit heatmap requests to 20 per minute per IP
+async def sentiment_heatmap(request: Request, chat_id: int, user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:
         # Get activity by day/hour from member_events
         heatmap_rows = await conn.fetch("""
@@ -179,7 +186,9 @@ async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)
 
 
 @router.get("/{chat_id}/member-stats")
+@limiter.limit("30/minute")  # Limit member stats requests to 30 per minute per IP
 async def member_stats(
+    request: Request,
     chat_id: int,
     limit: int = Query(10, ge=1, le=50),
     user: dict = Depends(get_current_user),

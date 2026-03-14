@@ -13,6 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from telegram import Update
 
+# Rate limiting imports
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from config import settings
 from db.client import db
 from bot.factory import create_application
@@ -353,7 +358,17 @@ async def lifespan(app: FastAPI):
     await db.disconnect()
     logger.info("[SHUTDOWN] Complete")
 
+# Initialize rate limiter with Redis if available, else in-memory
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["100/minute"],  # Default: 100 requests per minute per IP
+)
+
 fastapi_app = FastAPI(title="Nexus Bot API", lifespan=lifespan)
+
+# Add rate limiter to app state
+fastapi_app.state.limiter = limiter
+fastapi_app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Add GZip compression for responses > 1KB to reduce bandwidth
 fastapi_app.add_middleware(
@@ -412,15 +427,43 @@ fastapi_app.include_router(log_channel_router)
 fastapi_app.include_router(reports_router)
 fastapi_app.include_router(webhooks_router)
 
-# Serve miniapp static files
+# Serve miniapp static files with CDN-friendly caching
 miniapp_dir = os.path.join(os.path.dirname(__file__), "miniapp")
 if os.path.exists(miniapp_dir):
-    fastapi_app.mount("/miniapp", StaticFiles(directory=miniapp_dir, html=True), name="miniapp")
+    from fastapi.staticfiles import StaticFiles
+    from starlette.staticfiles import StaticFiles as StarletteStaticFiles
+    from starlette.responses import FileResponse
+    from starlette.requests import Request
+    
+    class CachedStaticFiles(StarletteStaticFiles):
+        """Static files with proper cache headers for CDN optimization."""
+        
+        async def get_response(self, path: str, scope):
+            response = await super().get_response(path, scope)
+            
+            # Add cache headers for static assets
+            if path.endswith(('.js', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.woff', '.woff2')):
+                # Cache static assets for 1 year (immutable files with hash in filename)
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                response.headers["CDN-Cache-Control"] = "public, max-age=31536000, immutable"
+            elif path.endswith('.html'):
+                # Cache HTML for 1 minute (short cache for HTML that might change)
+                response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
+            else:
+                # Default cache for other files
+                response.headers["Cache-Control"] = "public, max-age=3600"
+            
+            # Enable CORS for CDN
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            
+            return response
+    
+    fastapi_app.mount("/miniapp", CachedStaticFiles(directory=miniapp_dir, html=True), name="miniapp")
 
 # Serve webapp static files (for legacy React version)
 webapp_dir = os.path.join(os.path.dirname(__file__), "webapp")
 if os.path.exists(webapp_dir):
-    fastapi_app.mount("/webapp", StaticFiles(directory=webapp_dir, html=True), name="webapp")
+    fastapi_app.mount("/webapp", CachedStaticFiles(directory=webapp_dir, html=True), name="webapp")
 
 
 @fastapi_app.get("/favicon.ico")

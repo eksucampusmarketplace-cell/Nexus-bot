@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS music_userbots (
     tg_username     TEXT,
     tg_name         TEXT,
     is_active       BOOLEAN DEFAULT TRUE,
-    risk_fee        INT DEFAULT 0,         -- Monthly fee in Stars
+    risk_free       INT DEFAULT 0,         -- Risk free guarantee amount in Stars
     is_banned       BOOLEAN DEFAULT FALSE, -- Banned from using service
     ban_reason      TEXT,
     added_at        TIMESTAMPTZ DEFAULT NOW(),

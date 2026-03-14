@@ -47,9 +47,9 @@ class QRStatusResponse(BaseModel):
     tg_username: Optional[str] = None
 
 
-class UpdateRiskFeeRequest(BaseModel):
+class UpdateRiskFreeRequest(BaseModel):
     userbot_id: int
-    risk_fee: int
+    risk_free: int
 
 
 class BanUserbotRequest(BaseModel):
@@ -370,7 +370,7 @@ async def get_music_userbots(
 ):
     """
     Get all music userbot accounts for a bot.
-    Returns: { ok: true, userbots: [{ id, tg_name, tg_username, risk_fee, is_banned, added_at, ... }] }
+    Returns: { ok: true, userbots: [{ id, tg_name, tg_username, risk_free, is_banned, added_at, ... }] }
     """
     await _verify_bot_owner(bot_id, user)
     pool = _get_db()
@@ -386,7 +386,7 @@ async def get_music_userbots(
                 "id": ub["id"],
                 "tg_name": ub["tg_name"],
                 "tg_username": ub["tg_username"],
-                "risk_fee": ub.get("risk_fee", 0),
+                "risk_free": ub.get("risk_free", 0),
                 "is_banned": ub.get("is_banned", False),
                 "ban_reason": ub.get("ban_reason"),
                 "is_active": ub["is_active"],
@@ -437,14 +437,14 @@ async def get_music_userbot(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.put("/bots/{bot_id}/music/userbot/risk-fee")
-async def update_userbot_risk_fee(
+@router.put("/bots/{bot_id}/music/userbot/risk-free")
+async def update_userbot_risk_free(
     bot_id: int,
-    request: UpdateRiskFeeRequest,
+    request: UpdateRiskFreeRequest,
     user: dict = Depends(get_current_user)
 ):
     """
-    Update risk fee for a specific userbot.
+    Update risk free for a specific userbot.
     Returns: { ok: true }
     """
     await _verify_bot_owner(bot_id, user)
@@ -453,12 +453,12 @@ async def update_userbot_risk_fee(
         raise HTTPException(status_code=503, detail="Database not available")
 
     try:
-        await db_music.update_userbot_risk_fee(
-            pool, bot_id, request.userbot_id, request.risk_fee
+        await db_music.update_userbot_risk_free(
+            pool, bot_id, request.userbot_id, request.risk_free
         )
         return {"ok": True}
     except Exception as e:
-        logger.error(f"[MUSIC_API] Update risk fee failed: {e}")
+        logger.error(f"[MUSIC_API] Update risk free failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -469,7 +469,7 @@ async def ban_userbot_endpoint(
     user: dict = Depends(get_current_user)
 ):
     """
-    Ban a userbot for risk fee non-payment.
+    Ban a userbot for risk free non-payment.
     Returns: { ok: true }
     """
     await _verify_bot_owner(bot_id, user)

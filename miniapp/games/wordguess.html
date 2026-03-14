@@ -107,6 +107,14 @@ const WORDS = [
   'JUICE','KNACK','LEMON','MAPLE','NOVEL','OCEAN','PEARL','QUILL','RADAR','SWIFT',
   'TIGER','ULTRA','VAPOR','WALTZ','XENON','YACHT','ZEBRA','ATLAS','BLAZE','COMET',
   'DRONE','EMBER','FROST','GLYPH','HASTE','IRONY','JEWEL','KARMA','LUNAR','MAGMA',
+  'NECTAR','ORBIT','PIXEL','QUARTZ','RHYTHM','SIGNAL','TEMPLE','UNICORN','VECTOR','WISDOM',
+  'ZODIAC','ANCHOR','BRIDGE','CANYON','DESERT','FALCON','GARDEN','HARBOR','ISLAND','JUNGLE',
+  'KINGDOM','LEGEND','MIRROR','NEBULA','OXYGEN','PALACE','QUANTUM','RANGER','SUNSET','TEMPLE',
+  'UNIVERSE','VORTEX','WIZARD','YELLOW','ABSENT','BANANA','CANDLE','DANGER','EMERALD','FAMILY',
+  'GALAXY','HAMMER','IGNITE','JACKET','KETTLE','LADDER','MAGNET','NATURE','ORANGE','PEBBLE',
+  'QUENCH','ROCKET','SPIRIT','TUNNEL','URGENT','VALLEY','WINTER','YELLOW','ABOARD','BASKET',
+  'CIRCUS','DOCTOR','ENERGY','FOREST','GUITAR','HORNET','IMPACT','JUNGLE','KIDNEY','LUMBER',
+  'MARBLE','NOTIFY','ORACLE','PICKLE','RABBIT','SILVER','TURTLE','UNIQUE','VOYAGE','WONDER'
 ];
 
 const ROWS = 6, COLS = 5;
@@ -285,7 +293,15 @@ function endGame(won){
     document.getElementById('r-xp').textContent = won ? `+${xp} XP` : 'No XP this time';
     document.getElementById('result').classList.add('show');
     if(xp>0) submitScore(xp);
+    saveLeaderboard(won, attempt, xp);
   }, 800);
+}
+
+function saveLeaderboard(won, attempts, xp){
+  const lb = JSON.parse(localStorage.getItem('nexus_wordguess_lb') || '[]');
+  lb.push({name: player.first_name || 'Player', won, attempts, xp, date: Date.now()});
+  lb.sort((a,b) => b.xp - a.xp);
+  localStorage.setItem('nexus_wordguess_lb', JSON.stringify(lb.slice(0, 10)));
 }
 
 function newGame(){

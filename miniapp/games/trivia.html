@@ -83,7 +83,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   <div id="quiz-ui" style="display:flex;flex-direction:column;gap:14px;flex:1">
     <div class="progress-row">
       <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
-      <div class="q-count" id="q-count">1 / 10</div>
+      <div class="q-count" id="q-count">1 / 15</div>
     </div>
     <div class="stats-row">
       <div class="stat-box stat-score"><div class="stat-val" id="score-val">0</div><div class="stat-label">Score</div></div>
@@ -103,7 +103,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
   <div class="results" id="results">
     <div class="results-emoji" id="res-emoji">🏆</div>
     <div class="results-title" id="res-title">Quiz Complete!</div>
-    <div class="results-score" id="res-score">8/10</div>
+    <div class="results-score" id="res-score">8/15</div>
     <div class="results-detail" id="res-detail">Excellent!</div>
     <div class="results-xp" id="res-xp">+200 XP Earned</div>
     <button class="restart-btn" onclick="restartQuiz()">Play Again</button>
@@ -116,22 +116,112 @@ if(tg){tg.expand();tg.ready();}
 const player = tg?.initDataUnsafe?.user || {id:0,first_name:'Player'};
 const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
 
+// Expanded question database with 100+ questions
 const QUESTIONS = [
+  // Tech
   {q:"What programming language is Python named after?",opts:["A snake","Monty Python","A mathematician","A city"],correct:1,cat:"💻 Tech",exp:"Guido van Rossum named Python after Monty Python's Flying Circus, his favorite TV show."},
   {q:"Which company created Telegram?",opts:["Meta","Google","Durov brothers","Apple"],correct:2,cat:"💬 Telegram",exp:"Pavel and Nikolai Durov created Telegram, launching it in 2013."},
   {q:"What does 'HTTP' stand for?",opts:["HyperText Transfer Protocol","High Tech Transfer Process","HyperText Transmission Program","High Transfer Text Protocol"],correct:0,cat:"💻 Tech",exp:"HTTP stands for HyperText Transfer Protocol — the foundation of data exchange on the web."},
   {q:"Which data structure uses LIFO ordering?",opts:["Queue","Stack","Array","Tree"],correct:1,cat:"💻 Tech",exp:"A Stack uses Last-In, First-Out (LIFO) ordering. Think of a stack of plates."},
   {q:"What year was the first iPhone released?",opts:["2005","2006","2007","2008"],correct:2,cat:"📱 Tech History",exp:"Apple released the first iPhone on June 29, 2007, revolutionizing the smartphone industry."},
-  {q:"What is the capital of Japan?",opts:["Osaka","Kyoto","Hiroshima","Tokyo"],correct:3,cat:"🌍 Geography",exp:"Tokyo is the capital and most populous city of Japan, home to over 13 million people."},
-  {q:"How many bits are in a byte?",opts:["4","8","16","32"],correct:1,cat:"💻 Tech",exp:"One byte is made up of exactly 8 bits. This is a fundamental unit in computing."},
   {q:"What does 'API' stand for?",opts:["Application Programming Interface","Advanced Protocol Integration","Automated Process Interface","Application Process Integration"],correct:0,cat:"💻 Tech",exp:"API stands for Application Programming Interface — it defines how software components interact."},
-  {q:"Which planet is known as the Red Planet?",opts:["Venus","Saturn","Mars","Jupiter"],correct:2,cat:"🪐 Science",exp:"Mars is called the Red Planet because of iron oxide (rust) on its surface, giving it a reddish appearance."},
   {q:"What is the maximum message length in Telegram?",opts:["1,000","2,048","4,096","10,000"],correct:2,cat:"💬 Telegram",exp:"Telegram allows messages up to 4,096 characters long for regular text messages."},
+  {q:"Which company owns Android?",opts:["Apple","Microsoft","Google","Samsung"],correct:2,cat:"📱 Tech",exp:"Google acquired Android in 2005 and released the first Android phone in 2008."},
+  {q:"What does 'CPU' stand for?",opts:["Central Processing Unit","Computer Power Unit","Central Power Unit","Core Processing Unit"],correct:0,cat:"💻 Tech",exp:"CPU stands for Central Processing Unit — the 'brain' of a computer."},
+  {q:"Which programming language is used for web styling?",opts:["HTML","JavaScript","CSS","Python"],correct:2,cat:"💻 Tech",exp:"CSS (Cascading Style Sheets) is used to style and layout web pages."},
+  {q:"What is the most popular programming language in 2024?",opts:["JavaScript","Python","Java","C++"],correct:1,cat:"💻 Tech",exp:"Python has become the most popular programming language due to its simplicity and versatility."},
+  {q:"Which company developed Windows?",opts:["Apple","IBM","Microsoft","Google"],correct:2,cat:"💻 Tech",exp:"Microsoft developed Windows, first released in 1985."},
+  {q:"What does 'VPN' stand for?",opts:["Virtual Private Network","Very Private Network","Virtual Protected Network","Virtual Public Network"],correct:0,cat:"💻 Tech",exp:"VPN stands for Virtual Private Network, used for secure internet connections."},
+  {q:"Which social media platform has the most users?",opts:["Twitter/X","Instagram","Facebook","TikTok"],correct:2,cat:"📱 Tech",exp:"Facebook remains the largest social media platform with over 3 billion monthly active users."},
+  {q:"What is the name of Apple's virtual assistant?",opts:["Alexa","Cortana","Siri","Google"],correct:2,cat:"📱 Tech",exp:"Siri is Apple's virtual assistant, introduced in 2011 with the iPhone 4S."},
+  {q:"Which browser is developed by Google?",opts:["Firefox","Safari","Chrome","Edge"],correct:2,cat:"💻 Tech",exp:"Google Chrome was first released in 2008 and is now the most popular web browser."},
+  {q:"What does 'RAM' stand for?",opts:["Random Access Memory","Read Access Memory","Rapid Access Memory","Real Access Memory"],correct:0,cat:"💻 Tech",exp:"RAM stands for Random Access Memory — temporary memory that computers use for active tasks."},
+  {q:"Which cryptocurrency was created first?",opts:["Ethereum","Bitcoin","Litecoin","Ripple"],correct:1,cat:"💰 Crypto",exp:"Bitcoin was the first cryptocurrency, created by Satoshi Nakamoto in 2009."},
+  {q:"What is the main function of a GPU?",opts:["Store files","Process graphics","Connect to internet","Play sound"],correct:1,cat:"💻 Tech",exp:"GPU (Graphics Processing Unit) specializes in rendering graphics and images."},
+  {q:"Which company created ChatGPT?",opts:["Google","Microsoft","OpenAI","Meta"],correct:2,cat:"🤖 AI",exp:"ChatGPT was created by OpenAI and launched in November 2022."},
+  
+  // Science
+  {q:"Which planet is known as the Red Planet?",opts:["Venus","Saturn","Mars","Jupiter"],correct:2,cat:"🪐 Science",exp:"Mars is called the Red Planet because of iron oxide (rust) on its surface, giving it a reddish appearance."},
+  {q:"How many bits are in a byte?",opts:["4","8","16","32"],correct:1,cat:"💻 Tech",exp:"One byte is made up of exactly 8 bits. This is a fundamental unit in computing."},
+  {q:"What is the chemical symbol for gold?",opts:["Go","Gd","Au","Ag"],correct:2,cat:"🧪 Science",exp:"Au comes from the Latin word 'aurum' meaning gold."},
+  {q:"What is the speed of light approximately?",opts:["300,000 km/s","150,000 km/s","1,000,000 km/s","100,000 km/s"],correct:0,cat:"🪐 Science",exp:"Light travels at approximately 300,000 kilometers per second in a vacuum."},
+  {q:"Which element has the atomic number 1?",opts:["Oxygen","Hydrogen","Carbon","Helium"],correct:1,cat:"🧪 Science",exp:"Hydrogen is the first element on the periodic table with atomic number 1."},
+  {q:"What is the largest organ in the human body?",opts:["Heart","Brain","Liver","Skin"],correct:3,cat:"🧬 Science",exp:"The skin is the largest organ of the human body, covering about 20 square feet."},
+  {q:"What force keeps planets in orbit?",opts:["Magnetism","Gravity","Friction","Electricity"],correct:1,cat:"🪐 Science",exp:"Gravity is the force of attraction between objects with mass, keeping planets in orbit."},
+  {q:"How many bones are in the adult human body?",opts:["106","206","306","256"],correct:1,cat:"🧬 Science",exp:"An adult human has 206 bones, while babies are born with about 270."},
+  {q:"What is the hardest natural substance?",opts:["Gold","Iron","Diamond","Platinum"],correct:2,cat:"🧪 Science",exp:"Diamond is the hardest known natural material, rated 10 on the Mohs hardness scale."},
+  {q:"What gas do plants absorb?",opts:["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"],correct:2,cat:"🌿 Science",exp:"Plants absorb carbon dioxide and release oxygen through photosynthesis."},
+  {q:"What is the center of an atom called?",opts:["Electron","Proton","Neutron","Nucleus"],correct:3,cat:"🧪 Science",exp:"The nucleus is at the center of an atom, containing protons and neutrons."},
+  
+  // Geography
+  {q:"What is the capital of Japan?",opts:["Osaka","Kyoto","Hiroshima","Tokyo"],correct:3,cat:"🌍 Geography",exp:"Tokyo is the capital and most populous city of Japan, home to over 13 million people."},
+  {q:"Which is the largest ocean?",opts:["Atlantic","Indian","Arctic","Pacific"],correct:3,cat:"🌍 Geography",exp:"The Pacific Ocean is the largest and deepest ocean on Earth."},
+  {q:"Which country has the most population?",opts:["India","China","USA","Indonesia"],correct:0,cat:"🌍 Geography",exp:"India surpassed China in 2023 to become the world's most populous country."},
+  {q:"What is the smallest country in the world?",opts:["Monaco","Vatican City","San Marino","Liechtenstein"],correct:1,cat:"🌍 Geography",exp:"Vatican City is the smallest country, covering just 0.44 square kilometers."},
+  {q:"Which continent is Egypt in?",opts:["Asia","Europe","Africa","Middle East"],correct:2,cat:"🌍 Geography",exp:"Egypt is located in northeastern Africa, though the Sinai Peninsula is in Asia."},
+  {q:"What is the longest river in the world?",opts:["Amazon","Nile","Yangtze","Mississippi"],correct:1,cat:"🌍 Geography",exp:"The Nile River is traditionally considered the longest, at about 6,650 km."},
+  {q:"Which mountain is the tallest?",opts:["K2","Kangchenjunga","Mount Everest","Makalu"],correct:2,cat:"🌍 Geography",exp:"Mount Everest is the tallest mountain above sea level at 8,848 meters."},
+  {q:"What is the capital of Australia?",opts:["Sydney","Melbourne","Canberra","Brisbane"],correct:2,cat:"🌍 Geography",exp:"Canberra was purpose-built as the capital, located between Sydney and Melbourne."},
+  {q:"Which desert is the largest hot desert?",opts:["Gobi","Sahara","Kalahari","Arabian"],correct:1,cat:"🌍 Geography",exp:"The Sahara is the largest hot desert, covering much of North Africa."},
+  {q:"How many continents are there?",opts:["5","6","7","8"],correct:2,cat:"🌍 Geography",exp:"There are 7 continents: Africa, Antarctica, Asia, Australia/Oceania, Europe, North America, and South America."},
+  
+  // History
+  {q:"Who was the first President of the USA?",opts:["Thomas Jefferson","John Adams","George Washington","Benjamin Franklin"],correct:2,cat:"📜 History",exp:"George Washington served as the first President from 1789 to 1797."},
+  {q:"In which year did World War II end?",opts:["1943","1944","1945","1946"],correct:2,cat:"📜 History",exp:"World War II ended in 1945 with Germany surrendering in May and Japan in September."},
+  {q:"Who painted the Mona Lisa?",opts:["Michelangelo","Leonardo da Vinci","Raphael","Donatello"],correct:1,cat:"🎨 History",exp:"Leonardo da Vinci painted the Mona Lisa between 1503 and 1519."},
+  {q:"Which empire built the Colosseum?",opts:["Greek","Roman","Ottoman","Egyptian"],correct:1,cat:"📜 History",exp:"The Roman Empire built the Colosseum in Rome around 70-80 AD."},
+  {q:"Who wrote Romeo and Juliet?",opts:["Charles Dickens","William Shakespeare","Jane Austen","Mark Twain"],correct:1,cat:"📚 History",exp:"William Shakespeare wrote Romeo and Juliet around 1594-1596."},
+  {q:"In which year did the Titanic sink?",opts:["1910","1911","1912","1913"],correct:2,cat:"📜 History",exp:"The Titanic sank on April 15, 1912 after hitting an iceberg."},
+  {q:"Who was the first man on the moon?",opts:["Buzz Aldrin","Neil Armstrong","Yuri Gagarin","Michael Collins"],correct:1,cat:"🚀 History",exp:"Neil Armstrong was the first human to walk on the moon on July 20, 1969."},
+  {q:"Which pharaoh built the Great Pyramid?",opts:["Tutankhamun","Ramses II","Khufu","Cleopatra"],correct:2,cat:"📜 History",exp:"Pharaoh Khufu built the Great Pyramid of Giza around 2560 BC."},
+  {q:"What year did the Berlin Wall fall?",opts:["1987","1988","1989","1990"],correct:2,cat:"📜 History",exp:"The Berlin Wall fell on November 9, 1989, symbolizing the end of the Cold War."},
+  {q:"Who invented the telephone?",opts:["Thomas Edison","Nikola Tesla","Alexander Graham Bell","Guglielmo Marconi"],correct:2,cat:"📜 History",exp:"Alexander Graham Bell is credited with inventing the telephone in 1876."},
+  
+  // Entertainment
+  {q:"Who directed Titanic?",opts:["Steven Spielberg","James Cameron","Christopher Nolan","Martin Scorsese"],correct:1,cat:"🎬 Movies",exp:"James Cameron directed Titanic, which was released in 1997."},
+  {q:"Which band performed 'Bohemian Rhapsody'?",opts:["The Beatles","Led Zeppelin","Queen","Pink Floyd"],correct:2,cat:"🎵 Music",exp:"Queen released Bohemian Rhapsody in 1975, written by Freddie Mercury."},
+  {q:"Who played Iron Man in the MCU?",opts:["Chris Evans","Chris Hemsworth","Robert Downey Jr.","Mark Ruffalo"],correct:2,cat:"🎬 Movies",exp:"Robert Downey Jr. played Tony Stark/Iron Man from 2008 to 2019."},
+  {q:"Which game features Mario?",opts:["Sonic","Zelda","Super Mario Bros","Pokemon"],correct:2,cat:"🎮 Gaming",exp:"Super Mario Bros. was released by Nintendo in 1985 and became iconic."},
+  {q:"Who is known as the 'King of Pop'?",opts:["Elvis Presley","Michael Jackson","Prince","Madonna"],correct:1,cat:"🎵 Music",exp:"Michael Jackson was called the 'King of Pop' for his massive influence on music."},
+  {q:"Which TV show features dragons?",opts:["Vikings","Game of Thrones","The Witcher","Outlander"],correct:1,cat:"📺 TV Shows",exp:"Game of Thrones, based on books by George R.R. Martin, features dragons prominently."},
+  {q:"What is the best-selling video game of all time?",opts:["Tetris","Minecraft","GTA V","Wii Sports"],correct:1,cat:"🎮 Gaming",exp:"Minecraft has sold over 300 million copies, making it the best-selling game ever."},
+  {q:"Who painted 'Starry Night'?",opts:["Pablo Picasso","Claude Monet","Vincent van Gogh","Salvador Dali"],correct:2,cat:"🎨 Art",exp:"Vincent van Gogh painted The Starry Night in 1889 while at an asylum."},
+  {q:"Which is the highest-grossing film of all time?",opts:["Avatar","Avengers: Endgame","Titanic","Star Wars"],correct:0,cat:"🎬 Movies",exp:"Avatar (2009) is the highest-grossing film, earning over $2.9 billion worldwide."},
+  {q:"What instrument does a pianist play?",opts:["Violin","Guitar","Piano","Drums"],correct:2,cat:"🎵 Music",exp:"A pianist plays the piano, a keyboard instrument invented around 1700."},
+  
+  // Sports
+  {q:"How many players are in a football/soccer team?",opts:["9","10","11","12"],correct:2,cat:"⚽ Sports",exp:"A football/soccer team has 11 players on the field, including the goalkeeper."},
+  {q:"Which country has won the most World Cups?",opts:["Germany","Argentina","Italy","Brazil"],correct:3,cat:"⚽ Sports",exp:"Brazil has won the FIFA World Cup 5 times (1958, 1962, 1970, 1994, 2002)."},
+  {q:"What sport uses a racket and shuttlecock?",opts:["Tennis","Badminton","Squash","Table Tennis"],correct:1,cat:"🏸 Sports",exp:"Badminton uses a racket to hit a shuttlecock over a net."},
+  {q:"How many rings are in the Olympic symbol?",opts:["3","4","5","6"],correct:2,cat:"🏅 Sports",exp:"The Olympic rings represent the five inhabited continents of the world."},
+  {q:"Which sport is played at Wimbledon?",opts:["Golf","Cricket","Tennis","Rugby"],correct:2,cat:"🎾 Sports",exp:"Wimbledon is the oldest tennis tournament, held in London since 1877."},
+  {q:"In basketball, how many points is a free throw?",opts:["1","2","3","4"],correct:0,cat:"🏀 Sports",exp:"A free throw is worth 1 point in basketball."},
+  {q:"Which country invented tea?",opts:["India","England","Japan","China"],correct:3,cat:"🍵 Culture",exp:"Tea was first discovered in China around 2737 BC according to legend."},
+  {q:"What is the national sport of Japan?",opts:["Karate","Judo","Sumo","Baseball"],correct:2,cat:"🥋 Sports",exp:"Sumo wrestling is considered Japan's national sport."},
+  {q:"How many Grand Slam tournaments are there?",opts:["3","4","5","6"],correct:1,cat:"🎾 Sports",exp:"The four Grand Slams are: Australian Open, French Open, Wimbledon, and US Open."},
+  {q:"Which sport uses terms like 'eagle' and 'birdie'?",opts:["Cricket","Golf","Baseball","Football"],correct:1,cat:"⛳ Sports",exp:"In golf, an eagle is 2 under par and a birdie is 1 under par."},
+  
+  // General Knowledge
+  {q:"What is the currency of Japan?",opts:["Yuan","Won","Yen","Ringgit"],correct:2,cat:"💰 General",exp:"The Japanese Yen (¥) is the official currency of Japan."},
+  {q:"How many days are in a leap year?",opts:["364","365","366","367"],correct:2,cat:"📅 General",exp:"A leap year has 366 days, with February having 29 days instead of 28."},
+  {q:"What is the main ingredient in guacamole?",opts:["Tomato","Onion","Avocado","Pepper"],correct:2,cat:"🥑 Food",exp:"Avocado is the main ingredient in guacamole, a Mexican dip."},
+  {q:"Which planet has the most moons?",opts:["Jupiter","Saturn","Uranus","Neptune"],correct:1,cat:"🪐 Science",exp:"Saturn has the most confirmed moons with 146 as of 2023."},
+  {q:"What does a barometer measure?",opts:["Temperature","Air pressure","Humidity","Wind speed"],correct:1,cat:"🌡️ Science",exp:"A barometer measures atmospheric pressure, used for weather forecasting."},
+  {q:"Which animal is known as the 'Ship of the Desert'?",opts:["Horse","Camel","Elephant","Donkey"],correct:1,cat:"🐪 Nature",exp:"Camels are called the 'Ship of the Desert' for their ability to travel long distances."},
+  {q:"What is the national flower of Japan?",opts:["Rose","Cherry Blossom","Lotus","Chrysanthemum"],correct:1,cat:"🌸 Culture",exp:"Cherry blossoms (Sakura) are iconic in Japanese culture and represent the fleeting nature of life."},
+  {q:"How many sides does a hexagon have?",opts:["4","5","6","8"],correct:2,cat:"📐 Math",exp:"A hexagon is a six-sided polygon."},
+  {q:"What is the opposite of matter?",opts:["Energy","Anti-matter","Dark matter","Void"],correct:1,cat:"🪐 Science",exp:"Anti-matter is composed of particles with opposite charges to regular matter."},
+  {q:"Which zodiac sign is represented by a lion?",opts:["Aries","Taurus","Leo","Sagittarius"],correct:2,cat:"♌ Astrology",exp:"Leo (July 23 - August 22) is represented by the lion."},
+  {q:"What is the fear of spiders called?",opts:["Acrophobia","Arachnophobia","Claustrophobia","Agoraphobia"],correct:1,cat:"🧠 Psychology",exp:"Arachnophobia is the intense fear of spiders and other arachnids."},
+  {q:"Which organ pumps blood through the body?",opts:["Lungs","Brain","Heart","Liver"],correct:2,cat:"🫀 Science",exp:"The heart is a muscular organ that pumps blood throughout the body."},
+  {q:"What color is chlorophyll?",opts:["Red","Blue","Green","Yellow"],correct:2,cat:"🌿 Science",exp:"Chlorophyll gives plants their green color and helps with photosynthesis."},
+  {q:"How many time zones does Russia span?",opts:["5","7","9","11"],correct:3,cat:"🌍 Geography",exp:"Russia spans 11 time zones, the most of any country."},
+  {q:"What is the largest mammal?",opts:["African Elephant","Blue Whale","Giraffe","Polar Bear"],correct:1,cat:"🐋 Nature",exp:"The Blue Whale is the largest animal ever known to have lived on Earth."},
 ];
 
 let questions = [], current = 0, score = 0, streak = 0, maxStreak = 0;
 let timerInterval, timeLeft = 15, answered = false, totalXP = 0;
-const TOTAL = 10;
+const TOTAL = 15;
 
 function shuffle(arr){return [...arr].sort(()=>Math.random()-.5);}
 
@@ -293,6 +383,14 @@ function showResults(){
   
   tg?.HapticFeedback?.notificationOccurred('success');
   submitScore(Math.round(totalXP/10)*10);
+  saveLeaderboard(score, Math.round(totalXP/10)*10);
+}
+
+function saveLeaderboard(score, xp){
+  const lb = JSON.parse(localStorage.getItem('nexus_trivia_lb') || '[]');
+  lb.push({name: player.first_name || 'Player', score, xp, date: Date.now()});
+  lb.sort((a,b) => b.score - a.score);
+  localStorage.setItem('nexus_trivia_lb', JSON.stringify(lb.slice(0, 10)));
 }
 
 function restartQuiz(){ startQuiz(); }

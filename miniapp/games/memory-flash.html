@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Memory Flash</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#08080f;--card:#10101a;--border:#1a1a30;--text:#e8edf7;--muted:#4a5070;--accent:#a855f7;--r:12px}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;padding:16px 14px;gap:14px}
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800}
+.stats{display:flex;gap:8px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 12px;text-align:center}
+.stat-val{font-size:18px;font-weight:800;color:var(--accent)}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+.phase-banner{width:100%;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px;text-align:center}
+.phase-text{font-size:15px;font-weight:700;color:var(--accent)}
+.phase-sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+.grid-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+.grid{display:grid;gap:8px}
+.cell{border-radius:var(--r);cursor:pointer;transition:.12s;background:var(--card);border:2px solid var(--border);aspect-ratio:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.cell:active{transform:scale(.93)}
+.cell.lit{background:var(--accent)!important;border-color:var(--accent)!important;box-shadow:0 0 20px var(--accent)66}
+.cell.correct-tap{background:#22c55e!important;border-color:#22c55e!important;box-shadow:0 0 16px #22c55e66}
+.cell.wrong-tap{background:#ef4444!important;border-color:#ef4444!important;animation:shake .3s ease}
+.cell.dimmed{opacity:.35}
+@keyframes shake{0%,100%{transform:translate(0)}25%{transform:translate(-4px)}75%{transform:translate(4px)}}
+
+.progress-dots{display:flex;gap:6px;justify-content:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:.2s}
+.dot.done{background:var(--accent)}
+.dot.active{background:#fff;transform:scale(1.3)}
+
+.overlay{position:fixed;inset:0;background:#000c;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ov-card{background:#10101a;border:1px solid #1a1a30;border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.ov-score{font-size:40px;font-weight:800;color:var(--accent);margin:8px 0}
+.ov-sub{font-size:13px;color:var(--muted);margin-bottom:6px}
+.ov-xp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">🧠 Memory Flash</div>
+    <div class="stats">
+      <div class="stat"><div class="stat-val" id="level-val">1</div><div class="stat-lbl">Level</div></div>
+      <div class="stat"><div class="stat-val" id="score-val">0</div><div class="stat-lbl">Score</div></div>
+    </div>
+  </div>
+  <div class="phase-banner">
+    <div class="phase-text" id="phase-text">Get Ready</div>
+    <div class="phase-sub" id="phase-sub">Watch the pattern</div>
+  </div>
+  <div class="grid-wrap"><div class="grid" id="grid"></div></div>
+  <div class="progress-dots" id="progress-dots"></div>
+</div>
+
+<div class="overlay" id="start-ov">
+  <div class="ov-card">
+    <div class="ov-icon">🧠</div>
+    <div class="ov-title">Memory Flash</div>
+    <div style="font-size:13px;color:#4a5070;margin:8px 0 20px">Watch the grid light up, then tap the same cells in order. Grids grow each round!</div>
+    <button class="ov-btn" onclick="startGame()">Start</button>
+  </div>
+</div>
+<div class="overlay" id="over-ov" style="display:none">
+  <div class="ov-card">
+    <div class="ov-icon" id="ov-icon">🧠</div>
+    <div class="ov-title" id="ov-title">Game Over</div>
+    <div class="ov-score" id="ov-score">Level 1</div>
+    <div class="ov-sub" id="ov-sub">Score: 0</div>
+    <div class="ov-xp" id="ov-xp">+0 XP</div>
+    <button class="ov-btn" onclick="startGame()">Try Again</button>
+  </div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+
+let level=1,score=0,pattern=[],playerTaps=[],phase='watch',cols,cells;
+
+function gridSize(lvl){
+  if(lvl<=3) return 3;
+  if(lvl<=6) return 4;
+  if(lvl<=10) return 5;
+  return 6;
+}
+function patternLength(lvl){return Math.min(lvl+2,12);}
+
+function buildGrid(size){
+  cols=size;
+  const g=document.getElementById('grid');
+  const cellSize=Math.floor((Math.min(window.innerWidth-28,360)-8*(size-1))/size);
+  g.style.gridTemplateColumns=`repeat(${size},${cellSize}px)`;
+  g.innerHTML='';
+  cells=[];
+  for(let i=0;i<size*size;i++){
+    const c=document.createElement('div');
+    c.className='cell';
+    c.style.width=cellSize+'px';
+    c.onclick=()=>playerTap(i);
+    g.appendChild(c);
+    cells.push(c);
+  }
+}
+
+function buildDots(total,current){
+  const d=document.getElementById('progress-dots');
+  d.innerHTML='';
+  for(let i=0;i<total;i++){
+    const dot=document.createElement('div');
+    dot.className='dot'+(i<current?' done':i===current?' active':'');
+    d.appendChild(dot);
+  }
+}
+
+async function runLevel(){
+  const size=gridSize(level);
+  buildGrid(size);
+  const len=patternLength(level);
+  pattern=[];
+  for(let i=0;i<len;i++){
+    let n;
+    do{n=Math.floor(Math.random()*size*size);}while(pattern.includes(n));
+    pattern.push(n);
+  }
+  buildDots(len,0);
+  playerTaps=[];
+  phase='watch';
+  document.getElementById('level-val').textContent=level;
+  document.getElementById('phase-text').textContent='Watch!';
+  document.getElementById('phase-sub').textContent=`Remember ${len} cells`;
+  cells.forEach(c=>c.classList.add('dimmed'));
+
+  await delay(600);
+  for(let i=0;i<pattern.length;i++){
+    cells[pattern[i]].classList.remove('dimmed');
+    cells[pattern[i]].classList.add('lit');
+    tg?.HapticFeedback?.selectionChanged();
+    await delay(Math.max(350,650-level*20));
+    cells[pattern[i]].classList.remove('lit');
+    cells[pattern[i]].classList.add('dimmed');
+    await delay(150);
+  }
+  cells.forEach(c=>c.classList.remove('dimmed'));
+  phase='tap';
+  document.getElementById('phase-text').textContent='Your turn!';
+  document.getElementById('phase-sub').textContent=`Tap ${pattern.length} cells in order`;
+}
+
+function playerTap(idx){
+  if(phase!=='tap') return;
+  const expected=pattern[playerTaps.length];
+  tg?.HapticFeedback?.selectionChanged();
+  if(idx===expected){
+    cells[idx].classList.add('correct-tap');
+    setTimeout(()=>cells[idx].classList.remove('correct-tap'),300);
+    playerTaps.push(idx);
+    buildDots(pattern.length,playerTaps.length);
+    if(playerTaps.length===pattern.length){
+      phase='done';
+      const pts=level*50+pattern.length*15;
+      score+=pts;
+      document.getElementById('score-val').textContent=score;
+      tg?.HapticFeedback?.notificationOccurred('success');
+      document.getElementById('phase-text').textContent='✓ Correct!';
+      document.getElementById('phase-sub').textContent=`+${pts} points`;
+      setTimeout(()=>{level++;runLevel();},800);
+    }
+  } else {
+    phase='over';
+    cells[idx].classList.add('wrong-tap');
+    tg?.HapticFeedback?.notificationOccurred('error');
+    pattern.forEach(pi=>cells[pi].classList.add('lit'));
+    setTimeout(()=>showOver(),1200);
+  }
+}
+
+function showOver(){
+  const xp=Math.floor(score/8);
+  document.getElementById('ov-icon').textContent=level>8?'🏆':level>5?'🧠':'😅';
+  document.getElementById('ov-title').textContent=level>8?'Incredible Memory!':level>5?'Good Memory!':'Keep Practicing!';
+  document.getElementById('ov-score').textContent=`Level ${level}`;
+  document.getElementById('ov-sub').textContent=`Score: ${score} pts`;
+  document.getElementById('ov-xp').textContent=`+${xp} XP Earned`;
+  document.getElementById('over-ov').style.display='flex';
+  submitScore(xp);
+  saveLeaderboard(score,xp);
+}
+
+function saveLeaderboard(score,xp){
+  const lb=JSON.parse(localStorage.getItem('nexus_memory_lb')||'[]');
+  lb.push({name:player.first_name||'Player',level,score,xp,date:Date.now()});
+  lb.sort((a,b)=>b.score-a.score);
+  localStorage.setItem('nexus_memory_lb',JSON.stringify(lb.slice(0,10)));
+}
+
+function startGame(){
+  document.getElementById('start-ov').style.display='none';
+  document.getElementById('over-ov').style.display='none';
+  level=1;score=0;
+  document.getElementById('score-val').textContent='0';
+  runLevel();
+}
+
+function delay(ms){return new Promise(r=>setTimeout(r,ms));}
+
+async function submitScore(xp){
+  if(!chatId||!player.id||xp<=0) return;
+  try{await fetch(`/api/groups/${chatId}/xp`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},body:JSON.stringify({user_id:player.id,xp})});}catch(e){}
+}
+</script>
+</body>
+</html>

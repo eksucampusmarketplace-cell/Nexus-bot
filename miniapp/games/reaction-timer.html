@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Reaction Timer</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+.app{display:flex;flex-direction:column;align-items:center;height:100dvh;background:#080c18;color:#e8edf7;padding:16px 14px;gap:12px}
+.header{width:100%;display:flex;align-items:center;justify-content:space-between}
+.title{font-size:18px;font-weight:800}
+.rounds{font-size:13px;color:#4a6080}
+
+/* Big tap zone */
+.tap-zone{flex:1;width:100%;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:background .2s,transform .1s;gap:12px;position:relative;overflow:hidden;border:2px solid #1a2840}
+.tap-zone:active{transform:scale(.99)}
+.tap-zone.wait{background:#0f1620}
+.tap-zone.ready{background:#1a3a1a;border-color:#22c55e}
+.tap-zone.go{background:#0a2a0a;border-color:#22c55e;animation:pulse-green 0.5s ease infinite alternate}
+.tap-zone.too-early{background:#3a0a0a;border-color:#ef4444}
+.tap-zone.result{background:#0f1620;border-color:#1a2840}
+@keyframes pulse-green{from{background:#0a2a0a}to{background:#0f3a0f}}
+.zone-emoji{font-size:72px;line-height:1;transition:.3s}
+.zone-text{font-size:22px;font-weight:800;transition:.3s}
+.zone-sub{font-size:13px;color:#4a6080;text-align:center;padding:0 20px;transition:.3s}
+.zone-time{font-size:64px;font-weight:800;color:#22c55e;font-variant-numeric:tabular-nums}
+
+/* History */
+.history{width:100%;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.hist-chip{padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700;background:#0f1620;border:1px solid #1a2840}
+.hist-chip.great{border-color:#22c55e40;color:#22c55e}
+.hist-chip.good{border-color:#f59e0b40;color:#f59e0b}
+.hist-chip.slow{border-color:#ef444440;color:#ef4444}
+
+/* Stats */
+.stats-row{width:100%;display:flex;gap:8px}
+.stat{flex:1;background:#0f1620;border:1px solid #1a2840;border-radius:12px;padding:8px;text-align:center}
+.stat-val{font-size:18px;font-weight:800;color:#00d4ff}
+.stat-lbl{font-size:10px;color:#4a6080;text-transform:uppercase;letter-spacing:.06em}
+
+/* Overlay */
+.overlay{position:fixed;inset:0;background:#000c;backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:50}
+.ov-card{background:#0f1620;border:1px solid #1a2840;border-radius:20px;padding:28px 24px;text-align:center;width:min(300px,88vw)}
+.ov-icon{font-size:52px;margin-bottom:8px}
+.ov-title{font-size:22px;font-weight:800;margin-bottom:4px}
+.ov-avg{font-size:40px;font-weight:800;color:#22c55e;margin:8px 0}
+.ov-rank{font-size:15px;font-weight:700;margin-bottom:4px}
+.ov-sub{font-size:13px;color:#4a6080;margin-bottom:6px}
+.ov-xp{font-size:15px;font-weight:700;color:#f59e0b;margin-bottom:20px}
+.ov-btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;background:linear-gradient(135deg,#22c55e,#15803d);color:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="title">⚡ Reaction Timer</div>
+    <div class="rounds" id="rounds-lbl">Round 1 / 5</div>
+  </div>
+  <div class="stats-row">
+    <div class="stat"><div class="stat-val" id="best-val">—</div><div class="stat-lbl">Best (ms)</div></div>
+    <div class="stat"><div class="stat-val" id="avg-val">—</div><div class="stat-lbl">Avg (ms)</div></div>
+    <div class="stat"><div class="stat-val" id="rank-val">—</div><div class="stat-lbl">Rank</div></div>
+  </div>
+  <div class="tap-zone wait" id="tap-zone" onclick="handleTap()">
+    <div class="zone-emoji" id="zone-emoji">👆</div>
+    <div class="zone-text" id="zone-text">Tap to Start</div>
+    <div class="zone-sub" id="zone-sub">Test your reaction speed</div>
+  </div>
+  <div class="history" id="history"></div>
+</div>
+
+<div class="overlay" id="over-ov" style="display:none">
+  <div class="ov-card">
+    <div class="ov-icon" id="ov-icon">⚡</div>
+    <div class="ov-title" id="ov-title">Result</div>
+    <div class="ov-avg" id="ov-avg">200ms</div>
+    <div class="ov-rank" id="ov-rank">🥇 Elite Reflexes!</div>
+    <div class="ov-sub" id="ov-sub">Average reaction time</div>
+    <div class="ov-xp" id="ov-xp">+100 XP</div>
+    <button class="ov-btn" onclick="resetGame()">Play Again</button>
+  </div>
+</div>
+
+<script>
+const tg=window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player=tg?.initDataUnsafe?.user||{id:0,first_name:'Player'};
+const chatId=new URLSearchParams(location.search).get('chat_id')||'0';
+
+const ROUNDS=5;
+let state='idle',round=0,results=[],goTime,waitTimeout;
+
+const zone=document.getElementById('tap-zone');
+const emoji=document.getElementById('zone-emoji');
+const text=document.getElementById('zone-text');
+const sub=document.getElementById('zone-sub');
+
+function setState(s){
+  state=s;
+  zone.className='tap-zone '+s;
+  if(s==='wait'){emoji.textContent='🟡';text.textContent='Wait...';sub.textContent='Don\'t tap yet!';}
+  if(s==='go'){emoji.textContent='🟢';text.style.display='none';sub.style.display='none';const t=document.createElement('div');t.className='zone-time';t.id='zone-time';t.textContent='TAP!';zone.appendChild(t);}
+  if(s==='too-early'){emoji.textContent='🔴';text.textContent='Too Early!';sub.textContent='Wait for GREEN';document.getElementById('zone-time')?.remove();text.style.display='';sub.style.display='';}
+}
+
+function handleTap(){
+  if(state==='idle'||state==='result'){startRound();return;}
+  if(state==='wait'){
+    clearTimeout(waitTimeout);
+    setState('too-early');
+    tg?.HapticFeedback?.notificationOccurred('error');
+    setTimeout(()=>startRound(),1500);
+    return;
+  }
+  if(state==='go'){
+    const rt=Date.now()-goTime;
+    results.push(rt);
+    tg?.HapticFeedback?.impactOccurred('heavy');
+    showResult(rt);
+    return;
+  }
+  if(state==='too-early') return;
+}
+
+function startRound(){
+  if(round>=ROUNDS){showFinal();return;}
+  round++;
+  document.getElementById('rounds-lbl').textContent=`Round ${round} / ${ROUNDS}`;
+  setState('wait');
+  const delay=1500+Math.random()*3500;
+  waitTimeout=setTimeout(()=>{
+    goTime=Date.now();
+    setState('go');
+    tg?.HapticFeedback?.impactOccurred('medium');
+  },delay);
+}
+
+function showResult(rt){
+  state='result';
+  zone.className='tap-zone result';
+  document.getElementById('zone-time')?.remove();
+  text.style.display='';sub.style.display='';
+  emoji.textContent=rt<150?'🚀':rt<250?'⚡':rt<350?'👍':'🐢';
+  text.textContent=`${rt} ms`;
+  sub.textContent=rt<150?'Superhuman!':rt<250?'Excellent!':rt<350?'Good!':'Keep practicing!';
+  updateStats();
+  addHistChip(rt);
+  setTimeout(()=>{if(round<ROUNDS)startRound();else showFinal();},900);
+}
+
+function updateStats(){
+  if(!results.length) return;
+  const best=Math.min(...results);
+  const avg=Math.round(results.reduce((a,b)=>a+b,0)/results.length);
+  document.getElementById('best-val').textContent=best;
+  document.getElementById('avg-val').textContent=avg;
+  document.getElementById('rank-val').textContent=avg<150?'🚀':avg<250?'⚡':avg<350?'👍':'🐢';
+}
+
+function addHistChip(rt){
+  const h=document.getElementById('history');
+  const chip=document.createElement('div');
+  chip.className='hist-chip '+(rt<250?'great':rt<350?'good':'slow');
+  chip.textContent=rt+'ms';
+  h.appendChild(chip);
+}
+
+function showFinal(){
+  if(!results.length) return;
+  const avg=Math.round(results.reduce((a,b)=>a+b,0)/results.length);
+  const best=Math.min(...results);
+  let rank,icon,xp;
+  if(avg<150){rank='Superhuman 🚀';icon='🏆';xp=350;}
+  else if(avg<200){rank='Elite Reflexes ⚡';icon='⚡';xp=300;}
+  else if(avg<250){rank='Pro Gamer 🎮';icon='🎮';xp=250;}
+  else if(avg<350){rank='Average Human 👍';icon='👍';xp=180;}
+  else{rank='Needs Practice 🐢';icon='🐢';xp=100;}
+  document.getElementById('ov-icon').textContent=icon;
+  document.getElementById('ov-title').textContent='Your Results';
+  document.getElementById('ov-avg').textContent=avg+'ms';
+  document.getElementById('ov-rank').textContent=rank;
+  document.getElementById('ov-sub').textContent=`Best: ${best}ms · ${ROUNDS} rounds`;
+  document.getElementById('ov-xp').textContent=`+${xp} XP Earned`;
+  document.getElementById('over-ov').style.display='flex';
+  submitScore(xp);
+  saveLeaderboard(avg,xp);
+}
+
+function saveLeaderboard(avg,xp){
+  const lb=JSON.parse(localStorage.getItem('nexus_reaction_lb')||'[]');
+  lb.push({name:player.first_name||'Player',avg,rounds:ROUNDS,xp,date:Date.now()});
+  lb.sort((a,b)=>a.avg-b.avg);
+  localStorage.setItem('nexus_reaction_lb',JSON.stringify(lb.slice(0,10)));
+}
+
+function resetGame(){
+  document.getElementById('over-ov').style.display='none';
+  state='idle';round=0;results=[];
+  document.getElementById('history').innerHTML='';
+  document.getElementById('rounds-lbl').textContent='Round 1 / 5';
+  ['best-val','avg-val','rank-val'].forEach(id=>document.getElementById(id).textContent='—');
+  zone.className='tap-zone wait';
+  emoji.textContent='👆';text.textContent='Tap to Start';sub.textContent='Test your reaction speed';
+}
+
+async function submitScore(xp){
+  if(!chatId||!player.id||xp<=0) return;
+  try{await fetch(`/api/groups/${chatId}/xp`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`tma ${tg?.initData||''}`},body:JSON.stringify({user_id:player.id,xp})});}catch(e){}
+}
+</script>
+</body>
+</html>

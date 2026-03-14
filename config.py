@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     MUSIC_JOB_TTL: int = 3600  # seconds
     MUSIC_SERVICE_TIMEOUT: int = 10  # seconds
     MUSIC_MAX_RETRIES: int = 3
-    MUSIC_YTDLP_VERSION: str = "2024.3.10"
+    MUSIC_YTDLP_VERSION: str = "2024.12.6"
 
     # ── Memory Management ──────────────────────────────────────────────────
     PYROGRAM_MAX_ACTIVE: int = 10

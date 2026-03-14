@@ -223,7 +223,7 @@ Per-group music settings.
 
 All added to `requirements.txt`:
 - `pytgcalls==3.0.0.dev29` — Voice chat streaming
-- `yt-dlp==2024.3.10` — Audio downloading
+- `yt-dlp==2024.12.6` — Audio downloading
 - `ffmpeg-python==0.2.0` — Audio conversion
 - `qrcode==7.4.2` — QR code generation
 - `pillow==10.3.0` — Image processing for QR

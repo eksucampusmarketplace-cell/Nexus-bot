@@ -19,17 +19,14 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
-# Virtual environments
+MANIFEST
+.env
+.venv
+env/
 venv/
 ENV/
-env/
-.venv/
-
-# Environment variables
-.env
-.env.local
-.env.*.local
+env.bak/
+venv.bak/
 
 # IDE
 .vscode/
@@ -37,43 +34,78 @@ env/
 *.swp
 *.swo
 *~
-
-# Logs
-*.log
-logs/
+.DS_Store
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
 
-# OS
-.DS_Store
-Thumbs.db
+# Logs
+*.log
+logs/
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Temp files
+tmp/
+temp/
+/tmp/nexus_music/
+*.mp3
+*.m4a
+*.webm
+*.ogg
 
 # Render
-render.yaml.bak
+.render/
+render.yaml
+.render.buildinfo
 
-# Music downloads (if stored locally)
-downloads/
-*.mp3
-*.mp4
-*.webm
-*.m4a
+# Environment variables
+.env
+.env.local
+.env.*.local
 
-# Redis dump
-dump.rdb
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
 
-# Node modules
-node_modules/
-package-lock.json
-yarn.lock
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Local development
-ngrok.yml
-*.local
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Bandwidth tracking data
+bandwidth_stats.json

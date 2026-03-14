@@ -85,14 +85,23 @@ const COMMAND_CATEGORIES = [
     commands: [
       { cmd: '/play', args: '<url/query>', desc: 'Play music or add to queue' },
       { cmd: '/playnow', args: '<url>', desc: 'Play immediately, skip queue' },
+      { cmd: '/play_youtube', args: '<url>', desc: 'Play directly from YouTube' },
       { cmd: '/pause', args: '', desc: 'Pause playback' },
       { cmd: '/resume', args: '', desc: 'Resume playback' },
       { cmd: '/skip', args: '', desc: 'Skip current track' },
       { cmd: '/stop', args: '', desc: 'Stop and clear queue' },
       { cmd: '/queue', args: '', desc: 'Show music queue' },
+      { cmd: '/nowplaying', args: '', desc: 'Show current track with controls' },
       { cmd: '/volume', args: '<0-200>', desc: 'Set volume level (default 100)' },
       { cmd: '/loop', args: '', desc: 'Toggle loop current track' },
+      { cmd: '/repeat', args: 'none|one|all', desc: 'Set repeat mode' },
+      { cmd: '/shuffle', args: '', desc: 'Toggle shuffle mode' },
       { cmd: '/musicmode', args: 'all|admins', desc: 'Set who can use music commands' },
+      { cmd: '/playlist_create', args: '<name>', desc: 'Create a new playlist' },
+      { cmd: '/playlist_play', args: '<name>', desc: 'Play a saved playlist' },
+      { cmd: '/history', args: '', desc: 'Show play history' },
+      { cmd: '/search', args: '<query>', desc: 'Search for music' },
+      { cmd: '/sync', args: '', desc: 'Sync music state to all clones' },
     ]
   },
   {

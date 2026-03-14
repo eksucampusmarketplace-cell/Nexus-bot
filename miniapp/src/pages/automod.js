@@ -53,6 +53,7 @@ const AUTOMOD_SECTIONS = [
       ], default: 'restrict' },
       { key: 'antiraid_threshold', label: 'Join threshold (per min)', type: 'number', min: 3, max: 50, default: 10 },
       { key: 'auto_antiraid_enabled', label: 'Auto-activate Anti-Raid', type: 'toggle' },
+      { key: 'lock_admins', label: 'Apply rules to admins', type: 'toggle' },
     ],
   },
   {
@@ -66,6 +67,7 @@ const AUTOMOD_SECTIONS = [
       { key: 'lock_bot', label: 'Block bot invites', type: 'toggle' },
       { key: 'lock_bot_inviter', label: 'Block bots from adding users', type: 'toggle' },
       { key: 'duplicate_limit', label: 'Max duplicate messages', type: 'number', min: 1, max: 10, default: 2 },
+      { key: 'duplicate_window_mins', label: 'Duplicate window (mins)', type: 'number', min: 1, max: 60, default: 5 },
     ],
   },
   {
@@ -111,6 +113,8 @@ const AUTOMOD_SECTIONS = [
       { key: 'max_lines', label: 'Max lines', type: 'number', min: 0, max: 100, default: 0 },
       { key: 'regex_active', label: 'Enable Regex Filters', type: 'toggle' },
       { key: 'necessary_words_active', label: 'Enable Required Words', type: 'toggle' },
+      { key: 'self_destruct_enabled', label: 'Enable Self-Destruct', type: 'toggle' },
+      { key: 'self_destruct_minutes', label: 'Self-Destruct (minutes)', type: 'number', min: 1, max: 1440, default: 60 },
     ],
   },
   {

@@ -26,12 +26,16 @@ import json
 import logging
 from datetime import timezone, datetime
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from config import settings
 
 log = logging.getLogger("sse")
 router = APIRouter()
+
+# Track SSE connections per IP for rate limiting
+_sse_connections = {}
+MAX_SSE_CONNECTIONS_PER_IP = 5  # Max 5 concurrent SSE connections per IP
 
 
 class EventBus:
@@ -61,10 +65,17 @@ class EventBus:
 
     @classmethod
     async def publish(cls, chat_id: int, event_type: str, data: dict):
-        if chat_id not in cls._connections:
+        if chat_id not in cls._connections or not cls._connections[chat_id]:
             return
-        payload = json.dumps({"type": event_type, "data": data,
-                               "ts": datetime.now(timezone.utc).isoformat()})
+        # Minimize payload size - only include essential fields
+        minimal_data = {}
+        for key, value in data.items():
+            # Skip large fields and internal fields
+            if key not in ('_internal', 'full_user_data', 'message_text', 'raw_update'):
+                minimal_data[key] = value
+        
+        payload = json.dumps({"type": event_type, "data": minimal_data,
+                               "ts": datetime.now(timezone.utc).isoformat()}, separators=(',', ':'))
         dead = []
         for q in cls._connections[chat_id]:
             try:
@@ -86,9 +97,32 @@ def push_event(owner_id: int, data: dict):
         asyncio.create_task(EventBus.publish(chat_id, data.get("type", "notification"), data))
 
 
+def _get_client_ip(request: Request) -> str:
+    """Extract client IP from request, considering proxies."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @router.get("/api/events")
 async def sse_events(request: Request, chat_id: int, token: str = ""):
     """SSE stream for a specific chat_id."""
+    
+    # Rate limiting: Check concurrent connections per IP
+    client_ip = _get_client_ip(request)
+    current_connections = _sse_connections.get(client_ip, 0)
+    
+    if current_connections >= MAX_SSE_CONNECTIONS_PER_IP:
+        log.warning(f"[SSE] Rate limit exceeded for IP {client_ip}: {current_connections} connections")
+        return StreamingResponse(
+            iter([f"event: error\ndata: {json.dumps({'error':'too_many_connections'})}\n\n"]),
+            media_type="text/event-stream"
+        )
+    
+    # Increment connection count
+    _sse_connections[client_ip] = current_connections + 1
+    
     # Validate token
     from api.auth import validate_init_data
     if not settings.SKIP_AUTH:
@@ -140,7 +174,11 @@ async def sse_events(request: Request, chat_id: int, token: str = ""):
             log.warning(f"[SSE] Stream error | chat={chat_id} error={e}")
         finally:
             EventBus.unsubscribe(chat_id, queue)
-            log.info(f"[SSE] Connection closed | chat={chat_id}")
+            # Decrement connection count
+            _sse_connections[client_ip] = max(0, _sse_connections.get(client_ip, 1) - 1)
+            if _sse_connections[client_ip] == 0:
+                del _sse_connections[client_ip]
+            log.info(f"[SSE] Connection closed | chat={chat_id} | IP={client_ip}")
 
     return StreamingResponse(
         stream(),

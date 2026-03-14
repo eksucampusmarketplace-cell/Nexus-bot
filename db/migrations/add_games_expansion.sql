@@ -86,10 +86,6 @@ CREATE TABLE IF NOT EXISTS warnings (
 );
 CREATE INDEX IF NOT EXISTS idx_warnings_user_chat ON warnings(user_id, chat_id);
 
--- Add columns if they don't exist
-ALTER TABLE warnings ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
-ALTER TABLE warnings ADD COLUMN IF NOT EXISTS is_expired BOOLEAN DEFAULT FALSE;
-
 -- Music vote skip
 ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_enabled BOOLEAN DEFAULT FALSE;
 ALTER TABLE music_settings ADD COLUMN IF NOT EXISTS vote_skip_threshold INTEGER DEFAULT 51;

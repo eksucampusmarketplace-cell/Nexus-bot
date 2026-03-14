@@ -152,13 +152,14 @@ class Database:
                     display_name TEXT NOT NULL,
                     token_encrypted TEXT NOT NULL,
                     token_hash TEXT UNIQUE NOT NULL,
-                    owner_user_id BIGINT NOT NULL,
+                    owner_user_id BIGINT,
                     status TEXT NOT NULL DEFAULT 'active',
                     webhook_url TEXT,
                     webhook_active BOOLEAN DEFAULT FALSE,
                     groups_count INT DEFAULT 0,
                     is_primary BOOLEAN DEFAULT FALSE,
                     added_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
                     last_seen TIMESTAMPTZ DEFAULT NOW(),
                     death_reason TEXT,
                     group_limit INT DEFAULT 1 CHECK (group_limit BETWEEN 1 AND 20),
@@ -221,7 +222,9 @@ class Database:
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS bot_add_notifications BOOLEAN DEFAULT FALSE;
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT FALSE;
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS token_hash TEXT;
-
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+                ALTER TABLE bots ALTER COLUMN owner_user_id DROP NOT NULL;
+                
                 -- Rate limiting table
                 CREATE TABLE IF NOT EXISTS clone_attempts (
                     id BIGSERIAL PRIMARY KEY,

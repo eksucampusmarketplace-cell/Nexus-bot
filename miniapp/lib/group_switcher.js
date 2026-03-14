@@ -12,8 +12,8 @@
  *   await switcher.init();
  */
 
-import { showToast } from './components.js';
-import { apiFetch } from './api.js';
+import { showToast } from './components.js?v=1.2.0';
+import { apiFetch } from './api.js?v=1.2.0';
 
 export class GroupSwitcher {
   constructor(containerEl, store) {

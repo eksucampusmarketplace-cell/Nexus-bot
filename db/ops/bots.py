@@ -76,6 +76,83 @@ async def get_bots_by_owner(pool: asyncpg.Pool, owner_user_id: int) -> list[dict
     return [dict(r) for r in rows]
 
 
+async def get_active_clones(pool: asyncpg.Pool) -> list[dict]:
+    """
+    Return all non-primary bots with status='active'.
+    Called at startup to recover all clones.
+    Logs: [DB][bots][SELECT] clones active → {count} rows
+    """
+    start = time.monotonic()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT * FROM bots WHERE is_primary = false AND status = 'active'"
+        )
+    duration = (time.monotonic() - start) * 1000
+    count = len(rows)
+    logger.debug(f"[DB][bots][SELECT] clones active → {count} rows | duration={duration:.1f}ms")
+    return [dict(r) for r in rows]
+
+
+async def upsert_bot(
+    pool: asyncpg.Pool,
+    bot_id: int,
+    username: str,
+    token: str,
+    is_primary: bool = False,
+    status: str = 'active',
+    owner_user_id: int = None,
+    display_name: str = None,
+    webhook_url: str = None
+) -> dict:
+    """
+    Insert or update a bot record. If bot_id exists, updates; otherwise inserts.
+    Automatically encrypts the token and computes its hash before storing.
+    Returns the bot record as dict.
+    Logs: [DB][bots][UPSERT] bot_id={bot_id} username=@{username}
+    """
+    from bot.utils.crypto import encrypt_token, hash_token
+    
+    token_encrypted = encrypt_token(token)
+    token_hash = hash_token(token)
+    
+    start = time.monotonic()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            """
+            INSERT INTO bots (
+                bot_id, username, display_name, token_encrypted, token_hash,
+                owner_user_id, webhook_url, is_primary, status, webhook_active,
+                group_limit, group_access_policy, bot_add_notifications
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ON CONFLICT (bot_id) DO UPDATE
+            SET username = EXCLUDED.username,
+                display_name = EXCLUDED.display_name,
+                token_encrypted = EXCLUDED.token_encrypted,
+                token_hash = EXCLUDED.token_hash,
+                is_primary = EXCLUDED.is_primary,
+                status = EXCLUDED.status,
+                updated_at = NOW()
+            RETURNING *
+            """,
+            bot_id,
+            username,
+            display_name or username,
+            token_encrypted,
+            token_hash,
+            owner_user_id,
+            webhook_url,
+            is_primary,
+            status,
+            False,  # webhook_active default
+            1,  # group_limit default
+            'blocked',  # group_access_policy default
+            False  # bot_add_notifications default
+        )
+    duration = (time.monotonic() - start) * 1000
+    logger.info(f"[DB][bots][UPSERT] bot_id={bot_id} username=@{username} is_primary={is_primary} | duration={duration:.1f}ms")
+    return dict(row)
+
+
 async def get_all_active_bots(pool: asyncpg.Pool) -> list[dict]:
     """
     Return all bots with status='active'.

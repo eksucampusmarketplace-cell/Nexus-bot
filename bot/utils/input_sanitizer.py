@@ -34,7 +34,7 @@ SQL_INJECTION_PATTERNS = [
 ]
 
 # Compiled regex for performance
-SQL_INJECTION_REGEX = re.compile('|'.join(SQL_INJECTION_PATTERNS), re.IGNORECASE | re.VERBOSE)
+SQL_INJECTION_REGEX = re.compile('|'.join(SQL_INJECTION_PATTERNS), re.IGNORECASE)
 
 
 # ============================================================================
@@ -55,7 +55,7 @@ XSS_PATTERNS = [
     r'<\s*embed[^>]*>',  # <embed> tags
 ]
 
-XSS_REGEX = re.compile('|'.join(XSS_PATTERNS), re.IGNORECASE | re.VERBOSE)
+XSS_REGEX = re.compile('|'.join(XSS_PATTERNS), re.IGNORECASE)
 
 
 # ============================================================================

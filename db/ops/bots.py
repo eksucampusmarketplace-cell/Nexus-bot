@@ -13,16 +13,18 @@ Logging:
   - Never log token values — log token_hash instead
 """
 
-import asyncpg
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-from datetime import datetime, timezone, timedelta
+
+import asyncpg
 
 logger = logging.getLogger(__name__)
 
 
 # ── Bot CRUD ──────────────────────────────────────────────────────────────────
+
 
 async def get_bot_by_id(pool: asyncpg.Pool, bot_id: int) -> Optional[dict]:
     """
@@ -32,10 +34,7 @@ async def get_bot_by_id(pool: asyncpg.Pool, bot_id: int) -> Optional[dict]:
     """
     start = time.monotonic()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM bots WHERE bot_id = $1",
-            bot_id
-        )
+        row = await conn.fetchrow("SELECT * FROM bots WHERE bot_id = $1", bot_id)
     duration = (time.monotonic() - start) * 1000
     logger.debug(f"[DB][bots][SELECT] bot_id={bot_id} | duration={duration:.1f}ms")
     return dict(row) if row else None
@@ -49,10 +48,7 @@ async def get_bot_by_token_hash(pool: asyncpg.Pool, token_hash: str) -> Optional
     """
     start = time.monotonic()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM bots WHERE token_hash = $1",
-            token_hash
-        )
+        row = await conn.fetchrow("SELECT * FROM bots WHERE token_hash = $1", token_hash)
     duration = (time.monotonic() - start) * 1000
     logger.debug(f"[DB][bots][SELECT] token_hash={token_hash[:12]}... | duration={duration:.1f}ms")
     return dict(row) if row else None
@@ -68,11 +64,13 @@ async def get_bots_by_owner(pool: asyncpg.Pool, owner_user_id: int) -> list[dict
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             "SELECT * FROM bots WHERE owner_user_id = $1 ORDER BY is_primary DESC, added_at DESC",
-            owner_user_id
+            owner_user_id,
         )
     duration = (time.monotonic() - start) * 1000
     count = len(rows)
-    logger.debug(f"[DB][bots][SELECT] owner={owner_user_id} → {count} rows | duration={duration:.1f}ms")
+    logger.debug(
+        f"[DB][bots][SELECT] owner={owner_user_id} → {count} rows | duration={duration:.1f}ms"
+    )
     return [dict(r) for r in rows]
 
 
@@ -84,9 +82,7 @@ async def get_active_clones(pool: asyncpg.Pool) -> list[dict]:
     """
     start = time.monotonic()
     async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT * FROM bots WHERE is_primary = false AND status = 'active'"
-        )
+        rows = await conn.fetch("SELECT * FROM bots WHERE is_primary = false AND status = 'active'")
     duration = (time.monotonic() - start) * 1000
     count = len(rows)
     logger.debug(f"[DB][bots][SELECT] clones active → {count} rows | duration={duration:.1f}ms")
@@ -99,22 +95,26 @@ async def upsert_bot(
     username: str,
     token: str,
     is_primary: bool = False,
-    status: str = 'active',
+    status: str = "active",
     owner_user_id: int = None,
     display_name: str = None,
-    webhook_url: str = None
+    webhook_url: str = None,
 ) -> dict:
     """
     Insert or update a bot record. If bot_id exists, updates; otherwise inserts.
     Automatically encrypts the token and computes its hash before storing.
+    Primary bot gets unlimited groups (group_limit = 0 means unlimited).
     Returns the bot record as dict.
     Logs: [DB][bots][UPSERT] bot_id={bot_id} username=@{username}
     """
     from bot.utils.crypto import encrypt_token, hash_token
-    
+
     token_encrypted = encrypt_token(token)
     token_hash = hash_token(token)
-    
+
+    # Primary bot has unlimited groups (0 = unlimited), clones default to 1
+    group_limit = 0 if is_primary else 1
+
     start = time.monotonic()
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -144,12 +144,14 @@ async def upsert_bot(
             is_primary,
             status,
             False,  # webhook_active default
-            1,  # group_limit default
-            'blocked',  # group_access_policy default
-            False  # bot_add_notifications default
+            group_limit,  # 0 for primary (unlimited), 1 for clones
+            "blocked",  # group_access_policy default
+            False,  # bot_add_notifications default
         )
     duration = (time.monotonic() - start) * 1000
-    logger.info(f"[DB][bots][UPSERT] bot_id={bot_id} username=@{username} is_primary={is_primary} | duration={duration:.1f}ms")
+    logger.info(
+        f"[DB][bots][UPSERT] bot_id={bot_id} username=@{username} is_primary={is_primary} | duration={duration:.1f}ms"
+    )
     return dict(row)
 
 
@@ -161,9 +163,7 @@ async def get_all_active_bots(pool: asyncpg.Pool) -> list[dict]:
     """
     start = time.monotonic()
     async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT * FROM bots WHERE status = 'active'"
-        )
+        rows = await conn.fetch("SELECT * FROM bots WHERE status = 'active'")
     duration = (time.monotonic() - start) * 1000
     count = len(rows)
     logger.debug(f"[DB][bots][SELECT] status=active → {count} rows | duration={duration:.1f}ms")
@@ -177,9 +177,7 @@ async def get_primary_bot(pool: asyncpg.Pool) -> Optional[dict]:
     """
     start = time.monotonic()
     async with pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM bots WHERE is_primary = true LIMIT 1"
-        )
+        row = await conn.fetchrow("SELECT * FROM bots WHERE is_primary = true LIMIT 1")
     duration = (time.monotonic() - start) * 1000
     logger.debug(f"[DB][bots][SELECT] is_primary=true | duration={duration:.1f}ms")
     return dict(row) if row else None
@@ -191,9 +189,15 @@ async def insert_bot(pool: asyncpg.Pool, bot_data: dict) -> dict:
       bot_id, username, display_name, token_encrypted, token_hash,
       owner_user_id, webhook_url, is_primary (bool)
     Returns inserted row as dict.
+    Primary bot gets unlimited groups (group_limit = 0 means unlimited).
     Logs: [DB][bots][INSERT] bot_id={bot_id} username=@{username}
     """
     start = time.monotonic()
+
+    is_primary = bot_data.get("is_primary", False)
+    # Primary bot has unlimited groups (0 = unlimited), clones use provided or default to 1
+    group_limit = 0 if is_primary else bot_data.get("group_limit", 1)
+
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
@@ -211,15 +215,17 @@ async def insert_bot(pool: asyncpg.Pool, bot_data: dict) -> dict:
             bot_data["token_hash"],
             bot_data["owner_user_id"],
             bot_data.get("webhook_url"),
-            bot_data.get("is_primary", False),
+            is_primary,
             bot_data.get("status", "active"),
             bot_data.get("webhook_active", False),
-            bot_data.get("group_limit", 1),
+            group_limit,
             bot_data.get("group_access_policy", "blocked"),
-            bot_data.get("bot_add_notifications", False)
+            bot_data.get("bot_add_notifications", False),
         )
     duration = (time.monotonic() - start) * 1000
-    logger.info(f"[DB][bots][INSERT] bot_id={bot_data['bot_id']} username=@{bot_data['username']} | duration={duration:.1f}ms")
+    logger.info(
+        f"[DB][bots][INSERT] bot_id={bot_data['bot_id']} username=@{bot_data['username']} is_primary={is_primary} | duration={duration:.1f}ms"
+    )
     return dict(row)
 
 
@@ -228,7 +234,7 @@ async def update_bot_status(
     bot_id: int,
     status: str,
     death_reason: str = None,
-    webhook_active: bool = None
+    webhook_active: bool = None,
 ) -> None:
     """
     Update bot status. Only updates fields that are not None.
@@ -241,21 +247,21 @@ async def update_bot_status(
         updates = ["status = $2", "last_seen = NOW()"]
         params = [bot_id, status]
         param_idx = 3
-        
+
         if death_reason is not None:
             updates.append(f"death_reason = ${param_idx}")
             params.append(death_reason)
             param_idx += 1
-        
+
         if webhook_active is not None:
             updates.append(f"webhook_active = ${param_idx}")
             params.append(webhook_active)
             param_idx += 1
-        
+
         query = f"UPDATE bots SET {', '.join(updates)} WHERE bot_id = $1"
-        
+
         await conn.execute(query, *params)
-    
+
     duration = (time.monotonic() - start) * 1000
     logger.info(f"[DB][bots][UPDATE] bot_id={bot_id} status={status} | duration={duration:.1f}ms")
 
@@ -265,7 +271,7 @@ async def update_bot_access_settings(
     bot_id: int,
     group_limit: int = None,
     group_access_policy: str = None,
-    bot_add_notifications: bool = None
+    bot_add_notifications: bool = None,
 ) -> None:
     """
     Update bot access settings. Only updates fields that are not None.
@@ -276,28 +282,28 @@ async def update_bot_access_settings(
         updates = []
         params = [bot_id]
         param_idx = 2
-        
+
         if group_limit is not None:
             updates.append(f"group_limit = ${param_idx}")
             params.append(group_limit)
             param_idx += 1
-            
+
         if group_access_policy is not None:
             updates.append(f"group_access_policy = ${param_idx}")
             params.append(group_access_policy)
             param_idx += 1
-            
+
         if bot_add_notifications is not None:
             updates.append(f"bot_add_notifications = ${param_idx}")
             params.append(bot_add_notifications)
             param_idx += 1
-            
+
         if not updates:
             return
-            
+
         query = f"UPDATE bots SET {', '.join(updates)} WHERE bot_id = $1"
         await conn.execute(query, *params)
-        
+
     duration = (time.monotonic() - start) * 1000
     logger.info(f"[DB][bots][UPDATE] access settings | bot_id={bot_id} | duration={duration:.1f}ms")
 
@@ -310,21 +316,19 @@ async def update_bot_last_seen(pool: asyncpg.Pool, bot_id: int) -> None:
     try:
         start = time.monotonic()
         async with pool.acquire() as conn:
-            await conn.execute(
-                "UPDATE bots SET last_seen = NOW() WHERE bot_id = $1",
-                bot_id
-            )
+            await conn.execute("UPDATE bots SET last_seen = NOW() WHERE bot_id = $1", bot_id)
         duration = (time.monotonic() - start) * 1000
-        logger.debug(f"[DB][bots][UPDATE] last_seen touched | bot_id={bot_id} | duration={duration:.1f}ms")
+        logger.debug(
+            f"[DB][bots][UPDATE] last_seen touched | bot_id={bot_id} | duration={duration:.1f}ms"
+        )
     except Exception as e:
-        logger.warning(f"[DB][bots][UPDATE] failed to touch last_seen | bot_id={bot_id} | error={e}")
+        logger.warning(
+            f"[DB][bots][UPDATE] failed to touch last_seen | bot_id={bot_id} | error={e}"
+        )
 
 
 async def update_bot_token(
-    pool: asyncpg.Pool,
-    bot_id: int,
-    token_encrypted: str,
-    token_hash: str
+    pool: asyncpg.Pool, bot_id: int, token_encrypted: str, token_hash: str
 ) -> None:
     """
     Update bot token for reauthentication.
@@ -339,7 +343,9 @@ async def update_bot_token(
             SET token_encrypted = $1, token_hash = $2, status = 'active', updated_at = NOW()
             WHERE bot_id = $3
             """,
-            token_encrypted, token_hash, bot_id
+            token_encrypted,
+            token_hash,
+            bot_id,
         )
     duration = (time.monotonic() - start) * 1000
     logger.info(f"[DB][bots][UPDATE] token | bot_id={bot_id} | duration={duration:.1f}ms")
@@ -356,19 +362,17 @@ async def update_bot_groups_count(pool: asyncpg.Pool, bot_id: int) -> None:
         if not bot:
             logger.warning(f"[DB][bots] Bot not found for groups_count update | bot_id={bot_id}")
             return
-        
+
         # Count groups for this bot using token_hash
         count = await conn.fetchval(
-            "SELECT COUNT(*) FROM groups WHERE bot_token_hash = $1",
-            bot["token_hash"]
+            "SELECT COUNT(*) FROM groups WHERE bot_token_hash = $1", bot["token_hash"]
         )
-        
-        await conn.execute(
-            "UPDATE bots SET groups_count = $1 WHERE bot_id = $2",
-            count, bot_id
-        )
+
+        await conn.execute("UPDATE bots SET groups_count = $1 WHERE bot_id = $2", count, bot_id)
     duration = (time.monotonic() - start) * 1000
-    logger.debug(f"[DB][bots][UPDATE] groups_count={count} | bot_id={bot_id} | duration={duration:.1f}ms")
+    logger.debug(
+        f"[DB][bots][UPDATE] groups_count={count} | bot_id={bot_id} | duration={duration:.1f}ms"
+    )
 
 
 async def delete_bot(pool: asyncpg.Pool, bot_id: int) -> None:
@@ -386,10 +390,9 @@ async def delete_bot(pool: asyncpg.Pool, bot_id: int) -> None:
 
 # ── Rate limiting ─────────────────────────────────────────────────────────────
 
+
 async def count_recent_clone_attempts(
-    pool: asyncpg.Pool,
-    user_id: int,
-    window_minutes: int = 60
+    pool: asyncpg.Pool, user_id: int, window_minutes: int = 60
 ) -> int:
     """
     Count clone attempts by user in the last N minutes.
@@ -403,19 +406,18 @@ async def count_recent_clone_attempts(
             WHERE user_id = $1
             AND attempted_at > NOW() - INTERVAL '1 minute' * $2
             """,
-            user_id, window_minutes
+            user_id,
+            window_minutes,
         )
     duration = (time.monotonic() - start) * 1000
-    logger.debug(f"[DB][clone_attempts][SELECT] user_id={user_id} count={count} | duration={duration:.1f}ms")
+    logger.debug(
+        f"[DB][clone_attempts][SELECT] user_id={user_id} count={count} | duration={duration:.1f}ms"
+    )
     return count or 0
 
 
 async def log_clone_attempt(
-    pool: asyncpg.Pool,
-    user_id: int,
-    success: bool,
-    fail_reason: str = None,
-    token_hash: str = None
+    pool: asyncpg.Pool, user_id: int, success: bool, fail_reason: str = None, token_hash: str = None
 ) -> None:
     """
     Append to clone_attempts.
@@ -429,7 +431,12 @@ async def log_clone_attempt(
             INSERT INTO clone_attempts (user_id, success, fail_reason, token_hash)
             VALUES ($1, $2, $3, $4)
             """,
-            user_id, success, fail_reason, token_hash
+            user_id,
+            success,
+            fail_reason,
+            token_hash,
         )
     duration = (time.monotonic() - start) * 1000
-    logger.debug(f"[DB][clone_attempts][INSERT] user_id={user_id} success={success} | duration={duration:.1f}ms")
+    logger.debug(
+        f"[DB][clone_attempts][INSERT] user_id={user_id} success={success} | duration={duration:.1f}ms"
+    )

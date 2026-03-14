@@ -19,21 +19,26 @@ On ADD — decision tree:
 On REMOVE — mark group as left in DB.
 """
 
+import hashlib
 import logging
-from telegram import Update, ChatMemberUpdated
-from telegram.ext import ContextTypes, ChatMemberHandler
-from telegram.constants import ParseMode
 
-from config import settings
+from telegram import ChatMemberUpdated, Update
+from telegram.constants import ParseMode
+from telegram.ext import ChatMemberHandler, ContextTypes
+
 from bot.utils.keyboards import support_keyboard
+from config import settings
+
 # alert_new_group_add might not exist, I'll check or just skip it if it's not provided
 # from bot.utils.alerts import alert_new_group_add
 from db.ops.clone_groups import (
-    get_active_group_count, get_clone_config, register_group,
-    mark_group_left, get_group_entry
+    get_active_group_count,
+    get_clone_config,
+    get_group_entry,
+    mark_group_left,
+    register_group,
 )
 from db.ops.groups import upsert_group
-import hashlib
 
 log = logging.getLogger("group_lifecycle")
 
@@ -42,9 +47,9 @@ def _is_bot_add(update: ChatMemberUpdated, bot_id: int) -> bool:
     """Returns True if this event is the bot itself being added."""
     new = update.new_chat_member
     return (
-        new.user.id == bot_id and
-        new.status in ("member", "administrator") and
-        update.old_chat_member.status in ("left", "kicked")
+        new.user.id == bot_id
+        and new.status in ("member", "administrator")
+        and update.old_chat_member.status in ("left", "kicked")
     )
 
 
@@ -52,9 +57,9 @@ def _is_bot_remove(update: ChatMemberUpdated, bot_id: int) -> bool:
     """Returns True if this event is the bot itself being removed."""
     new = update.new_chat_member
     return (
-        new.user.id == bot_id and
-        new.status in ("left", "kicked") and
-        update.old_chat_member.status in ("member", "administrator")
+        new.user.id == bot_id
+        and new.status in ("left", "kicked")
+        and update.old_chat_member.status in ("member", "administrator")
     )
 
 
@@ -67,11 +72,11 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
     bot_id = context.bot.id
     chat = event.chat
     actor = event.from_user  # who added or removed the bot
-    
+
     # In this project, db is often in bot_data["db_pool"] or similar
     # Based on main.py: primary_app.bot_data["db_pool"] = pool
     db_pool = context.bot_data.get("db_pool")
-    
+
     # ── BOT REMOVED ──────────────────────────────────────────────────────
     if _is_bot_remove(event, bot_id):
         log.info(f"[LIFECYCLE] Removed | bot={bot_id} chat={chat.id} by={actor.id}")
@@ -97,26 +102,30 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
             log.error(f"[LIFECYCLE] Clone config not found | bot={bot_id}")
             return
 
-        owner_id        = config["owner_id"]
-        group_limit     = config["group_limit"]       # 1–5
-        policy          = config["group_access_policy"]  # open|approval|blocked
-        notify_owner    = config["bot_add_notifications"]
-        is_owner        = (actor.id == owner_id)
+        owner_id = config["owner_id"]
+        group_limit = config["group_limit"]  # 1–5
+        policy = config["group_access_policy"]  # open|approval|blocked
+        notify_owner = config["bot_add_notifications"]
+        is_owner = actor.id == owner_id
 
         # ── 1. OWNER ADDING TO THEIR OWN GROUP ───────────────────────────────
         if is_owner:
             active_count = await get_active_group_count(db, bot_id)
 
-            # Check limit even for owner
-            if active_count >= group_limit:
+            # Check limit even for owner (group_limit = 0 means unlimited)
+            if group_limit > 0 and active_count >= group_limit:
                 await _leave_with_message(context, chat, "limit_reached", owner_id, is_owner=True)
                 return
 
             await register_group(
-                db, bot_id, chat.id, chat.title,
-                actor.id, actor.full_name,
+                db,
+                bot_id,
+                chat.id,
+                chat.title,
+                actor.id,
+                actor.full_name,
                 is_owner_group=True,
-                access_status="active"
+                access_status="active",
             )
             # Also register in main groups table
             token_hash = hashlib.sha256(context.bot.token.encode()).hexdigest()[:10]
@@ -134,8 +143,8 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         # ── 2. STRANGER ADDING THE BOT ───────────────────────────────────────
         active_count = await get_active_group_count(db, bot_id)
 
-        # Check group limit first
-        if active_count >= group_limit:
+        # Check group limit first (group_limit = 0 means unlimited)
+        if group_limit > 0 and active_count >= group_limit:
             await _leave_with_message(context, chat, "limit_reached", actor.id, is_owner=False)
             # Notify owner if enabled
             if notify_owner:
@@ -149,10 +158,14 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
         if policy == "open":
             await register_group(
-                db, bot_id, chat.id, chat.title,
-                actor.id, actor.full_name,
+                db,
+                bot_id,
+                chat.id,
+                chat.title,
+                actor.id,
+                actor.full_name,
                 is_owner_group=False,
-                access_status="active"
+                access_status="active",
             )
             # Also register in main groups table
             token_hash = hashlib.sha256(context.bot.token.encode()).hexdigest()[:10]
@@ -170,10 +183,14 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
         if policy == "approval":
             await register_group(
-                db, bot_id, chat.id, chat.title,
-                actor.id, actor.full_name,
+                db,
+                bot_id,
+                chat.id,
+                chat.title,
+                actor.id,
+                actor.full_name,
                 is_owner_group=False,
-                access_status="pending"
+                access_status="pending",
             )
             # Tell stranger to wait
             await _send_stranger_onboard_dm(context, actor, chat, policy="approval")
@@ -183,6 +200,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 # ── HELPERS ───────────────────────────────────────────────────────────────
+
 
 async def _leave_with_message(context, chat, reason: str, actor_id: int, is_owner: bool):
     """
@@ -208,11 +226,7 @@ async def _leave_with_message(context, chat, reason: str, actor_id: int, is_owne
         )
 
     try:
-        await context.bot.send_message(
-            chat_id=chat.id,
-            text=text,
-            parse_mode=ParseMode.HTML
-        )
+        await context.bot.send_message(chat_id=chat.id, text=text, parse_mode=ParseMode.HTML)
     except Exception as e:
         log.warning(f"[LIFECYCLE] Could not send leave message | chat={chat.id} error={e}")
 
@@ -227,11 +241,11 @@ async def _send_owner_setup_dm(context, owner_id: int, chat, bot_id: int):
     """DM the owner confirming their bot was added to a new group."""
     miniapp_url = settings.MINI_APP_URL
     try:
-        # We need to send this via the primary bot if possible, 
+        # We need to send this via the primary bot if possible,
         # or just via the current bot. The prompt says DM to owner via primary bot.
         # But here 'context.bot' is the clone bot.
         # To send via primary bot, we need its instance.
-        # For now, let's send via the current bot. 
+        # For now, let's send via the current bot.
         # Actually, let's check how other handlers do it.
         await context.bot.send_message(
             chat_id=owner_id,
@@ -244,9 +258,8 @@ async def _send_owner_setup_dm(context, owner_id: int, chat, bot_id: int):
             ),
             parse_mode=ParseMode.HTML,
             reply_markup=support_keyboard(
-                include_miniapp=bool(miniapp_url),
-                miniapp_url=miniapp_url
-            )
+                include_miniapp=bool(miniapp_url), miniapp_url=miniapp_url
+            ),
         )
     except Exception as e:
         log.warning(f"[LIFECYCLE] Could not DM owner | owner={owner_id} error={e}")
@@ -286,10 +299,7 @@ async def _send_stranger_onboard_dm(context, actor, chat, policy: str):
 
     try:
         await context.bot.send_message(
-            chat_id=actor.id,
-            text=text,
-            parse_mode=ParseMode.HTML,
-            reply_markup=support_keyboard()
+            chat_id=actor.id, text=text, parse_mode=ParseMode.HTML, reply_markup=support_keyboard()
         )
     except Exception as e:
         log.warning(f"[LIFECYCLE] Could not DM stranger | user={actor.id} error={e}")
@@ -308,7 +318,7 @@ async def _notify_owner_new_group(context, owner_id: int, chat, actor):
                 f"Your policy is set to <b>Open</b> — the bot is now active there."
                 f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}"
             ),
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
     except Exception as e:
         log.warning(f"[LIFECYCLE] Could not notify owner | owner={owner_id} error={e}")
@@ -320,7 +330,8 @@ async def _notify_owner_approval_needed(context, owner_id: int, chat, actor, bot
     Sends inline buttons: [✅ Approve] [❌ Deny]
     """
     try:
-        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
         await context.bot.send_message(
             chat_id=owner_id,
             text=(
@@ -334,16 +345,18 @@ async def _notify_owner_approval_needed(context, owner_id: int, chat, actor, bot
                 f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}"
             ),
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton(
-                    "✅ Approve",
-                    callback_data=f"grp_approve:{bot_id}:{chat.id}:{actor.id}"
-                ),
-                InlineKeyboardButton(
-                    "❌ Deny",
-                    callback_data=f"grp_deny:{bot_id}:{chat.id}:{actor.id}"
-                ),
-            ]])
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "✅ Approve", callback_data=f"grp_approve:{bot_id}:{chat.id}:{actor.id}"
+                        ),
+                        InlineKeyboardButton(
+                            "❌ Deny", callback_data=f"grp_deny:{bot_id}:{chat.id}:{actor.id}"
+                        ),
+                    ]
+                ]
+            ),
         )
     except Exception as e:
         log.warning(f"[LIFECYCLE] Could not send approval request | owner={owner_id} error={e}")
@@ -361,14 +374,11 @@ async def _notify_owner_limit_hit(context, owner_id: int, chat, actor):
                 f"To increase your limit (up to 5), update it with /cloneset."
                 f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}"
             ),
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
     except Exception as e:
         log.warning(f"[LIFECYCLE] Could not notify owner limit | owner={owner_id} error={e}")
 
 
 # ── Handler object to register in factory.py ─────────────────────────────
-group_lifecycle_handler = ChatMemberHandler(
-    handle_my_chat_member,
-    ChatMemberHandler.MY_CHAT_MEMBER
-)
+group_lifecycle_handler = ChatMemberHandler(handle_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER)

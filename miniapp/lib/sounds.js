@@ -11,39 +11,39 @@ class SoundManager {
     this.cache = {}; // preloaded Audio objects
     this.basePath = '/sounds/';
 
-    // Sound variants for variety
+    // Sound variants for variety (using WAV format)
     this.variants = {
-      correct: ['trivia/correct1.mp3', 'trivia/correct2.mp3', 'trivia/correct3.mp3'],
-      wrong: ['trivia/wrong1.mp3', 'trivia/wrong2.mp3'],
-      victory: ['general/victory.mp3'],
-      gameover: ['general/gameover.mp3'],
-      levelup: ['general/levelup.mp3'],
-      click: ['general/click.mp3'],
-      countdown: ['general/countdown.mp3'],
-      tick: ['general/tick.mp3'],
-      dice: ['dice/roll1.mp3', 'dice/roll2.mp3'],
-      coins: ['dice/coins.mp3'],
-      jackpot: ['dice/jackpot.mp3'],
-      cardflip: ['cards/flip.mp3'],
-      shuffle: ['cards/shuffle.mp3'],
-      deal: ['cards/deal.mp3'],
-      win: ['cards/win.mp3'],
-      lose: ['cards/lose.mp3'],
-      move: ['strategy/move.mp3'],
-      attack: ['strategy/attack.mp3'],
-      build: ['strategy/build.mp3'],
-      defeat: ['strategy/defeat.mp3'],
-      math_correct: ['math/correct.mp3'],
-      math_wrong: ['math/wrong.mp3'],
-      timeup: ['math/timeup.mp3'],
-      word_correct: ['word/correct.mp3'],
-      word_wrong: ['word/wrong.mp3'],
-      hint: ['word/hint.mp3'],
-      complete: ['word/complete.mp3'],
-      suspense: ['trivia/suspense.mp3'],
-      final_answer: ['trivia/final_answer.mp3'],
-      timeout: ['trivia/timeout.mp3'],
-      daily_bonus: ['general/daily_bonus.mp3'],
+      correct: ['trivia/correct1.wav', 'trivia/correct2.wav', 'trivia/correct3.wav'],
+      wrong: ['trivia/wrong1.wav', 'trivia/wrong2.wav'],
+      victory: ['general/victory.wav'],
+      gameover: ['general/gameover.wav'],
+      levelup: ['general/levelup.wav'],
+      click: ['general/click.wav'],
+      countdown: ['general/countdown.wav'],
+      tick: ['general/tick.wav'],
+      dice: ['dice/roll1.wav', 'dice/roll2.wav'],
+      coins: ['dice/coins.wav'],
+      jackpot: ['dice/coins.wav'], // Use coins as jackpot
+      cardflip: ['cards/flip.wav'],
+      shuffle: ['cards/shuffle.wav'],
+      deal: ['cards/shuffle.wav'], // Use shuffle as deal
+      win: ['cards/win.wav'],
+      lose: ['general/gameover.wav'], // Use gameover as lose
+      move: ['general/click.wav'], // Use click as move
+      attack: ['general/click.wav'],
+      build: ['general/levelup.wav'],
+      defeat: ['general/gameover.wav'],
+      math_correct: ['math/correct.wav'],
+      math_wrong: ['math/wrong.wav'],
+      timeup: ['trivia/timeout.wav'],
+      word_correct: ['word/correct.wav'],
+      word_wrong: ['word/wrong.wav'],
+      hint: ['general/countdown.wav'],
+      complete: ['word/complete.wav'],
+      suspense: ['trivia/timeout.wav'],
+      final_answer: ['trivia/correct1.wav'],
+      timeout: ['trivia/timeout.wav'],
+      daily_bonus: ['general/victory.wav'],
     };
 
     this._lastUsed = {}; // track last used variant per type

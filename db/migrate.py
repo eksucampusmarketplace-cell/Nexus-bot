@@ -38,6 +38,7 @@ def split_sql_statements(sql: str) -> list:
     - Multiple ADD COLUMN in single ALTER TABLE
     - Comments
     - Arrays and other complex values
+    - Dollar-quoted strings ($$ or $tag$)
     """
     # Remove comments
     lines = []
@@ -53,11 +54,34 @@ def split_sql_statements(sql: str) -> list:
     brace_level = 0
     in_single_quote = False
     in_double_quote = False
+    in_dollar_quote = None  # Tracks the tag: e.g., "$$" or "$body$"
     
     i = 0
     while i < len(sql):
         char = sql[i]
         
+        # Handle dollar quotes
+        if in_dollar_quote:
+            if sql[i:].startswith(in_dollar_quote):
+                tag = in_dollar_quote
+                for _ in range(len(tag)):
+                    current_stmt.append(sql[i])
+                    i += 1
+                in_dollar_quote = None
+                continue
+            current_stmt.append(char)
+            i += 1
+            continue
+
+        if char == '$' and not in_single_quote and not in_double_quote:
+            match = re.match(r'\$[a-zA-Z_0-9]*\$', sql[i:])
+            if match:
+                in_dollar_quote = match.group(0)
+                for _ in range(len(in_dollar_quote)):
+                    current_stmt.append(sql[i])
+                    i += 1
+                continue
+
         # Track quote states (for string literals)
         if char == "'" and not in_double_quote:
             if in_single_quote and i + 1 < len(sql) and sql[i + 1] == "'":

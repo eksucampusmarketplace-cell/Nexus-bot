@@ -48,10 +48,7 @@ async def create_music_tables(pool: asyncpg.Pool):
             sql = f.read()
 
         # Execute all statements
-        for statement in sql.split(';'):
-            statement = statement.strip()
-            if statement:
-                await conn.execute(statement)
+        await conn.execute(sql)
 
         logger.info("[MUSIC_DB] Tables created successfully")
 

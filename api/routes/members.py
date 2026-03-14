@@ -183,17 +183,21 @@ async def list_members(chat_id: int, user: dict = Depends(get_current_user)):
     members_list = list(members_map.values())
 
     def get_sort_key(x):
+        from datetime import timezone
         last_seen = x.get('last_seen')
         if last_seen is None:
-            return datetime(1970, 1, 1)
+            return datetime(1970, 1, 1, tzinfo=timezone.utc)
         if isinstance(last_seen, datetime):
+            # Ensure timezone-aware for comparison
+            if last_seen.tzinfo is None:
+                return last_seen.replace(tzinfo=timezone.utc)
             return last_seen
         if isinstance(last_seen, str):
             try:
                 return datetime.fromisoformat(last_seen.replace('Z', '+00:00'))
             except (ValueError, AttributeError):
-                return datetime(1970, 1, 1)
-        return datetime(1970, 1, 1)
+                return datetime(1970, 1, 1, tzinfo=timezone.utc)
+        return datetime(1970, 1, 1, tzinfo=timezone.utc)
 
     members_list.sort(key=get_sort_key, reverse=True)
 

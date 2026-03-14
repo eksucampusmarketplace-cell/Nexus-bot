@@ -14,9 +14,9 @@
  * Live character counter. Preview panel. Reset to default.
  */
 
-import { Card, EmptyState, showToast } from '../../lib/components.js';
-import { useStore } from '../../store/index.js';
-import { apiFetch } from '../../lib/api.js';
+import { Card, EmptyState, showToast } from '../../lib/components.js?v=1.3.3';
+import { useStore } from '../../store/index.js?v=1.3.3';
+import { apiFetch } from '../../lib/api.js?v=1.3.3';
 
 const store = useStore;
 

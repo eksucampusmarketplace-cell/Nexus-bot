@@ -1,6 +1,6 @@
-import { Card, showToast, StatCard, EmptyState, Badge, ProgressBar } from '../../lib/components.js?v=1.2.0';
-import { apiFetch } from '../../lib/api.js?v=1.2.0';
-import { useStore } from '../../store/index.js?v=1.2.0';
+import { Card, showToast, StatCard, EmptyState, Badge, ProgressBar } from '../../lib/components.js?v=1.3.3';
+import { apiFetch } from '../../lib/api.js?v=1.3.3';
+import { useStore } from '../../store/index.js?v=1.3.3';
 
 export async function renderBroadcastPage(container) {
     const state = useStore.getState();

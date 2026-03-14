@@ -13,8 +13,8 @@
  *   // Automatically shows bar when selections made
  */
 
-import { showToast } from './components.js?v=1.2.0';
-import { apiFetch } from './api.js?v=1.2.0';
+import { showToast } from './components.js?v=1.3.3';
+import { apiFetch } from './api.js?v=1.3.3';
 
 export class BulkActionManager {
   constructor(store) {

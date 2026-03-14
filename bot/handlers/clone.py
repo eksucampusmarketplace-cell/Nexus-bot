@@ -33,19 +33,34 @@ import httpx
 from datetime import datetime, timezone
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ContextTypes, ConversationHandler,
-    CommandHandler, CallbackQueryHandler, MessageHandler, filters
+    ContextTypes,
+    ConversationHandler,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 from telegram.constants import ParseMode
 
 from bot.registry import register as registry_register, deregister as registry_deregister
 from bot.factory import create_application
-from bot.utils.crypto import encrypt_token, hash_token, mask_token, validate_token_format, decrypt_token
+from bot.utils.crypto import (
+    encrypt_token,
+    hash_token,
+    mask_token,
+    validate_token_format,
+    decrypt_token,
+)
 from db.ops.bots import (
-    get_bot_by_id, get_bot_by_token_hash,
-    get_bots_by_owner, insert_bot,
-    update_bot_status, update_bot_token, delete_bot,
-    count_recent_clone_attempts, log_clone_attempt
+    get_bot_by_id,
+    get_bot_by_token_hash,
+    get_bots_by_owner,
+    insert_bot,
+    update_bot_status,
+    update_bot_token,
+    delete_bot,
+    count_recent_clone_attempts,
+    log_clone_attempt,
 )
 from config import settings
 
@@ -68,10 +83,11 @@ WEBHOOK_RETRY_DELAY = 5
 
 # ─── Entry point: /clone ──────────────────────────────────────────────────────
 
+
 async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
-    
+
     logger.info(f"[CLONE] /clone initiated | user_id={user.id} username=@{user.username}")
 
     # Access control
@@ -79,34 +95,48 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         logger.warning(f"[CLONE] Access denied | user_id={user.id} | reason=not_owner")
         # Check if this is a callback query or message
         if update.callback_query:
-            await update.callback_query.answer("⛔ Cloning is restricted to the bot owner.", show_alert=True)
-            await update.callback_query.edit_message_text("⛔ Cloning is restricted to the bot owner.")
+            await update.callback_query.answer(
+                "⛔ Cloning is restricted to the bot owner.", show_alert=True
+            )
+            await update.callback_query.edit_message_text(
+                "⛔ Cloning is restricted to the bot owner."
+            )
         else:
             await update.message.reply_text("⛔ Cloning is restricted to the bot owner.")
         return ConversationHandler.END
-    
+
     # Get bot username from cache (avoid API call)
     cached_info = context.bot_data.get("cached_bot_info", {})
     bot_username = cached_info.get("username")
     if not bot_username:
         # Fallback to API call if cache miss
         bot_username = (await context.bot.get_me()).username
-    
+
     # Force redirect to PM for clone creation
     if chat.type != "private":
         reply_text = (
             "🤖 *Create Your Own Bot*\n\n"
             "To create your own Nexus bot clone, please continue in a private message with me\.",
         )
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🚀 Continue in PM", url=f"https://t.me/{bot_username}?start=clone")
-        ]])
-        
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton(
+                        "🚀 Continue in PM", url=f"https://t.me/{bot_username}?start=clone"
+                    )
+                ]
+            ]
+        )
+
         if update.callback_query:
             await update.callback_query.answer()
-            await update.callback_query.edit_message_text(reply_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=keyboard)
+            await update.callback_query.edit_message_text(
+                reply_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=keyboard
+            )
         else:
-            await update.message.reply_text(reply_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=keyboard)
+            await update.message.reply_text(
+                reply_text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=keyboard
+            )
         return ConversationHandler.END
 
     # Determine if this is from a callback query or message
@@ -130,30 +160,30 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         "_Your bot will keep its own name, username, and photo_\.\n\n"
         "⚠️ Only paste tokens for bots *you own*\!",
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")
-        ]])
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")]]
+        ),
     )
     return WAITING_FOR_TOKEN
 
 
 # ─── State: WAITING_FOR_TOKEN ─────────────────────────────────────────────────
 
+
 async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Handle callback query (shouldn't normally happen in this state, but handle it)
     if update.callback_query:
         await update.callback_query.answer("Please send me the bot token as a message.")
         return WAITING_FOR_TOKEN
-    
+
     user = update.effective_user
     token = update.message.text.strip()
 
-    logger.info(
-        f"[CLONE] Token received | user_id={user.id} | "
-        f"masked={mask_token(token)}"
-    )
+    logger.info(f"[CLONE] Token received | user_id={user.id} | " f"masked={mask_token(token)}")
 
-    processing = await update.message.reply_text("🔍 Checking token\.\.\.", parse_mode=ParseMode.MARKDOWN_V2)
+    processing = await update.message.reply_text(
+        "🔍 Checking token\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
+    )
     db_pool = context.bot_data["db_pool"]
 
     # ── Layer 1: Rate limit ────────────────────────────────────────────────
@@ -165,7 +195,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.warning(f"[CLONE] Rate limited | user_id={user.id} | attempts={attempts}")
         await processing.edit_text(
             f"⏱ Too many attempts\. Max {CLONE_RATE_LIMIT} per hour\. Try again later\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
         return ConversationHandler.END
 
@@ -177,7 +207,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             "❌ Invalid token format\.\n\n"
             "It should look like: `1234567890:ABCdef\.\.\.`\n\n"
             "Send /clone to try again\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
         return ConversationHandler.END
 
@@ -189,18 +219,20 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if existing:
         reason = "already_registered_dead" if existing["status"] == "dead" else "already_registered"
         await log_clone_attempt(db_pool, user.id, False, reason, token_hash)
-        logger.info(f"[CLONE] Duplicate token | user_id={user.id} | existing_bot=@{existing['username']} | status={existing['status']}")
+        logger.info(
+            f"[CLONE] Duplicate token | user_id={user.id} | existing_bot=@{existing['username']} | status={existing['status']}"
+        )
 
         if existing["status"] == "dead":
             await processing.edit_text(
                 f"⚠️ @{existing['username']} is already registered but its token was revoked\.\n\n"
                 f"Send /myclones and use *Re\-authenticate* to fix it\.",
-                parse_mode=ParseMode.MARKDOWN_V2
+                parse_mode=ParseMode.MARKDOWN_V2,
             )
         else:
             await processing.edit_text(
                 f"⚠️ This token belongs to @{existing['username']} which is already a registered clone\.",
-                parse_mode=ParseMode.MARKDOWN_V2
+                parse_mode=ParseMode.MARKDOWN_V2,
             )
         return ConversationHandler.END
 
@@ -216,30 +248,35 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await log_clone_attempt(db_pool, user.id, False, "telegram_timeout", token_hash)
         logger.error(f"[CLONE] getMe timed out | user_id={user.id} | masked={mask_token(token)}")
         await processing.edit_text(
-            "⏱ Telegram didn't respond\. Please try again\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+            "⏱ Telegram didn't respond\. Please try again\.", parse_mode=ParseMode.MARKDOWN_V2
         )
         return ConversationHandler.END
     except Exception as e:
         await log_clone_attempt(db_pool, user.id, False, f"network_error: {e}", token_hash)
         logger.error(f"[CLONE] getMe network error | user_id={user.id} | error={e}")
-        await processing.edit_text("❌ Network error\. Please try again\.", parse_mode=ParseMode.MARKDOWN_V2)
+        await processing.edit_text(
+            "❌ Network error\. Please try again\.", parse_mode=ParseMode.MARKDOWN_V2
+        )
         return ConversationHandler.END
 
     if not tg_data.get("ok"):
         err_desc = tg_data.get("description", "Unknown error")
-        await log_clone_attempt(db_pool, user.id, False, f"telegram_rejected: {err_desc}", token_hash)
-        logger.warning(f"[CLONE] Token rejected by Telegram | user_id={user.id} | reason={err_desc}")
+        await log_clone_attempt(
+            db_pool, user.id, False, f"telegram_rejected: {err_desc}", token_hash
+        )
+        logger.warning(
+            f"[CLONE] Token rejected by Telegram | user_id={user.id} | reason={err_desc}"
+        )
         await processing.edit_text(
             f"❌ Telegram rejected this token:\n_{err_desc}_\n\nSend /clone to try again\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
         return ConversationHandler.END
 
     bot_info = tg_data["result"]
-    cloned_bot_id   = bot_info["id"]
+    cloned_bot_id = bot_info["id"]
     cloned_username = bot_info["username"]
-    cloned_name     = bot_info["first_name"]
+    cloned_name = bot_info["first_name"]
 
     logger.info(
         f"[CLONE] Token valid | "
@@ -256,12 +293,8 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if existing_bot and existing_bot["status"] == "dead":
             # Update the existing bot with new token
             from db.ops.bots import update_bot_token
-            await update_bot_token(
-                db_pool,
-                reauth_bot_id,
-                encrypt_token(token),
-                token_hash
-            )
+
+            await update_bot_token(db_pool, reauth_bot_id, encrypt_token(token), token_hash)
             await update_bot_status(db_pool, reauth_bot_id, "active", webhook_active=False)
             logger.info(f"[CLONE] Reauth token updated | bot_id={reauth_bot_id}")
 
@@ -274,7 +307,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     await client.post(
                         f"https://api.telegram.org/bot{token}/deleteWebhook",
-                        json={"drop_pending_updates": True}
+                        json={"drop_pending_updates": True},
                     )
 
                 # Set new webhook
@@ -286,9 +319,14 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                                 f"https://api.telegram.org/bot{token}/setWebhook",
                                 json={
                                     "url": webhook_url,
-                                    "allowed_updates": ["message", "callback_query", "chat_member", "new_chat_members"],
-                                    "drop_pending_updates": True
-                                }
+                                    "allowed_updates": [
+                                        "message",
+                                        "callback_query",
+                                        "chat_member",
+                                        "new_chat_members",
+                                    ],
+                                    "drop_pending_updates": True,
+                                },
                             )
                             wh_data = wh_resp.json()
                             if wh_data.get("ok"):
@@ -312,19 +350,18 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     await processing.edit_text(
                         f"✅ *@{cloned_username} re\-authenticated\!*\n\n"
                         f"Your bot is now active again\.",
-                        parse_mode=ParseMode.MARKDOWN_V2
+                        parse_mode=ParseMode.MARKDOWN_V2,
                     )
                     logger.info(f"[CLONE] Reauth complete | bot_id={reauth_bot_id}")
                 else:
                     await processing.edit_text(
                         f"⚠️ Token updated but webhook setup failed\. Please contact support\.",
-                        parse_mode=ParseMode.MARKDOWN_V2
+                        parse_mode=ParseMode.MARKDOWN_V2,
                     )
             except Exception as e:
                 logger.error(f"[CLONE] Reauth failed | bot_id={reauth_bot_id} | error={e}")
                 await processing.edit_text(
-                    f"❌ Re\-authentication failed: _{e}_",
-                    parse_mode=ParseMode.MARKDOWN_V2
+                    f"❌ Re\-authentication failed: _{e}_", parse_mode=ParseMode.MARKDOWN_V2
                 )
 
             context.user_data.pop("reauth_bot_id", None)
@@ -332,10 +369,10 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     # Store pending data for new clone registration
     context.user_data["pending_clone"] = {
-        "token":        token,
-        "token_hash":   token_hash,
-        "bot_id":       cloned_bot_id,
-        "username":     cloned_username,
+        "token": token,
+        "token_hash": token_hash,
+        "bot_id": cloned_bot_id,
+        "username": cloned_username,
         "display_name": cloned_name,
     }
 
@@ -346,20 +383,24 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"How many groups should this bot work in? \(1–5\)\n"
         f"Default: 1",
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("1", callback_data="clone:limit:1"),
-            InlineKeyboardButton("2", callback_data="clone:limit:2"),
-            InlineKeyboardButton("3", callback_data="clone:limit:3"),
-            InlineKeyboardButton("4", callback_data="clone:limit:4"),
-            InlineKeyboardButton("5", callback_data="clone:limit:5"),
-        ], [
-            InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")
-        ]])
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("1", callback_data="clone:limit:1"),
+                    InlineKeyboardButton("2", callback_data="clone:limit:2"),
+                    InlineKeyboardButton("3", callback_data="clone:limit:3"),
+                    InlineKeyboardButton("4", callback_data="clone:limit:4"),
+                    InlineKeyboardButton("5", callback_data="clone:limit:5"),
+                ],
+                [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")],
+            ]
+        ),
     )
     return WAITING_FOR_LIMIT
 
 
 # ─── State: WAITING_FOR_LIMIT ─────────────────────────────────────────────────
+
 
 async def on_limit_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -379,17 +420,20 @@ async def on_limit_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\.\n"
         "🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group\.",
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔒 Only me", callback_data="clone:policy:blocked")],
-            [InlineKeyboardButton("✅ Anyone (open)", callback_data="clone:policy:open")],
-            [InlineKeyboardButton("🔔 Approval needed", callback_data="clone:policy:approval")],
-            [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")]
-        ])
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("🔒 Only me", callback_data="clone:policy:blocked")],
+                [InlineKeyboardButton("✅ Anyone (open)", callback_data="clone:policy:open")],
+                [InlineKeyboardButton("🔔 Approval needed", callback_data="clone:policy:approval")],
+                [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")],
+            ]
+        ),
     )
     return WAITING_FOR_POLICY
 
 
 # ─── State: WAITING_FOR_POLICY ────────────────────────────────────────────────
+
 
 async def on_policy_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -412,16 +456,19 @@ async def on_policy_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await query.edit_message_text(
             "Notify me when someone adds my bot to a group?",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Yes, notify me", callback_data="clone:notify:yes")],
-                [InlineKeyboardButton("No thanks", callback_data="clone:notify:no")],
-                [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")]
-            ])
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton("Yes, notify me", callback_data="clone:notify:yes")],
+                    [InlineKeyboardButton("No thanks", callback_data="clone:notify:no")],
+                    [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")],
+                ]
+            ),
         )
         return WAITING_FOR_NOTIFICATIONS
 
 
 # ─── State: WAITING_FOR_NOTIFICATIONS ─────────────────────────────────────────
+
 
 async def on_notify_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -429,7 +476,7 @@ async def on_notify_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
     parts = query.data.split(":")
-    notify = (parts[2] == "yes")
+    notify = parts[2] == "yes"
 
     logger.info(f"[CLONE] Notify chosen | user_id={user.id} | notify={notify}")
 
@@ -439,6 +486,7 @@ async def on_notify_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ─── State: WAITING_FOR_CONFIRM ───────────────────────────────────────────────
+
 
 async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -451,20 +499,18 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not pending:
         logger.warning(f"[CLONE] Confirm with no pending data | user_id={user.id}")
-        await query.edit_message_text("❌ Session expired\. Send /clone to try again\.", parse_mode=ParseMode.MARKDOWN_V2)
+        await query.edit_message_text(
+            "❌ Session expired\. Send /clone to try again\.", parse_mode=ParseMode.MARKDOWN_V2
+        )
         return ConversationHandler.END
 
     await query.edit_message_text(
-        f"⚙️ Registering @{pending['username']}\.\.\.",
-        parse_mode=ParseMode.MARKDOWN_V2
+        f"⚙️ Registering @{pending['username']}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
     )
 
     try:
         await _complete_clone_registration(
-            db_pool=db_pool,
-            pending=pending,
-            owner_user_id=user.id,
-            edit_message=query.message
+            db_pool=db_pool, pending=pending, owner_user_id=user.id, edit_message=query.message
         )
         await log_clone_attempt(db_pool, user.id, True, None, pending["token_hash"])
     except Exception as e:
@@ -472,13 +518,14 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"[CLONE] Registration failed | user_id={user.id} | error={e}", exc_info=True)
         await query.edit_message_text(
             f"❌ Registration failed:\n_{e}_\n\nSend /clone to try again\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
 
     return ConversationHandler.END
 
 
 # ─── Cancel handler ───────────────────────────────────────────────────────────
+
 
 async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -495,6 +542,7 @@ async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─── Helper: Show final confirmation ──────────────────────────────────────────
 
+
 async def _show_final_confirmation(query, context):
     pending = context.user_data.get("pending_clone", {})
     cloned_username = pending["username"]
@@ -510,14 +558,19 @@ async def _show_final_confirmation(query, context):
         f"🔔 Notify: {'Yes' if pending.get('bot_add_notifications') else 'No'}\n\n"
         f"Confirm to register this bot as a Nexus clone?",
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("✅ Confirm", callback_data="clone:confirm"),
-            InlineKeyboardButton("❌ Cancel",  callback_data="clone:cancel")
-        ]])
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("✅ Confirm", callback_data="clone:confirm"),
+                    InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel"),
+                ]
+            ]
+        ),
     )
 
 
 # ─── Non-conversation callbacks (outside ConversationHandler) ─────────────────
+
 
 async def clone_management_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handles myclones management callbacks (new, remove, confirm_remove, reauth)."""
@@ -528,7 +581,9 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
     parts = query.data.split(":")
     action = parts[1]
 
-    logger.info(f"[CLONE] Management callback | user_id={user.id} | action={action} | data={query.data}")
+    logger.info(
+        f"[CLONE] Management callback | user_id={user.id} | action={action} | data={query.data}"
+    )
 
     db_pool = context.bot_data["db_pool"]
 
@@ -536,9 +591,9 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
     if action == "new":
         await query.edit_message_text(
             "Paste your new bot token from @BotFather:",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel_entry")
-            ]])
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel_entry")]]
+            ),
         )
         return WAITING_FOR_TOKEN
 
@@ -549,17 +604,25 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
 
         if not bot_record or bot_record["owner_user_id"] != user.id:
             logger.warning(f"[CLONE] Remove denied | user_id={user.id} | target={target_bot_id}")
-            await query.edit_message_text("❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2)
+            await query.edit_message_text(
+                "❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
 
         await query.edit_message_text(
             f"⚠️ *Remove @{bot_record['username']}?*\n\n"
             f"This stops the bot, deletes its webhook, and removes all data\. Cannot be undone\.",
             parse_mode=ParseMode.MARKDOWN_V2,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🗑️ Yes, remove", callback_data=f"clone:confirm_remove:{target_bot_id}"),
-                InlineKeyboardButton("↩️ Keep it",     callback_data="clone:keep")
-            ]])
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "🗑️ Yes, remove", callback_data=f"clone:confirm_remove:{target_bot_id}"
+                        ),
+                        InlineKeyboardButton("↩️ Keep it", callback_data="clone:keep"),
+                    ]
+                ]
+            ),
         )
         return
 
@@ -569,31 +632,36 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
         bot_record = await get_bot_by_id(db_pool, target_bot_id)
 
         if not bot_record or bot_record["owner_user_id"] != user.id:
-            await query.edit_message_text("❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2)
+            await query.edit_message_text(
+                "❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
 
         if bot_record.get("is_primary"):
             logger.warning(f"[CLONE] Attempt to remove primary bot | user_id={user.id}")
-            await query.edit_message_text("❌ You cannot remove the primary bot\.", parse_mode=ParseMode.MARKDOWN_V2)
+            await query.edit_message_text(
+                "❌ You cannot remove the primary bot\.", parse_mode=ParseMode.MARKDOWN_V2
+            )
             return
 
         await query.edit_message_text(
-            f"🗑️ Removing @{bot_record['username']}\.\.\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+            f"🗑️ Removing @{bot_record['username']}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
         )
 
         try:
             await _remove_clone(db_pool, target_bot_id, bot_record)
-            logger.info(f"[CLONE] Removed | bot_id={target_bot_id} | username=@{bot_record['username']} | by=user_id={user.id}")
+            logger.info(
+                f"[CLONE] Removed | bot_id={target_bot_id} | username=@{bot_record['username']} | by=user_id={user.id}"
+            )
             await query.edit_message_text(
-                f"✅ @{bot_record['username']} has been removed\.",
-                parse_mode=ParseMode.MARKDOWN_V2
+                f"✅ @{bot_record['username']} has been removed\.", parse_mode=ParseMode.MARKDOWN_V2
             )
         except Exception as e:
-            logger.error(f"[CLONE] Removal failed | bot_id={target_bot_id} | error={e}", exc_info=True)
+            logger.error(
+                f"[CLONE] Removal failed | bot_id={target_bot_id} | error={e}", exc_info=True
+            )
             await query.edit_message_text(
-                f"❌ Removal failed: _{e}_",
-                parse_mode=ParseMode.MARKDOWN_V2
+                f"❌ Removal failed: _{e}_", parse_mode=ParseMode.MARKDOWN_V2
             )
         return
 
@@ -608,9 +676,9 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
         context.user_data["reauth_bot_id"] = target_bot_id
         await query.edit_message_text(
             f"Paste the new token for this bot from @BotFather:",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel_entry")
-            ]])
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel_entry")]]
+            ),
         )
         return WAITING_FOR_TOKEN
 
@@ -623,8 +691,9 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
 
 # ─── /myclones ────────────────────────────────────────────────────────────────
 
+
 async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user    = update.effective_user
+    user = update.effective_user
     db_pool = context.bot_data["db_pool"]
 
     logger.info(f"[CLONE] /myclones | user_id={user.id}")
@@ -634,7 +703,7 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
     if not clones:
         await update.message.reply_text(
             "You have no clones yet\.\n\nSend /clone to add your first one\.",
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
         return
 
@@ -642,9 +711,9 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
     keyboard = []
 
     for bot in clones:
-        status_icon  = "👑" if bot["is_primary"] else ("🟢" if bot["status"] == "active" else "🔴")
+        status_icon = "👑" if bot["is_primary"] else ("🟢" if bot["status"] == "active" else "🔴")
         webhook_icon = "🔗" if bot["webhook_active"] else "⚠️"
-        label        = " \(Primary\)" if bot["is_primary"] else ""
+        label = " \(Primary\)" if bot["is_primary"] else ""
 
         text += (
             f"{status_icon} *@{bot['username']}*{label}\n"
@@ -658,20 +727,25 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
         if not bot["is_primary"]:
             row = []
             if bot["status"] == "dead":
-                row.append(InlineKeyboardButton("🔄 Re-auth", callback_data=f"clone:reauth:{bot['bot_id']}"))
-            row.append(InlineKeyboardButton(f"🗑️ Remove", callback_data=f"clone:remove:{bot['bot_id']}"))
+                row.append(
+                    InlineKeyboardButton(
+                        "🔄 Re-auth", callback_data=f"clone:reauth:{bot['bot_id']}"
+                    )
+                )
+            row.append(
+                InlineKeyboardButton(f"🗑️ Remove", callback_data=f"clone:remove:{bot['bot_id']}")
+            )
             keyboard.append(row)
 
     keyboard.append([InlineKeyboardButton("➕ Add new clone", callback_data="clone:new")])
 
     await update.message.reply_text(
-        text,
-        parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=InlineKeyboardMarkup(keyboard)
+        text, parse_mode=ParseMode.MARKDOWN_V2, reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
 # ─── /cloneset ────────────────────────────────────────────────────────────────
+
 
 async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -689,7 +763,7 @@ async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "`/cloneset limit <1-5>`\n"
             "`/cloneset policy open|approval|blocked`\n"
             "`/cloneset notify on|off`",
-            parse_mode=ParseMode.MARKDOWN_V2
+            parse_mode=ParseMode.MARKDOWN_V2,
         )
         return
 
@@ -713,22 +787,28 @@ async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ Limit must be between 1 and 20.")
             return
         await update_bot_access_settings(db_pool, bot_id, group_limit=int(value))
-        await update.message.reply_text(f"✅ Group limit updated to {value} for @{target_bot['username']}.")
+        await update.message.reply_text(
+            f"✅ Group limit updated to {value} for @{target_bot['username']}."
+        )
 
     elif subcommand == "policy":
         if value not in ["open", "approval", "blocked"]:
             await update.message.reply_text("❌ Policy must be: open, approval, or blocked.")
             return
         await update_bot_access_settings(db_pool, bot_id, group_access_policy=value)
-        await update.message.reply_text(f"✅ Access policy updated to {value} for @{target_bot['username']}.")
+        await update.message.reply_text(
+            f"✅ Access policy updated to {value} for @{target_bot['username']}."
+        )
 
     elif subcommand == "notify":
         if value not in ["on", "off"]:
             await update.message.reply_text("❌ Notify must be: on or off.")
             return
-        notify = (value == "on")
+        notify = value == "on"
         await update_bot_access_settings(db_pool, bot_id, bot_add_notifications=notify)
-        await update.message.reply_text(f"✅ Notifications turned {value} for @{target_bot['username']}.")
+        await update.message.reply_text(
+            f"✅ Notifications turned {value} for @{target_bot['username']}."
+        )
 
     else:
         await update.message.reply_text("❌ Unknown subcommand.")
@@ -736,18 +816,17 @@ async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─── Internal: complete registration ─────────────────────────────────────────
 
-async def _complete_clone_registration(
-    db_pool, pending: dict, owner_user_id: int, edit_message
-):
+
+async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: int, edit_message):
     """
     The core 5-step registration sequence.
     Steps MUST run in this exact order.
     If any step fails, raises an exception — caller handles messaging.
     """
-    token       = pending["token"]
-    bot_id      = pending["bot_id"]
-    username    = pending["username"]
-    render_url  = settings.RENDER_EXTERNAL_URL
+    token = pending["token"]
+    bot_id = pending["bot_id"]
+    username = pending["username"]
+    render_url = settings.RENDER_EXTERNAL_URL
     webhook_url = f"{render_url}/webhook/{bot_id}"
 
     logger.info(
@@ -761,27 +840,30 @@ async def _complete_clone_registration(
     async with httpx.AsyncClient(timeout=10.0) as client:
         clear_resp = await client.post(
             f"https://api.telegram.org/bot{token}/deleteWebhook",
-            json={"drop_pending_updates": True}
+            json={"drop_pending_updates": True},
         )
         logger.debug(f"[CLONE][REGISTER] deleteWebhook response: {clear_resp.json()}")
 
     # Step 2: Save to DB (before webhook — allows retry if webhook step fails)
     logger.debug(f"[CLONE][REGISTER] Step 2: Inserting DB record | bot_id={bot_id}")
-    await insert_bot(db_pool, {
-        "bot_id":          bot_id,
-        "username":        username,
-        "display_name":    pending["display_name"],
-        "token_encrypted": encrypt_token(token),
-        "token_hash":      pending["token_hash"],
-        "owner_user_id":   owner_user_id,
-        "webhook_url":     webhook_url,
-        "is_primary":      False,
-        "status":          "active",
-        "webhook_active":  False,
-        "group_limit":     pending.get("group_limit", 1),
-        "group_access_policy": pending.get("group_access_policy", "blocked"),
-        "bot_add_notifications": pending.get("bot_add_notifications", False),
-    })
+    await insert_bot(
+        db_pool,
+        {
+            "bot_id": bot_id,
+            "username": username,
+            "display_name": pending["display_name"],
+            "token_encrypted": encrypt_token(token),
+            "token_hash": pending["token_hash"],
+            "owner_user_id": owner_user_id,
+            "webhook_url": webhook_url,
+            "is_primary": False,
+            "status": "active",
+            "webhook_active": False,
+            "group_limit": pending.get("group_limit", 1),
+            "group_access_policy": pending.get("group_access_policy", "blocked"),
+            "bot_add_notifications": pending.get("bot_add_notifications", False),
+        },
+    )
     logger.info(f"[CLONE][REGISTER] DB record inserted | bot_id={bot_id}")
 
     # Step 3: Register webhook with retries
@@ -794,10 +876,15 @@ async def _complete_clone_registration(
                 wh_resp = await client.post(
                     f"https://api.telegram.org/bot{token}/setWebhook",
                     json={
-                        "url":             webhook_url,
-                        "allowed_updates": ["message","callback_query","chat_member","new_chat_members"],
-                        "drop_pending_updates": True
-                    }
+                        "url": webhook_url,
+                        "allowed_updates": [
+                            "message",
+                            "callback_query",
+                            "chat_member",
+                            "new_chat_members",
+                        ],
+                        "drop_pending_updates": True,
+                    },
                 )
                 wh_data = wh_resp.json()
 
@@ -805,7 +892,9 @@ async def _complete_clone_registration(
 
             if wh_data.get("ok"):
                 webhook_ok = True
-                logger.info(f"[CLONE][REGISTER] Webhook confirmed | bot_id={bot_id} | attempt={attempt}")
+                logger.info(
+                    f"[CLONE][REGISTER] Webhook confirmed | bot_id={bot_id} | attempt={attempt}"
+                )
                 break
             else:
                 logger.warning(
@@ -842,13 +931,14 @@ async def _complete_clone_registration(
         f"🔗 Webhook: active\n\n"
         f"Add it to any group as admin — it will appear in your Mini App dashboard\.",
         parse_mode=ParseMode.MARKDOWN_V2,
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("🚀 Open Mini App", web_app={"url": f"{render_url}/miniapp"})
-        ]])
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🚀 Open Mini App", web_app={"url": f"{render_url}/miniapp"})]]
+        ),
     )
 
 
 # ─── Internal: remove clone ───────────────────────────────────────────────────
+
 
 async def _remove_clone(db_pool, bot_id: int, bot_record: dict):
     """
@@ -867,11 +957,13 @@ async def _remove_clone(db_pool, bot_id: int, bot_record: dict):
         async with httpx.AsyncClient(timeout=10.0) as client:
             wr = await client.post(
                 f"https://api.telegram.org/bot{token}/deleteWebhook",
-                json={"drop_pending_updates": True}
+                json={"drop_pending_updates": True},
             )
             logger.debug(f"[CLONE][REMOVE] deleteWebhook | bot_id={bot_id} | response={wr.json()}")
     except Exception as e:
-        logger.warning(f"[CLONE][REMOVE] deleteWebhook failed (continuing) | bot_id={bot_id} | error={e}")
+        logger.warning(
+            f"[CLONE][REMOVE] deleteWebhook failed (continuing) | bot_id={bot_id} | error={e}"
+        )
 
     # 2. Deregister from memory
     removed = await registry_deregister(bot_id)
@@ -887,13 +979,13 @@ async def _remove_clone(db_pool, bot_id: int, bot_record: dict):
 clone_conversation = ConversationHandler(
     entry_points=[
         CommandHandler("clone", clone_command_handler),
-        CallbackQueryHandler(clone_management_callback, pattern=r"^clone:(new|reauth):")
+        CallbackQueryHandler(clone_management_callback, pattern=r"^clone:(new|reauth):"),
     ],
     states={
         WAITING_FOR_TOKEN: [
             MessageHandler(
                 filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d{8,12}:[\w-]{35,50}$"),
-                token_input_handler
+                token_input_handler,
             ),
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel$"),
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel_entry$"),
@@ -903,7 +995,9 @@ clone_conversation = ConversationHandler(
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel$"),
         ],
         WAITING_FOR_POLICY: [
-            CallbackQueryHandler(on_policy_chosen, pattern=r"^clone:policy:(blocked|open|approval)$"),
+            CallbackQueryHandler(
+                on_policy_chosen, pattern=r"^clone:policy:(blocked|open|approval)$"
+            ),
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel$"),
         ],
         WAITING_FOR_NOTIFICATIONS: [

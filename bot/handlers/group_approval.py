@@ -26,11 +26,11 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     parts = query.data.split(":")
-    action      = parts[0]          # grp_approve | grp_deny
-    bot_id      = int(parts[1])
-    chat_id     = int(parts[2])
-    requester   = int(parts[3])
-    db_pool     = context.bot_data.get("db_pool")
+    action = parts[0]  # grp_approve | grp_deny
+    bot_id = int(parts[1])
+    chat_id = int(parts[2])
+    requester = int(parts[3])
+    db_pool = context.bot_data.get("db_pool")
 
     if action == "grp_approve":
         if db_pool:
@@ -38,7 +38,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update_access_status(db, bot_id, chat_id, "active")
 
         # DM the requester: approved
-        # We should try to send this via the clone bot if it's still in the group, 
+        # We should try to send this via the clone bot if it's still in the group,
         # or via the primary bot if the user has started it.
         # The prompt says DM to requester.
         try:
@@ -50,7 +50,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"The bot is now active in your group.\n\n"
                     f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
                 ),
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
             )
         except Exception as e:
             log.warning(f"[APPROVAL] Could not DM requester {requester}: {e}")
@@ -58,7 +58,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             f"✅ Approved. Bot is now active in that group."
             f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         log.info(f"[APPROVAL] Approved | bot={bot_id} chat={chat_id}")
 
@@ -80,7 +80,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"Want your own bot? Visit @{settings.MAIN_BOT_USERNAME}\n\n"
                         f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
                     ),
-                    parse_mode=ParseMode.HTML
+                    parse_mode=ParseMode.HTML,
                 )
             except Exception:
                 pass
@@ -90,7 +90,9 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
         else:
-            log.warning(f"[APPROVAL] Could not find clone bot {bot_id} in registry to leave group {chat_id}")
+            log.warning(
+                f"[APPROVAL] Could not find clone bot {bot_id} in registry to leave group {chat_id}"
+            )
 
         if db_pool:
             async with db_pool.acquire() as db:
@@ -106,21 +108,17 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"💡 Create your own free bot at @{settings.MAIN_BOT_USERNAME}\n\n"
                     f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
                 ),
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
             )
         except Exception:
             pass
 
         await query.edit_message_text(
-            f"❌ Denied. Bot has left that group."
-            f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-            parse_mode=ParseMode.HTML
+            f"❌ Denied. Bot has left that group." f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
+            parse_mode=ParseMode.HTML,
         )
         log.info(f"[APPROVAL] Denied | bot={bot_id} chat={chat_id}")
 
 
 # Registered on PRIMARY bot only
-group_approval_handler = CallbackQueryHandler(
-    handle_approval,
-    pattern=r"^grp_(approve|deny):"
-)
+group_approval_handler = CallbackQueryHandler(handle_approval, pattern=r"^grp_(approve|deny):")

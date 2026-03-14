@@ -39,8 +39,10 @@ import pytz
 from croniter import croniter
 
 from db.ops.scheduler import (
-    get_due_messages, mark_sent, deactivate_message,
-    get_active_silent_times
+    get_due_messages,
+    mark_sent,
+    deactivate_message,
+    get_active_silent_times,
 )
 from db.ops.automod import get_group_settings
 from bot.logging.log_channel import log_event
@@ -56,8 +58,8 @@ class NexusScheduler:
     """
 
     def __init__(self, bot, db):
-        self.bot    = bot
-        self.db     = db
+        self.bot = bot
+        self.db = db
         self._tasks = []
         self._silent_active: dict[int, dict[int, bool]] = {}
 
@@ -81,8 +83,7 @@ class NexusScheduler:
                 await self._process_due_messages()
             except asyncpg.UndefinedTableError as e:
                 log.warning(
-                    f"[SCHEDULER] scheduled_messages table missing — "
-                    f"run migrations: {e}"
+                    f"[SCHEDULER] scheduled_messages table missing — " f"run migrations: {e}"
                 )
                 await asyncio.sleep(300)
                 continue
@@ -96,34 +97,29 @@ class NexusScheduler:
             try:
                 await self._send_scheduled(msg)
             except Exception as e:
-                log.warning(
-                    f"[SCHEDULER] Send failed | id={msg['id']} err={e}"
-                )
+                log.warning(f"[SCHEDULER] Send failed | id={msg['id']} err={e}")
 
     async def _send_scheduled(self, msg: dict):
-        chat_id  = msg["chat_id"]
-        content  = msg.get("content") or ""
-        sent_id  = None
+        chat_id = msg["chat_id"]
+        content = msg.get("content") or ""
+        sent_id = None
 
         try:
-            media_type    = msg.get("media_type")
+            media_type = msg.get("media_type")
             media_file_id = msg.get("media_file_id")
 
             if media_type and media_file_id:
                 if media_type == "photo":
                     sent = await self.bot.send_photo(
-                        chat_id=chat_id, photo=media_file_id,
-                        caption=content or None
+                        chat_id=chat_id, photo=media_file_id, caption=content or None
                     )
                 elif media_type == "video":
                     sent = await self.bot.send_video(
-                        chat_id=chat_id, video=media_file_id,
-                        caption=content or None
+                        chat_id=chat_id, video=media_file_id, caption=content or None
                     )
                 elif media_type == "document":
                     sent = await self.bot.send_document(
-                        chat_id=chat_id, document=media_file_id,
-                        caption=content or None
+                        chat_id=chat_id, document=media_file_id, caption=content or None
                     )
                 else:
                     sent = await self.bot.send_message(
@@ -131,9 +127,7 @@ class NexusScheduler:
                     )
             else:
                 sent = await self.bot.send_message(
-                    chat_id=chat_id,
-                    text=content or "(scheduled)",
-                    parse_mode="HTML"
+                    chat_id=chat_id, text=content or "(scheduled)", parse_mode="HTML"
                 )
             sent_id = sent.message_id
         except Exception as e:
@@ -143,9 +137,7 @@ class NexusScheduler:
         if msg.get("pin_after_send") and sent_id:
             try:
                 await self.bot.pin_chat_message(
-                    chat_id=chat_id,
-                    message_id=sent_id,
-                    disable_notification=True
+                    chat_id=chat_id, message_id=sent_id, disable_notification=True
                 )
             except Exception:
                 pass
@@ -155,19 +147,19 @@ class NexusScheduler:
 
         if max_sends > 0 and new_count >= max_sends:
             await deactivate_message(self.db, msg["id"])
-            log.info(
-                f"[SCHEDULER] Deactivated (max sends reached) | id={msg['id']}"
-            )
+            log.info(f"[SCHEDULER] Deactivated (max sends reached) | id={msg['id']}")
             return
 
         next_send = _calc_next_send(msg)
         await mark_sent(self.db, msg["id"], new_count, next_send)
         await log_event(
-            bot=self.bot, db=self.db, chat_id=chat_id,
+            bot=self.bot,
+            db=self.db,
+            chat_id=chat_id,
             event_type="schedule_send",
             details={
                 "schedule_type": msg.get("schedule_type"),
-                "message_id":    msg["id"],
+                "message_id": msg["id"],
             },
             bot_id=self.bot.id,
         )
@@ -182,10 +174,7 @@ class NexusScheduler:
             try:
                 await self._check_silent_times()
             except asyncpg.UndefinedTableError as e:
-                log.warning(
-                    f"[SCHEDULER] Silent time table missing — "
-                    f"run migrations: {e}"
-                )
+                log.warning(f"[SCHEDULER] Silent time table missing — " f"run migrations: {e}")
                 await asyncio.sleep(300)
                 continue
             except asyncpg.UndefinedColumnError as e:
@@ -200,44 +189,38 @@ class NexusScheduler:
         slots = await get_active_silent_times(self.db)
 
         for slot in slots:
-            chat_id    = slot["chat_id"]
-            slot_num   = slot["slot"]
-            start_str  = str(slot["start_time"])
-            end_str    = str(slot["end_time"])
+            chat_id = slot["chat_id"]
+            slot_num = slot["slot"]
+            start_str = str(slot["start_time"])
+            end_str = str(slot["end_time"])
             start_text = slot.get("start_text", "")
-            end_text   = slot.get("end_text", "")
+            end_text = slot.get("end_text", "")
 
             settings = await get_group_settings(self.db, chat_id)
-            tz_name  = settings.get("timezone", "UTC") if settings else "UTC"
+            tz_name = settings.get("timezone", "UTC") if settings else "UTC"
 
             from bot.automod.detectors import is_in_time_window
-            now_time  = _now_in_tz(tz_name)
+
+            now_time = _now_in_tz(tz_name)
             in_window = is_in_time_window(now_time, start_str, end_str)
 
             prev = self._silent_active.get(chat_id, {}).get(slot_num, False)
 
             if in_window and not prev:
                 self._silent_active.setdefault(chat_id, {})[slot_num] = True
-                await self._enable_silent_mode(
-                    chat_id, start_text or "🔕 Silent mode activated."
-                )
-                log.info(
-                    f"[SCHEDULER] Silent start | chat={chat_id} slot={slot_num}"
-                )
+                await self._enable_silent_mode(chat_id, start_text or "🔕 Silent mode activated.")
+                log.info(f"[SCHEDULER] Silent start | chat={chat_id} slot={slot_num}")
 
             elif not in_window and prev:
                 self._silent_active.setdefault(chat_id, {})[slot_num] = False
-                await self._disable_silent_mode(
-                    chat_id, end_text or "🔔 Silent mode ended."
-                )
-                log.info(
-                    f"[SCHEDULER] Silent end | chat={chat_id} slot={slot_num}"
-                )
+                await self._disable_silent_mode(chat_id, end_text or "🔔 Silent mode ended.")
+                log.info(f"[SCHEDULER] Silent end | chat={chat_id} slot={slot_num}")
 
     async def _enable_silent_mode(self, chat_id: int, text: str):
         """Restrict all members from sending messages."""
         try:
             from telegram import ChatPermissions
+
             await self.bot.set_chat_permissions(
                 chat_id=chat_id,
                 permissions=ChatPermissions(
@@ -245,7 +228,7 @@ class NexusScheduler:
                     can_send_media_messages=False,
                     can_send_polls=False,
                     can_send_other_messages=False,
-                )
+                ),
             )
             if text:
                 await self.bot.send_message(chat_id=chat_id, text=text)
@@ -256,6 +239,7 @@ class NexusScheduler:
         """Restore all member permissions."""
         try:
             from telegram import ChatPermissions
+
             await self.bot.set_chat_permissions(
                 chat_id=chat_id,
                 permissions=ChatPermissions(
@@ -264,7 +248,7 @@ class NexusScheduler:
                     can_send_polls=True,
                     can_send_other_messages=True,
                     can_add_web_page_previews=True,
-                )
+                ),
             )
             if text:
                 await self.bot.send_message(chat_id=chat_id, text=text)
@@ -274,8 +258,8 @@ class NexusScheduler:
 
 def _calc_next_send(msg: dict) -> datetime:
     """Calculate next send time based on schedule type."""
-    now     = datetime.now(timezone.utc)
-    stype   = msg["schedule_type"]
+    now = datetime.now(timezone.utc)
+    stype = msg["schedule_type"]
     tz_name = msg.get("timezone", "UTC")
 
     if stype == "once":
@@ -290,20 +274,19 @@ def _calc_next_send(msg: dict) -> datetime:
             tz = pytz.timezone(tz_name)
         except Exception:
             tz = pytz.utc
-        tod       = msg.get("time_of_day")
+        tod = msg.get("time_of_day")
         now_local = datetime.now(tz)
 
         if stype == "daily":
             next_local = now_local.replace(
-                hour=tod.hour, minute=tod.minute,
-                second=0, microsecond=0
+                hour=tod.hour, minute=tod.minute, second=0, microsecond=0
             )
             if next_local <= now_local:
                 next_local += timedelta(days=1)
             return next_local.astimezone(timezone.utc)
 
         if stype == "weekly":
-            days        = msg.get("days_of_week") or [0]
+            days = msg.get("days_of_week") or [0]
             current_dow = now_local.weekday()
             for offset in range(1, 8):
                 candidate_dow = (current_dow + offset) % 7
@@ -311,8 +294,7 @@ def _calc_next_send(msg: dict) -> datetime:
                 if tg_dow in days:
                     next_local = now_local + timedelta(days=offset)
                     next_local = next_local.replace(
-                        hour=tod.hour, minute=tod.minute,
-                        second=0, microsecond=0
+                        hour=tod.hour, minute=tod.minute, second=0, microsecond=0
                     )
                     return next_local.astimezone(timezone.utc)
 
@@ -328,7 +310,7 @@ def _calc_next_send(msg: dict) -> datetime:
 
 def _now_in_tz(tz_name: str):
     try:
-        tz  = pytz.timezone(tz_name)
+        tz = pytz.timezone(tz_name)
         now = datetime.now(tz)
         return now.time()
     except Exception:

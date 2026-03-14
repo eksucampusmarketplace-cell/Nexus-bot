@@ -44,22 +44,22 @@ def split_sql_statements(sql: str) -> list:
     lines = []
     for line in sql.splitlines():
         # Remove -- comments but preserve line for statement tracking
-        if '--' in line:
-            line = line[:line.index('--')]
+        if "--" in line:
+            line = line[: line.index("--")]
         lines.append(line)
-    sql = '\n'.join(lines)
-    
+    sql = "\n".join(lines)
+
     statements = []
     current_stmt = []
     brace_level = 0
     in_single_quote = False
     in_double_quote = False
     in_dollar_quote = None  # Tracks the tag: e.g., "$$" or "$body$"
-    
+
     i = 0
     while i < len(sql):
         char = sql[i]
-        
+
         # Handle dollar quotes
         if in_dollar_quote:
             if sql[i:].startswith(in_dollar_quote):
@@ -73,8 +73,8 @@ def split_sql_statements(sql: str) -> list:
             i += 1
             continue
 
-        if char == '$' and not in_single_quote and not in_double_quote:
-            match = re.match(r'\$[a-zA-Z_0-9]*\$', sql[i:])
+        if char == "$" and not in_single_quote and not in_double_quote:
+            match = re.match(r"\$[a-zA-Z_0-9]*\$", sql[i:])
             if match:
                 in_dollar_quote = match.group(0)
                 for _ in range(len(in_dollar_quote)):
@@ -94,27 +94,27 @@ def split_sql_statements(sql: str) -> list:
         elif char == '"' and not in_single_quote:
             in_double_quote = not in_double_quote
         # Track brace level for JSON/arrays (but not inside quotes)
-        elif char in '{' and not in_single_quote and not in_double_quote:
+        elif char in "{" and not in_single_quote and not in_double_quote:
             brace_level += 1
-        elif char in '}' and not in_single_quote and not in_double_quote:
+        elif char in "}" and not in_single_quote and not in_double_quote:
             brace_level -= 1
-        
+
         current_stmt.append(char)
-        
+
         # Statement terminator - only at top level (not inside braces or quotes)
-        if char == ';' and brace_level == 0 and not in_single_quote and not in_double_quote:
-            stmt = ''.join(current_stmt).strip()
+        if char == ";" and brace_level == 0 and not in_single_quote and not in_double_quote:
+            stmt = "".join(current_stmt).strip()
             if stmt:
                 statements.append(stmt)
             current_stmt = []
-        
+
         i += 1
-    
+
     # Add any remaining statement
-    stmt = ''.join(current_stmt).strip()
+    stmt = "".join(current_stmt).strip()
     if stmt:
         statements.append(stmt)
-    
+
     return [s for s in statements if s]
 
 
@@ -153,10 +153,7 @@ async def run_migrations(pool):
                     if stmt.strip():
                         await conn.execute(stmt)
 
-                await conn.execute(
-                    "INSERT INTO migrations_log (filename) VALUES ($1)",
-                    filename
-                )
+                await conn.execute("INSERT INTO migrations_log (filename) VALUES ($1)", filename)
                 log.info(f"[MIGRATE] Applied: {filename}")
 
             except Exception as e:

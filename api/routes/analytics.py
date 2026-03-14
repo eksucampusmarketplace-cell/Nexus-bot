@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/groups")
 
+
 @router.get("/{chat_id}/analytics")
 async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:
@@ -19,13 +20,17 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
         start_date = now - timedelta(days=29)
 
         # Activity: Aggregate message_count by join date from users table
-        activity_rows = await conn.fetch("""
+        activity_rows = await conn.fetch(
+            """
             SELECT DATE(join_date) as date, SUM(message_count) as messages
             FROM users
             WHERE chat_id = $1 AND join_date >= $2
             GROUP BY DATE(join_date)
             ORDER BY date
-        """, chat_id, start_date)
+        """,
+            chat_id,
+            start_date,
+        )
 
         # Create activity map for quick lookup
         activity_map = {str(row["date"]): row["messages"] or 0 for row in activity_rows}
@@ -33,18 +38,22 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
         # Build activity array for last 30 days
         activity = []
         for i in range(30):
-            date = (now - timedelta(days=29-i)).strftime("%Y-%m-%d")
+            date = (now - timedelta(days=29 - i)).strftime("%Y-%m-%d")
             messages = activity_map.get(date, 0)
             activity.append({"date": date, "messages": messages})
 
         # Member Growth: Get join/leave events from member_events table
-        events_rows = await conn.fetch("""
+        events_rows = await conn.fetch(
+            """
             SELECT DATE(created_at) as date, event_type, COUNT(*) as count
             FROM member_events
             WHERE chat_id = $1 AND created_at >= $2
             GROUP BY DATE(created_at), event_type
             ORDER BY date
-        """, chat_id, start_date)
+        """,
+            chat_id,
+            start_date,
+        )
 
         # Build events map
         events_map = {}
@@ -67,24 +76,25 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
             # This is an approximation - in a perfect world we'd track daily snapshots
             joins = day_events["joins"]
             leaves = day_events["leaves"]
-            growth.append({
-                "date": date,
-                "joins": joins,
-                "leaves": leaves,
-                "total": max(0, running_total)
-            })
-            running_total -= (joins - leaves)
+            growth.append(
+                {"date": date, "joins": joins, "leaves": leaves, "total": max(0, running_total)}
+            )
+            running_total -= joins - leaves
 
         # Reverse to get chronological order
         growth.reverse()
 
         # Module Activity: Get action counts from actions_log table
-        module_rows = await conn.fetch("""
+        module_rows = await conn.fetch(
+            """
             SELECT action, COUNT(*) as count
             FROM actions_log
             WHERE chat_id = $1 AND timestamp >= $2
             GROUP BY action
-        """, chat_id, start_date)
+        """,
+            chat_id,
+            start_date,
+        )
 
         # Map actions to module names
         action_to_module = {
@@ -114,38 +124,40 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
             modules = [{"name": "no_activity", "actions": 0}]
 
         # Peak hours analysis (for heatmap)
-        hour_rows = await conn.fetch("""
+        hour_rows = await conn.fetch(
+            """
             SELECT EXTRACT(hour FROM created_at) as hour,
                    COUNT(*) as count
             FROM member_events
             WHERE chat_id = $1
               AND created_at >= NOW() - INTERVAL '30 days'
             GROUP BY EXTRACT(hour FROM created_at)
-        """, chat_id)
+        """,
+            chat_id,
+        )
 
         peak_hours = [0] * 24
         for row in hour_rows:
-            peak_hours[int(row['hour'])] = row['count']
+            peak_hours[int(row["hour"])] = row["count"]
 
-    return {
-        "activity": activity,
-        "growth": growth,
-        "modules": modules,
-        "peak_hours": peak_hours
-    }
+    return {"activity": activity, "growth": growth, "modules": modules, "peak_hours": peak_hours}
+
 
 @router.get("/{chat_id}/analytics/heatmap")
 async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:
         # Get activity by day/hour from member_events
-        heatmap_rows = await conn.fetch("""
+        heatmap_rows = await conn.fetch(
+            """
             SELECT EXTRACT(DOW FROM created_at) as day,
                    EXTRACT(HOUR FROM created_at) as hour,
                    COUNT(*) as count
             FROM member_events
             WHERE chat_id = $1 AND created_at >= NOW() - INTERVAL '7 days'
             GROUP BY EXTRACT(DOW FROM created_at), EXTRACT(HOUR FROM created_at)
-        """, chat_id)
+        """,
+            chat_id,
+        )
 
         # Create lookup map
         heatmap_map = {}
@@ -159,12 +171,14 @@ async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)
         for day in range(7):
             for hour in range(24):
                 count = heatmap_map.get((day, hour), 0)
-                heatmap.append({
-                    "day": day,
-                    "hour": hour,
-                    "count": count,
-                    "sentiment": 0  # Neutral sentiment (not tracked yet)
-                })
+                heatmap.append(
+                    {
+                        "day": day,
+                        "hour": hour,
+                        "count": count,
+                        "sentiment": 0,  # Neutral sentiment (not tracked yet)
+                    }
+                )
 
     return heatmap
 
@@ -189,20 +203,25 @@ async def member_stats(
                WHERE chat_id = $1 AND message_count > 0
                ORDER BY message_count DESC
                LIMIT $2""",
-            chat_id, limit
+            chat_id,
+            limit,
         )
 
-        total_members = await conn.fetchval(
-            "SELECT COUNT(*) FROM users WHERE chat_id = $1", chat_id
-        ) or 0
+        total_members = (
+            await conn.fetchval("SELECT COUNT(*) FROM users WHERE chat_id = $1", chat_id) or 0
+        )
 
-        avg_trust = await conn.fetchval(
-            "SELECT AVG(trust_score) FROM users WHERE chat_id = $1", chat_id
-        ) or 50.0
+        avg_trust = (
+            await conn.fetchval("SELECT AVG(trust_score) FROM users WHERE chat_id = $1", chat_id)
+            or 50.0
+        )
 
-        low_trust_count = await conn.fetchval(
-            "SELECT COUNT(*) FROM users WHERE chat_id = $1 AND trust_score <= 30", chat_id
-        ) or 0
+        low_trust_count = (
+            await conn.fetchval(
+                "SELECT COUNT(*) FROM users WHERE chat_id = $1 AND trust_score <= 30", chat_id
+            )
+            or 0
+        )
 
     return {
         "top_members": [dict(r) for r in rows],

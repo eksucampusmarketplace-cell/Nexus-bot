@@ -22,9 +22,15 @@ from telegram.constants import ParseMode
 
 from config import settings
 from bot.billing.stars_economy import (
-    get_bonus_balance, grant_bonus_stars, spend_bonus_stars,
-    redeem_promo_code, create_promo_code, get_referral_link,
-    get_referral_stats, record_referral, REFERRAL_BONUS_STARS
+    get_bonus_balance,
+    grant_bonus_stars,
+    spend_bonus_stars,
+    redeem_promo_code,
+    create_promo_code,
+    get_referral_link,
+    get_referral_stats,
+    record_referral,
+    REFERRAL_BONUS_STARS,
 )
 from bot.billing.entitlements import STARS_PRICES, ITEM_LABELS
 
@@ -38,32 +44,28 @@ async def cmd_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Works in private chat only.
     """
     user = update.effective_user
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     if update.effective_chat.type != "private":
         await update.message.reply_text("Please use /redeem in our private chat.")
         return
 
     if not context.args:
-        await update.message.reply_text(
-            "❓ Usage: /redeem <code>\n\nExample: /redeem NEXUS2024"
-        )
+        await update.message.reply_text("❓ Usage: /redeem <code>\n\nExample: /redeem NEXUS2024")
         return
 
-    code   = context.args[0]
+    code = context.args[0]
     result = await redeem_promo_code(db, context.bot, user.id, code)
 
     if not result["ok"]:
         await update.message.reply_text(
-            f"❌ {result['message']}\n\n"
-            f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
+            f"❌ {result['message']}\n\n" f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
         )
         return
 
     await update.message.reply_text(
-        f"{result['message']}\n\n"
-        f"⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-        parse_mode=ParseMode.HTML
+        f"{result['message']}\n\n" f"⚡ Powered by {settings.BOT_DISPLAY_NAME}",
+        parse_mode=ParseMode.HTML,
     )
     log.info(f"[ECONOMY_CMD] Redeemed | user={user.id} code={code}")
 
@@ -74,10 +76,10 @@ async def cmd_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Show referral link and stats.
     """
     user = update.effective_user
-    db   = context.bot_data.get("db")
-    me   = await context.bot.get_me()
+    db = context.bot_data.get("db")
+    me = await context.bot.get_me()
 
-    link  = await get_referral_link(me.username, user.id)
+    link = await get_referral_link(me.username, user.id)
     stats = await get_referral_stats(db, user.id)
 
     await update.message.reply_text(
@@ -93,9 +95,9 @@ async def cmd_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"  Stars earned:    ⭐{stats['stars_earned']}\n\n"
         f"⚡ Powered by {settings.BOT_DISPLAY_NAME}",
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("📤 Share Link", switch_inline_query=link)
-        ]])
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("📤 Share Link", switch_inline_query=link)]]
+        ),
     )
 
 
@@ -105,7 +107,7 @@ async def cmd_mystars(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Show bonus Stars balance and active feature purchases.
     """
     user = update.effective_user
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     balance = await get_bonus_balance(db, user.id)
 
@@ -118,14 +120,15 @@ async def cmd_mystars(update: Update, context: ContextTypes.DEFAULT_TYPE):
         GROUP BY item_type
         ORDER BY expires_at ASC
         """,
-        user.id
+        user.id,
     )
 
     from datetime import datetime, timezone
+
     now = datetime.now(timezone.utc)
     active_lines = []
     for r in rows:
-        days  = (r["expires_at"] - now).days
+        days = (r["expires_at"] - now).days
         label = ITEM_LABELS.get(r["item_type"], r["item_type"])
         active_lines.append(f"  ✅ {label} — {days}d left")
 
@@ -139,7 +142,7 @@ async def cmd_mystars(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Use /referral to earn more bonus Stars.\n"
         f"Use /redeem <code> to redeem promo codes.\n\n"
         f"⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     )
 
 
@@ -150,17 +153,17 @@ async def cmd_spend_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Shows available items if no args.
     """
     user = update.effective_user
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     if not context.args:
         balance = await get_bonus_balance(db, user.id)
-        lines   = [f"⭐ <b>Spend Bonus Stars</b>\n\nBalance: ⭐{balance}\n\nAvailable:\n"]
+        lines = [f"⭐ <b>Spend Bonus Stars</b>\n\nBalance: ⭐{balance}\n\nAvailable:\n"]
         for item, stars in STARS_PRICES.items():
             label = ITEM_LABELS.get(item, item)
             lines.append(f"  /spendbonus {item} — ⭐{stars} — {label}\n")
         await update.message.reply_text(
             "".join(lines) + f"\n⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -169,7 +172,7 @@ async def cmd_spend_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Unknown item. Use /spendbonus to see options.")
         return
 
-    cost   = STARS_PRICES[item_type]
+    cost = STARS_PRICES[item_type]
     result = await spend_bonus_stars(db, user.id, cost, item_type)
 
     if not result["ok"]:
@@ -185,11 +188,12 @@ async def cmd_spend_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ <b>{label}</b> unlocked using ⭐{cost} bonus Stars!\n\n"
         f"Remaining balance: ⭐{result['remaining_balance']}\n\n"
         f"⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     )
 
 
 # ── ADMIN COMMANDS (OWNER_ID only) ────────────────────────────────────────
+
 
 async def cmd_grant_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -201,14 +205,15 @@ async def cmd_grant_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = context.bot_data.get("db")
     try:
         target_id = int(context.args[0])
-        amount    = int(context.args[1])
-        reason    = " ".join(context.args[2:]) if len(context.args) > 2 else "admin_grant"
+        amount = int(context.args[1])
+        reason = " ".join(context.args[2:]) if len(context.args) > 2 else "admin_grant"
     except (IndexError, ValueError):
         await update.message.reply_text("❓ Usage: /grantbonus <user_id> <amount> [reason]")
         return
 
-    balance = await grant_bonus_stars(db, target_id, amount, reason,
-                                       granted_by=update.effective_user.id)
+    balance = await grant_bonus_stars(
+        db, target_id, amount, reason, granted_by=update.effective_user.id
+    )
 
     # Notify recipient
     try:
@@ -221,7 +226,7 @@ async def cmd_grant_bonus(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Use /spendbonus to unlock features.\n\n"
                 f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
             ),
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
     except Exception:
         pass
@@ -252,11 +257,11 @@ async def cmd_create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = context.bot_data.get("db")
 
     try:
-        code        = context.args[0]
+        code = context.args[0]
         reward_type = context.args[1]
-        raw_value   = context.args[2] if len(context.args) > 2 else "0"
-        days        = int(context.args[3]) if len(context.args) > 3 else 30
-        max_uses    = int(context.args[4]) if len(context.args) > 4 else 1
+        raw_value = context.args[2] if len(context.args) > 2 else "0"
+        days = int(context.args[3]) if len(context.args) > 3 else 30
+        max_uses = int(context.args[4]) if len(context.args) > 4 else 1
         expire_days = int(context.args[5]) if len(context.args) > 5 else 0
     except (IndexError, ValueError):
         await update.message.reply_text(
@@ -265,7 +270,7 @@ async def cmd_create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    reward_value   = 0
+    reward_value = 0
     reward_feature = ""
 
     if reward_type == "bonus_stars":
@@ -298,7 +303,7 @@ async def cmd_create_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Days: {days}\n"
             f"Max uses: {max_uses} (0=unlimited)\n"
             f"Expires: {'Never' if not expire_days else f'{expire_days} days'}",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
     else:
         await update.message.reply_text(f"❌ {result['error']}")
@@ -308,15 +313,13 @@ async def cmd_promo_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/promoinfo <code> — Show code stats. Owner only."""
     if update.effective_user.id != settings.OWNER_ID:
         return
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
     code = (context.args[0] if context.args else "").upper()
     if not code:
         await update.message.reply_text("❓ Usage: /promoinfo <code>")
         return
 
-    row = await db.fetchrow(
-        "SELECT * FROM promo_codes WHERE UPPER(code)=$1", code
-    )
+    row = await db.fetchrow("SELECT * FROM promo_codes WHERE UPPER(code)=$1", code)
     if not row:
         await update.message.reply_text("❌ Code not found.")
         return
@@ -329,7 +332,7 @@ async def cmd_promo_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Uses: {row['current_uses']}/{row['max_uses'] or '∞'}\n"
         f"Active: {'✅' if row['is_active'] else '❌'}\n"
         f"Expires: {row['expires_at'] or 'Never'}",
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     )
 
 
@@ -337,15 +340,14 @@ async def cmd_disable_promo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/disablepromo <code> — Deactivate a code. Owner only."""
     if update.effective_user.id != settings.OWNER_ID:
         return
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
     code = (context.args[0] if context.args else "").upper()
-    await db.execute(
-        "UPDATE promo_codes SET is_active=FALSE WHERE UPPER(code)=$1", code
-    )
+    await db.execute("UPDATE promo_codes SET is_active=FALSE WHERE UPPER(code)=$1", code)
     await update.message.reply_text(f"✅ Code {code} disabled.")
 
 
 # ── /start referral handler ───────────────────────────────────────────────
+
 
 async def handle_start_referral(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -353,7 +355,7 @@ async def handle_start_referral(update: Update, context: ContextTypes.DEFAULT_TY
     Records referral if not already referred.
     """
     user = update.effective_user
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     payload = context.args[0] if context.args else ""
     if not payload.startswith("ref_"):
@@ -370,12 +372,12 @@ async def handle_start_referral(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ── Handler objects ───────────────────────────────────────────────────────
 economy_handlers = [
-    CommandHandler("redeem",       cmd_redeem),
-    CommandHandler("referral",     cmd_referral),
-    CommandHandler("mystars",      cmd_mystars),
-    CommandHandler("spendbonus",   cmd_spend_bonus),
-    CommandHandler("grantbonus",   cmd_grant_bonus),
-    CommandHandler("createpromo",  cmd_create_promo),
-    CommandHandler("promoinfo",    cmd_promo_info),
+    CommandHandler("redeem", cmd_redeem),
+    CommandHandler("referral", cmd_referral),
+    CommandHandler("mystars", cmd_mystars),
+    CommandHandler("spendbonus", cmd_spend_bonus),
+    CommandHandler("grantbonus", cmd_grant_bonus),
+    CommandHandler("createpromo", cmd_create_promo),
+    CommandHandler("promoinfo", cmd_promo_info),
     CommandHandler("disablepromo", cmd_disable_promo),
 ]

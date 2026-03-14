@@ -84,8 +84,9 @@ HELP_CATEGORIES = {
         "/admin_requests - View open requests (admin)",
         "/admin_req_stats - Request statistics (admin)",
         "/set_admin_requests - Configure @admins (admin)",
-    ]
+    ],
 }
+
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
@@ -103,22 +104,46 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for cat, cmds in HELP_CATEGORIES.items():
             if arg in cat.lower():
                 text = f"⚡ *Nexus Help: {cat}*\n\n" + "\n".join(cmds)
-                text += f"\n\n📱 <a href=\"{miniapp_url}\">Open Mini App for detailed configuration</a>" if miniapp_url else ""
-                await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True)
+                text += (
+                    f'\n\n📱 <a href="{miniapp_url}">Open Mini App for detailed configuration</a>'
+                    if miniapp_url
+                    else ""
+                )
+                await update.message.reply_text(
+                    text, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True
+                )
                 return
 
         # Check if it is a command
-        await update.message.reply_text(f"Detailed help for `{arg}` is coming soon. Use the Mini App for complete command documentation.", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(
+            f"Detailed help for `{arg}` is coming soon. Use the Mini App for complete command documentation.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
         return
 
     keyboard = [
         [InlineKeyboardButton("📱 Open Mini App", url=miniapp_url)] if miniapp_url else [],
-        [InlineKeyboardButton("🛡️ Moderation", callback_data="help_mod"), InlineKeyboardButton("🚫 Anti-Spam", callback_data="help_spam")],
-        [InlineKeyboardButton("👋 Greetings", callback_data="help_greet"), InlineKeyboardButton("🔒 Security", callback_data="help_sec")],
-        [InlineKeyboardButton("📢 Channel", callback_data="help_chan"), InlineKeyboardButton("📊 Analytics", callback_data="help_ana")],
-        [InlineKeyboardButton("📝 Content", callback_data="help_cont"), InlineKeyboardButton("🎮 Fun", callback_data="help_fun")],
-        [InlineKeyboardButton("🔧 Utilities", callback_data="help_util"), InlineKeyboardButton("📢 Admin Requests", callback_data="help_areq")],
-        [InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")]
+        [
+            InlineKeyboardButton("🛡️ Moderation", callback_data="help_mod"),
+            InlineKeyboardButton("🚫 Anti-Spam", callback_data="help_spam"),
+        ],
+        [
+            InlineKeyboardButton("👋 Greetings", callback_data="help_greet"),
+            InlineKeyboardButton("🔒 Security", callback_data="help_sec"),
+        ],
+        [
+            InlineKeyboardButton("📢 Channel", callback_data="help_chan"),
+            InlineKeyboardButton("📊 Analytics", callback_data="help_ana"),
+        ],
+        [
+            InlineKeyboardButton("📝 Content", callback_data="help_cont"),
+            InlineKeyboardButton("🎮 Fun", callback_data="help_fun"),
+        ],
+        [
+            InlineKeyboardButton("🔧 Utilities", callback_data="help_util"),
+            InlineKeyboardButton("📢 Admin Requests", callback_data="help_areq"),
+        ],
+        [InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")],
     ]
 
     # Filter out empty rows
@@ -126,42 +151,50 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    help_text = "⚡ *Nexus Help System*\n\nChoose a category or open the Mini App for detailed configuration:\n\n" + (
-        f"📱 Full command documentation with descriptions and examples available in the [Mini App]({miniapp_url})" if miniapp_url else ""
+    help_text = (
+        "⚡ *Nexus Help System*\n\nChoose a category or open the Mini App for detailed configuration:\n\n"
+        + (
+            f"📱 Full command documentation with descriptions and examples available in the [Mini App]({miniapp_url})"
+            if miniapp_url
+            else ""
+        )
     )
 
     await update.message.reply_text(
         help_text,
         reply_markup=reply_markup,
         parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True
+        disable_web_page_preview=True,
     )
+
 
 async def help_modules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db_pool = context.bot_data["db_pool"]
     chat_id = update.effective_chat.id
-    
+
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow("SELECT modules FROM groups WHERE chat_id = $1", chat_id)
         modules = {}
-        if row and row['modules']:
-            modules = row['modules']
-            if isinstance(modules, str): modules = json.loads(modules)
-    
+        if row and row["modules"]:
+            modules = row["modules"]
+            if isinstance(modules, str):
+                modules = json.loads(modules)
+
     text = "📦 *Nexus Modules Status*\n\n"
     for mod, enabled in modules.items():
         status = "✅ ON" if enabled else "❌ OFF"
         text += f"• `{mod}`: {status}\n"
-    
+
     if not modules:
         text += "No modules configured yet."
-        
+
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
 
 async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
+
     cat_map = {
         "help_mod": "🛡️ Moderation",
         "help_spam": "🚫 Anti-Spam",
@@ -174,14 +207,18 @@ async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
         "help_util": "🔧 Utilities",
         "help_areq": "📢 Admin Requests",
     }
-    
+
     cat = cat_map.get(query.data)
     if cat:
         cmds = HELP_CATEGORIES[cat]
         text = f"⚡ *Nexus Help: {cat}*\n\n" + "\n".join(cmds)
-        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=query.message.reply_markup)
+        await query.edit_message_text(
+            text, parse_mode=ParseMode.MARKDOWN, reply_markup=query.message.reply_markup
+        )
     elif query.data == "help_all":
         text = "⚡ *Nexus All Commands*\n\n"
         for cat, cmds in HELP_CATEGORIES.items():
             text += f"*{cat}*:\n" + "\n".join(cmds) + "\n\n"
-        await query.edit_message_text(text, parse_mode=ParseMode.MARKDOWN, reply_markup=query.message.reply_markup)
+        await query.edit_message_text(
+            text, parse_mode=ParseMode.MARKDOWN, reply_markup=query.message.reply_markup
+        )

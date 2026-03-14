@@ -4,6 +4,7 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class Database:
     def __init__(self):
         self.pool = None
@@ -11,14 +12,14 @@ class Database:
     async def connect(self):
         """Connect to the database with retry logic and better error messages."""
         import asyncio
-        
+
         conn_str = settings.SUPABASE_CONNECTION_STRING
-        
+
         # Note: statement_cache_size=0 is required for Supabase/pgbouncer compatibility
         # Supabase uses pgbouncer with transaction pooling, which doesn't support
         # prepared statements properly. Setting statement_cache_size to 0 disables
         # the prepared statement cache and allows the application to work correctly.
-        
+
         # Validate connection string format
         if not conn_str or not conn_str.startswith("postgresql://"):
             raise ValueError(
@@ -26,10 +27,10 @@ class Database:
                 "It should start with 'postgresql://' and contain valid connection details. "
                 "Example: postgresql://postgres:password@db.project.supabase.co:5432/postgres"
             )
-        
+
         max_retries = 3
         last_error = None
-        
+
         for attempt in range(1, max_retries + 1):
             try:
                 self.pool = await asyncpg.create_pool(
@@ -38,9 +39,7 @@ class Database:
                     max_size=10,
                     command_timeout=60,
                     statement_cache_size=0,
-                    server_settings={
-                        'application_name': 'nexus-bot'
-                    }
+                    server_settings={"application_name": "nexus-bot"},
                 )
                 logger.info("Successfully connected to Supabase PostgreSQL")
                 # Initialize schema
@@ -50,8 +49,8 @@ class Database:
                 last_error = e
                 logger.warning(f"Database connection attempt {attempt}/{max_retries} failed: {e}")
                 if attempt < max_retries:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
-        
+                    await asyncio.sleep(2**attempt)  # Exponential backoff
+
         logger.error(f"Failed to connect to database after {max_retries} attempts")
         raise last_error
 
@@ -319,7 +318,7 @@ class Database:
                     UNIQUE(group_id, user_id)
                 );
             """)
-            
+
             # Create indexes
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_bots_owner ON bots(owner_user_id);
@@ -338,5 +337,6 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_force_channel_user ON force_channel_records(user_id);
             """)
             logger.info("Database schema initialized")
+
 
 db = Database()

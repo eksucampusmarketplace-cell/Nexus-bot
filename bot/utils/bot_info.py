@@ -14,13 +14,13 @@ logger = logging.getLogger(__name__)
 async def get_bot_info_cached(bot, bot_data: dict) -> dict:
     """
     Get bot info with caching to avoid excessive getMe() API calls.
-    
+
     The bot info is cached in bot_data['cached_bot_info'].
     """
     cached = bot_data.get("cached_bot_info")
     if cached:
         return cached
-    
+
     # Not cached, fetch from API
     try:
         me = await bot.get_me()
@@ -50,6 +50,7 @@ def init_bot_info_cache(context: ContextTypes.DEFAULT_TYPE, bot, is_primary: boo
     """
     try:
         import asyncio
+
         loop = asyncio.get_event_loop()
         if loop.is_running():
             # Can't await in sync context, will be cached on first use

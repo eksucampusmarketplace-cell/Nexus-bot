@@ -12,9 +12,11 @@ which doesn't match the current migration file. This typically happens when:
 This script manually applies the required schema changes and marks
 the migration as complete in migrations_log.
 """
+
 import asyncio
 import os
 import sys
+
 
 async def main():
     # Import here to avoid import errors if asyncpg not available
@@ -26,7 +28,7 @@ async def main():
         return
 
     # Get connection string from environment
-    conn_str = os.environ.get('SUPABASE_CONNECTION_STRING')
+    conn_str = os.environ.get("SUPABASE_CONNECTION_STRING")
     if not conn_str:
         print("Error: SUPABASE_CONNECTION_STRING environment variable not set")
         print("\nTo use this script, you need to set the database connection string:")
@@ -101,10 +103,18 @@ async def main():
 
             # Create indexes
             print("   Creating indexes...")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_chat_id ON reports (chat_id)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (chat_id, status)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports (reporter_id)")
-            await conn.execute("CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports (reported_id)")
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_reports_chat_id ON reports (chat_id)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_reports_status ON reports (chat_id, status)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_reports_reporter ON reports (reporter_id)"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports (reported_id)"
+            )
             print("   ✓ Indexes created")
         else:
             print("   ✓ Reports table already exists")
@@ -144,12 +154,14 @@ async def main():
         print("  3. Roll back any incomplete transactions")
         print("  4. Re-run this script")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
     finally:
         if conn:
             await conn.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

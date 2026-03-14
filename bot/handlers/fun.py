@@ -87,21 +87,16 @@ async def cmd_afk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set AFK status with optional reason."""
     user = update.effective_user
     chat = update.effective_chat
-    
+
     reason = " ".join(context.args) if context.args else "No reason given"
-    
+
     if chat.id not in afk_users:
         afk_users[chat.id] = {}
-    
-    afk_users[chat.id][user.id] = {
-        "reason": reason,
-        "since": datetime.now(timezone.utc)
-    }
-    
+
+    afk_users[chat.id][user.id] = {"reason": reason, "since": datetime.now(timezone.utc)}
+
     await update.message.reply_text(
-        f"😴 <b>{user.first_name}</b> is now AFK\n"
-        f"Reason: {reason}",
-        parse_mode=ParseMode.HTML
+        f"😴 <b>{user.first_name}</b> is now AFK\n" f"Reason: {reason}", parse_mode=ParseMode.HTML
     )
     log.info(f"[FUN_CMD] AFK set | user={user.id} chat={chat.id}")
 
@@ -110,17 +105,16 @@ async def cmd_back(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Clear AFK status."""
     user = update.effective_user
     chat = update.effective_chat
-    
+
     if chat.id in afk_users and user.id in afk_users[chat.id]:
         afk_data = afk_users[chat.id].pop(user.id)
         since = afk_data["since"]
         duration = datetime.now(timezone.utc) - since
         minutes = int(duration.total_seconds() / 60)
-        
+
         await update.message.reply_text(
-            f"👋 <b>Welcome back!</b>\n"
-            f"You were AFK for {minutes} minutes.",
-            parse_mode=ParseMode.HTML
+            f"👋 <b>Welcome back!</b>\n" f"You were AFK for {minutes} minutes.",
+            parse_mode=ParseMode.HTML,
         )
         log.info(f"[FUN_CMD] AFK cleared | user={user.id} chat={chat.id}")
     else:
@@ -131,18 +125,18 @@ async def check_afk(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check if mentioned user is AFK."""
     message = update.effective_message
     chat = update.effective_chat
-    
+
     if not message or not chat:
         return
-    
+
     # Check for mentions
     if message.entities:
         for entity in message.entities:
             if entity.type == "mention":
-                mentioned_username = message.text[entity.offset:entity.offset + entity.length]
+                mentioned_username = message.text[entity.offset : entity.offset + entity.length]
                 # Try to find user by mention - simplified
                 pass
-    
+
     # Check reply to AFK user
     if message.reply_to_message:
         replied_user = message.reply_to_message.from_user
@@ -151,12 +145,12 @@ async def check_afk(update: Update, context: ContextTypes.DEFAULT_TYPE):
             since = afk_data["since"]
             duration = datetime.now(timezone.utc) - since
             minutes = int(duration.total_seconds() / 60)
-            
+
             await message.reply_text(
                 f"💤 <b>{replied_user.first_name}</b> is AFK\n"
                 f"Reason: {afk_data['reason']}\n"
                 f"Duration: {minutes} minutes",
-                parse_mode=ParseMode.HTML
+                parse_mode=ParseMode.HTML,
             )
 
 
@@ -164,28 +158,24 @@ async def cmd_poll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Create a simple yes/no poll."""
     if not context.args:
         await update.message.reply_text(
-            "❓ Usage: /poll <question>\n"
-            "Example: /poll Should we have a game night?"
+            "❓ Usage: /poll <question>\n" "Example: /poll Should we have a game night?"
         )
         return
-    
+
     question = " ".join(context.args)
-    
+
     await context.bot.send_poll(
         chat_id=update.effective_chat.id,
         question=question,
         options=["👍 Yes", "👎 No", "🤷 Maybe"],
-        is_anonymous=False
+        is_anonymous=False,
     )
     log.info(f"[FUN_CMD] Poll created | chat={update.effective_chat.id}")
 
 
 async def cmd_dice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Roll a dice."""
-    await context.bot.send_dice(
-        chat_id=update.effective_chat.id,
-        emoji="🎲"
-    )
+    await context.bot.send_dice(chat_id=update.effective_chat.id, emoji="🎲")
 
 
 async def cmd_coin(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -198,34 +188,29 @@ async def cmd_choose(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Randomly choose between options."""
     if not context.args:
         await update.message.reply_text(
-            "❓ Usage: /choose option1|option2|option3\n"
-            "Example: /choose pizza|burger|sushi"
+            "❓ Usage: /choose option1|option2|option3\n" "Example: /choose pizza|burger|sushi"
         )
         return
-    
+
     options_text = " ".join(context.args)
     options = [opt.strip() for opt in options_text.split("|")]
-    
+
     if len(options) < 2:
         await update.message.reply_text("Please provide at least 2 options separated by |")
         return
-    
+
     chosen = random.choice(options)
-    await update.message.reply_text(
-        f"🎯 I choose:\n<b>{chosen}</b>",
-        parse_mode=ParseMode.HTML
-    )
+    await update.message.reply_text(f"🎯 I choose:\n<b>{chosen}</b>", parse_mode=ParseMode.HTML)
 
 
 async def cmd_8ball(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Magic 8-ball response."""
     if not context.args:
         await update.message.reply_text(
-            "❓ Usage: /8ball <question>\n"
-            "Example: /8ball Will I win the lottery?"
+            "❓ Usage: /8ball <question>\n" "Example: /8ball Will I win the lottery?"
         )
         return
-    
+
     response = random.choice(EIGHT_BALL_RESPONSES)
     await update.message.reply_text(response)
 
@@ -242,9 +227,11 @@ async def cmd_roll(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 max_val = 1000000
         except ValueError:
             pass
-    
+
     result = random.randint(1, max_val)
-    await update.message.reply_text(f"🎲 Rolled: <b>{result}</b> (1-{max_val})", parse_mode=ParseMode.HTML)
+    await update.message.reply_text(
+        f"🎲 Rolled: <b>{result}</b> (1-{max_val})", parse_mode=ParseMode.HTML
+    )
 
 
 async def cmd_joke(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -264,7 +251,7 @@ async def cmd_roast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Reply to someone to roast them! 🔥")
         return
-    
+
     roasts = [
         "is as useful as a screen door on a submarine 🚪",
         "has the reflexes of a sloth on sleeping pills 🦥",
@@ -275,13 +262,12 @@ async def cmd_roast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "is like a cloud - when they disappear, it's a beautiful day ☀️",
         "would lose a battle of wits with a houseplant 🌱",
     ]
-    
+
     target = update.message.reply_to_message.from_user
     roast = random.choice(roasts)
-    
+
     await update.message.reply_text(
-        f"🔥 <b>{target.first_name}</b> {roast}",
-        parse_mode=ParseMode.HTML
+        f"🔥 <b>{target.first_name}</b> {roast}", parse_mode=ParseMode.HTML
     )
 
 
@@ -290,7 +276,7 @@ async def cmd_compliment(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message:
         await update.message.reply_text("Reply to someone to compliment them! 💝")
         return
-    
+
     compliments = [
         "is an absolute legend! 🌟",
         "makes everything better just by being here! ✨",
@@ -301,13 +287,12 @@ async def cmd_compliment(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "is proof that nice people still exist! 💎",
         "deserves all the good things coming their way! 🎁",
     ]
-    
+
     target = update.message.reply_to_message.from_user
     compliment = random.choice(compliments)
-    
+
     await update.message.reply_text(
-        f"💝 <b>{target.first_name}</b> {compliment}",
-        parse_mode=ParseMode.HTML
+        f"💝 <b>{target.first_name}</b> {compliment}", parse_mode=ParseMode.HTML
     )
 
 
@@ -320,21 +305,20 @@ async def cmd_calc(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Supported: +, -, *, /, ** (power)"
         )
         return
-    
+
     expression = " ".join(context.args)
-    
+
     # Security: only allow safe characters
     allowed_chars = set("0123456789+-*/.() **")
     if not all(c in allowed_chars for c in expression.replace(" ", "")):
         await update.message.reply_text("❌ Invalid characters in expression")
         return
-    
+
     try:
         # Safe evaluation
         result = eval(expression, {"__builtins__": {}}, {})
         await update.message.reply_text(
-            f"🧮 <code>{expression}</code> = <b>{result}</b>",
-            parse_mode=ParseMode.HTML
+            f"🧮 <code>{expression}</code> = <b>{result}</b>", parse_mode=ParseMode.HTML
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")

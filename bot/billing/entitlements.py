@@ -24,21 +24,21 @@ log = logging.getLogger("entitlements")
 # ── PRICING & LABELS ─────────────────────────────────────────────────────────
 
 STARS_PRICES = {
-    "feat_music":       100,
-    "feat_autojoin":    50,
-    "feat_analytics":   200,
-    "feat_webhooks":    150,
-    "group_slot":       500,
-    "clone_slot":       1000,
+    "feat_music": 100,
+    "feat_autojoin": 50,
+    "feat_analytics": 200,
+    "feat_webhooks": 150,
+    "group_slot": 500,
+    "clone_slot": 1000,
 }
 
 ITEM_LABELS = {
-    "feat_music":       "Music Player",
-    "feat_autojoin":    "Auto Join",
-    "feat_analytics":   "Analytics",
-    "feat_webhooks":    "Webhooks",
-    "group_slot":       "Additional Group Slot",
-    "clone_slot":       "Additional Clone Slot",
+    "feat_music": "Music Player",
+    "feat_autojoin": "Auto Join",
+    "feat_analytics": "Analytics",
+    "feat_webhooks": "Webhooks",
+    "group_slot": "Additional Group Slot",
+    "clone_slot": "Additional Clone Slot",
 }
 
 
@@ -64,6 +64,7 @@ def invalidate_cache(owner_id: int):
 
 # ── ENTITLEMENT CHECKS ───────────────────────────────────────────────────────
 
+
 async def has_entitlement(db, owner_id: int, item_type: str) -> bool:
     """
     Check if owner has active entitlement for item_type.
@@ -87,7 +88,8 @@ async def has_entitlement(db, owner_id: int, item_type: str) -> bool:
         FROM stars_purchases
         WHERE owner_id=$1 AND item_type=$2 AND expires_at > NOW()
         """,
-        owner_id, item_type
+        owner_id,
+        item_type,
     )
 
     if row and row["expires_at"]:
@@ -114,7 +116,8 @@ async def get_entitlement_expiry(db, owner_id: int, item_type: str) -> Optional[
         FROM stars_purchases
         WHERE owner_id=$1 AND item_type=$2 AND expires_at > NOW()
         """,
-        owner_id, item_type
+        owner_id,
+        item_type,
     )
 
     if row and row["expires_at"]:
@@ -125,6 +128,7 @@ async def get_entitlement_expiry(db, owner_id: int, item_type: str) -> Optional[
 
 
 # ── ENTITLEMENT GRANTING ─────────────────────────────────────────────────────
+
 
 async def grant_entitlement(db, owner_id: int, item_type: str, days: int = 30):
     """
@@ -153,7 +157,7 @@ async def grant_entitlement(db, owner_id: int, item_type: str, days: int = 30):
         f"grant_{item_type}_{owner_id}_{int(datetime.now(timezone.utc).timestamp())}",
         item_type,
         0,  # granted via bonus or admin
-        expires_at
+        expires_at,
     )
 
     # Update cache
@@ -174,7 +178,8 @@ async def revoke_entitlement(db, owner_id: int, item_type: str):
         SET expires_at = NOW()
         WHERE owner_id=$1 AND item_type=$2 AND expires_at > NOW()
         """,
-        owner_id, item_type
+        owner_id,
+        item_type,
     )
 
     invalidate_cache(owner_id)
@@ -182,6 +187,7 @@ async def revoke_entitlement(db, owner_id: int, item_type: str):
 
 
 # ── UTILITIES ────────────────────────────────────────────────────────────────
+
 
 async def get_all_entitlements(db, owner_id: int) -> Dict[str, datetime]:
     """Get all active entitlements for owner."""
@@ -192,7 +198,7 @@ async def get_all_entitlements(db, owner_id: int) -> Dict[str, datetime]:
         WHERE owner_id=$1 AND expires_at > NOW()
         GROUP BY item_type
         """,
-        owner_id
+        owner_id,
     )
 
     result = {}

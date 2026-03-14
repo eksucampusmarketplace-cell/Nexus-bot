@@ -126,7 +126,9 @@ async def should_auto_delete(context: ContextTypes.DEFAULT_TYPE, chat_id: int) -
     return None
 
 
-async def auto_delete_message(message, context: ContextTypes.DEFAULT_TYPE, exclude_important: bool = False):
+async def auto_delete_message(
+    message, context: ContextTypes.DEFAULT_TYPE, exclude_important: bool = False
+):
     """
     Schedule a message for auto-deletion if enabled
     Call this after sending bot messages
@@ -137,7 +139,9 @@ async def auto_delete_message(message, context: ContextTypes.DEFAULT_TYPE, exclu
     # Don't delete important messages if excluded
     if exclude_important:
         # Check if message contains important info
-        if message.text and any(kw in message.text.lower() for kw in ["warning", "banned", "muted", "important"]):
+        if message.text and any(
+            kw in message.text.lower() for kw in ["warning", "banned", "muted", "important"]
+        ):
             return
 
     seconds = await should_auto_delete(context, message.chat.id)

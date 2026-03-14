@@ -22,6 +22,7 @@ from config import settings
 # It cannot be removed or edited. Ever. By anyone.
 POWERED_BY_FOOTER = "\n\n⚡ Powered by {bot_name}"
 
+
 def _append_footer(text: str) -> str:
     return text + POWERED_BY_FOOTER.format(bot_name=settings.BOT_DISPLAY_NAME)
 
@@ -31,7 +32,6 @@ def _append_footer(text: str) -> str:
 # Clone owners can replace the body but footer is always re-appended.
 
 DEFAULTS = {
-
     # /start in PRIVATE chat
     # Variables: {first_name}, {clone_name}, {main_bot}
     "start_private": (
@@ -42,7 +42,6 @@ DEFAULTS = {
         "📱 <b>Managing a group?</b>\n"
         "Add me to your group and open the Mini App to configure everything."
     ),
-
     # /start in GROUP chat (sent as DM to the admin who added the bot)
     # Variables: {first_name}, {clone_name}, {group_name}
     "start_group_dm": (
@@ -52,7 +51,6 @@ DEFAULTS = {
         "welcome messages, and more.\n\n"
         "Tip: Start with the <b>Commands</b> tab to enable the features you need."
     ),
-
     # /help
     # Variables: {clone_name}, {main_bot}, {miniapp_url}
     "help": (
@@ -60,14 +58,13 @@ DEFAULTS = {
         "<b>📱 Open the Mini App for full command documentation</b>\n"
         "All commands are listed with detailed descriptions and usage examples.\n"
         "Configure all features deeply through the visual interface.\n\n"
-        "<a href=\"{miniapp_url}\">🚀 Open Commands Panel</a>\n\n"
+        '<a href="{miniapp_url}">🚀 Open Commands Panel</a>\n\n'
         "<b>🛡️ Quick Reference:</b>\n\n"
         "<b>Moderation:</b> /warn, /ban, /mute, /kick, /purge, /pin\n"
         "<b>Security:</b> !antispam, !antiflood, !antilink, !captcha\n"
         "<b>Music:</b> /play, /skip, /queue, /volume, /loop\n\n"
         "<b>💡 Tip:</b> Use /panel to open the full management interface."
     ),
-
     # Shown when a member is muted
     # Variables: {first_name}, {group_name}, {reason}, {duration}
     "member_muted": (
@@ -77,7 +74,6 @@ DEFAULTS = {
         "Duration: {duration}\n\n"
         "If you think this was a mistake, contact the group admins."
     ),
-
     # Shown when a member is banned
     # Variables: {first_name}, {group_name}, {reason}
     "member_banned": (
@@ -86,13 +82,9 @@ DEFAULTS = {
         "Reason: {reason}\n\n"
         "If you think this was a mistake, contact the group admins."
     ),
-
     # Appended to every error message sent to users
     # Variables: {main_bot}
-    "error_suffix": (
-        "If this keeps happening, please report it to @{main_bot}."
-    ),
-
+    "error_suffix": ("If this keeps happening, please report it to @{main_bot}."),
     # Warn notification DM
     # Variables: {first_name}, {group_name}, {reason}, {warn_count}, {warn_limit}
     "warn_dm": (
@@ -102,7 +94,6 @@ DEFAULTS = {
         "Warnings: {warn_count}/{warn_limit}\n\n"
         "Please follow the group rules to avoid further action."
     ),
-
     # Force channel gate message
     # Variables: {first_name}, {channel_name}, {channel_link}
     "channel_gate": (
@@ -111,7 +102,6 @@ DEFAULTS = {
         "1. Join <b>{channel_name}</b>\n"
         "2. Come back here — you'll be automatically verified."
     ),
-
     # Force boost gate message
     # Variables: {first_name}, {required}, {current}, {remaining}, {link}, {bar}
     "boost_gate": (
@@ -121,7 +111,6 @@ DEFAULTS = {
         "Your progress: {bar} ({current}/{required})\n\n"
         "Your personal invite link:\n{link}"
     ),
-
     # Boost unlocked notification
     # Variables: {first_name}, {group_name}
     "boost_unlocked": (
@@ -134,12 +123,9 @@ DEFAULTS = {
 
 # ── MESSAGE GETTER ─────────────────────────────────────────────────────────
 
+
 async def get_message(
-    key: str,
-    group_id: int | None,
-    variables: dict,
-    db=None,
-    bot_id: int | None = None
+    key: str, group_id: int | None, variables: dict, db=None, bot_id: int | None = None
 ) -> str:
     """
     Returns the final message string for a given key.
@@ -161,6 +147,7 @@ async def get_message(
     Logs: [MESSAGES] key={key} group={group_id} bot={bot_id} custom={bool}
     """
     import logging
+
     log = logging.getLogger("messages")
 
     custom_body = None
@@ -169,9 +156,9 @@ async def get_message(
     if db and group_id:
         try:
             row = await db.fetchrow(
-                "SELECT body FROM group_custom_messages "
-                "WHERE group_id=$1 AND message_key=$2",
-                group_id, key
+                "SELECT body FROM group_custom_messages " "WHERE group_id=$1 AND message_key=$2",
+                group_id,
+                key,
             )
             if row:
                 custom_body = row["body"]
@@ -182,9 +169,9 @@ async def get_message(
     if not custom_body and db and bot_id:
         try:
             row = await db.fetchrow(
-                "SELECT body FROM bot_custom_messages "
-                "WHERE bot_id=$1 AND message_key=$2",
-                bot_id, key
+                "SELECT body FROM bot_custom_messages " "WHERE bot_id=$1 AND message_key=$2",
+                bot_id,
+                key,
             )
             if row:
                 custom_body = row["body"]

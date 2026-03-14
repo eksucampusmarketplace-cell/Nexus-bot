@@ -1,9 +1,11 @@
 from telegram import User
 
+
 def format_user(user: User) -> str:
     if user.username:
         return f"@{user.username}"
     return f"<a href='tg://user?id={user.id}'>{user.first_name}</a>"
+
 
 def format_stats(stats: dict) -> str:
     return (

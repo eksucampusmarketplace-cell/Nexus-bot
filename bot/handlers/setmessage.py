@@ -32,8 +32,12 @@ Rules:
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
-    ContextTypes, CommandHandler, CallbackQueryHandler,
-    MessageHandler, ConversationHandler, filters
+    ContextTypes,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    ConversationHandler,
+    filters,
 )
 from telegram.constants import ParseMode
 
@@ -55,9 +59,9 @@ MESSAGE_CATALOG = {
         "label": "👋 Welcome Message (DM)",
         "description": "Shown when a user starts the bot in private chat.",
         "variables": {
-            "{first_name}":  "User's first name",
-            "{clone_name}":  "This bot's name",
-            "{main_bot}":    f"Main support bot (@{settings.MAIN_BOT_USERNAME})",
+            "{first_name}": "User's first name",
+            "{clone_name}": "This bot's name",
+            "{main_bot}": f"Main support bot (@{settings.MAIN_BOT_USERNAME})",
         },
         "required_vars": [],
     },
@@ -65,9 +69,9 @@ MESSAGE_CATALOG = {
         "label": "📚 Help Message",
         "description": "Shown when any user sends /help.",
         "variables": {
-            "{clone_name}":  "This bot's name",
-            "{main_bot}":    "Main support bot username",
-            "{bot_name}":    f"Brand name ({settings.BOT_DISPLAY_NAME})",
+            "{clone_name}": "This bot's name",
+            "{main_bot}": "Main support bot username",
+            "{bot_name}": f"Brand name ({settings.BOT_DISPLAY_NAME})",
         },
         "required_vars": [],
     },
@@ -75,10 +79,10 @@ MESSAGE_CATALOG = {
         "label": "🔇 Mute Notification",
         "description": "Sent to a user when they are muted.",
         "variables": {
-            "{first_name}":  "User's first name",
-            "{group_name}":  "Group name",
-            "{reason}":      "Mute reason",
-            "{duration}":    "Mute duration",
+            "{first_name}": "User's first name",
+            "{group_name}": "Group name",
+            "{reason}": "Mute reason",
+            "{duration}": "Mute duration",
         },
         "required_vars": ["{reason}"],
     },
@@ -86,9 +90,9 @@ MESSAGE_CATALOG = {
         "label": "🚫 Ban Notification",
         "description": "Sent to a user when they are banned.",
         "variables": {
-            "{first_name}":  "User's first name",
-            "{group_name}":  "Group name",
-            "{reason}":      "Ban reason",
+            "{first_name}": "User's first name",
+            "{group_name}": "Group name",
+            "{reason}": "Ban reason",
         },
         "required_vars": ["{reason}"],
     },
@@ -96,11 +100,11 @@ MESSAGE_CATALOG = {
         "label": "⚠️ Warning Notification",
         "description": "Sent to a user when they receive a warning.",
         "variables": {
-            "{first_name}":  "User's first name",
-            "{group_name}":  "Group name",
-            "{reason}":      "Warning reason",
-            "{warn_count}":  "Current warn count",
-            "{warn_limit}":  "Max warns before action",
+            "{first_name}": "User's first name",
+            "{group_name}": "Group name",
+            "{reason}": "Warning reason",
+            "{warn_count}": "Current warn count",
+            "{warn_limit}": "Max warns before action",
         },
         "required_vars": ["{warn_count}", "{warn_limit}"],
     },
@@ -108,7 +112,7 @@ MESSAGE_CATALOG = {
         "label": "📢 Channel Gate Message",
         "description": "Shown when a user must join the channel first.",
         "variables": {
-            "{first_name}":   "User's first name",
+            "{first_name}": "User's first name",
             "{channel_name}": "Required channel name",
             "{channel_link}": "Channel join link",
         },
@@ -118,12 +122,12 @@ MESSAGE_CATALOG = {
         "label": "🚀 Boost Gate Message",
         "description": "Shown when a user must invite members to gain access.",
         "variables": {
-            "{first_name}":  "User's first name",
-            "{required}":    "Total invites needed",
-            "{current}":     "User's current invites",
-            "{remaining}":   "Invites still needed",
-            "{link}":        "User's personal invite link",
-            "{bar}":         "Progress bar graphic",
+            "{first_name}": "User's first name",
+            "{required}": "Total invites needed",
+            "{current}": "User's current invites",
+            "{remaining}": "Invites still needed",
+            "{link}": "User's personal invite link",
+            "{bar}": "Progress bar graphic",
         },
         "required_vars": ["{remaining}", "{link}"],
     },
@@ -131,8 +135,8 @@ MESSAGE_CATALOG = {
         "label": "🎉 Boost Unlocked Message",
         "description": "Sent to a user when they complete their invite goal.",
         "variables": {
-            "{first_name}":  "User's first name",
-            "{group_name}":  "Group name",
+            "{first_name}": "User's first name",
+            "{group_name}": "Group name",
         },
         "required_vars": [],
     },
@@ -145,10 +149,7 @@ def _catalog_keyboard() -> InlineKeyboardMarkup:
     """Show all customizable messages as buttons, 1 per row."""
     rows = []
     for key, meta in MESSAGE_CATALOG.items():
-        rows.append([InlineKeyboardButton(
-            text=meta["label"],
-            callback_data=f"setmsg:{key}"
-        )])
+        rows.append([InlineKeyboardButton(text=meta["label"], callback_data=f"setmsg:{key}")])
     rows.append([InlineKeyboardButton("❌ Cancel", callback_data="setmsg:cancel")])
     return InlineKeyboardMarkup(rows)
 
@@ -156,8 +157,7 @@ def _catalog_keyboard() -> InlineKeyboardMarkup:
 def _vars_text(key: str) -> str:
     """Human-readable variable reference for a message key."""
     meta = MESSAGE_CATALOG[key]
-    lines = [f"  <code>{var}</code> — {desc}"
-             for var, desc in meta["variables"].items()]
+    lines = [f"  <code>{var}</code> — {desc}" for var, desc in meta["variables"].items()]
     return "\n".join(lines)
 
 
@@ -178,10 +178,10 @@ async def cmd_setmessage(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✏️ <b>Customize Bot Messages</b>\n\n"
         "Choose which message you want to edit.\n"
         "Each message can use special variables (I'll show you which ones).\n\n"
-        f"📌 Note: All messages end with \"⚡ Powered by {settings.BOT_DISPLAY_NAME}\" "
+        f'📌 Note: All messages end with "⚡ Powered by {settings.BOT_DISPLAY_NAME}" '
         f"— this cannot be removed.",
         parse_mode=ParseMode.HTML,
-        reply_markup=_catalog_keyboard()
+        reply_markup=_catalog_keyboard(),
     )
     return CHOOSING_MESSAGE
 
@@ -217,12 +217,12 @@ async def on_message_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💬 <b>Send your new message text now.</b>\n"
         f"You can use HTML: <code>&lt;b&gt;bold&lt;/b&gt;</code>, "
         f"<code>&lt;i&gt;italic&lt;/i&gt;</code>\n\n"
-        f"⚠️ The footer <i>\"⚡ Powered by {settings.BOT_DISPLAY_NAME}\"</i> "
+        f'⚠️ The footer <i>"⚡ Powered by {settings.BOT_DISPLAY_NAME}"</i> '
         f"is always added automatically — don't add it yourself.",
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("❌ Cancel", callback_data="setmsg:cancel")
-        ]])
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("❌ Cancel", callback_data="setmsg:cancel")]]
+        ),
     )
     return WAITING_FOR_TEXT
 
@@ -273,16 +273,20 @@ async def on_text_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"──────────────────\n"
         f"Does this look right?",
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([
+        reply_markup=InlineKeyboardMarkup(
             [
-                InlineKeyboardButton("✅ Save", callback_data="setmsg_confirm:save"),
-                InlineKeyboardButton("✏️ Edit again", callback_data="setmsg_confirm:edit"),
-            ],
-            [
-                InlineKeyboardButton("🔄 Reset to default", callback_data="setmsg_confirm:reset"),
-                InlineKeyboardButton("❌ Cancel", callback_data="setmsg_confirm:cancel"),
+                [
+                    InlineKeyboardButton("✅ Save", callback_data="setmsg_confirm:save"),
+                    InlineKeyboardButton("✏️ Edit again", callback_data="setmsg_confirm:edit"),
+                ],
+                [
+                    InlineKeyboardButton(
+                        "🔄 Reset to default", callback_data="setmsg_confirm:reset"
+                    ),
+                    InlineKeyboardButton("❌ Cancel", callback_data="setmsg_confirm:cancel"),
+                ],
             ]
-        ])
+        ),
     )
     return CONFIRMING
 
@@ -311,9 +315,9 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔤 <b>Variables:</b>\n{_vars_text(key)}\n\n"
             f"Send your updated message text:",
             parse_mode=ParseMode.HTML,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("❌ Cancel", callback_data="setmsg:cancel")
-            ]])
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("❌ Cancel", callback_data="setmsg:cancel")]]
+            ),
         )
         return WAITING_FOR_TEXT
 
@@ -321,12 +325,12 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if db_pool:
             await db_pool.fetch(
                 "DELETE FROM group_custom_messages WHERE group_id=$1 AND message_key=$2",
-                chat.id, key
+                chat.id,
+                key,
             )
         log.info(f"[SETMESSAGE] Reset | user={user.id} key={key} chat={chat.id}")
         await query.edit_message_text(
-            f"🔄 Message reset to default.\n\n"
-            f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
+            f"🔄 Message reset to default.\n\n" f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
         )
         return ConversationHandler.END
 
@@ -339,14 +343,17 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ON CONFLICT (group_id, message_key)
                 DO UPDATE SET body=EXCLUDED.body, updated_by=EXCLUDED.updated_by, updated_at=NOW()
                 """,
-                chat.id, key, body, user.id
+                chat.id,
+                key,
+                body,
+                user.id,
             )
         log.info(f"[SETMESSAGE] Saved | user={user.id} key={key} chat={chat.id}")
         await query.edit_message_text(
             f"✅ <b>Message saved!</b>\n\n"
             f"Your new message is now active. Use /setmessage anytime to change it again.\n\n"
             f"⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return ConversationHandler.END
 

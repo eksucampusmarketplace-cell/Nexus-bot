@@ -10,8 +10,12 @@ from pydantic import BaseModel
 
 from config import settings
 from bot.billing.stars_economy import (
-    get_bonus_balance, redeem_promo_code, spend_bonus_stars,
-    get_referral_link, get_referral_stats, REFERRAL_BONUS_STARS
+    get_bonus_balance,
+    redeem_promo_code,
+    spend_bonus_stars,
+    get_referral_link,
+    get_referral_stats,
+    REFERRAL_BONUS_STARS,
 )
 
 log = logging.getLogger("billing_api")
@@ -61,5 +65,7 @@ async def spend_bonus_endpoint(request: Request, req: SpendBonusRequest):
     """Spend bonus Stars to unlock a feature."""
     owner_id = request.state.user_id
     db = request.app.state.db
-    result = await spend_bonus_stars(db, owner_id, 0, req.item_type)  # Amount checked in spend function
+    result = await spend_bonus_stars(
+        db, owner_id, 0, req.item_type
+    )  # Amount checked in spend function
     return result

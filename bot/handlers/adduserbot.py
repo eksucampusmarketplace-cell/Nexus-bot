@@ -35,15 +35,23 @@ Logs prefix: [ADDUSERBOT]
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import (
-    ContextTypes, ConversationHandler, CommandHandler,
-    CallbackQueryHandler, MessageHandler, filters
+    ContextTypes,
+    ConversationHandler,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 from telegram.constants import ParseMode
 
 from config import settings
 from bot.userbot.music_auth import (
-    MusicAuthSession, start_phone_auth, complete_phone_auth,
-    start_qr_auth, check_qr_auth, session_string_auth
+    MusicAuthSession,
+    start_phone_auth,
+    complete_phone_auth,
+    start_qr_auth,
+    check_qr_auth,
+    session_string_auth,
 )
 import db.ops.music_new as db_music
 
@@ -66,9 +74,8 @@ async def cmd_adduserbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not clones:
         await update.message.reply_text(
-            "❌ You don't have any clone bots yet.\n"
-            "Use /clone to create one first.",
-            parse_mode=ParseMode.HTML
+            "❌ You don't have any clone bots yet.\n" "Use /clone to create one first.",
+            parse_mode=ParseMode.HTML,
         )
         return ConversationHandler.END
 
@@ -77,13 +84,17 @@ async def cmd_adduserbot(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await _ask_method(update, context)
 
     # Multiple clones — ask which one
-    rows = [[InlineKeyboardButton(
-        f"@{c['username']} — {c['display_name']}",
-        callback_data=f"aub_clone:{c['bot_id']}"
-    )] for c in clones]
+    rows = [
+        [
+            InlineKeyboardButton(
+                f"@{c['username']} — {c['display_name']}", callback_data=f"aub_clone:{c['bot_id']}"
+            )
+        ]
+        for c in clones
+    ]
     await update.message.reply_text(
         "🤖 Which bot do you want to add a music account for?",
-        reply_markup=InlineKeyboardMarkup(rows)
+        reply_markup=InlineKeyboardMarkup(rows),
     )
     return CHOOSING_CLONE
 
@@ -104,12 +115,18 @@ async def _ask_method(update, context):
         "This account will join voice chats to stream music. "
         "It should be a real account, not a bot.",
         parse_mode=ParseMode.HTML,
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📱 Phone + OTP", callback_data="aub_method:phone")],
-            [InlineKeyboardButton("📷 QR Code", callback_data="aub_method:qr")],
-            [InlineKeyboardButton("🔑 Session String (Advanced)", callback_data="aub_method:session")],
-            [InlineKeyboardButton("❌ Cancel", callback_data="aub_method:cancel")],
-        ])
+        reply_markup=InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("📱 Phone + OTP", callback_data="aub_method:phone")],
+                [InlineKeyboardButton("📷 QR Code", callback_data="aub_method:qr")],
+                [
+                    InlineKeyboardButton(
+                        "🔑 Session String (Advanced)", callback_data="aub_method:session"
+                    )
+                ],
+                [InlineKeyboardButton("❌ Cancel", callback_data="aub_method:cancel")],
+            ]
+        ),
     )
     return CHOOSING_METHOD
 
@@ -129,7 +146,7 @@ async def on_method_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(
             "📱 Send your phone number in international format.\n"
             "Example: <code>+1234567890</code>",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return PHONE_NUMBER
 
@@ -149,16 +166,16 @@ async def on_method_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Open Telegram → Settings → Devices → Scan QR Code\n\n"
                 "Waiting for scan... (30 seconds)",
             ),
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return QR_WAIT
 
     if method == "session":
         await query.edit_message_text(
             "🔑 Paste your Pyrogram session string below.\n\n"
-            "To get one: run <code>python3 -c \"from pyrogram import Client; "
+            'To get one: run <code>python3 -c "from pyrogram import Client; '
             "Client(':memory:').run(lambda c: print(c.export_session_string()))\"</code>",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return SESSION_STRING
 
@@ -170,9 +187,7 @@ async def on_phone_received(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not result.ok:
         await update.message.reply_text(f"❌ {result.error}\nTry again or /cancel")
         return PHONE_NUMBER
-    await update.message.reply_text(
-        "✅ Code sent! Enter the OTP Telegram sent to your account."
-    )
+    await update.message.reply_text("✅ Code sent! Enter the OTP Telegram sent to your account.")
     return OTP_CODE
 
 
@@ -214,9 +229,7 @@ async def _finish_auth(update, context, result):
     owner_bot_id = context.user_data.get("target_bot_id", 0)
 
     if not result.ok:
-        await update.effective_message.reply_text(
-            f"❌ {result.error}\n\nTry /adduserbot again."
-        )
+        await update.effective_message.reply_text(f"❌ {result.error}\n\nTry /adduserbot again.")
         return ConversationHandler.END
 
     # Save to DB
@@ -227,7 +240,7 @@ async def _finish_auth(update, context, result):
             tg_user_id=result.tg_user_id,
             tg_name=result.tg_name,
             tg_username=result.tg_username,
-            encrypted_session=result.session_string
+            encrypted_session=result.session_string,
         )
 
     # Reload MusicWorker for this clone
@@ -245,7 +258,7 @@ async def _finish_auth(update, context, result):
             api_id=settings.PYROGRAM_API_ID,
             api_hash=settings.PYROGRAM_API_HASH,
             session_string=raw_session,
-            in_memory=True
+            in_memory=True,
         )
         await pyro_client.start()
         worker = MusicWorker(pyro_client, owner_bot_id, db)
@@ -256,11 +269,11 @@ async def _finish_auth(update, context, result):
     await update.effective_message.reply_text(
         f"✅ <b>Music account added!</b>\n\n"
         f"Account: <b>{result.tg_name}</b>"
-        + (f" (@{result.tg_username})" if result.tg_username else "") +
-        f"\n\nYour bot can now stream music in voice chats. "
+        + (f" (@{result.tg_username})" if result.tg_username else "")
+        + f"\n\nYour bot can now stream music in voice chats. "
         f"Use /play in any group.\n\n"
         f"⚡ Powered by {settings.BOT_DISPLAY_NAME}",
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     )
     return ConversationHandler.END
 

@@ -11,7 +11,10 @@ logger = logging.getLogger(__name__)
 
 def validate_init_data(init_data: str, bot_token: str) -> dict:
     if settings.SKIP_AUTH:
-        return {"user": {"id": settings.OWNER_ID or 12345, "first_name": "DevUser"}, "chat_id": None}
+        return {
+            "user": {"id": settings.OWNER_ID or 12345, "first_name": "DevUser"},
+            "chat_id": None,
+        }
 
     vals = parse_qs(init_data)
     if "hash" not in vals:
@@ -60,7 +63,10 @@ async def get_current_user(request: Request):
     if not init_data:
         raise HTTPException(
             status_code=401,
-            detail={"error": "Missing initData — send Authorization: tma <initData>", "code": "AUTH_FAILED"}
+            detail={
+                "error": "Missing initData — send Authorization: tma <initData>",
+                "code": "AUTH_FAILED",
+            },
         )
 
     try:
@@ -71,8 +77,9 @@ async def get_current_user(request: Request):
     except Exception as e:
         # If primary bot token fails, try all registered clone bots
         from bot.registry import get_all
+
         registered_bots = get_all()
-        
+
         for bot_id, bot_app in registered_bots.items():
             try:
                 # Get token from the bot instance
@@ -85,9 +92,8 @@ async def get_current_user(request: Request):
                 return user
             except Exception:
                 continue
-        
+
         logger.error(f"Auth validation failed: {e}")
         raise HTTPException(
-            status_code=401, 
-            detail={"error": "Invalid or expired initData", "code": "AUTH_FAILED"}
+            status_code=401, detail={"error": "Invalid or expired initData", "code": "AUTH_FAILED"}
         )

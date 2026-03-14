@@ -22,15 +22,17 @@ async def download_from_youtube(url: str) -> Optional[Dict]:
     Returns track dict with file_path, title, duration, etc.
     """
     ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'outtmpl': tempfile.gettempdir() + '/%(title)s.%(ext)s',
-        'quiet': True,
-        'no_warnings': True,
+        "format": "bestaudio/best",
+        "postprocessors": [
+            {
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }
+        ],
+        "outtmpl": tempfile.gettempdir() + "/%(title)s.%(ext)s",
+        "quiet": True,
+        "no_warnings": True,
     }
 
     try:
@@ -38,19 +40,19 @@ async def download_from_youtube(url: str) -> Optional[Dict]:
             info = ydl.extract_info(url, download=True)
 
             track = {
-                'type': 'file',
-                'file_path': ydl.prepare_filename(info),
-                'title': info.get('title', 'Unknown'),
-                'performer': info.get('uploader', 'Unknown'),
-                'duration': info.get('duration', 0),
-                'thumbnail': info.get('thumbnail'),
-                'url': url,
-                'source': 'youtube'
+                "type": "file",
+                "file_path": ydl.prepare_filename(info),
+                "title": info.get("title", "Unknown"),
+                "performer": info.get("uploader", "Unknown"),
+                "duration": info.get("duration", 0),
+                "thumbnail": info.get("thumbnail"),
+                "url": url,
+                "source": "youtube",
             }
 
             # Clean up filename extension
-            if track['file_path'].endswith('.webm'):
-                track['file_path'] = track['file_path'][:-5] + '.mp3'
+            if track["file_path"].endswith(".webm"):
+                track["file_path"] = track["file_path"][:-5] + ".mp3"
 
             logger.info(f"Downloaded: {track['title']}")
             return track
@@ -67,7 +69,7 @@ async def play_youtube_command(update: Update, context: ContextTypes.DEFAULT_TYP
             "🎵 <b>YouTube Music Player</b>\n\n"
             "Usage: /play_youtube <url>\n\n"
             "Example: /play_youtube https://youtube.com/watch?v=...",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -77,49 +79,51 @@ async def play_youtube_command(update: Update, context: ContextTypes.DEFAULT_TYP
     try:
         from bot.utils.music_helpers import get_queue, add_to_queue, play_next
         import db.ops.music as db_ops_music
+
         pool = context.bot_data.get("db_pool")
 
         # Download track
         track = await download_from_youtube(url)
         if not track:
-            await update.message.reply_text("❌ Failed to download from YouTube. Check the URL and try again.")
+            await update.message.reply_text(
+                "❌ Failed to download from YouTube. Check the URL and try again."
+            )
             return
 
         # Add to queue
         await add_to_queue(update.effective_chat.id, track, pool)
 
         # Send the audio file
-        with open(track['file_path'], 'rb') as audio_file:
+        with open(track["file_path"], "rb") as audio_file:
             sent_message = await context.bot.send_audio(
                 chat_id=update.effective_chat.id,
                 audio=audio_file,
-                title=track['title'],
-                performer=track['performer'],
-                duration=track['duration'],
+                title=track["title"],
+                performer=track["performer"],
+                duration=track["duration"],
                 caption=f"🎵 <b>{track['title']}</b>\n\n"
-                         f"👤 {track['performer']}\n"
-                         f"⏱️ {track['duration']}s",
-                parse_mode=ParseMode.HTML
+                f"👤 {track['performer']}\n"
+                f"⏱️ {track['duration']}s",
+                parse_mode=ParseMode.HTML,
             )
 
             # Update track with file_id for future playback
-            track['file_id'] = sent_message.audio.file_id
-            track['type'] = 'telegram'
+            track["file_id"] = sent_message.audio.file_id
+            track["type"] = "telegram"
 
             # Clean up temp file
             try:
-                os.unlink(track['file_path'])
+                os.unlink(track["file_path"])
             except:
                 pass
 
         await update.message.reply_text(
-            f"✅ Added to queue: <b>{track['title']}</b>",
-            parse_mode=ParseMode.HTML
+            f"✅ Added to queue: <b>{track['title']}</b>", parse_mode=ParseMode.HTML
         )
 
         # Start playing if not already
         queue_data = await get_queue(update.effective_chat.id, pool)
-        if not queue_data.get('is_playing'):
+        if not queue_data.get("is_playing"):
             await play_next(update.effective_chat.id, context, pool)
 
     except Exception as e:
@@ -133,6 +137,7 @@ async def volume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     if not context.args or not context.args[0].isdigit():
@@ -141,7 +146,7 @@ async def volume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔊 <b>Current Volume:</b> {current_volume}%\n\n"
             f"Usage: /volume <0-200>\n"
             f"Example: /volume 75",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -156,10 +161,11 @@ async def repeat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
-    mode = context.args[0] if context.args else 'none'
-    if mode not in ['none', 'one', 'all']:
+    mode = context.args[0] if context.args else "none"
+    if mode not in ["none", "one", "all"]:
         await update.message.reply_text(
             "🔄 <b>Repeat Mode</b>\n\n"
             "Usage: /repeat <mode>\n\n"
@@ -167,12 +173,12 @@ async def repeat_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• none - Don't repeat (default)\n"
             "• one - Repeat current track\n"
             "• all - Repeat all tracks",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
     await db_ops_music.set_repeat_mode(pool, update.effective_chat.id, mode)
-    mode_emoji = {'none': '🔁', 'one': '🔂', 'all': '🔁'}
+    mode_emoji = {"none": "🔁", "one": "🔂", "all": "🔁"}
     await update.message.reply_text(f"{mode_emoji.get(mode, '🔁')} Repeat mode: {mode}")
 
 
@@ -182,10 +188,11 @@ async def shuffle_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     queue_data = await db_ops_music.get_or_create_queue(pool, update.effective_chat.id)
-    current_shuffle = queue_data.get('shuffle_mode', False)
+    current_shuffle = queue_data.get("shuffle_mode", False)
     new_shuffle = not current_shuffle
 
     await db_ops_music.set_shuffle_mode(pool, update.effective_chat.id, new_shuffle)
@@ -200,18 +207,19 @@ async def playlist_create_command(update: Update, context: ContextTypes.DEFAULT_
             "📝 <b>Create Playlist</b>\n\n"
             "Usage: /playlist_create <name>\n\n"
             "Example: /playlist_create My Favorites",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
-    playlist_name = ' '.join(context.args)
+    playlist_name = " ".join(context.args)
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     # Get current queue
     queue_data = await db_ops_music.get_or_create_queue(pool, update.effective_chat.id)
-    tracks = queue_data.get('queue', [])
-    current_track = queue_data.get('current_track')
+    tracks = queue_data.get("queue", [])
+    current_track = queue_data.get("current_track")
 
     all_tracks = []
     if current_track:
@@ -224,15 +232,11 @@ async def playlist_create_command(update: Update, context: ContextTypes.DEFAULT_
 
     try:
         await db_ops_music.create_playlist(
-            pool,
-            update.effective_chat.id,
-            playlist_name,
-            all_tracks,
-            update.effective_user.id
+            pool, update.effective_chat.id, playlist_name, all_tracks, update.effective_user.id
         )
         await update.message.reply_text(
             f"✅ Playlist '<b>{playlist_name}</b>' created with {len(all_tracks)} tracks!",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {str(e)}")
@@ -241,17 +245,20 @@ async def playlist_create_command(update: Update, context: ContextTypes.DEFAULT_
 async def playlist_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """List all playlists"""
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     playlists = await db_ops_music.get_playlists(pool, update.effective_chat.id)
 
     if not playlists:
-        await update.message.reply_text("📋 No playlists found.\nCreate one with /playlist_create <name>")
+        await update.message.reply_text(
+            "📋 No playlists found.\nCreate one with /playlist_create <name>"
+        )
         return
 
     text = "📋 <b>Playlists</b>\n\n"
     for pl in playlists:
-        tracks = pl.get('tracks', [])
+        tracks = pl.get("tracks", [])
         text += f"• <b>{pl['playlist_name']}</b> ({len(tracks)} tracks)\n"
 
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
@@ -264,13 +271,14 @@ async def playlist_play_command(update: Update, context: ContextTypes.DEFAULT_TY
             "🎵 <b>Play Playlist</b>\n\n"
             "Usage: /playlist_play <name>\n\n"
             "Example: /playlist_play My Favorites",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
-    playlist_name = ' '.join(context.args)
+    playlist_name = " ".join(context.args)
     import db.ops.music as db_ops_music
     from bot.utils.music_helpers import add_tracks_to_queue, play_next
+
     pool = context.bot_data.get("db_pool")
 
     playlist = await db_ops_music.get_playlist(pool, update.effective_chat.id, playlist_name)
@@ -278,7 +286,7 @@ async def playlist_play_command(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text(f"❌ Playlist '{playlist_name}' not found.")
         return
 
-    tracks = playlist.get('tracks', [])
+    tracks = playlist.get("tracks", [])
     if not tracks:
         await update.message.reply_text(f"❌ Playlist '{playlist_name}' is empty.")
         return
@@ -286,7 +294,7 @@ async def playlist_play_command(update: Update, context: ContextTypes.DEFAULT_TY
     await add_tracks_to_queue(update.effective_chat.id, tracks, pool)
     await update.message.reply_text(
         f"✅ Added {len(tracks)} tracks from '<b>{playlist_name}</b>' to queue!",
-        parse_mode=ParseMode.HTML
+        parse_mode=ParseMode.HTML,
     )
 
     # Start playing
@@ -300,24 +308,25 @@ async def playlist_delete_command(update: Update, context: ContextTypes.DEFAULT_
             "🗑️ <b>Delete Playlist</b>\n\n"
             "Usage: /playlist_delete <name>\n\n"
             "Example: /playlist_delete My Favorites",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
-    playlist_name = ' '.join(context.args)
+    playlist_name = " ".join(context.args)
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     await db_ops_music.delete_playlist(pool, update.effective_chat.id, playlist_name)
     await update.message.reply_text(
-        f"🗑️ Playlist '<b>{playlist_name}</b>' deleted!",
-        parse_mode=ParseMode.HTML
+        f"🗑️ Playlist '<b>{playlist_name}</b>' deleted!", parse_mode=ParseMode.HTML
     )
 
 
 async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show play history"""
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     limit = int(context.args[0]) if context.args and context.args[0].isdigit() else 10
@@ -331,8 +340,8 @@ async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = f"📜 <b>Play History (Last {limit})</b>\n\n"
     for i, entry in enumerate(history, 1):
-        track = entry['track_data']
-        played_at = entry['played_at'].strftime('%H:%M')
+        track = entry["track_data"]
+        played_at = entry["played_at"].strftime("%H:%M")
         text += f"{i}. {track.get('title', 'Unknown')} - {played_at}\n"
 
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
@@ -345,29 +354,30 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "🔍 <b>Search Music</b>\n\n"
             "Usage: /search <query>\n\n"
             "Searches in current queue and all playlists.",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
-    query = ' '.join(context.args).lower()
+    query = " ".join(context.args).lower()
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     # Search in current queue
     queue_data = await db_ops_music.get_or_create_queue(pool, update.effective_chat.id)
-    queue_tracks = queue_data.get('queue', [])
+    queue_tracks = queue_data.get("queue", [])
 
     results = []
     for track in queue_tracks:
-        title = track.get('title', '').lower()
+        title = track.get("title", "").lower()
         if query in title:
-            results.append(('Queue', track))
+            results.append(("Queue", track))
 
     # Search in playlists
     playlists = await db_ops_music.get_playlists(pool, update.effective_chat.id)
     for pl in playlists:
-        for track in pl.get('tracks', []):
-            title = track.get('title', '').lower()
+        for track in pl.get("tracks", []):
+            title = track.get("title", "").lower()
             if query in title:
                 results.append((f"Playlist: {pl['playlist_name']}", track))
 
@@ -379,7 +389,7 @@ async def search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for source, track in results[:10]:
         text += f"• <b>{track.get('title', 'Unknown')}</b>\n"
         text += f"  📂 {source}\n"
-        if track.get('performer'):
+        if track.get("performer"):
             text += f"  👤 {track['performer']}\n"
         text += "\n"
 
@@ -393,10 +403,12 @@ async def sync_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     import db.ops.bots as db_ops_bots
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     # Check if user is owner
     from config import settings
+
     if update.effective_user.id != settings.OWNER_ID:
         await update.message.reply_text("❌ Only the bot owner can sync music.")
         return
@@ -409,6 +421,7 @@ async def sync_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Get all active bots
         from bot.registry import get_all as registry_get_all
+
         all_bots = registry_get_all()
 
         synced_count = 0
@@ -418,17 +431,15 @@ async def sync_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await db_ops_music.update_queue(
                     pool,
                     update.effective_chat.id,
-                    queue_data.get('queue', []),
-                    queue_data.get('current_track'),
-                    queue_data.get('is_playing', False)
+                    queue_data.get("queue", []),
+                    queue_data.get("current_track"),
+                    queue_data.get("is_playing", False),
                 )
                 synced_count += 1
             except Exception as e:
                 logger.error(f"Failed to sync to bot {bot_id}: {e}")
 
-        await update.message.reply_text(
-            f"✅ Synced to {synced_count}/{len(all_bots)} bots"
-        )
+        await update.message.reply_text(f"✅ Synced to {synced_count}/{len(all_bots)} bots")
     except Exception as e:
         logger.error(f"Sync failed: {e}")
         await update.message.reply_text(f"❌ Sync failed: {str(e)}")
@@ -437,13 +448,14 @@ async def sync_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def music_settings_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show music settings with interactive buttons"""
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     queue_data = await db_ops_music.get_or_create_queue(pool, update.effective_chat.id)
 
-    volume = queue_data.get('volume', 100)
-    repeat = queue_data.get('repeat_mode', 'none')
-    shuffle = queue_data.get('shuffle_mode', False)
+    volume = queue_data.get("volume", 100)
+    repeat = queue_data.get("repeat_mode", "none")
+    shuffle = queue_data.get("shuffle_mode", False)
 
     text = f"⚙️ <b>Music Settings</b>\n\n"
     text += f"🔊 Volume: {volume}%\n"
@@ -452,17 +464,29 @@ async def music_settings_command(update: Update, context: ContextTypes.DEFAULT_T
 
     keyboard = [
         [
-            InlineKeyboardButton("🔉 Volume -10", callback_data=f"music:vol:-10:{update.effective_chat.id}"),
-            InlineKeyboardButton("🔊 Volume +10", callback_data=f"music:vol:+10:{update.effective_chat.id}")
+            InlineKeyboardButton(
+                "🔉 Volume -10", callback_data=f"music:vol:-10:{update.effective_chat.id}"
+            ),
+            InlineKeyboardButton(
+                "🔊 Volume +10", callback_data=f"music:vol:+10:{update.effective_chat.id}"
+            ),
         ],
         [
-            InlineKeyboardButton("🔁 None", callback_data=f"music:repeat:none:{update.effective_chat.id}"),
-            InlineKeyboardButton("🔂 One", callback_data=f"music:repeat:one:{update.effective_chat.id}"),
-            InlineKeyboardButton("🔁 All", callback_data=f"music:repeat:all:{update.effective_chat.id}")
+            InlineKeyboardButton(
+                "🔁 None", callback_data=f"music:repeat:none:{update.effective_chat.id}"
+            ),
+            InlineKeyboardButton(
+                "🔂 One", callback_data=f"music:repeat:one:{update.effective_chat.id}"
+            ),
+            InlineKeyboardButton(
+                "🔁 All", callback_data=f"music:repeat:all:{update.effective_chat.id}"
+            ),
         ],
         [
-            InlineKeyboardButton("🔀 Toggle Shuffle", callback_data=f"music:shuffle:{update.effective_chat.id}")
-        ]
+            InlineKeyboardButton(
+                "🔀 Toggle Shuffle", callback_data=f"music:shuffle:{update.effective_chat.id}"
+            )
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -474,7 +498,7 @@ async def music_advanced_callback_handler(update: Update, context: ContextTypes.
     query = update.callback_query
     await query.answer()
 
-    parts = query.data.split(':')
+    parts = query.data.split(":")
     if len(parts) < 3:
         return
 
@@ -482,22 +506,23 @@ async def music_advanced_callback_handler(update: Update, context: ContextTypes.
     chat_id = int(parts[2])
 
     import db.ops.music as db_ops_music
+
     pool = context.bot_data.get("db_pool")
 
     try:
-        if action.startswith('vol'):
-            volume_change = int(parts[1].split('_')[1])
+        if action.startswith("vol"):
+            volume_change = int(parts[1].split("_")[1])
             current_volume = await db_ops_music.get_volume(pool, chat_id)
             new_volume = max(0, min(200, current_volume + volume_change))
             await db_ops_music.set_volume(pool, chat_id, new_volume)
             await query.edit_message_text(f"🔊 Volume set to {new_volume}%")
 
-        elif action == 'repeat':
+        elif action == "repeat":
             mode = parts[2]
             await db_ops_music.set_repeat_mode(pool, chat_id, mode)
             await query.edit_message_text(f"🔄 Repeat mode: {mode}")
 
-        elif action == 'shuffle':
+        elif action == "shuffle":
             current = await db_ops_music.get_shuffle_mode(pool, chat_id)
             new_mode = not current
             await db_ops_music.set_shuffle_mode(pool, chat_id, new_mode)

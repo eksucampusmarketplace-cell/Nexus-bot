@@ -11,7 +11,7 @@ Tests:
 from bot.handlers.admin_request import (
     contains_admin_mention,
     extract_mention_context,
-    ADMIN_MENTION_PATTERNS
+    ADMIN_MENTION_PATTERNS,
 )
 
 
@@ -93,6 +93,7 @@ def test_import_handlers():
             admin_request_command_handlers,
             admin_request_callback,
         )
+
         print("✅ All handlers imported successfully")
         print(f"  - Message handler: {handle_admin_mention.__name__}")
         print(f"  - Command handlers: {len(admin_request_command_handlers)}")
@@ -107,6 +108,7 @@ def test_db_operations():
     print("Testing database operations import...")
     try:
         import db.ops.admin_requests as db_admin_req
+
         functions = [
             "create_admin_request",
             "get_open_requests",
@@ -134,6 +136,7 @@ def test_migration_file():
     """Test that migration file exists and is valid."""
     print("Testing migration file...")
     import os
+
     migration_path = "/home/engine/project/db/migrations/add_admin_requests.sql"
     if os.path.exists(migration_path):
         print(f"✅ Migration file exists: {migration_path}")

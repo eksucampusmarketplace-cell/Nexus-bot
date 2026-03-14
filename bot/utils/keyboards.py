@@ -13,7 +13,7 @@ def support_keyboard(
     include_miniapp: bool = False,
     miniapp_url: str | None = None,
     include_docs: bool = False,
-    include_privacy: bool = True
+    include_privacy: bool = True,
 ) -> InlineKeyboardMarkup:
     """
     Standard support keyboard shown in help/start messages.
@@ -33,31 +33,29 @@ def support_keyboard(
     if include_miniapp:
         url = miniapp_url or settings.mini_app_url
         if url:
-            buttons.append([InlineKeyboardButton(
-                "⚡ Open Mini App",
-                web_app=WebAppInfo(url=url)
-            )])
+            buttons.append([InlineKeyboardButton("⚡ Open Mini App", web_app=WebAppInfo(url=url))])
 
     # Main bot support button
-    buttons.append([InlineKeyboardButton(
-        "💬 Support Group",
-        url=settings.SUPPORT_GROUP_URL or f"https://t.me/{settings.MAIN_BOT_USERNAME}"
-    )])
+    buttons.append(
+        [
+            InlineKeyboardButton(
+                "💬 Support Group",
+                url=settings.SUPPORT_GROUP_URL or f"https://t.me/{settings.MAIN_BOT_USERNAME}",
+            )
+        ]
+    )
 
     # Documentation button (if configured)
     if include_docs and settings.DOCS_URL:
-        buttons.append([InlineKeyboardButton(
-            "📚 Documentation",
-            url=settings.DOCS_URL
-        )])
+        buttons.append([InlineKeyboardButton("📚 Documentation", url=settings.DOCS_URL)])
 
     # Privacy Policy button - show a link to online version if available
     if include_privacy:
-        privacy_url = settings.PRIVACY_POLICY_URL or "https://github.com/yourusername/nexus/blob/main/PRIVACY_POLICY.md"
-        buttons.append([InlineKeyboardButton(
-            "🔒 Privacy Policy",
-            url=privacy_url
-        )])
+        privacy_url = (
+            settings.PRIVACY_POLICY_URL
+            or "https://github.com/yourusername/nexus/blob/main/PRIVACY_POLICY.md"
+        )
+        buttons.append([InlineKeyboardButton("🔒 Privacy Policy", url=privacy_url)])
 
     return InlineKeyboardMarkup(buttons)
 
@@ -77,13 +75,11 @@ def mini_app_keyboard(miniapp_url: str | None = None) -> InlineKeyboardMarkup:
         # Fall back to support keyboard if no miniapp URL
         return support_keyboard()
 
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("⚡ Open Settings", web_app=WebAppInfo(url=url))
-    ]])
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("⚡ Open Settings", web_app=WebAppInfo(url=url))]]
+    )
 
 
 def cancel_keyboard() -> InlineKeyboardMarkup:
     """Simple cancel button for conversations."""
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("❌ Cancel", callback_data="cancel")
-    ]])
+    return InlineKeyboardMarkup([[InlineKeyboardButton("❌ Cancel", callback_data="cancel")]])

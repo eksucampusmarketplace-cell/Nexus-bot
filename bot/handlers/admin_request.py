@@ -124,7 +124,9 @@ async def handle_admin_mention(update: Update, context: ContextTypes.DEFAULT_TYP
     # Check rate limit
     try:
         rate_limit = await db_admin_req.get_group_setting(db, chat.id, "admin_requests_rate_limit")
-        rate_period = await db_admin_req.get_group_setting(db, chat.id, "admin_requests_rate_period")
+        rate_period = await db_admin_req.get_group_setting(
+            db, chat.id, "admin_requests_rate_period"
+        )
     except Exception:
         rate_limit = 3
         rate_period = 3600  # 1 hour
@@ -205,7 +207,7 @@ async def _notify_admins(
     context: ContextTypes.DEFAULT_TYPE,
     request_id: int,
     message_text: str,
-    reply_to_msg_id: Optional[int]
+    reply_to_msg_id: Optional[int],
 ):
     """Send notification to all group admins."""
     message = update.effective_message
@@ -232,31 +234,46 @@ async def _notify_admins(
     if chat.username:
         # Public group
         msg_link = f"https://t.me/{chat.username}/{message.message_id}"
-        admin_text += f"\n🔗 <a href=\"{msg_link}\">View Message</a>"
+        admin_text += f'\n🔗 <a href="{msg_link}">View Message</a>'
     else:
         # Private group - use reply_to_link if available
         if reply_to_msg_id:
             admin_text += f"\n📎 Reply to message <code>{reply_to_msg_id}</code>"
 
     # Inline keyboard for quick actions
-    keyboard = InlineKeyboardMarkup([
+    keyboard = InlineKeyboardMarkup(
         [
-            InlineKeyboardButton("📝 Responding", callback_data=f"admin_req:responding:{request_id}"),
-            InlineKeyboardButton("✅ Close", callback_data=f"admin_req:close:{request_id}"),
-        ],
-        [
-            InlineKeyboardButton("🔗 View in Chat", url=f"https://t.me/c/{str(chat.id)[4:]}/{message.message_id}" if not chat.username else None),
+            [
+                InlineKeyboardButton(
+                    "📝 Responding", callback_data=f"admin_req:responding:{request_id}"
+                ),
+                InlineKeyboardButton("✅ Close", callback_data=f"admin_req:close:{request_id}"),
+            ],
+            [
+                InlineKeyboardButton(
+                    "🔗 View in Chat",
+                    url=(
+                        f"https://t.me/c/{str(chat.id)[4:]}/{message.message_id}"
+                        if not chat.username
+                        else None
+                    ),
+                ),
+            ],
         ]
-    ])
+    )
 
     # If private group, remove the View in Chat button (we already have the link above)
     if not chat.username:
-        keyboard = InlineKeyboardMarkup([
+        keyboard = InlineKeyboardMarkup(
             [
-                InlineKeyboardButton("📝 Responding", callback_data=f"admin_req:responding:{request_id}"),
-                InlineKeyboardButton("✅ Close", callback_data=f"admin_req:close:{request_id}"),
+                [
+                    InlineKeyboardButton(
+                        "📝 Responding", callback_data=f"admin_req:responding:{request_id}"
+                    ),
+                    InlineKeyboardButton("✅ Close", callback_data=f"admin_req:close:{request_id}"),
+                ]
             ]
-        ])
+        )
 
     try:
         admins = await context.bot.get_chat_administrators(chat.id)
@@ -357,7 +374,7 @@ async def cmd_admin_req_stats(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"✅ <b>Closed:</b> {stats['closed']}\n"
     )
 
-    if stats['avg_response_minutes'] > 0:
+    if stats["avg_response_minutes"] > 0:
         text += f"⏱️ <b>Avg Response Time:</b> {stats['avg_response_minutes']} min\n"
 
     await update.effective_message.reply_text(text, parse_mode=ParseMode.HTML)
@@ -384,8 +401,12 @@ async def cmd_set_admin_requests(update: Update, context: ContextTypes.DEFAULT_T
         # Show current settings
         try:
             enabled = await db_admin_req.get_group_setting(db, chat.id, "admin_requests_enabled")
-            rate_limit = await db_admin_req.get_group_setting(db, chat.id, "admin_requests_rate_limit")
-            rate_period = await db_admin_req.get_group_setting(db, chat.id, "admin_requests_rate_period")
+            rate_limit = await db_admin_req.get_group_setting(
+                db, chat.id, "admin_requests_rate_limit"
+            )
+            rate_period = await db_admin_req.get_group_setting(
+                db, chat.id, "admin_requests_rate_period"
+            )
         except Exception:
             enabled = True
             rate_limit = 3
@@ -409,15 +430,16 @@ async def cmd_set_admin_requests(update: Update, context: ContextTypes.DEFAULT_T
     if action in ["off", "disable", "false"]:
         await db_admin_req.set_group_setting(db, chat.id, "admin_requests_enabled", False)
         await update.effective_message.reply_text(
-            "❌ <b>Admin requests disabled</b>\n\n"
-            "Users can still use /report to flag issues.",
+            "❌ <b>Admin requests disabled</b>\n\n" "Users can still use /report to flag issues.",
             parse_mode=ParseMode.HTML,
         )
         return
 
     if action in ["on", "enable", "true"]:
         rate_limit = int(context.args[1]) if len(context.args) > 1 else 3
-        rate_period = int(context.args[2]) * 60 if len(context.args) > 2 else 3600  # Convert minutes to seconds
+        rate_period = (
+            int(context.args[2]) * 60 if len(context.args) > 2 else 3600
+        )  # Convert minutes to seconds
 
         # Validate
         rate_limit = max(1, min(rate_limit, 20))  # Between 1 and 20
@@ -472,13 +494,11 @@ async def admin_request_callback(update: Update, context: ContextTypes.DEFAULT_T
 
         if success:
             await query.edit_message_text(
-                query.message.text + f"\n\n📝 <b>Responding:</b> @{admin.username or admin.first_name}",
+                query.message.text
+                + f"\n\n📝 <b>Responding:</b> @{admin.username or admin.first_name}",
                 parse_mode=ParseMode.HTML,
             )
-            log.info(
-                f"[ADMIN_REQ] Responding status | request_id={request_id} "
-                f"by={admin.id}"
-            )
+            log.info(f"[ADMIN_REQ] Responding status | request_id={request_id} " f"by={admin.id}")
         else:
             await query.edit_message_text(
                 query.message.text + "\n\n⚠️ Request not found.",
@@ -496,13 +516,11 @@ async def admin_request_callback(update: Update, context: ContextTypes.DEFAULT_T
         if success:
             emoji = "✅"
             await query.edit_message_text(
-                query.message.text + f"\n\n{emoji} <b>Closed by:</b> @{admin.username or admin.first_name}",
+                query.message.text
+                + f"\n\n{emoji} <b>Closed by:</b> @{admin.username or admin.first_name}",
                 parse_mode=ParseMode.HTML,
             )
-            log.info(
-                f"[ADMIN_REQ] Closed | request_id={request_id} "
-                f"by={admin.id}"
-            )
+            log.info(f"[ADMIN_REQ] Closed | request_id={request_id} " f"by={admin.id}")
         else:
             await query.edit_message_text(
                 query.message.text + "\n\n⚠️ Request not found.",

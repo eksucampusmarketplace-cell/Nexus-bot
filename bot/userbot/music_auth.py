@@ -42,8 +42,11 @@ from typing import Optional
 
 from pyrogram import Client
 from pyrogram.errors import (
-    PhoneNumberInvalid, PhoneCodeInvalid, SessionPasswordNeeded,
-    PasswordHashInvalid, FloodWait
+    PhoneNumberInvalid,
+    PhoneCodeInvalid,
+    SessionPasswordNeeded,
+    PasswordHashInvalid,
+    FloodWait,
 )
 import qrcode
 
@@ -68,6 +71,7 @@ class MusicAuthSession:
     Holds in-progress auth state for one user.
     Stored in context.user_data["music_auth"] during conversation.
     """
+
     def __init__(self, owner_bot_id: int):
         self.owner_bot_id = owner_bot_id
         self.client: Optional[Client] = None
@@ -86,7 +90,7 @@ async def start_phone_auth(session: MusicAuthSession, phone: str) -> UserbotAuth
         name=f"music_auth_{phone}",
         api_id=settings.PYROGRAM_API_ID,
         api_hash=settings.PYROGRAM_API_HASH,
-        in_memory=True
+        in_memory=True,
     )
 
     try:
@@ -144,7 +148,7 @@ async def start_qr_auth(session: MusicAuthSession) -> UserbotAuthResult:
         name=f"music_qr_{id(session)}",
         api_id=settings.PYROGRAM_API_ID,
         api_hash=settings.PYROGRAM_API_HASH,
-        in_memory=True
+        in_memory=True,
     )
 
     try:
@@ -184,16 +188,14 @@ async def check_qr_auth(session: MusicAuthSession, timeout: int = 30) -> Userbot
         return UserbotAuthResult(ok=False, error=str(e))
 
 
-async def session_string_auth(
-    owner_bot_id: int, session_str: str
-) -> UserbotAuthResult:
+async def session_string_auth(owner_bot_id: int, session_str: str) -> UserbotAuthResult:
     """Validate and save a pasted Pyrogram session string."""
     client = Client(
         name="music_session_validate",
         api_id=settings.PYROGRAM_API_ID,
         api_hash=settings.PYROGRAM_API_HASH,
         session_string=session_str.strip(),
-        in_memory=True
+        in_memory=True,
     )
     try:
         await client.connect()
@@ -209,7 +211,9 @@ async def _finalize(client: Client, owner_bot_id: int) -> UserbotAuthResult:
 
         if me.is_bot:
             await client.disconnect()
-            return UserbotAuthResult(ok=False, error="This is a bot account. Use a real user account.")
+            return UserbotAuthResult(
+                ok=False, error="This is a bot account. Use a real user account."
+            )
 
         raw_session = await client.export_session_string()
         await client.disconnect()
@@ -222,7 +226,7 @@ async def _finalize(client: Client, owner_bot_id: int) -> UserbotAuthResult:
             tg_user_id=me.id,
             tg_name=f"{me.first_name} {me.last_name or ''}".strip(),
             tg_username=me.username or "",
-            session_string=encrypted
+            session_string=encrypted,
         )
     except Exception as e:
         return UserbotAuthResult(ok=False, error=str(e))

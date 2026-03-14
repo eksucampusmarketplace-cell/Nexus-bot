@@ -19,10 +19,10 @@ async def get_queue(chat_id: int, pool) -> Optional[Dict]:
 async def add_to_queue(chat_id: int, track: Dict, pool):
     """Add a track to the queue"""
     queue_data = await get_queue(chat_id, pool)
-    queue = queue_data.get('queue', [])
+    queue = queue_data.get("queue", [])
 
     # Check shuffle mode
-    if queue_data.get('shuffle_mode', False):
+    if queue_data.get("shuffle_mode", False):
         # Insert at random position
         pos = random.randint(0, len(queue))
         queue.insert(pos, track)
@@ -37,9 +37,9 @@ async def add_to_queue(chat_id: int, track: Dict, pool):
 async def add_tracks_to_queue(chat_id: int, tracks: List[Dict], pool):
     """Add multiple tracks to the queue"""
     queue_data = await get_queue(chat_id, pool)
-    queue = queue_data.get('queue', [])
+    queue = queue_data.get("queue", [])
 
-    if queue_data.get('shuffle_mode', False):
+    if queue_data.get("shuffle_mode", False):
         random.shuffle(tracks)
 
     queue.extend(tracks)
@@ -50,18 +50,18 @@ async def add_tracks_to_queue(chat_id: int, tracks: List[Dict], pool):
 async def play_next(chat_id: int, context, pool):
     """Play the next track in the queue"""
     queue_data = await get_queue(chat_id, pool)
-    queue = queue_data.get('queue', [])
-    current_track = queue_data.get('current_track')
+    queue = queue_data.get("queue", [])
+    current_track = queue_data.get("current_track")
 
-    repeat_mode = queue_data.get('repeat_mode', 'none')
+    repeat_mode = queue_data.get("repeat_mode", "none")
 
     # Check repeat modes
     if current_track:
-        if repeat_mode == 'one':
+        if repeat_mode == "one":
             # Repeat current track
             await _play_track(chat_id, context, current_track, pool)
             return
-        elif repeat_mode == 'all':
+        elif repeat_mode == "all":
             # Add current track to end of queue
             queue.append(current_track)
             await db_ops_music.update_queue(pool, chat_id, queue)
@@ -82,8 +82,9 @@ async def play_next(chat_id: int, context, pool):
     # Add to history
     try:
         from bot.factory import create_application
+
         # Get bot from context
-        user_id = context._user_id if hasattr(context, '_user_id') else None
+        user_id = context._user_id if hasattr(context, "_user_id") else None
         await db_ops_music.add_to_history(pool, chat_id, next_track, user_id)
     except:
         pass
@@ -97,30 +98,23 @@ async def play_next(chat_id: int, context, pool):
 async def _play_track(chat_id: int, context, track: Dict, pool):
     """Play a single track"""
     try:
-        if track.get('type') == 'telegram':
+        if track.get("type") == "telegram":
             # Re-send the audio file
-            file_id = track.get('file_id')
-            title = track.get('title', 'Unknown')
-            performer = track.get('performer', 'Unknown')
+            file_id = track.get("file_id")
+            title = track.get("title", "Unknown")
+            performer = track.get("performer", "Unknown")
 
             caption = f"🎵 <b>{title}</b>"
-            if performer and performer != 'Unknown':
+            if performer and performer != "Unknown":
                 caption += f"\n👤 {performer}"
 
             try:
                 await context.bot.send_audio(
-                    chat_id=chat_id,
-                    audio=file_id,
-                    caption=caption,
-                    parse_mode='HTML'
+                    chat_id=chat_id, audio=file_id, caption=caption, parse_mode="HTML"
                 )
             except Exception:
                 # Try voice format
-                await context.bot.send_voice(
-                    chat_id=chat_id,
-                    voice=file_id,
-                    caption=caption
-                )
+                await context.bot.send_voice(chat_id=chat_id, voice=file_id, caption=caption)
 
             logger.info(f"Playing: {title}")
 
@@ -152,9 +146,9 @@ async def sync_queue_to_all_bots(chat_id: int, pool, registry):
                 await db_ops_music.update_queue(
                     pool,
                     chat_id,
-                    queue_data.get('queue', []),
-                    queue_data.get('current_track'),
-                    queue_data.get('is_playing', False)
+                    queue_data.get("queue", []),
+                    queue_data.get("current_track"),
+                    queue_data.get("is_playing", False),
                 )
                 synced += 1
             except Exception as e:

@@ -8,69 +8,54 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from db.ops.approval import (
-    add_approved_member, remove_approved_member,
-    get_approved_members
-)
+from db.ops.approval import add_approved_member, remove_approved_member, get_approved_members
 
 log = logging.getLogger("approval")
 
 
 async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     target = await _resolve_target(update, context)
     if not target:
-        await msg.reply_text(
-            "Usage: /approve @username or reply to a user's message"
-        )
+        await msg.reply_text("Usage: /approve @username or reply to a user's message")
         return
 
-    await add_approved_member(
-        db, chat.id, target.id,
-        approved_by=update.effective_user.id
-    )
+    await add_approved_member(db, chat.id, target.id, approved_by=update.effective_user.id)
 
     name = f"@{target.username}" if target.username else target.full_name
     await msg.reply_text(
-        f"✅ <b>{name}</b> is now approved.\n"
-        f"They will bypass all automod rules.",
-        parse_mode="HTML"
+        f"✅ <b>{name}</b> is now approved.\n" f"They will bypass all automod rules.",
+        parse_mode="HTML",
     )
     log.info(
-        f"[APPROVAL] Approved | chat={chat.id} user={target.id} "
-        f"by={update.effective_user.id}"
+        f"[APPROVAL] Approved | chat={chat.id} user={target.id} " f"by={update.effective_user.id}"
     )
 
 
 async def cmd_unapprove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     target = await _resolve_target(update, context)
     if not target:
-        await msg.reply_text(
-            "Usage: /unapprove @username or reply to a user's message"
-        )
+        await msg.reply_text("Usage: /unapprove @username or reply to a user's message")
         return
 
     await remove_approved_member(db, chat.id, target.id)
 
     name = f"@{target.username}" if target.username else target.full_name
-    await msg.reply_text(
-        f"✅ <b>{name}</b> approval removed.",
-        parse_mode="HTML"
-    )
+    await msg.reply_text(f"✅ <b>{name}</b> approval removed.", parse_mode="HTML")
     log.info(f"[APPROVAL] Unapproved | chat={chat.id} user={target.id}")
 
 
 async def cmd_approved(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
 
     members = await get_approved_members(db, chat.id)
     if not members:
@@ -117,16 +102,18 @@ async def _resolve_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ── Anti-raid commands ─────────────────────────────────────────────────────
 
+
 async def cmd_antiraid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg      = update.effective_message
-    chat     = update.effective_chat
-    db       = context.bot_data.get("db")
-    args     = context.args or []
-    
+    msg = update.effective_message
+    chat = update.effective_chat
+    db = context.bot_data.get("db")
+    args = context.args or []
+
     get_settings = context.bot_data.get("get_settings")
     if not get_settings:
         # Fallback if get_settings is not in bot_data
         from db.ops.automod import get_group_settings
+
         settings = await get_group_settings(db, chat.id)
     else:
         settings = await get_settings(chat.id)
@@ -142,7 +129,7 @@ async def cmd_antiraid(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"Triggered: {session['triggered_by']}\n"
                 f"Joins blocked: {session['join_count']}\n"
                 f"Ends: {session['ends_at'] or 'Manual unlock required'}",
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
         else:
             status = "enabled" if settings.get("auto_antiraid_enabled") else "disabled"
@@ -155,23 +142,21 @@ async def cmd_antiraid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if args[0] == "on":
         result = await manual_toggle_raid(
-            context.bot, chat.id, True, settings, db,
-            update.effective_user.id
+            context.bot, chat.id, True, settings, db, update.effective_user.id
         )
         await msg.reply_text(result)
 
     elif args[0] == "off":
         result = await manual_toggle_raid(
-            context.bot, chat.id, False, settings, db,
-            update.effective_user.id
+            context.bot, chat.id, False, settings, db, update.effective_user.id
         )
         await msg.reply_text(result)
 
 
 async def cmd_autoantiraid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
     args = context.args or []
 
     from db.ops.automod import update_group_setting
@@ -189,9 +174,7 @@ async def cmd_autoantiraid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if args[0] == "on":
         await update_group_setting(db, chat.id, "auto_antiraid_enabled", True)
         if len(args) > 1 and args[1].isdigit():
-            await update_group_setting(
-                db, chat.id, "auto_antiraid_threshold", int(args[1])
-            )
+            await update_group_setting(db, chat.id, "auto_antiraid_threshold", int(args[1]))
         await msg.reply_text("✅ Auto anti-raid enabled")
 
     elif args[0] == "off":
@@ -207,25 +190,21 @@ async def cmd_autoantiraid(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text("Modes: restrict | ban | captcha")
 
     elif args[0] == "duration" and len(args) > 1 and args[1].isdigit():
-        await update_group_setting(
-            db, chat.id, "antiraid_duration_mins", int(args[1])
-        )
+        await update_group_setting(db, chat.id, "antiraid_duration_mins", int(args[1]))
         await msg.reply_text(
-            f"✅ Raid auto-ends after {args[1]} min" +
-            (" (manual unlock)" if args[1] == "0" else "")
+            f"✅ Raid auto-ends after {args[1]} min"
+            + (" (manual unlock)" if args[1] == "0" else "")
         )
 
     elif args[0].isdigit():
-        await update_group_setting(
-            db, chat.id, "auto_antiraid_threshold", int(args[0])
-        )
+        await update_group_setting(db, chat.id, "auto_antiraid_threshold", int(args[0]))
         await msg.reply_text(f"✅ Anti-raid threshold: {args[0]} joins/min")
 
 
 async def cmd_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
     args = context.args or []
 
     from db.ops.automod import update_group_setting
@@ -234,19 +213,20 @@ async def cmd_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE):
         get_settings = context.bot_data.get("get_settings")
         if not get_settings:
             from db.ops.automod import get_group_settings
+
             settings = await get_group_settings(db, chat.id)
         else:
             settings = await get_settings(chat.id)
 
-        mode     = settings.get("captcha_mode", "button")
-        enabled  = settings.get("captcha_enabled", False)
-        timeout  = settings.get("captcha_timeout_mins", 5)
+        mode = settings.get("captcha_mode", "button")
+        enabled = settings.get("captcha_enabled", False)
+        timeout = settings.get("captcha_timeout_mins", 5)
         await msg.reply_text(
             f"🤖 <b>CAPTCHA Status</b>\n"
             f"Enabled: {'✅' if enabled else '❌'}\n"
             f"Mode: {mode}\n"
             f"Timeout: {timeout} min",
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
         return
 
@@ -259,9 +239,9 @@ async def cmd_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_captchamode(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg  = update.effective_message
+    msg = update.effective_message
     chat = update.effective_chat
-    db   = context.bot_data.get("db")
+    db = context.bot_data.get("db")
     args = context.args or []
 
     from db.ops.automod import update_group_setting
@@ -281,7 +261,5 @@ async def cmd_captchamode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"✅ CAPTCHA mode: {args[0]}")
 
     elif args[0] == "timeout" and len(args) > 1 and args[1].isdigit():
-        await update_group_setting(
-            db, chat.id, "captcha_timeout_mins", int(args[1])
-        )
+        await update_group_setting(db, chat.id, "captcha_timeout_mins", int(args[1]))
         await msg.reply_text(f"✅ CAPTCHA timeout: {args[1]} min")

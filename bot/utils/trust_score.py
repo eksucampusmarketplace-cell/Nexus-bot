@@ -28,8 +28,8 @@ from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
 
-_LOW_TRUST_THRESHOLD    = 30
-_HIGH_TRUST_THRESHOLD   = 86
+_LOW_TRUST_THRESHOLD = 30
+_HIGH_TRUST_THRESHOLD = 86
 _RESTRICTED_PERMISSIONS = ChatPermissions(
     can_send_messages=True,
     can_send_audios=False,
@@ -69,7 +69,8 @@ async def calculate_trust_score(user_id: int, chat_id: int, db_pool) -> int:
             """SELECT message_count, warns, is_banned, is_muted, report_count
                FROM users
                WHERE user_id = $1 AND chat_id = $2""",
-            user_id, chat_id
+            user_id,
+            chat_id,
         )
         if not row:
             return 50
@@ -81,10 +82,10 @@ async def calculate_trust_score(user_id: int, chat_id: int, db_pool) -> int:
                 warns = json.loads(warns)
             except Exception:
                 warns = []
-        warn_count    = len(warns) if isinstance(warns, list) else 0
-        report_count  = row["report_count"] or 0
-        is_banned     = row["is_banned"] or False
-        is_muted      = row["is_muted"] or False
+        warn_count = len(warns) if isinstance(warns, list) else 0
+        report_count = row["report_count"] or 0
+        is_banned = row["is_banned"] or False
+        is_muted = row["is_muted"] or False
 
         # Activity score (0-40): 1 pt per 10 messages, capped at 40
         activity_score = min(40, message_count // 10)
@@ -100,23 +101,25 @@ async def calculate_trust_score(user_id: int, chat_id: int, db_pool) -> int:
         days_active_row = await conn.fetchval(
             """SELECT COUNT(DISTINCT DATE(last_seen)) FROM users
                WHERE user_id = $1 AND chat_id = $2""",
-            user_id, chat_id
+            user_id,
+            chat_id,
         )
-        days_active     = int(days_active_row or 1)
+        days_active = int(days_active_row or 1)
         engagement_score = min(20, 10 + min(10, (days_active - 1) * 2))
 
         new_score = activity_score + history_score + engagement_score
         new_score = max(0, min(100, new_score))
 
         old_row = await conn.fetchrow(
-            "SELECT trust_score FROM users WHERE user_id = $1 AND chat_id = $2",
-            user_id, chat_id
+            "SELECT trust_score FROM users WHERE user_id = $1 AND chat_id = $2", user_id, chat_id
         )
         old_score = old_row["trust_score"] if old_row else 50
 
         await conn.execute(
             "UPDATE users SET trust_score = $1 WHERE user_id = $2 AND chat_id = $3",
-            new_score, user_id, chat_id
+            new_score,
+            user_id,
+            chat_id,
         )
 
         delta = new_score - old_score
@@ -131,8 +134,7 @@ async def get_trust_score(user_id: int, chat_id: int, db_pool) -> int:
     """Fast DB read of current score."""
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
-            "SELECT trust_score FROM users WHERE user_id = $1 AND chat_id = $2",
-            user_id, chat_id
+            "SELECT trust_score FROM users WHERE user_id = $1 AND chat_id = $2", user_id, chat_id
         )
     return row["trust_score"] if row else 50
 

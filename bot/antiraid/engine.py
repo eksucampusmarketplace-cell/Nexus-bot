@@ -6,19 +6,23 @@ Anti-raid detection and enforcement.
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 from telegram import Bot, Chat, User
 from telegram.error import TelegramError
 
-from db.ops.antiraid import (
-    record_join, count_recent_joins,
-    create_antiraid_session, get_active_session,
-    end_antiraid_session, get_session_join_count,
-    increment_session_joins, log_member_event
-)
 from api.routes.events import push_event
 from bot.logging.log_channel import log_event
+from db.ops.antiraid import (
+    count_recent_joins,
+    create_antiraid_session,
+    end_antiraid_session,
+    get_active_session,
+    get_session_join_count,
+    increment_session_joins,
+    log_member_event,
+    record_join,
+)
 
 log = logging.getLogger("antiraid")
 
@@ -33,12 +37,7 @@ def _get_lock(chat_id: int) -> asyncio.Lock:
 
 
 async def handle_new_member(
-    bot: Bot,
-    chat_id: int,
-    user: User,
-    settings: dict,
-    db,
-    owner_id: int | None
+    bot: Bot, chat_id: int, user: User, settings: dict, db, owner_id: int | None
 ):
     """
     Called for every new member join event.
@@ -84,26 +83,22 @@ async def handle_new_member(
     return True
 
 
-async def _trigger_raid(
-    bot, chat_id, settings, db, owner_id, join_count
-):
+async def _trigger_raid(bot, chat_id, settings, db, owner_id, join_count):
     """Create session, alert group, schedule auto-end."""
     duration = settings.get("antiraid_duration_mins", 15)
-    ends_at  = (
-        datetime.now(timezone.utc) + timedelta(minutes=duration)
-        if duration > 0 else None
-    )
+    ends_at = datetime.now(timezone.utc) + timedelta(minutes=duration) if duration > 0 else None
     # Log raid start
     await log_event(
-        bot=bot, db=db, chat_id=chat_id,
+        bot=bot,
+        db=db,
+        chat_id=chat_id,
         event_type="antiraid_start",
         details={"join_count": join_count, "mode": settings.get("antiraid_mode")},
         bot_id=bot.id,
     )
 
     session_id = await create_antiraid_session(
-        db, chat_id, triggered_by="auto",
-        ends_at=ends_at, join_count=join_count
+        db, chat_id, triggered_by="auto", ends_at=ends_at, join_count=join_count
     )
 
     log.warning(
@@ -118,17 +113,20 @@ async def _trigger_raid(
             text=(
                 "🚨 <b>Anti-Raid Activated</b>\n\n"
                 f"Unusual join activity detected ({join_count} joins/min).\n"
-                "New members will be " +
-                {
+                "New members will be "
+                + {
                     "restrict": "muted",
-                    "ban":      "banned",
-                    "captcha":  "required to solve CAPTCHA",
-                }.get(settings.get("antiraid_mode", "restrict"), "restricted") +
-                " until the raid ends.\n\n" +
-                (f"Auto-ends in {duration} minutes." if duration else
-                 "Use /antiraid off to end manually.")
+                    "ban": "banned",
+                    "captcha": "required to solve CAPTCHA",
+                }.get(settings.get("antiraid_mode", "restrict"), "restricted")
+                + " until the raid ends.\n\n"
+                + (
+                    f"Auto-ends in {duration} minutes."
+                    if duration
+                    else "Use /antiraid off to end manually."
+                )
             ),
-            parse_mode="HTML"
+            parse_mode="HTML",
         )
     except TelegramError as e:
         log.warning(f"[ANTIRAID] Alert failed: {e}")
@@ -136,20 +134,21 @@ async def _trigger_raid(
     # Push SSE to Mini App
     if owner_id:
         try:
-            push_event(owner_id, {
-                "type":    "raid",
-                "title":   "🚨 Raid Detected",
-                "body":    f"{join_count} joins/min in {chat_id}",
-                "chat_id": chat_id,
-            })
+            push_event(
+                owner_id,
+                {
+                    "type": "raid",
+                    "title": "🚨 Raid Detected",
+                    "body": f"{join_count} joins/min in {chat_id}",
+                    "chat_id": chat_id,
+                },
+            )
         except Exception:
             pass
 
     # Schedule auto-end
     if duration > 0:
-        asyncio.create_task(
-            _auto_end_raid(bot, chat_id, session_id, duration * 60, db)
-        )
+        asyncio.create_task(_auto_end_raid(bot, chat_id, session_id, duration * 60, db))
 
 
 async def _handle_raid_join(bot, chat_id, user, session, settings, db):
@@ -164,18 +163,14 @@ async def _handle_raid_join(bot, chat_id, user, session, settings, db):
 
         elif mode == "restrict":
             await bot.restrict_chat_member(
-                chat_id=chat_id,
-                user_id=user.id,
-                permissions={"can_send_messages": False}
+                chat_id=chat_id, user_id=user.id, permissions={"can_send_messages": False}
             )
             log.info(f"[ANTIRAID] Restricted raid joiner | user={user.id}")
 
         elif mode == "captcha":
             # Force CAPTCHA on this user
             await bot.restrict_chat_member(
-                chat_id=chat_id,
-                user_id=user.id,
-                permissions={"can_send_messages": False}
+                chat_id=chat_id, user_id=user.id, permissions={"can_send_messages": False}
             )
             # CAPTCHA handler will send challenge (handled in new_member.py)
 
@@ -186,27 +181,26 @@ async def _handle_raid_join(bot, chat_id, user, session, settings, db):
 async def _auto_end_raid(bot, chat_id, session_id, delay_seconds, db):
     await asyncio.sleep(delay_seconds)
     session = await db.fetchrow("SELECT is_active FROM antiraid_sessions WHERE id = $1", session_id)
-    if session and session['is_active']:
+    if session and session["is_active"]:
         await end_antiraid_session(db, session_id)
         log.info(f"[ANTIRAID] Auto-ended | chat={chat_id}")
         try:
             await bot.send_message(
-                chat_id=chat_id,
-                text="✅ Anti-raid protection deactivated. Group is open again."
+                chat_id=chat_id, text="✅ Anti-raid protection deactivated. Group is open again."
             )
         except TelegramError:
             pass
         await log_event(
-            bot=bot, db=db, chat_id=chat_id,
+            bot=bot,
+            db=db,
+            chat_id=chat_id,
             event_type="antiraid_end",
             details={"session_id": session_id},
             bot_id=bot.id,
         )
 
 
-async def manual_toggle_raid(
-    bot, chat_id, enable: bool, settings, db, triggered_by: int
-):
+async def manual_toggle_raid(bot, chat_id, enable: bool, settings, db, triggered_by: int):
     """Called by /antiraid on|off command."""
     if enable:
         session = await get_active_session(db, chat_id)
@@ -226,15 +220,18 @@ async def _push_join_sse(owner_id, chat_id, user, is_raid: bool):
     if not owner_id:
         return
     try:
-        push_event(owner_id, {
-            "type":    "raid_join" if is_raid else "join",
-            "title":   f"{'🚨 Raid' if is_raid else '👋'} {user.full_name}",
-            "body":    f"@{user.username or user.id} joined {chat_id}",
-            "chat_id": chat_id,
-            "user_id": user.id,
-            "username": user.username,
-            "full_name": user.full_name,
-            "is_raid": is_raid,
-        })
+        push_event(
+            owner_id,
+            {
+                "type": "raid_join" if is_raid else "join",
+                "title": f"{'🚨 Raid' if is_raid else '👋'} {user.full_name}",
+                "body": f"@{user.username or user.id} joined {chat_id}",
+                "chat_id": chat_id,
+                "user_id": user.id,
+                "username": user.username,
+                "full_name": user.full_name,
+                "is_raid": is_raid,
+            },
+        )
     except Exception:
         pass

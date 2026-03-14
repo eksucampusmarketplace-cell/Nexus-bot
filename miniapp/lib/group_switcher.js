@@ -29,46 +29,62 @@ export class GroupSwitcher {
     try {
       data = await apiFetch('/api/me');
       this._store.setState({ userContext: data });
+      console.log('[GroupSwitcher] Received user data:', {
+        admin_groups: data.admin_groups?.length || 0,
+        mod_groups: data.mod_groups?.length || 0,
+        member_groups: data.member_groups?.length || 0,
+        groups: data.groups?.length || 0
+      });
     } catch (e) {
       console.error('[GroupSwitcher] Failed to load /api/me:', e.message);
+      return;
     }
-    
-    // Gather groups from all possible sources
+
+    // Gather groups - only include admin/mod groups (not member_groups)
+    // Users can only manage groups where they have admin or mod permissions
     const adminGroups = data.admin_groups || [];
     const modGroups = data.mod_groups || [];
-    const memberGroups = data.member_groups || [];
     const allGroups = data.groups || [];
-    
-    // Merge all groups and remove duplicates by chat_id
+
+    console.log('[GroupSwitcher] Group breakdown:', {
+      admin: adminGroups.length,
+      mod: modGroups.length,
+      manageable: allGroups.length
+    });
+
+    // Merge admin/mod groups only (exclude member_groups)
     const groupMap = new Map();
-    [...adminGroups, ...modGroups, ...memberGroups, ...allGroups].forEach(g => {
+    [...adminGroups, ...modGroups, ...allGroups].forEach(g => {
       if (g && g.chat_id && !groupMap.has(g.chat_id)) {
         groupMap.set(g.chat_id, g);
       }
     });
-    
+
     this._groups = Array.from(groupMap.values());
-    
-    this._store.setState({ 
+
+    console.log('[GroupSwitcher] Final groups list:', this._groups.length, 'groups',
+      this._groups.map(g => `${g.title} (${g.chat_id})`));
+
+    this._store.setState({
       groups: this._groups,
       bot_info: data.bot_info,
       userContext: data.user
     });
-    
+
     // Try to restore saved group or use first available
     const saved = sessionStorage.getItem('active_group');
     this._active = this._groups.find(g => g.chat_id == saved)
                 || this._groups[0]
                 || null;
-    
+
+    console.log('[GroupSwitcher] Active group:', this._active?.title || 'None');
+
     this._render();
-    
+
     if (this._active) {
       this._store.getState().setActiveChatId(this._active.chat_id);
       this._store.setState({ activeGroup: this._active });
     }
-    
-    console.log('[GroupSwitcher] Initialized with', this._groups.length, 'groups');
   }
 
   _render() {

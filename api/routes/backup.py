@@ -132,9 +132,10 @@ async def import_backup(chat_id: int, request: Request, user: dict = Depends(get
     is_valid, errors = validate_multiple_inputs(inputs_to_validate, validation_rules)
     
     if not is_valid:
+        error_messages = ', '.join(f"{k}: {v['message']}" for k, v in errors.items())
         raise HTTPException(
             400,
-            f"Invalid backup data: {', '.join(f'{k}: {v[\"message\"]}' for k, v in errors.items())}"
+            f"Invalid backup data: {error_messages}"
         )
     
     # Additional security: Check for malicious JSON structure

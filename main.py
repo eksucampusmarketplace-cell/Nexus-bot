@@ -137,7 +137,7 @@ async def lifespan(app: FastAPI):
             is_primary=True,
             status='active'
         )
-        registry_register(primary_me.id, primary_app)
+        await registry_register(primary_me.id, primary_app)
 
     except Exception as e:
         logger.critical(f"[STARTUP] ❌ Failed to start primary bot: {e}")
@@ -166,7 +166,7 @@ async def lifespan(app: FastAPI):
                 except AttributeError:
                     me = clone_app.bot.get_me()
                     
-                registry_register(me.id, clone_app)
+                await registry_register(me.id, clone_app)
                 logger.info(f"[STARTUP] ✅ Started clone bot @{me.username} (ID: {me.id})")
             except Exception as ce:
                 logger.error(f"[STARTUP] ⚠️ Failed to start clone {clone_row['bot_id']}: {ce}")

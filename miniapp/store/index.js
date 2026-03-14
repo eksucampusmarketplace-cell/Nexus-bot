@@ -24,8 +24,15 @@ export const useStore = createStore((set, get) => ({
   // ── Active Group ───────────────────────────────────────────
   activeChatId: null,
   activeGroup: null,
-  setActiveChatId: (chatId) => set({ activeChatId: chatId }),
+  setActiveChatId: (chatId) => {
+    // Persist to sessionStorage for page refreshes
+    if (chatId) {
+      sessionStorage.setItem('active_group', chatId);
+    }
+    set({ activeChatId: chatId });
+  },
   setActiveGroup: (group) => set({ activeGroup: group }),
+  setGroups: (groups) => set({ groups }),
   
   // ── Navigation ──────────────────────────────────────────────
   activePage: 'dashboard',

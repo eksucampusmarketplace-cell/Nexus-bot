@@ -11,10 +11,10 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js';
-import { RULE_TEMPLATES, applyTemplate } from '../../lib/rule_templates.js';
-import { useStore } from '../../store/index.js';
-import { apiFetch } from '../../lib/api.js';
+import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js?v=1.2.0';
+import { RULE_TEMPLATES, applyTemplate } from '../../lib/rule_templates.js?v=1.2.0';
+import { useStore } from '../../store/index.js?v=1.2.0';
+import { apiFetch } from '../../lib/api.js?v=1.2.0';
 
 const store = useStore;
 
@@ -170,6 +170,7 @@ const AUTOMOD_SECTIONS = [
 export async function renderAutomodPage(container) {
   const chatId = store.getState().activeChatId;
 
+  // Always clear and reset container
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
@@ -204,6 +205,7 @@ export async function renderAutomodPage(container) {
 
   // Clear loading state
   container.innerHTML = '';
+  container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
   // Templates section
   const templatesCard = Card({

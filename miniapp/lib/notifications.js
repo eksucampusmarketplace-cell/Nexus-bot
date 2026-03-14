@@ -16,7 +16,7 @@
  *   nc.push({ type: 'bot_action', title: 'User banned', body: '@user123 banned for spam' });
  */
 
-import { BottomSheet } from './components.js';
+import { BottomSheet } from './components.js?v=1.2.0';
 
 const TYPE_ICONS = {
   member_action:   '👤',

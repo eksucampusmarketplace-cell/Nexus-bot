@@ -12,8 +12,8 @@
  *   await switcher.init();
  */
 
-import { showToast } from './components.js';
-import { apiFetch } from './api.js';
+import { showToast } from './components.js?v=1.2.0';
+import { apiFetch } from './api.js?v=1.2.0';
 
 export class GroupSwitcher {
   constructor(containerEl, store) {
@@ -32,21 +32,43 @@ export class GroupSwitcher {
     } catch (e) {
       console.error('[GroupSwitcher] Failed to load /api/me:', e.message);
     }
-    this._groups = [
-      ...(data.admin_groups || []),
-      ...(data.mod_groups   || []),
-    ];
+    
+    // Gather groups from all possible sources
+    const adminGroups = data.admin_groups || [];
+    const modGroups = data.mod_groups || [];
+    const memberGroups = data.member_groups || [];
+    const allGroups = data.groups || [];
+    
+    // Merge all groups and remove duplicates by chat_id
+    const groupMap = new Map();
+    [...adminGroups, ...modGroups, ...memberGroups, ...allGroups].forEach(g => {
+      if (g && g.chat_id && !groupMap.has(g.chat_id)) {
+        groupMap.set(g.chat_id, g);
+      }
+    });
+    
+    this._groups = Array.from(groupMap.values());
+    
     this._store.setState({ 
       groups: this._groups,
       bot_info: data.bot_info,
       userContext: data.user
     });
+    
+    // Try to restore saved group or use first available
     const saved = sessionStorage.getItem('active_group');
     this._active = this._groups.find(g => g.chat_id == saved)
                 || this._groups[0]
                 || null;
+    
     this._render();
-    if (this._active) this._store.getState().setActiveChatId(this._active.chat_id);
+    
+    if (this._active) {
+      this._store.getState().setActiveChatId(this._active.chat_id);
+      this._store.setState({ activeGroup: this._active });
+    }
+    
+    console.log('[GroupSwitcher] Initialized with', this._groups.length, 'groups');
   }
 
   _render() {

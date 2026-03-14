@@ -6,9 +6,9 @@
  * for events like member joins, bans, warnings, etc.
  */
 
-import { Card, EmptyState, showToast, Spinner } from '../../lib/components.js';
-import { apiFetch } from '../../lib/api.js';
-import { useStore } from '../../store/index.js';
+import { Card, EmptyState, showToast, Spinner } from '../../lib/components.js?v=1.2.0';
+import { apiFetch } from '../../lib/api.js?v=1.2.0';
+import { useStore } from '../../store/index.js?v=1.2.0';
 
 const store = useStore;
 

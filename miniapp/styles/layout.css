@@ -96,12 +96,20 @@ html, body {
 /* ── Page ────────────────────────────────────────────── */
 .page {
   display: none;
-  padding: var(--sp-4);
-  max-width: var(--content-max);
-  margin: 0 auto;
   width: 100%;
+  min-height: 100%;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease;
 }
-.page.active { display: block; }
+.page.active { 
+  display: block; 
+  opacity: 1;
+}
+
+/* Ensure content is properly contained */
+.page > * {
+  animation: fadeIn var(--dur-normal) ease-out;
+}
 
 /* ── View transitions ────────────────────────────────── */
 @keyframes slide-in-right {

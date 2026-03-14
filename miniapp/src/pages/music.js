@@ -9,9 +9,9 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, EmptyState, showToast, Modal, TabBar, Spinner, Avatar, Badge } from '../../lib/components.js';
-import { useStore } from '../../store/index.js';
-import { apiFetch } from '../../lib/api.js';
+import { Card, EmptyState, showToast, Modal, TabBar, Spinner, Avatar, Badge } from '../../lib/components.js?v=1.2.0';
+import { useStore } from '../../store/index.js?v=1.2.0';
+import { apiFetch } from '../../lib/api.js?v=1.2.0';
 
 const store = useStore;
 
@@ -19,10 +19,11 @@ const store = useStore;
  * Render the Music player page
  * @param {HTMLElement} container - Container element to render into
  */
-export function renderMusicPage(container) {
+export async function renderMusicPage(container) {
   const chatId = store.getState().activeChatId;
   const initData = window.Telegram?.WebApp?.initData || '';
   
+  // Always clear container first
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
@@ -44,7 +45,7 @@ export function renderMusicPage(container) {
   `;
 
   // Fetch music data
-  fetchMusicData(chatId, initData, container);
+  await fetchMusicData(chatId, initData, container);
 }
 
 async function fetchMusicData(chatId, initData, container) {

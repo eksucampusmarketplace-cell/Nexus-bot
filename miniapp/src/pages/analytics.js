@@ -15,9 +15,9 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, StatCard, EmptyState, showToast, Spinner } from '../../lib/components.js';
-import { apiFetch } from '../../lib/api.js';
-import { useStore } from '../../store/index.js';
+import { Card, StatCard, EmptyState, showToast, Spinner } from '../../lib/components.js?v=1.2.0';
+import { apiFetch } from '../../lib/api.js?v=1.2.0';
+import { useStore } from '../../store/index.js?v=1.2.0';
 
 const store = useStore;
 
@@ -27,6 +27,7 @@ export async function renderAnalyticsPage(container) {
   const state = store.getState();
   const chatId = state.activeChatId;
 
+  // Always clear and reset container first
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
@@ -39,10 +40,13 @@ export async function renderAnalyticsPage(container) {
     return;
   }
 
-  const loadingWrap = document.createElement('div');
-  loadingWrap.style.cssText = 'display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-6) 0;color:var(--text-muted);font-size:var(--text-sm);';
-  loadingWrap.innerHTML = '<span>Loading analytics…</span>';
-  container.appendChild(loadingWrap);
+  // Show loading state
+  container.innerHTML = `
+    <div style="text-align: center; padding: var(--sp-8);">
+      <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
+      <div style="color: var(--text-muted);">Loading analytics...</div>
+    </div>
+  `;
 
   let analytics, memberStats, reports;
 

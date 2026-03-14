@@ -3,13 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Nexus Bot Panel</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Nexus Bot Panel v1.2</title>
   <base href="/miniapp/">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <!-- Design System -->
-  <link rel="stylesheet" href="styles/tokens.css?v=1.1.0">
-  <link rel="stylesheet" href="styles/layout.css?v=1.1.0">
-  <link rel="stylesheet" href="styles/animations.css?v=1.1.0">
+  <link rel="stylesheet" href="styles/tokens.css?v=1.2.0">
+  <link rel="stylesheet" href="styles/layout.css?v=1.2.0">
+  <link rel="stylesheet" href="styles/animations.css?v=1.2.0">
   <style>
     /* ── Additional component styles ───────────────────────────────────── */
     
@@ -414,44 +417,25 @@
 
     <!-- Bottom Nav (mobile) -->
     <div id="bottom-nav">
-      <div class="bottom-nav-item" data-page="dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-        <span>Dashboard</span>
-      </div>
-      <div class="bottom-nav-item" data-page="commands">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
-        <span>Commands</span>
-      </div>
-      <div class="bottom-nav-item" data-page="automod">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <span>AutoMod</span>
-      </div>
-      <div class="bottom-nav-item" data-page="members">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span>Members</span>
-      </div>
-      <div class="bottom-nav-item" data-page="settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>
-        <span>Settings</span>
-      </div>
+      <!-- Populated dynamically by setupNavigation() -->
     </div>
   </div>
 
   <script type="module">
-    import { ThemeEngine } from './lib/theme.js?v=1.1.0';
-    import { GroupSwitcher } from './lib/group_switcher.js?v=1.1.0';
-    import { NotificationCenter } from './lib/notifications.js?v=1.1.0';
-    import { SSEClient } from './lib/sse.js?v=1.1.0';
-    import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow, showToast } from './lib/components.js?v=1.1.0';
-    import { useStore } from './store/index.js?v=1.1.0';
-    import { apiFetch } from './lib/api.js?v=1.1.0';
-    import { renderAutomodPage } from './src/pages/automod.js?v=1.1.0';
-    import { renderCommandsPage } from './src/pages/commands.js?v=1.1.0';
-    import { renderMusicPage } from './src/pages/music.js?v=1.1.0';
-    import { renderBotsPage } from './src/pages/bots.js?v=1.1.0';
-    import { renderAnalyticsPage } from './src/pages/analytics.js?v=1.1.0';
-    import { renderWebhooksPage } from './src/pages/webhooks.js?v=1.1.0';
-    import { renderBroadcastPage } from './src/pages/broadcast.js?v=1.1.0';
+    import { ThemeEngine } from './lib/theme.js?v=1.2.0';
+    import { GroupSwitcher } from './lib/group_switcher.js?v=1.2.0';
+    import { NotificationCenter } from './lib/notifications.js?v=1.2.0';
+    import { SSEClient } from './lib/sse.js?v=1.2.0';
+    import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow, showToast } from './lib/components.js?v=1.2.0';
+    import { useStore } from './store/index.js?v=1.2.0';
+    import { apiFetch } from './lib/api.js?v=1.2.0';
+    import { renderAutomodPage } from './src/pages/automod.js?v=1.2.0';
+    import { renderCommandsPage } from './src/pages/commands.js?v=1.2.0';
+    import { renderMusicPage } from './src/pages/music.js?v=1.2.0';
+    import { renderBotsPage } from './src/pages/bots.js?v=1.2.0';
+    import { renderAnalyticsPage } from './src/pages/analytics.js?v=1.2.0';
+    import { renderWebhooksPage } from './src/pages/webhooks.js?v=1.2.0';
+    import { renderBroadcastPage } from './src/pages/broadcast.js?v=1.2.0';
 
     // Initialize theme
     ThemeEngine.init();
@@ -468,18 +452,36 @@
         tg.expand();
         tg.setHeaderColor(getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim());
         tg.enableClosingConfirmation();
+        
+        // Store initData for API calls
+        store.setState({ initData: tg.initData });
+      } else {
+        console.warn('[App] Not running inside Telegram WebApp');
       }
 
-      // Initialize group switcher
-      const groupSwitcher = new GroupSwitcher(
-        document.getElementById('topbar'),
-        store
-      );
-      await groupSwitcher.init();
+      // Initialize group switcher with retry
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries) {
+        try {
+          const groupSwitcher = new GroupSwitcher(
+            document.getElementById('topbar'),
+            store
+          );
+          await groupSwitcher.init();
+          break; // Success, exit retry loop
+        } catch (e) {
+          retryCount++;
+          console.error(`[App] Group switcher init failed (attempt ${retryCount}/${maxRetries}):`, e);
+          if (retryCount < maxRetries) {
+            await new Promise(r => setTimeout(r, 1000 * retryCount)); // Exponential backoff
+          }
+        }
+      }
 
       // Initialize notification center
       const notificationBell = document.getElementById('notification-bell');
-      const notificationCount = document.getElementById('notification-count');
       const nc = new NotificationCenter(notificationBell);
       
       // Connect SSE if active chat
@@ -521,9 +523,11 @@
       // Navigation setup
       setupNavigation();
       
-      // Render initial page
-      const activePage = getState().activePage || 'dashboard';
-      navigateToPage(activePage);
+      // Render initial page with small delay to ensure all init is complete
+      setTimeout(() => {
+        const activePage = getState().activePage || 'dashboard';
+        navigateToPage(activePage);
+      }, 100);
     });
 
     function setupNavigation() {
@@ -555,13 +559,14 @@
         </div>
       `).join('');
 
-      // Build bottom nav (limit to 4 most important + More)
+      // Build bottom nav (limit to 5 most important)
       const bottomNav = document.getElementById('bottom-nav');
       const bottomPages = [
         pages.find(p => p.id === 'dashboard'),
         pages.find(p => p.id === 'commands'),
-        pages.find(p => p.id === 'music'),
+        pages.find(p => p.id === 'members'),
         pages.find(p => p.id === 'automod'),
+        pages.find(p => p.id === 'settings'),
       ].filter(Boolean);
 
       bottomNav.innerHTML = bottomPages.map(p => `
@@ -569,12 +574,7 @@
           ${p.icon}
           <span>${p.label}</span>
         </div>
-      `).join('') + `
-        <div class="bottom-nav-item" id="bottom-nav-more">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
-          <span>More</span>
-        </div>
-      `;
+      `).join('');
 
       // Setup click handlers
       document.querySelectorAll('[data-page]').forEach(el => {
@@ -585,23 +585,32 @@
           }
         };
       });
-
-      document.getElementById('bottom-nav-more').onclick = toggleMenu;
     }
 
+    // Track rendered pages to prevent duplicate rendering
+    const _renderedPages = new Set();
+    
     async function navigateToPage(pageId) {
       // Update state
       store.setState({ activePage: pageId });
       getState().setActivePage?.(pageId);
 
-      // Update UI
+      // Update UI - hide all pages first
       document.querySelectorAll('.page').forEach(p => {
         p.classList.remove('active');
-        if (p.id === `page-${pageId}`) {
-          p.classList.add('active');
-          renderPage(pageId);
+        // Clear content of inactive pages to prevent overlap
+        if (p.id !== `page-${pageId}`) {
+          p.innerHTML = '';
         }
       });
+
+      // Show and render the active page
+      const activePageEl = document.getElementById(`page-${pageId}`);
+      if (activePageEl) {
+        activePageEl.classList.add('active');
+        // Always re-render to ensure fresh data
+        await renderPage(pageId);
+      }
 
       document.querySelectorAll('.sidebar-item').forEach(el => {
         el.classList.toggle('active', el.dataset.page === pageId);
@@ -609,15 +618,21 @@
       document.querySelectorAll('.bottom-nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.page === pageId);
       });
+      
+      // Scroll to top of main content
+      document.getElementById('main').scrollTop = 0;
     }
 
     async function renderPage(pageId) {
       const container = document.getElementById(`page-${pageId}`);
       if (!container) return;
 
+      // Clear container first to prevent content overlap/duplication
+      container.innerHTML = '';
+
       switch (pageId) {
         case 'dashboard':
-          renderDashboard(container);
+          await renderDashboard(container);
           break;
         case 'bots':
           await renderBotsPage(container);
@@ -626,16 +641,16 @@
           await renderAutomodPage(container);
           break;
         case 'members':
-          renderMembers(container);
+          await renderMembers(container);
           break;
         case 'music':
-          renderMusicPage(container);
+          await renderMusicPage(container);
           break;
         case 'commands':
-          renderCommandsPage(container);
+          await renderCommandsPage(container);
           break;
         case 'modules':
-          renderModules(container);
+          await renderModules(container);
           break;
         case 'analytics':
           await renderAnalyticsPage(container);
@@ -653,7 +668,7 @@
           await renderSettings(container);
           break;
         case 'logs':
-          renderLogs(container);
+          await renderLogs(container);
           break;
         case 'webhooks':
           await renderWebhooksPage(container);
@@ -852,7 +867,20 @@
       const chatId = state.activeChatId;
       const initData = window.Telegram?.WebApp?.initData || '';
 
+      // Ensure container is empty
       container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
+      // Check if user has any groups
+      const groups = state.groups || [];
+      if (!chatId && groups.length === 0) {
+        container.appendChild(EmptyState({ 
+          icon: '🤖', 
+          title: 'No Groups Found', 
+          description: 'Add the bot to a group and make it an admin to get started.' 
+        }));
+        return;
+      }
 
       const quickActions = document.createElement('div');
       quickActions.style.cssText = 'margin-bottom: var(--sp-6);';
@@ -967,69 +995,177 @@
     async function renderMembers(container) {
       const state = getState();
       const chatId = state.activeChatId;
+      
+      // Clear and setup container
       container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
       if (!chatId) {
-        container.appendChild(EmptyState({ icon: '👆', title: 'Select a group' }));
+        container.appendChild(EmptyState({ icon: '👆', title: 'Select a group', description: 'Choose a group to view members' }));
         return;
       }
+      
+      // Show loading state
+      container.innerHTML = `
+        <div style="text-align: center; padding: var(--sp-8);">
+          <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
+          <div style="color: var(--text-muted);">Loading members...</div>
+        </div>
+      `;
+      
       try {
         const members = await apiFetch(`/api/groups/${chatId}/members`);
         state.setMembers(members);
+        
+        // Clear loading state
+        container.innerHTML = '';
+        container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+        
+        // Add header
+        const header = document.createElement('div');
+        header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-4);';
+        header.innerHTML = `
+          <div>
+            <h2 style="font-size: 20px; font-weight: 700; margin: 0;">👥 Members</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0;">${members.length} total members</p>
+          </div>
+        `;
+        container.appendChild(header);
+        
         container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => filterMembers(val, members, container) }));
+        
         const list = document.createElement('div');
         list.className = 'member-list';
+        list.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
+        
         members.forEach(m => list.appendChild(MemberRow({ 
           member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
           selectable: true,
           onSelect: (m) => state.toggleMemberSelection(m.id)
         })));
+        
         container.appendChild(list);
       } catch (e) {
-        showToast('Failed to load members', 'error');
+        container.innerHTML = '';
+        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load members', description: e.message || 'Please try again' }));
       }
     }
 
     function filterMembers(query, all, container) {
-      const q = query.toLowerCase();
-      const filtered = all.filter(m => (m.first_name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q));
+      const q = query.toLowerCase().trim();
+      if (!q) {
+        // Show all members when query is empty
+        const list = container.querySelector('.member-list');
+        if (!list) return;
+        list.innerHTML = '';
+        all.forEach(m => list.appendChild(MemberRow({ 
+          member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+          selectable: true,
+          onSelect: (m) => getState().toggleMemberSelection(m.id)
+        })));
+        return;
+      }
+      
+      const filtered = all.filter(m => 
+        (m.first_name || '').toLowerCase().includes(q) || 
+        (m.username || '').toLowerCase().includes(q) ||
+        (m.user_id?.toString() || m.id?.toString() || '').includes(q)
+      );
+      
       const list = container.querySelector('.member-list');
+      if (!list) return;
+      
       list.innerHTML = '';
-      filtered.forEach(m => list.appendChild(MemberRow({ member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) } })));
+      if (filtered.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.style.cssText = 'text-align: center; padding: var(--sp-8); color: var(--text-muted);';
+        emptyMsg.textContent = 'No members found matching "' + query + '"';
+        list.appendChild(emptyMsg);
+        return;
+      }
+      
+      filtered.forEach(m => list.appendChild(MemberRow({ 
+        member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+        selectable: true,
+        onSelect: (m) => getState().toggleMemberSelection(m.id)
+      })));
     }
 
-    function renderModules(container) {
+    async function renderModules(container) {
       const state = getState();
-      const modules = state.modules || {};
-      const settings = state.settings || {};
       const chatId = state.activeChatId;
-      const moduleList = [
-        { id: 'antiflood', name: 'Anti-Flood', desc: 'Prevent rapid messaging' },
-        { id: 'antispam', name: 'Anti-Spam', desc: 'Block known spam patterns' },
-        { id: 'antilink', name: 'Anti-Link', desc: 'Control external links' },
-        { id: 'welcome', name: 'Welcome Message', desc: 'Auto-greet new members' },
-        { id: 'rules', name: 'Rules Display', desc: 'Show group rules' },
-        { id: 'booster', name: '🚀 Booster System', desc: 'Channel and member boost requirements', isBooster: true },
-      ];
+      
       container.innerHTML = '';
-      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display:flex; flex-direction:column; gap:var(--sp-4)';
-      moduleList.forEach(m => {
-        const enabled = m.isBooster ? settings.booster_enabled : (modules[m.id] || false);
-        container.appendChild(Card({
-          title: m.name, subtitle: m.desc,
-          actions: Toggle({
-            checked: enabled,
-            onChange: async (v) => {
-              if (m.isBooster) {
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
+      if (!chatId) {
+        container.appendChild(EmptyState({ icon: '👆', title: 'Select a group', description: 'Choose a group to manage modules' }));
+        return;
+      }
+      
+      // Show loading state
+      container.innerHTML = `
+        <div style="text-align: center; padding: var(--sp-8);">
+          <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
+          <div style="color: var(--text-muted);">Loading modules...</div>
+        </div>
+      `;
+      
+      try {
+        // Fetch latest settings
+        const group = await apiFetch(`/api/groups/${chatId}`);
+        const settings = group.settings || {};
+        state.setSettings(settings);
+        
+        // Clear loading state
+        container.innerHTML = '';
+        container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-4);';
+        
+        // Add header
+        const header = document.createElement('div');
+        header.style.cssText = 'margin-bottom: var(--sp-2);';
+        header.innerHTML = `
+          <h2 style="font-size: 20px; font-weight: 700; margin: 0;">📦 Modules</h2>
+          <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0;">Toggle features for this group</p>
+        `;
+        container.appendChild(header);
+        
+        const moduleList = [
+          { id: 'antiflood', name: 'Anti-Flood', desc: 'Prevent rapid messaging', settingKey: 'antiflood' },
+          { id: 'antispam', name: 'Anti-Spam', desc: 'Block known spam patterns', settingKey: 'antispam' },
+          { id: 'antilink', name: 'Anti-Link', desc: 'Control external links', settingKey: 'lock_link' },
+          { id: 'welcome', name: 'Welcome Message', desc: 'Auto-greet new members', settingKey: 'welcome_enabled' },
+          { id: 'rules', name: 'Rules Display', desc: 'Show group rules', settingKey: 'rules_enabled' },
+          { id: 'captcha', name: 'Captcha', desc: 'Require verification for new members', settingKey: 'captcha_enabled' },
+        ];
+        
+        moduleList.forEach(m => {
+          const enabled = settings[m.settingKey] || false;
+          const card = Card({
+            title: m.name, 
+            subtitle: m.desc,
+            actions: Toggle({
+              checked: enabled,
+              onChange: async (v) => {
                 try {
-                  await apiFetch(`/api/groups/${chatId}/settings`, { method: 'PUT', body: JSON.stringify({ ...settings, booster_enabled: v }) });
-                  state.updateSetting('booster_enabled', v);
-                  showToast(`Booster ${v ? 'enabled' : 'disabled'}`, 'success');
-                } catch (e) { showToast('Failed to update', 'error'); }
-              } else { store.toggleModule(m.id, v); }
-            }
-          })
-        }));
-      });
+                  await apiFetch(`/api/groups/${chatId}/settings`, { 
+                    method: 'PUT', 
+                    body: JSON.stringify({ ...settings, [m.settingKey]: v }) 
+                  });
+                  state.updateSetting(m.settingKey, v);
+                  showToast(`${m.name} ${v ? 'enabled' : 'disabled'}`, 'success');
+                } catch (e) { 
+                  showToast('Failed to update', 'error'); 
+                }
+              }
+            })
+          });
+          container.appendChild(card);
+        });
+      } catch (e) {
+        container.innerHTML = '';
+        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load modules', description: e.message || 'Please try again' }));
+      }
     }
 
     async function renderSettings(container) {
@@ -1147,12 +1283,54 @@
     async function renderLogs(container) {
       const state = getState();
       const chatId = state.activeChatId;
+      
       container.innerHTML = '';
-      if (!chatId) return;
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      
+      if (!chatId) {
+        container.appendChild(EmptyState({ icon: '👆', title: 'Select a group', description: 'Choose a group to view logs' }));
+        return;
+      }
+      
+      // Show loading state
+      container.innerHTML = `
+        <div style="text-align: center; padding: var(--sp-8);">
+          <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
+          <div style="color: var(--text-muted);">Loading logs...</div>
+        </div>
+      `;
+      
       try {
         const logs = await apiFetch(`/api/groups/${chatId}/logs`);
-        container.appendChild(Card({ title: 'Recent Logs', children: logs.length > 0 ? logs.slice(0, 20).map(l => `<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">${getActionEmoji(l.action)} <b>${formatAction(l.action)}</b> by ${l.by_username || 'System'} <span style="float:right;color:var(--text-muted);font-size:11px">${formatTime(l.timestamp)}</span></div>`).join('') : EmptyState({ icon: '📋', title: 'No logs' }) }));
-      } catch (e) {}
+        
+        // Clear loading state
+        container.innerHTML = '';
+        container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+        
+        if (!logs || logs.length === 0) {
+          container.appendChild(Card({ 
+            title: '📋 Recent Logs', 
+            children: EmptyState({ icon: '📋', title: 'No logs yet', description: 'Activity will appear here' })
+          }));
+          return;
+        }
+        
+        const logsHtml = logs.slice(0, 50).map(l => `
+          <div style="padding: var(--sp-2) 0; border-bottom: 1px solid var(--border); font-size: 13px;">
+            ${getActionEmoji(l.action)} <b>${formatAction(l.action)}</b> 
+            ${l.by_username ? `by ${l.by_username}` : 'by System'} 
+            <span style="float: right; color: var(--text-muted); font-size: 11px;">${formatTime(l.timestamp)}</span>
+          </div>
+        `).join('');
+        
+        container.appendChild(Card({ 
+          title: `📋 Recent Logs (${logs.length})`,
+          children: `<div style="max-height: 600px; overflow-y: auto;">${logsHtml}</div>`
+        }));
+      } catch (e) {
+        container.innerHTML = '';
+        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load logs', description: e.message || 'Please try again' }));
+      }
     }
   </script>
 </body>

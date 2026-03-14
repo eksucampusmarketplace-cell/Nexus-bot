@@ -24,8 +24,48 @@ DEFAULT_SETTINGS = {
     "welcome": {"enabled": True, "text": "👋 Welcome {first_name}!", "delete_after": 60}
 }
 
-def get_setting(settings: dict, *keys, default=None):
-    """Safely get nested settings value with fallback to defaults."""
+def get_setting(settings: dict, *keys, default=None, modules=None):
+    """
+    Safely get nested settings value with fallback to defaults.
+    Also checks the modules dict for module-based settings.
+    
+    Module naming convention (prefix_handler.py):
+      - antiflood -> module: antiflood
+      - antispam -> module: antispam  
+      - antilink -> module: antilink
+      - captcha -> module: captcha
+      - antiraid -> module: anti_raid
+    """
+    # Map settings keys to module names
+    module_key_map = {
+        'antiflood': 'antiflood',
+        'antispam': 'antispam',
+        'antilink': 'antilink',
+        'captcha': 'captcha',
+        'antibot': 'antibot',
+        'antiraid': 'anti_raid',
+        'welcome': 'welcome_message',
+        'goodbye': 'goodbye_message',
+    }
+    
+    # First check if this is a module-controlled setting
+    if modules and len(keys) >= 1:
+        setting_key = keys[0]
+        module_name = module_key_map.get(setting_key)
+        if module_name and module_name in modules:
+            # If module is explicitly disabled in modules, return default with enabled=False
+            if not modules.get(module_name, False):
+                # Return the default but with enabled=False
+                default_value = DEFAULT_SETTINGS
+                for k in keys:
+                    if isinstance(default_value, dict) and k in default_value:
+                        default_value = default_value[k]
+                    else:
+                        return default
+                if isinstance(default_value, dict):
+                    return {**default_value, 'enabled': False}
+                return default_value
+    
     value = settings
     for key in keys:
         if isinstance(value, dict) and key in value:
@@ -69,6 +109,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     settings = group.get('settings') or {}
+    modules = group.get('modules') or {}
 
     # ── Advanced Automod Engine Check ───────────────────────────────────
     # Call the new advanced automod engine first
@@ -79,7 +120,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ── Legacy automod (for backward compatibility) ──────────────
     # 1. Anti-link
-    antilink = get_setting(settings, 'automod', 'antilink')
+    antilink = get_setting(settings, 'automod', 'antilink', modules=modules)
     if antilink['enabled'] and update.message.text:
         import re
         links = re.findall(r'(https?://[^\s]+)', update.message.text)
@@ -94,7 +135,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
     # 2. Anti-flood
-    antiflood = get_setting(settings, 'automod', 'antiflood')
+    antiflood = get_setting(settings, 'automod', 'antiflood', modules=modules)
     if antiflood['enabled']:
         now = datetime.now()
         if chat_id not in flood_data: flood_data[chat_id] = {}
@@ -139,11 +180,12 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     settings = group.get('settings') or {}
+    modules = group.get('modules') or {}
     # Ensure automod settings exist with defaults
     if 'automod' not in settings:
         settings = dict(settings)
         settings['automod'] = DEFAULT_AUTOMOD
-    antiflood = get_setting(settings, 'automod', 'antiflood')
+    antiflood = get_setting(settings, 'automod', 'antiflood', modules=modules)
     
     if antiflood['enabled']:
         now = datetime.now()
@@ -202,11 +244,12 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     settings = group.get('settings') or {}
+    modules = group.get('modules') or {}
     # Ensure automod settings exist with defaults
     if 'automod' not in settings:
         settings = dict(settings)
         settings['automod'] = DEFAULT_AUTOMOD
-    antilink = get_setting(settings, 'automod', 'antilink')
+    antilink = get_setting(settings, 'automod', 'antilink', modules=modules)
     
     if antilink['enabled']:
         import re
@@ -230,11 +273,12 @@ async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if not group: return
     
     settings = group.get('settings') or {}
+    modules = group.get('modules') or {}
     for member in update.message.new_chat_members:
         if member.is_bot: continue
         
         # Anti-bot
-        antibot = get_setting(settings, 'automod', 'antibot')
+        antibot = get_setting(settings, 'automod', 'antibot', modules=modules)
         if antibot['enabled']:
             # min_age_days check is hard via TG API directly without extra info
             # but we can check for username

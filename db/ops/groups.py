@@ -11,6 +11,18 @@ async def get_group(chat_id: int):
                     res['settings'] = json.loads(res['settings'])
                 except Exception:
                     res['settings'] = {}
+            if isinstance(res.get('modules'), str):
+                try:
+                    res['modules'] = json.loads(res['modules'])
+                except Exception:
+                    res['modules'] = {}
+            elif res.get('modules') is None:
+                res['modules'] = {}
+            # Merge modules into settings for backward compatibility
+            if not res.get('settings'):
+                res['settings'] = {}
+            # Add module settings to the settings dict for easier access
+            res['settings']['_modules'] = res['modules']
             return res
         return None
 
@@ -25,6 +37,13 @@ async def get_or_create_group(db_pool, chat_id: int, title: str = None):
                     res['settings'] = json.loads(res['settings'])
                 except Exception:
                     res['settings'] = {}
+            if isinstance(res.get('modules'), str):
+                try:
+                    res['modules'] = json.loads(res['modules'])
+                except Exception:
+                    res['modules'] = {}
+            elif res.get('modules') is None:
+                res['modules'] = {}
             return res
         # Create new group
         if title is None:
@@ -152,6 +171,21 @@ async def delete_custom_message(chat_id: int, key: str):
             "DELETE FROM group_custom_messages WHERE group_id = $1 AND message_key = $2",
             chat_id, key
         )
+
+
+async def get_group_modules(chat_id: int) -> dict:
+    """Get the modules configuration for a group."""
+    async with db.pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT modules FROM groups WHERE chat_id = $1", chat_id)
+        if row and row['modules']:
+            modules = row['modules']
+            if isinstance(modules, str):
+                try:
+                    modules = json.loads(modules)
+                except Exception:
+                    modules = {}
+            return modules
+        return {}
 
 
 async def require_admin(db_pool, chat_id: int, user_id: int, bot) -> bool:

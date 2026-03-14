@@ -133,7 +133,17 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 member_count = await chat.get_member_count()
             except Exception:
                 member_count = 0
-            await upsert_group(chat.id, chat.title, token_hash, member_count=member_count)
+            # Fetch group photo
+            photo_big = None
+            photo_small = None
+            try:
+                chat_obj = await context.bot.get_chat(chat.id)
+                if chat_obj.photo:
+                    photo_big = chat_obj.photo.big_file_id
+                    photo_small = chat_obj.photo.small_file_id
+            except Exception as e:
+                log.warning(f"[LIFECYCLE] Could not get chat photo | chat={chat.id} error={e}")
+            await upsert_group(chat.id, chat.title, token_hash, member_count=member_count, photo_big=photo_big, photo_small=photo_small)
             log.info(f"[LIFECYCLE] Owner group registered | bot={bot_id} chat={chat.id}")
 
             # Send setup DM to owner
@@ -173,7 +183,17 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 member_count = await chat.get_member_count()
             except Exception:
                 member_count = 0
-            await upsert_group(chat.id, chat.title, token_hash, member_count=member_count)
+            # Fetch group photo
+            photo_big = None
+            photo_small = None
+            try:
+                chat_obj = await context.bot.get_chat(chat.id)
+                if chat_obj.photo:
+                    photo_big = chat_obj.photo.big_file_id
+                    photo_small = chat_obj.photo.small_file_id
+            except Exception as e:
+                log.warning(f"[LIFECYCLE] Could not get chat photo | chat={chat.id} error={e}")
+            await upsert_group(chat.id, chat.title, token_hash, member_count=member_count, photo_big=photo_big, photo_small=photo_small)
             # Onboard the stranger
             await _send_stranger_onboard_dm(context, actor, chat, policy="open")
             # Notify owner if enabled

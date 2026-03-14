@@ -194,6 +194,8 @@ class Database:
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS bot_token_hash TEXT;
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS modules JSONB DEFAULT '{}'::jsonb;
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS text_config JSONB DEFAULT '{}'::jsonb;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS photo_big TEXT;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS photo_small TEXT;
 
                 -- Ensure columns exist in users table
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS trust_score INTEGER DEFAULT 50;

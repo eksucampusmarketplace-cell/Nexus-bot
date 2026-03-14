@@ -143,15 +143,13 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 <code>/setrules [rules]</code> - Set group rules
 <code>/rules</code> - Show group rules
 
-<b>🎵 Music Commands:</b>
-<code>/play [url/query]</code> - Play music
-<code>/playnow [url]</code> - Play immediately
-<code>/skip</code> - Skip current track
-<code>/stop</code> - Stop playback
-<code>/pause</code> - Pause music
-<code>/resume</code> - Resume music
-<code>/queue</code> - Show queue
-<code>/volume [0-200]</code> - Set volume
+<b>⭐ Engagement Commands:</b>
+<code>/rank [@user]</code> - Show XP rank card
+<code>/top</code> - Group XP leaderboard
+<code>/rep [@user]</code> - Give +1 rep
+<code>/checkin</code> - Daily XP check-in
+<code>/badges [@user]</code> - Show badges
+<code>/profile [@user]</code> - Full member profile
 
 <b>🎮 Fun Commands:</b>
 <code>/afk [reason]</code> - Set AFK status

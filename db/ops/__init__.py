@@ -16,28 +16,6 @@ from db.ops.bots import (
     count_recent_clone_attempts,
     log_clone_attempt,
 )
-from db.ops.music import (
-    create_music_tables,
-    add_to_queue,
-    get_queue,
-    clear_queue,
-    skip_track,
-    pause_track,
-    resume_track,
-    get_current_track,
-    set_volume,
-    set_repeat,
-    set_shuffle,
-    get_player_state,
-    create_playlist,
-    get_playlists,
-    add_to_playlist,
-    get_playlist_tracks,
-    delete_playlist,
-    search_youtube,
-    play_youtube,
-)
-from db.ops import music_new as db_music_new
 from db.ops.channels import link_channel, unlink_channel, get_linked_channel, get_channel_posts
 from db.ops.modules import get_modules, set_module
 from db.ops.captcha import (

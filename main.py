@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
         logger.critical(f"[STARTUP] ❌ Migration failed — cannot start: {e}")
         raise
 
-    # Initialize Redis for music service
+    # Initialize Redis
     try:
         import redis.asyncio as aioredis
 
@@ -69,26 +69,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[STARTUP] ⚠️ Failed to connect to Redis: {e}")
         redis_client = None
-
-    # Initialize lazy manager for Pyrogram clients
-    try:
-        from bot.userbot.lazy_manager import LazyClientManager
-
-        lazy_manager = LazyClientManager(pool)
-        await lazy_manager.start()
-        logger.info("[STARTUP] ✅ LazyClientManager started")
-    except Exception as e:
-        logger.warning(f"[STARTUP] ⚠️ Failed to start LazyClientManager: {e}")
-        lazy_manager = None
-
-    # Initialize music player tables (includes schema check)
-    try:
-        import db.ops.music_new as db_music
-
-        await db_music.create_music_tables(pool)
-        logger.info("[STARTUP] ✅ Music player tables initialized")
-    except Exception as e:
-        logger.warning(f"[STARTUP] ⚠️ Failed to create music tables: {e}")
 
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
@@ -108,7 +88,6 @@ async def lifespan(app: FastAPI):
         primary_app.bot_data["db_pool"] = pool
         primary_app.bot_data["db"] = pool
         primary_app.bot_data["redis"] = redis_client
-        primary_app.bot_data["lazy_manager"] = lazy_manager
 
         logger.info("[STARTUP] Initializing primary bot...")
         await primary_app.initialize()
@@ -168,7 +147,6 @@ async def lifespan(app: FastAPI):
                 clone_app.bot_data["db_pool"] = pool
                 clone_app.bot_data["db"] = pool
                 clone_app.bot_data["redis"] = redis_client
-                clone_app.bot_data["lazy_manager"] = lazy_manager
 
                 await clone_app.initialize()
                 await clone_app.start()
@@ -209,9 +187,6 @@ async def lifespan(app: FastAPI):
             await app.shutdown()
         except Exception as e:
             logger.error(f"[SHUTDOWN] Error stopping bot {bot_id}: {e}")
-
-    if lazy_manager:
-        await lazy_manager.stop()
 
     await db.disconnect()
     logger.info("[SHUTDOWN] ✅ Database pool disconnected")
@@ -290,14 +265,13 @@ try:
     from api.routes import moderation as moderation_api
     from api.routes import (
         modules,
-        music,
-        music_auth,
         reports,
         roles,
         scheduler,
         text_config,
         webhooks,
     )
+    from api.routes import engagement as engagement_api
 
     # Core API routers (need prefix since routes don't include it)
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
@@ -328,9 +302,8 @@ try:
 
     # Other routes with internal prefixes
     app.include_router(broadcast.router)  # prefix="/api/broadcast"
-    app.include_router(music.router)  # prefix="/api/music"
-    app.include_router(music_auth.router)  # prefix="/api/bots/{bot_id}/music"
     app.include_router(channels.router)  # prefix="/api/channels"
     app.include_router(member_stats.router)  # prefix="/api/me"
+    app.include_router(engagement_api.router)  # prefix="/api/groups/{chat_id}/..."
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

@@ -63,7 +63,7 @@ async def handle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("✅ Enable All", callback_data="modules:all")],
         [InlineKeyboardButton("🛡️ Moderation Only", callback_data="modules:mod")],
-        [InlineKeyboardButton("🎵 Music Only", callback_data="modules:music")],
+        [InlineKeyboardButton("⭐ Engagement Only", callback_data="modules:engagement")],
         [InlineKeyboardButton("🎮 Games Only", callback_data="modules:games")],
         [InlineKeyboardButton("⏭️ Skip", callback_data="skip")],
     ]

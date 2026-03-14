@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS warnings (
     expires_at TIMESTAMPTZ,
     is_active BOOLEAN DEFAULT TRUE
 );
+ALTER TABLE warnings ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE warnings ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
 
 -- Mutes (timed)
 CREATE TABLE IF NOT EXISTS mutes (
@@ -21,6 +23,8 @@ CREATE TABLE IF NOT EXISTS mutes (
     is_active BOOLEAN DEFAULT TRUE,
     PRIMARY KEY (chat_id, user_id)
 );
+ALTER TABLE mutes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE mutes ADD COLUMN IF NOT EXISTS unmute_at TIMESTAMPTZ;
 
 -- Bans (timed)
 CREATE TABLE IF NOT EXISTS bans (
@@ -33,6 +37,8 @@ CREATE TABLE IF NOT EXISTS bans (
     is_active BOOLEAN DEFAULT TRUE,
     PRIMARY KEY (chat_id, user_id)
 );
+ALTER TABLE bans ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE bans ADD COLUMN IF NOT EXISTS unban_at TIMESTAMPTZ;
 
 -- Group rules
 CREATE TABLE IF NOT EXISTS group_rules (
@@ -58,7 +64,6 @@ CREATE TABLE IF NOT EXISTS blacklist (
     chat_id BIGINT NOT NULL,
     word TEXT NOT NULL,
     action TEXT DEFAULT 'delete',
-    -- delete | warn | mute | ban
     added_by BIGINT,
     added_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (chat_id, word)
@@ -98,9 +103,7 @@ CREATE TABLE IF NOT EXISTS warn_settings (
     chat_id BIGINT NOT NULL PRIMARY KEY,
     max_warns INTEGER DEFAULT 3,
     warn_action TEXT DEFAULT 'mute',
-    -- mute | kick | ban | tban
     warn_duration TEXT DEFAULT '1h',
-    -- used if action is tban/tmute
     reset_on_kick BOOLEAN DEFAULT TRUE
 );
 
@@ -123,42 +126,24 @@ CREATE INDEX IF NOT EXISTS idx_blacklist_chat ON blacklist(chat_id);
 CREATE TABLE IF NOT EXISTS antiraid_settings (
     chat_id BIGINT PRIMARY KEY,
     enabled BOOLEAN DEFAULT TRUE,
-
-    -- Detection thresholds (joins per minute)
     threshold_yellow INTEGER DEFAULT 5,
     threshold_orange INTEGER DEFAULT 10,
     threshold_red INTEGER DEFAULT 20,
     threshold_critical INTEGER DEFAULT 50,
-
-    -- Auto actions per level
     action_yellow TEXT DEFAULT 'alert',
-    -- alert | captcha | slowmode | lockdown | off
     action_orange TEXT DEFAULT 'captcha',
     action_red TEXT DEFAULT 'lockdown',
     action_critical TEXT DEFAULT 'lockdown_ban',
-
-    -- Lockdown behavior
     lockdown_duration INTEGER DEFAULT 300,
-    -- seconds, 0 = manual unlock only
     lockdown_restricts_all BOOLEAN DEFAULT TRUE,
-    -- restrict all members or just new ones
     ban_suspicious_on_raid BOOLEAN DEFAULT FALSE,
-    -- auto-ban accounts scoring >80 suspicion
-
-    -- Member quality filters
     min_account_age_days INTEGER DEFAULT 0,
-    -- 0 = no minimum
     block_no_photo BOOLEAN DEFAULT FALSE,
     block_no_username BOOLEAN DEFAULT FALSE,
     block_similar_names BOOLEAN DEFAULT TRUE,
-
-    -- Slowmode during raid
     slowmode_seconds INTEGER DEFAULT 30,
-
-    -- Notifications
     notify_admins BOOLEAN DEFAULT TRUE,
     notify_log_channel BOOLEAN DEFAULT TRUE,
-
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -168,15 +153,22 @@ CREATE TABLE IF NOT EXISTS raid_incidents (
     chat_id BIGINT NOT NULL,
     started_at TIMESTAMPTZ DEFAULT NOW(),
     ended_at TIMESTAMPTZ,
-    peak_threat_level TEXT NOT NULL,
+    peak_threat_level TEXT DEFAULT 'green',
     peak_joins_per_minute INTEGER DEFAULT 0,
     total_raiders INTEGER DEFAULT 0,
     action_taken TEXT,
     resolved_by BIGINT,
-    -- user_id of admin who ended it, or NULL if auto
     notes TEXT,
     is_active BOOLEAN DEFAULT TRUE
 );
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS peak_threat_level TEXT DEFAULT 'green';
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS peak_joins_per_minute INTEGER DEFAULT 0;
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS total_raiders INTEGER DEFAULT 0;
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS action_taken TEXT;
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS resolved_by BIGINT;
+ALTER TABLE raid_incidents ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ;
 
 -- Individual raiders tracked per incident
 CREATE TABLE IF NOT EXISTS raid_members (
@@ -187,7 +179,6 @@ CREATE TABLE IF NOT EXISTS raid_members (
     joined_at TIMESTAMPTZ DEFAULT NOW(),
     suspicion_score INTEGER DEFAULT 0,
     action_taken TEXT,
-    -- none | kicked | banned | restricted
     account_age_days INTEGER,
     had_photo BOOLEAN,
     had_bio BOOLEAN,
@@ -200,14 +191,14 @@ CREATE TABLE IF NOT EXISTS lockdown_state (
     is_active BOOLEAN DEFAULT FALSE,
     started_at TIMESTAMPTZ,
     started_by BIGINT,
-    -- user_id or NULL for auto
     reason TEXT,
     auto_unlock_at TIMESTAMPTZ,
-    -- NULL = manual only
     previous_permissions JSONB,
-    -- store pre-lockdown permissions to restore
     incident_id BIGINT REFERENCES raid_incidents(id)
 );
+ALTER TABLE lockdown_state ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT FALSE;
+ALTER TABLE lockdown_state ADD COLUMN IF NOT EXISTS previous_permissions JSONB;
+ALTER TABLE lockdown_state ADD COLUMN IF NOT EXISTS incident_id BIGINT REFERENCES raid_incidents(id);
 
 -- Global ban list (raiders banned from one group, flagged for others)
 CREATE TABLE IF NOT EXISTS raid_ban_list (
@@ -218,6 +209,8 @@ CREATE TABLE IF NOT EXISTS raid_ban_list (
     suspicion_score INTEGER DEFAULT 0,
     is_active BOOLEAN DEFAULT TRUE
 );
+ALTER TABLE raid_ban_list ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE;
+ALTER TABLE raid_ban_list ADD COLUMN IF NOT EXISTS suspicion_score INTEGER DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_raid_incidents_chat
     ON raid_incidents(chat_id, is_active);

@@ -414,6 +414,8 @@
       <div id="page-backup" class="page"></div>
       <div id="page-settings" class="page"></div>
       <div id="page-logs" class="page"></div>
+      <div id="page-greetings" class="page"></div>
+      <div id="page-reports" class="page"></div>
     </div>
 
     <!-- Bottom Nav (mobile) -->
@@ -437,6 +439,8 @@
     import { renderAnalyticsPage } from './src/pages/analytics.js?v=1.5.0';
     import { renderWebhooksPage } from './src/pages/webhooks.js?v=1.5.0';
     import { renderBroadcastPage } from './src/pages/broadcast.js?v=1.5.0';
+    import { renderGreetingsPage } from './src/pages/greetings.js?v=1.5.0';
+    import { renderReportsPage as renderReportsPageFull } from './src/pages/reports.js?v=1.5.0';
 
     // Initialize theme
     ThemeEngine.init();
@@ -551,6 +555,8 @@
         { id: 'backup', label: 'Backup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' },
         { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>' },
         { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
+        { id: 'greetings', label: 'Greetings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' },
+        { id: 'reports', label: 'Reports', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
       ];
 
       // Build sidebar nav
@@ -565,7 +571,7 @@
       const bottomNav = document.getElementById('bottom-nav');
       const bottomPages = [
         pages.find(p => p.id === 'dashboard'),
-        pages.find(p => p.id === 'commands'),
+        pages.find(p => p.id === 'moderation'),
         pages.find(p => p.id === 'members'),
         pages.find(p => p.id === 'automod'),
         pages.find(p => p.id === 'settings'),
@@ -682,7 +688,75 @@
         case 'broadcast':
           await renderBroadcastPage(container);
           break;
+        case 'greetings':
+          await renderGreetingsPage(container);
+          break;
+        case 'reports':
+          await renderReportsPageFull(container);
+          break;
       }
+    }
+
+    async function renderReportsPage(container) {
+      const state = getState();
+      const chatId = state.activeChatId;
+      container.innerHTML = '';
+      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+      if (!chatId) {
+        container.appendChild(EmptyState({ icon: '🚨', title: 'Select a group', description: 'Choose a group to view reports.' }));
+        return;
+      }
+      container.innerHTML = '<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading reports...</div>';
+      try {
+        const res = await apiFetch(`/api/groups/${chatId}/reports`);
+        const reports = res?.reports || res || [];
+        container.innerHTML = '';
+        const header = document.createElement('div');
+        header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
+        header.innerHTML = `<div><h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">🚨 Reports</h2><p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">${reports.length} open report(s)</p></div>`;
+        container.appendChild(header);
+        if (reports.length === 0) {
+          container.appendChild(EmptyState({ icon: '✅', title: 'No open reports', description: 'Your group is clean! 🎉' }));
+          return;
+        }
+        reports.forEach(r => {
+          const card = document.createElement('div');
+          card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);margin-bottom:var(--sp-3);';
+          card.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:var(--sp-2);">
+              <div>
+                <span style="font-size:var(--text-sm);font-weight:var(--fw-semibold);">@${r.reporter_username || r.reporter_id}</span>
+                <span style="color:var(--text-muted);font-size:var(--text-sm);"> reported </span>
+                <span style="font-size:var(--text-sm);font-weight:var(--fw-semibold);">@${r.target_username || r.target_id}</span>
+              </div>
+              <span style="font-size:var(--text-xs);color:var(--text-muted);">${formatTime(r.created_at)}</span>
+            </div>
+            <p style="font-size:var(--text-sm);color:var(--text-secondary);margin:0 0 var(--sp-3);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${r.message_text || r.reason || 'No message preview'}</p>
+            <div style="display:flex;gap:var(--sp-2);">
+              <button class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);" onclick="resolveReport('${chatId}','${r.id}','resolved')">✓ Resolve</button>
+              <button class="btn btn-danger" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);" onclick="resolveReport('${chatId}','${r.id}','ban')">🔨 Ban</button>
+              <button class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);" onclick="resolveReport('${chatId}','${r.id}','dismissed')">✗ Dismiss</button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (e) {
+        container.innerHTML = '';
+        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load reports', description: e.message }));
+      }
+      window.resolveReport = async (cid, rid, action) => {
+        try {
+          if (action === 'ban') {
+            await apiFetch(`/api/groups/${cid}/reports/${rid}`, { method: 'PUT', body: JSON.stringify({ status: 'resolved', action: 'ban' }) });
+          } else {
+            await apiFetch(`/api/groups/${cid}/reports/${rid}`, { method: 'PUT', body: JSON.stringify({ status: action }) });
+          }
+          showToast(`Report ${action}d`, 'success');
+          renderReportsPage(container);
+        } catch (e) {
+          showToast('Failed: ' + e.message, 'error');
+        }
+      };
     }
 
     async function renderGamificationPage(container) {
@@ -737,9 +811,9 @@
                 user_id: m.user_id,
                 first_name: m.first_name || m.username || `User ${m.user_id}`,
                 username: m.username,
-                xp: (m.message_count || 0) * 10, // Convert messages to XP approximation
-                level: Math.floor(Math.sqrt((m.message_count || 0) * 10 / 100)) + 1,
-                badges: []
+                xp: m.xp || 0,
+                level: m.level || 1,
+                badges: m.badges || []
               }));
             }
           } catch (e) {
@@ -763,7 +837,7 @@
         container.appendChild(header);
         
         if (!leaderboardData || leaderboardData.length === 0) {
-          container.appendChild(EmptyState({ icon: '🎮', title: 'No XP yet', description: 'Play games to earn XP and climb the leaderboard!' }));
+          container.appendChild(EmptyState({ icon: '🏆', title: 'No XP data yet', description: 'Members need to chat and play games to earn XP.' }));
           return;
         }
         
@@ -912,7 +986,7 @@
             <div>
               <h4 style="margin:0 0 var(--sp-2);font-size:14px;">Export Backup</h4>
               <p style="font-size:13px;color:var(--text-muted);margin:0 0 var(--sp-3);">Download all group settings as a JSON file.</p>
-              <a href="/api/groups/${chatId}/backup" target="_blank" class="btn btn-primary" style="text-decoration:none;display:inline-block;">📥 Download Backup</a>
+              <button id="export-backup-btn" class="btn btn-primary">📥 Download Backup</button>
             </div>
             <div style="border-top:1px solid var(--border);padding-top:var(--sp-4);">
               <h4 style="margin:0 0 var(--sp-2);font-size:14px;">Restore from Backup</h4>
@@ -927,6 +1001,34 @@
       });
       container.appendChild(card);
       
+      // Wire up export button after card renders
+      setTimeout(() => {
+        const exportBtn = document.getElementById('export-backup-btn');
+        if (exportBtn) {
+          exportBtn.addEventListener('click', async () => {
+            exportBtn.textContent = '⏳ Preparing...';
+            exportBtn.disabled = true;
+            try {
+              const data = await apiFetch(`/api/groups/${chatId}/backup`);
+              const json = JSON.stringify(data, null, 2);
+              const blob = new Blob([json], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `nexus-backup-${chatId}-${Date.now()}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+              showToast('Backup downloaded!', 'success');
+            } catch (e) {
+              showToast('Failed to export: ' + e.message, 'error');
+            } finally {
+              exportBtn.textContent = '📥 Download Backup';
+              exportBtn.disabled = false;
+            }
+          });
+        }
+      }, 100);
+
       window.restoreBackup = async () => {
         const fileInput = document.getElementById('backup-file');
         if (!fileInput.files || !fileInput.files[0]) {
@@ -1029,22 +1131,28 @@
 
       if (finalChatId) {
         try {
-          const group = await apiFetch(`/api/groups/${finalChatId}`);
-          const logs = await apiFetch(`/api/groups/${finalChatId}/logs`);
+          const [group, logs, analyticsData] = await Promise.all([
+            apiFetch(`/api/groups/${finalChatId}`),
+            apiFetch(`/api/groups/${finalChatId}/logs`),
+            apiFetch(`/api/groups/${finalChatId}/analytics`).catch(() => ({ activity: [] }))
+          ]);
           
           const memberCount = group?.member_count || 0;
+          const activity = analyticsData?.activity || [];
+          const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.messages || 0) : 0;
           const stats = [
             { label: 'Total Members', value: memberCount.toLocaleString(), icon: '👥', color: 'accent' },
-            { label: 'Messages Today', value: '0', icon: '💬', color: 'success' },
-            { label: 'Actions Today', value: logs.length.toLocaleString(), icon: '⚡', color: 'warning' },
+            { label: 'Messages Today', value: todayMessages.toLocaleString(), icon: '💬', color: 'success' },
+            { label: 'Actions Today', value: (Array.isArray(logs) ? logs : []).length.toLocaleString(), icon: '⚡', color: 'warning' },
           ];
 
           statsGrid.innerHTML = '';
           stats.forEach(s => statsGrid.appendChild(StatCard(s)));
           
-          state.setLogs(logs);
+          const logList = Array.isArray(logs) ? logs : [];
+          state.setLogs(logList);
 
-          const recentLogs = logs.slice(0, 10);
+          const recentLogs = logList.slice(0, 10);
           container.appendChild(Card({
             title: 'Recent Activity',
             children: recentLogs.length > 0 ? recentLogs.map(log => `
@@ -1236,12 +1344,18 @@
         container.appendChild(header);
         
         const moduleList = [
-          { id: 'antiflood', name: 'Anti-Flood', desc: 'Prevent rapid messaging', settingKey: 'antiflood' },
-          { id: 'antispam', name: 'Anti-Spam', desc: 'Block known spam patterns', settingKey: 'antispam' },
-          { id: 'antilink', name: 'Anti-Link', desc: 'Control external links', settingKey: 'lock_link' },
-          { id: 'welcome', name: 'Welcome Message', desc: 'Auto-greet new members', settingKey: 'welcome_enabled' },
-          { id: 'rules', name: 'Rules Display', desc: 'Show group rules', settingKey: 'rules_enabled' },
-          { id: 'captcha', name: 'Captcha', desc: 'Require verification for new members', settingKey: 'captcha_enabled' },
+          { id: 'welcome',   name: '👋 Welcome Messages', desc: 'Greet new members',           settingKey: 'welcome_enabled',   page: 'greetings' },
+          { id: 'goodbye',   name: '👋 Goodbye Messages', desc: 'Farewell leaving members',     settingKey: 'goodbye_enabled',   page: 'greetings' },
+          { id: 'rules',     name: '📋 Group Rules',       desc: '/rules command',               settingKey: 'rules_enabled',     page: null },
+          { id: 'captcha',   name: '🔐 Captcha',           desc: 'Verify new members',           settingKey: 'captcha_enabled',   page: 'automod' },
+          { id: 'xp',        name: '⭐ XP & Levels',       desc: 'Member progression',           settingKey: 'xp_enabled',        page: 'engagement' },
+          { id: 'games',     name: '🎮 Games',              desc: 'In-chat games',                settingKey: 'games_enabled',     page: null },
+          { id: 'channel',   name: '📢 Channel Posting',   desc: 'Post to linked channel',       settingKey: 'channel_enabled',   page: null },
+          { id: 'logging',   name: '📋 Mod Logging',        desc: 'Log actions to channel',       settingKey: 'log_enabled',       page: 'logs' },
+          { id: 'inline',    name: '⚡ Inline Mode',        desc: '@botname queries',             settingKey: 'inline_mode_enabled', page: null },
+          { id: 'reports',   name: '🚨 Reports',            desc: '/report command',              settingKey: 'reports_enabled',   page: 'reports' },
+          { id: 'notes',     name: '📝 Notes',              desc: 'Save and retrieve notes',      settingKey: 'notes_enabled',     page: null },
+          { id: 'broadcast', name: '📡 Broadcast',          desc: 'Mass message system',          settingKey: 'broadcast_enabled', page: 'broadcast' },
         ];
         
         moduleList.forEach(m => {
@@ -1265,6 +1379,13 @@
               }
             })
           });
+          if (m.page) {
+            const link = document.createElement('div');
+            link.style.cssText = 'margin-top:var(--sp-2);';
+            link.innerHTML = `<button class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-3);" data-page="${m.page}">Configure →</button>`;
+            link.querySelector('button').onclick = () => navigateToPage(m.page);
+            card.appendChild(link);
+          }
           container.appendChild(card);
         });
       } catch (e) {

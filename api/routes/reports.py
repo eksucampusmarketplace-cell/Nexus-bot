@@ -22,6 +22,8 @@ router = APIRouter(prefix="/api/groups/{chat_id}/reports")
 
 class ResolveRequest(BaseModel):
     note: str = ""
+    status: str = "resolved"
+    action: str = ""
 
 
 @router.get("")
@@ -84,6 +86,30 @@ async def resolve_report(
     if not success:
         raise HTTPException(status_code=409, detail="Report already actioned")
     return {"ok": True, "report_id": report_id, "status": "resolved"}
+
+
+@router.put("/{report_id}")
+async def update_report_status(
+    chat_id: int,
+    report_id: int,
+    body: ResolveRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Update report status (resolve/dismiss/etc) via PUT."""
+    report = await db_reports.get_report(db.pool, report_id)
+    if not report or report["chat_id"] != chat_id:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    user_id = user.get("user_id") or user.get("id") or 0
+    status = body.status if body.status in ("resolved", "dismissed") else "resolved"
+    await db_reports.resolve_report(
+        pool=db.pool,
+        report_id=report_id,
+        resolved_by=user_id,
+        status=status,
+        note=body.note or "",
+    )
+    return {"ok": True, "report_id": report_id, "status": status}
 
 
 @router.post("/{report_id}/dismiss")

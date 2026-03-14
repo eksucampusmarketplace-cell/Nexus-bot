@@ -1,6 +1,7 @@
 -- Add group limit and access policy to existing bots table
+-- Note: group_limit = 0 means unlimited (only for primary bots), 1-20 is the allowed range for clone bots
 ALTER TABLE bots
-  ADD COLUMN IF NOT EXISTS group_limit            INT DEFAULT 1 CHECK (group_limit BETWEEN 1 AND 20),
+  ADD COLUMN IF NOT EXISTS group_limit            INT DEFAULT 1 CHECK (group_limit BETWEEN 0 AND 20),
   ADD COLUMN IF NOT EXISTS group_access_policy    TEXT DEFAULT 'blocked'
                                                   CHECK (group_access_policy IN ('open','approval','blocked')),
   ADD COLUMN IF NOT EXISTS bot_add_notifications  BOOLEAN DEFAULT FALSE;

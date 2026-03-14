@@ -40,7 +40,7 @@ All four major features have been successfully implemented for the Nexus bot pro
    - Separate Redis-based job queue
    - PyTGCalls and yt-dlp isolated from main bot
    - Auto-restart on crash
-   - yt-dlp version checking (pinned to 2024.3.10)
+   - yt-dlp version checking (pinned to 2024.12.6)
    - Source fallback chain with broken-flag expiry
    - Temp file cleanup every 5 min
    - Now-playing cards sent via Bot API directly
@@ -59,7 +59,7 @@ All four major features have been successfully implemented for the Nexus bot pro
    - `music:ytdlp:broken:{source}` — Fallback flags
 
 4. **Pinned versions**
-   - `yt-dlp==2024.3.10`
+   - `yt-dlp==2024.12.6`
    - `pytgcalls==3.0.0.dev29`
    - `redis==5.0.4`
    - `aioredis==2.0.1`

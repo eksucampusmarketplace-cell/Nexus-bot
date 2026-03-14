@@ -188,20 +188,35 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       <div class="game-desc">50+ questions with streak bonuses</div>
       <div class="game-xp">Up to 600 XP</div>
     </a>
-    <a class="game-card" id="card-word">
+    <a class="game-card" id="card-advanced-trivia" onclick="openGame('advanced-trivia')">
+      <span class="game-badge badge-hot">🔥</span>
+      <span class="game-icon">🧠</span>
+      <div class="game-name">Advanced Trivia</div>
+      <div class="game-desc">100+ questions, 6 categories, daily challenges</div>
+      <div class="game-xp">Up to 800 XP</div>
+    </a>
+    <a class="game-card" id="card-fruit-slash" onclick="openGame('fruit-slash')">
       <span class="game-badge badge-new">NEW</span>
+      <span class="game-icon">🍉</span>
+      <div class="game-name">Fruit Slash</div>
+      <div class="game-desc">Slice fruit, avoid bombs, combo bonuses</div>
+      <div class="game-xp">Combo ×5 XP</div>
+    </a>
+    <a class="game-card" id="card-nexus-kitchen" onclick="openGame('nexus-kitchen')">
+      <span class="game-badge badge-hot">TREND</span>
+      <span class="game-icon">👨‍🍳</span>
+      <div class="game-name">Nexus Kitchen</div>
+      <div class="game-desc">Cook & serve orders, level up system</div>
+      <div class="game-xp">Order rewards</div>
+    </a>
+    <a class="game-card" id="card-word-master" onclick="openGame('word-master')">
+      <span class="game-badge badge-xp">+XP</span>
       <span class="game-icon">📝</span>
-      <div class="game-name">Word Guess</div>
-      <div class="game-desc">100+ words to solve</div>
-      <div class="game-xp">Up to 500 XP</div>
+      <div class="game-name">Word Master</div>
+      <div class="game-desc">200+ words, power-ups, streaks</div>
+      <div class="game-xp">Streak bonuses</div>
     </a>
-    <a class="game-card" id="card-snake">
-      <span class="game-icon">🐍</span>
-      <div class="game-name">Snake</div>
-      <div class="game-desc">Classic arcade action</div>
-      <div class="game-xp">Score × 0.5 XP</div>
-    </a>
-  </div>
+    </div>
 
   <div class="section-label">Quick Games</div>
   <div class="games-grid">
@@ -530,23 +545,24 @@ function openGame(game, trackAs = null){
 }
 
 // Setup game cards
-document.getElementById('card-spin').onclick = ()=>openGame('spin-wheel');
-document.getElementById('card-trivia').onclick = ()=>openGame('trivia', 'trivia');
-document.getElementById('card-word').onclick = ()=>openGame('wordguess');
-document.getElementById('card-snake').onclick = ()=>openGame('snake');
-document.getElementById('card-tap').onclick = ()=>openGame('tap-rush');
-document.getElementById('card-memory').onclick = ()=>openGame('memory-flash');
-document.getElementById('card-reaction').onclick = ()=>openGame('reaction-timer');
-document.getElementById('card-hol').onclick = ()=>openGame('higher-lower');
-document.getElementById('card-2048').onclick = ()=>openGame('2048');
-document.getElementById('card-mines').onclick = ()=>openGame('minesweeper');
-document.getElementById('card-emoji').onclick = ()=>openGame('emoji-guess');
-document.getElementById('card-colorsort').onclick = ()=>openGame('color-sort');
-document.getElementById('card-flappy').onclick = ()=>openGame('flappy');
-document.getElementById('card-aim').onclick = ()=>openGame('aim-trainer');
-document.getElementById('card-brick').onclick = ()=>openGame('brick-breaker');
-document.getElementById('card-blackjack').onclick = ()=>openGame('blackjack');
-document.getElementById('card-redlight').onclick = ()=>openGame('redlight');
+    document.getElementById('card-spin').onclick = ()=>openGame('spin-wheel');
+    document.getElementById('card-advanced-trivia').onclick = ()=>openGame('advanced-trivia');
+    document.getElementById('card-fruit-slash').onclick = ()=>openGame('fruit-slash');
+    document.getElementById('card-nexus-kitchen').onclick = ()=>openGame('nexus-kitchen');
+    document.getElementById('card-word-master').onclick = ()=>openGame('word-master');
+    document.getElementById('card-tap').onclick = ()=>openGame('tap-rush');
+    document.getElementById('card-memory').onclick = ()=>openGame('memory-flash');
+    document.getElementById('card-reaction').onclick = ()=>openGame('reaction-timer');
+    document.getElementById('card-hol').onclick = ()=>openGame('higher-lower');
+    document.getElementById('card-2048').onclick = ()=>openGame('2048');
+    document.getElementById('card-mines').onclick = ()=>openGame('minesweeper');
+    document.getElementById('card-emoji').onclick = ()=>openGame('emoji-guess');
+    document.getElementById('card-colorsort').onclick = ()=>openGame('color-sort');
+    document.getElementById('card-flappy').onclick = ()=>openGame('flappy');
+    document.getElementById('card-aim').onclick = ()=>openGame('aim-trainer');
+    document.getElementById('card-brick').onclick = ()=>openGame('brick-breaker');
+    document.getElementById('card-blackjack').onclick = ()=>openGame('blackjack');
+    document.getElementById('card-redlight').onclick = ()=>openGame('redlight');
 
 // Leaderboard tabs
 let currentTab = 'global';

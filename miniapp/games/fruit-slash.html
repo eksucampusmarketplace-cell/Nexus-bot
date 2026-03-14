@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fruit Slash</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#080c18;--card:#0f1620;--card2:#141d2b;--border:#1a2840;--text:#e8edf7;--muted:#4a6080;--accent:#00d4ff;--gold:#f59e0b;--green:#22c55e;--red:#ef4444;--purple:#7c3aed}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;overflow:hidden;user-select:none}
+#app{display:flex;flex-direction:column;height:100dvh;position:relative}
+canvas{display:block;touch-action:none;position:absolute;top:0;left:0;z-index:1}
+
+/* HUD */
+#hud{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;align-items:center;z-index:10;pointer-events:none}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 12px;text-align:center;min-width:60px}
+.sv{font-size:18px;font-weight:800}.sl{font-size:9px;color:var(--muted);text-transform:uppercase}
+#lives-bar{display:flex;gap:4px;align-items:center}
+.life-dot{width:14px;height:14px;border-radius:50%;background:var(--red);border:2px solid var(--red);transition:.2s}
+.life-dot.lost{background:transparent;border-color:var(--muted)}
+
+/* Combo popup */
+#combo-popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;font-weight:900;color:var(--gold);text-shadow:0 0 20px var(--gold)80;pointer-events:none;opacity:0;transition:opacity .3s;z-index:20}
+
+/* Mode selector */
+#mode-select{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:4px}
+.mode-btn{padding:8px 16px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;background:transparent;color:var(--muted)}
+.mode-btn.active{background:var(--accent);color:#fff}
+.mode-btn:active{transform:scale(.95)}
+
+/* Overlay */
+#overlay{position:fixed;inset:0;background:#000c;display:flex;align-items:center;justify-content:center;z-index:50}
+#ov-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 24px;text-align:center;width:min(320px,88vw)}
+.ov-icon{font-size:56px;margin-bottom:8px}
+.ov-title{font-size:24px;font-weight:800;margin-bottom:6px}
+.ov-sub{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6}
+.ov-score{font-size:44px;font-weight:800;color:var(--gold);margin:8px 0}
+.ov-xp{font-size:14px;font-weight:600;color:var(--purple);margin-bottom:20px}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;cursor:pointer;font-size:15px;font-weight:700;margin-bottom:8px;transition:.15s}
+.btn-p{background:linear-gradient(135deg,#f97316,#ef4444);color:#fff}
+.btn-g{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+.btn:active{transform:scale(.97)}
+
+/* Daily challenge badge */
+#daily-badge{position:absolute;top:8px;right:8px;background:linear-gradient(135deg,var(--purple),var(--accent));border-radius:20px;padding:4px 10px;font-size:10px;font-weight:700;color:#fff;z-index:15}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+  
+  <div id="hud">
+    <div class="stat"><div class="sv" id="u-score">0</div><div class="sl">Score</div></div>
+    <div id="lives-bar"></div>
+    <div class="stat"><div class="sv" id="u-best" style="color:var(--accent)">0</div><div class="sl">Best</div></div>
+  </div>
+  
+  <div id="combo-popup">COMBO x3!</div>
+  
+  <div id="mode-select">
+    <button class="mode-btn active" onclick="setMode('classic')" data-mode="classic">Classic</button>
+    <button class="mode-btn" onclick="setMode('zen')" data-mode="zen">Zen</button>
+    <button class="mode-btn" onclick="setMode('blitz')" data-mode="blitz">Blitz</button>
+  </div>
+  
+  <div id="daily-badge" style="display:none">🎯 Daily: Slice 50 fruits</div>
+</div>
+
+<div id="overlay">
+  <div id="ov-card">
+    <div class="ov-icon">🍉</div>
+    <div class="ov-title">Fruit Slash</div>
+    <div class="ov-sub">Swipe to slice fruit! Avoid bombs!<br>Miss 3 fruits and it's over!</div>
+    <div class="ov-sub" style="font-size:11px;margin-bottom:20px">💡 Tip: Multi-slice for combo bonuses!</div>
+    <button class="btn btn-p" onclick="startGame()">▶ Slash!</button>
+  </div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.expand();tg.ready();}
+const player = tg?.initDataUnsafe?.user || {id:0,first_name:'Ninja'};
+const chatId = new URLSearchParams(location.search).get('chat_id')||'0';
+
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+let W,H;
+function resize(){W=c.width=window.innerWidth;H=c.height=window.innerHeight;}
+resize();window.addEventListener('resize',resize);
+
+// Fruit types with enhanced data
+const FRUITS = [
+  {e:'🍉',n:'Watermelon',pts:3,r:30,col:'#22c55e',juice:'#ef4444',weight:1},
+  {e:'🍊',n:'Orange',pts:1,r:24,col:'#f97316',juice:'#fed7aa',weight:2},
+  {e:'🍋',n:'Lemon',pts:1,r:22,col:'#fef08a',juice:'#fef9c3',weight:2},
+  {e:'🍇',n:'Grapes',pts:2,r:22,col:'#8b5cf6',juice:'#c4b5fd',weight:1.5},
+  {e:'🍓',n:'Strawberry',pts:2,r:20,col:'#ef4444',juice:'#fca5a5',weight:1.5},
+  {e:'🥝',n:'Kiwi',pts:2,r:22,col:'#84cc16',juice:'#d9f99d',weight:1.5},
+  {e:'🍑',n:'Peach',pts:1,r:24,col:'#fb923c',juice:'#fed7aa',weight:2},
+  {e:'🫐',n:'Blueberry',pts:2,r:18,col:'#3b82f6',juice:'#bfdbfe',weight:2.5},
+  {e:'🍍',n:'Pineapple',pts:3,r:28,col:'#eab308',juice:'#fef08a',weight:1},
+  {e:'💣',n:'BOMB',pts:-1,r:26,col:'#1f2937',juice:'#ef4444',weight:0},
+  {e:'⭐',n:'Star Fruit',pts:5,r:20,col:'#f59e0b',juice:'#fef08a',weight:0.1,rare:true},
+  {e:'🍄',n:'Golden Apple',pts:10,r:24,col:'#fbbf24',juice:'#fef08a',weight:0.05,legendary:true},
+];
+
+let fruits=[],slices=[],particles=[],score=0,lives=3,best=0,combo=0,comboTimer=0,frame=0;
+let state='menu',spawnTimer=0,spawnInterval=80,gameMode='classic';
+let achievements = {};
+let dailyProgress = 0;
+const DAILY_TARGET = 50;
+
+best = parseInt(localStorage.getItem('fs_best')||'0');
+achievements = JSON.parse(localStorage.getItem('fs_achievements')||'{}');
+
+// Blade trail
+let blade=[],bladeActive=false;
+
+function spawnFruit(){
+  const spawnPool = FRUITS.filter(f => {
+    if(gameMode === 'blitz') return f.pts > 0;
+    return true;
+  });
+  
+  const totalWeight = spawnPool.reduce((sum, f) => sum + f.weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  let type;
+  for(const f of spawnPool){
+    random -= f.weight;
+    if(random <= 0){type = f; break;}
+  }
+  if(!type) type = spawnPool[0];
+  
+  const x = type.r*2 + Math.random() * (W - type.r*4);
+  const vy = -(H*0.022 + Math.random()*H*0.01);
+  const vx = (Math.random() - 0.5) * 4;
+  const rot = Math.random() * Math.PI * 2;
+  const rspd = (Math.random() - 0.5) * 0.08;
+  
+  fruits.push({
+    ...type,
+    x, y: H + type.r,
+    vx, vy, rot, rspd,
+    sliced: false,
+    id: Date.now() + Math.random(),
+    spawnFrame: frame
+  });
+}
+
+function updateLivesBar(){
+  const bar = document.getElementById('lives-bar');
+  bar.innerHTML = '';
+  for(let i = 0; i < 3; i++){
+    const dot = document.createElement('div');
+    dot.className = 'life-dot' + (i >= lives ? ' lost' : '');
+    bar.appendChild(dot);
+  }
+}
+
+function update(){
+  frame++;
+  if(state !== 'playing') return;
+
+  // Adjust spawn rate based on mode
+  let adjustedInterval = spawnInterval;
+  if(gameMode === 'blitz') adjustedInterval = Math.max(25, 50 - score * 0.2);
+  if(gameMode === 'zen') adjustedInterval = Math.max(60, 100 - dailyProgress * 0.5);
+  
+  spawnTimer++;
+  if(spawnTimer >= adjustedInterval){
+    spawnTimer = 0;
+    spawnFruit();
+    if(Math.random() < 0.3 && gameMode !== 'zen') setTimeout(spawnFruit, 200);
+  }
+
+  const G = 0.28;
+  fruits.forEach(f => {
+    f.vy += G;
+    f.x += f.vx;
+    f.y += f.vy;
+    f.rot += f.rspd;
+  });
+
+  // Miss check
+  fruits.filter(f => !f.sliced && f.y > H + 60 && f.pts > 0).forEach(f => {
+    lives--;
+    updateLivesBar();
+    tg?.HapticFeedback?.notificationOccurred('warning');
+    spawnFloater(f.x, H-60, 'Miss!', '#ef4444');
+    combo = 0;
+    if(lives <= 0) endGame();
+  });
+  fruits = fruits.filter(f => f.y < H + 100 && !f._remove);
+
+  // Slice detection
+  if(blade.length >= 2){
+    const tip = blade[blade.length-1];
+    const prev = blade[blade.length-2];
+    fruits.filter(f => !f.sliced).forEach(f => {
+      if(lineCircle(prev.x, prev.y, tip.x, tip.y, f.x, f.y, f.r + 4)){
+        sliceFruit(f, tip.x - prev.x, tip.y - prev.y);
+      }
+    });
+  }
+
+  blade = blade.filter((_, i) => i > blade.length - 18);
+
+  // Animate slices
+  slices.forEach(s => {
+    s.x += s.vx;
+    s.y += s.vy;
+    s.vy += G * 0.6;
+    s.rot += s.rspd;
+    s.alpha -= 0.025;
+  });
+  slices = slices.filter(s => s.alpha > 0);
+
+  // Particles
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.08;
+    p.life -= 0.035;
+  });
+  particles = particles.filter(p => p.life > 0);
+
+  // Combo timer
+  if(comboTimer > 0){
+    comboTimer--;
+    if(comboTimer === 0){
+      combo = 0;
+      document.getElementById('combo-popup').style.opacity = '0';
+    }
+  }
+
+  // Daily progress
+  if(gameMode === 'zen'){
+    const dailyKey = 'fs_daily_' + new Date().toDateString();
+    dailyProgress = parseInt(localStorage.getItem(dailyKey)||'0');
+    document.getElementById('daily-badge').style.display = 'block';
+  }
+}
+
+function lineCircle(x1,y1,x2,y2,cx,cy,r){
+  const dx = x2 - x1, dy = y2 - y1;
+  const fx = x1 - cx, fy = y1 - cy;
+  const a = dx*dx + dy*dy;
+  const b = 2 * (fx*dx + fy*dy);
+  const cc = fx*fx + fy*fy - r*r;
+  let disc = b*b - 4*a*cc;
+  if(disc < 0) return false;
+  disc = Math.sqrt(disc);
+  const t1 = (-b - disc)/(2*a), t2 = (-b + disc)/(2*a);
+  return (t1 >= 0 && t1 <= 1) || (t2 >= 0 && t2 <= 1);
+}
+
+function sliceFruit(f, dx, dy){
+  f.sliced = true;
+  f._remove = true;
+  
+  if(f.pts < 0){
+    // Bomb hit!
+    lives = 0;
+    updateLivesBar();
+    for(let i = 0; i < 20; i++){
+      const a = Math.random() * Math.PI * 2;
+      const v = 3 + Math.random() * 6;
+      particles.push({x:f.x, y:f.y, vx:Math.cos(a)*v, vy:Math.sin(a)*v, life:1, r:4, color:'#f97316'});
+    }
+    tg?.HapticFeedback?.notificationOccurred('error');
+    spawnFloater(f.x, f.y, 'BOOM! 💥', '#ef4444');
+    endGame();
+    return;
+  }
+
+  combo++;
+  comboTimer = 90;
+  
+  // Calculate score with multipliers
+  let basePts = f.pts;
+  let comboMult = 1 + Math.min(combo - 1, 10) * 0.1;
+  if(f.rare) comboMult *= 2;
+  if(f.legendary) comboMult *= 5;
+  
+  const pts = Math.floor(basePts * comboMult);
+  score += pts;
+  
+  if(score > best){
+    best = score;
+    localStorage.setItem('fs_best', best);
+  }
+  
+  document.getElementById('u-score').textContent = score;
+  document.getElementById('u-best').textContent = best;
+  tg?.HapticFeedback?.impactOccurred('medium');
+
+  if(combo >= 2){
+    const cd = document.getElementById('combo-popup');
+    cd.textContent = `COMBO x${combo}! +${pts}`;
+    cd.style.opacity = '1';
+    setTimeout(() => cd.style.opacity = '0', 800);
+  }
+  
+  spawnFloater(f.x, f.y - 20, `+${pts}`, '#f59e0b');
+
+  // Track achievements
+  if(combo >= 5) unlockAchievement('combo5', 'Combo Master! (5x)');
+  if(combo >= 10) unlockAchievement('combo10', 'Combo Legend! (10x)');
+  if(f.rare) unlockAchievement('rare', 'Rare Fruit Hunter!');
+  if(f.legendary) unlockAchievement('legendary', 'Legendary Discovery!');
+
+  // Juice particles
+  for(let i = 0; i < 12; i++){
+    const a = Math.random() * Math.PI * 2;
+    const v = 2 + Math.random() * 5;
+    particles.push({x:f.x, y:f.y, vx:Math.cos(a)*v, vy:Math.sin(a)*v, life:1, r:3+Math.random()*3, color:f.juice});
+  }
+
+  // Slice halves
+  const ang = Math.atan2(dy, dx);
+  for(let h = 0; h < 2; h++){
+    const side = h === 0 ? 1 : -1;
+    slices.push({
+      e: f.e,
+      x: f.x, y: f.y,
+      r: f.r * 0.8,
+      vx: Math.cos(ang + side * Math.PI/2) * 3 + (Math.random() - 0.5) * 2,
+      vy: -3 + Math.random() * -2,
+      rot: f.rot + h * Math.PI/2,
+      rspd: (Math.random() - 0.5) * 0.12,
+      alpha: 0.9,
+      half: h,
+      juice: f.juice
+    });
+  }
+
+  // Update daily progress
+  if(gameMode === 'zen'){
+    const dailyKey = 'fs_daily_' + new Date().toDateString();
+    dailyProgress++;
+    localStorage.setItem(dailyKey, dailyProgress);
+    
+    const badge = document.getElementById('daily-badge');
+    badge.textContent = `🎯 Daily: ${dailyProgress}/${DAILY_TARGET}`;
+    
+    if(dailyProgress >= DAILY_TARGET && !achievements['daily50']){
+      unlockAchievement('daily50', 'Daily Champion!');
+      badge.textContent = '🎉 Daily Complete!';
+    }
+  }
+}
+
+// Floaters
+let floaters = [];
+function spawnFloater(x, y, txt, col){
+  floaters.push({x, y, txt, col, life: 1});
+}
+
+function draw(){
+  ctx.fillStyle = '#060a14';
+  ctx.fillRect(0, 0, W, H);
+  
+  // Background gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#080c18');
+  grad.addColorStop(1, '#0d1a2e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+  
+  // Background glow spots
+  [[W*0.2, H*0.3, '#7c3aed20'], [W*0.8, H*0.5, '#00d4ff15'], [W*0.5, H*0.7, '#ef444410']].forEach(([x, y, col]) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, W*0.4);
+    g.addColorStop(0, col);
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  });
+
+  // Draw slice halves
+  slices.forEach(s => {
+    ctx.save();
+    ctx.globalAlpha = s.alpha;
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot);
+    ctx.save();
+    ctx.beginPath();
+    if(s.half === 0) ctx.rect(-s.r, -s.r, s.r*2, s.r);
+    else ctx.rect(-s.r, 0, s.r*2, s.r);
+    ctx.clip();
+    ctx.font = `${s.r*2}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(s.e, 0, 0);
+    ctx.restore();
+    ctx.fillStyle = s.juice + '80';
+    if(s.half === 0) ctx.fillRect(-s.r, 0, s.r*2, 2);
+    else ctx.fillRect(-s.r, 0, s.r*2, 2);
+    ctx.restore();
+  });
+
+  // Draw fruits
+  fruits.filter(f => !f.sliced).forEach(f => {
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.rot);
+    
+    // Rare/legendary glow
+    if(f.rare || f.legendary){
+      ctx.shadowColor = f.rare ? '#f59e0b' : '#fbbf24';
+      ctx.shadowBlur = 20 + Math.sin(frame * 0.1) * 5;
+    }
+    
+    // Shadow
+    ctx.fillStyle = '#00000030';
+    ctx.beginPath();
+    ctx.ellipse(2, f.r - 2, f.r*0.8, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+    
+    ctx.font = `${f.r*2}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(f.e, 0, 0);
+    
+    // Bomb fuse spark
+    if(f.pts < 0){
+      ctx.fillStyle = '#f59e0b';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(f.r*0.3, -f.r*0.8 + Math.sin(frame*0.2)*3, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+    
+    ctx.restore();
+  });
+
+  // Draw particles
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // Draw blade trail
+  if(blade.length > 2){
+    ctx.beginPath();
+    ctx.moveTo(blade[0].x, blade[0].y);
+    blade.forEach((pt, i) => {
+      if(i === 0) return;
+      ctx.lineTo(pt.x, pt.y);
+    });
+    const grad = ctx.createLinearGradient(blade[0].x, blade[0].y, blade[blade.length-1].x, blade[blade.length-1].y);
+    grad.addColorStop(0, 'transparent');
+    grad.addColorStop(0.5, '#ffffff60');
+    grad.addColorStop(1, '#ffffff');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    // Glow
+    ctx.strokeStyle = '#00d4ff40';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+
+  // Draw floaters
+  floaters.forEach(f => {
+    ctx.save();
+    ctx.globalAlpha = f.life;
+    ctx.fillStyle = f.col;
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(f.txt, f.x, f.y);
+    ctx.restore();
+  });
+  floaters.forEach(f => {
+    f.y -= 1.5;
+    f.life -= 0.025;
+  });
+  floaters = floaters.filter(f => f.life > 0);
+}
+
+function setMode(mode){
+  gameMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+}
+
+function startGame(){
+  state = 'playing';
+  score = 0;
+  lives = 3;
+  combo = 0;
+  comboTimer = 0;
+  frame = 0;
+  fruits = [];
+  slices = [];
+  particles = [];
+  blade = [];
+  floaters = [];
+  spawnTimer = 0;
+  spawnInterval = 80;
+  
+  document.getElementById('u-score').textContent = '0';
+  document.getElementById('u-best').textContent = best;
+  updateLivesBar();
+  document.getElementById('overlay').style.display = 'none';
+  
+  if(gameMode === 'zen'){
+    const dailyKey = 'fs_daily_' + new Date().toDateString();
+    dailyProgress = parseInt(localStorage.getItem(dailyKey)||'0');
+    document.getElementById('daily-badge').textContent = `🎯 Daily: ${dailyProgress}/${DAILY_TARGET}`;
+    document.getElementById('daily-badge').style.display = 'block';
+  } else {
+    document.getElementById('daily-badge').style.display = 'none';
+  }
+}
+
+function endGame(){
+  state = 'dead';
+  const xp = Math.floor(score * 5);
+  tg?.HapticFeedback?.notificationOccurred(score > 500 ? 'success' : 'error');
+  
+  const ov = document.getElementById('ov-card');
+  ov.innerHTML = `
+    <div class="ov-icon">${score > 500 ? '🏆' : score > 200 ? '🥷' : '💥'}</div>
+    <div class="ov-title">${score > 500 ? 'Ninja Master!' : score > 200 ? 'Nice Slicing!' : 'Game Over!'}</div>
+    <div class="ov-score">${score}</div>
+    <div class="ov-sub">Best: ${best} ${gameMode === 'classic' ? '· Classic Mode' : gameMode === 'zen' ? '· Zen Mode' : '· Blitz Mode'}</div>
+    <div class="ov-xp">+${xp} XP Earned</div>
+    <button class="btn btn-p" onclick="startGame()">▶ Slash Again</button>
+    <button class="btn btn-g" onclick="showMenu()">Menu</button>
+  `;
+  document.getElementById('overlay').style.display = 'flex';
+  submitScore(xp);
+}
+
+function showMenu(){
+  document.getElementById('ov-card').innerHTML = `
+    <div class="ov-icon">🍉</div>
+    <div class="ov-title">Fruit Slash</div>
+    <div class="ov-sub">Swipe to slice fruit! Avoid bombs!<br>Miss 3 fruits and it's over!</div>
+    <div class="ov-sub" style="font-size:11px;margin-bottom:20px">💡 Tip: Multi-slice for combo bonuses!</div>
+    <div class="ov-sub" style="font-size:11px;color:var(--gold)">🏆 Achievements Unlocked: ${Object.keys(achievements).length}</div>
+    <button class="btn btn-p" onclick="startGame()">▶ Slash!</button>
+  `;
+}
+
+function unlockAchievement(id, name){
+  if(achievements[id]) return;
+  achievements[id] = {name, unlockedAt: Date.now()};
+  localStorage.setItem('fs_achievements', JSON.stringify(achievements));
+  showToast(`🏆 Achievement: ${name}`, 'success');
+  tg?.HapticFeedback?.notificationOccurred('success');
+}
+
+function showToast(msg, type = 'info'){
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:${type === 'success' ? '#22c55e' : type === 'error' ? '#ef4444' : '#3b82f6'};
+    color:#fff;padding:12px 24px;border-radius:12px;font-size:14px;font-weight:600;
+    z-index:9999;animation:fadeIn .3s ease;
+  `;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// Touch/mouse blade
+function addBladePoint(x, y){
+  if(state === 'playing') blade.push({x, y});
+}
+
+c.addEventListener('touchstart', e => {
+  e.preventDefault();
+  bladeActive = true;
+  addBladePoint(e.touches[0].clientX, e.touches[0].clientY);
+}, {passive: false});
+
+c.addEventListener('touchmove', e => {
+  e.preventDefault();
+  addBladePoint(e.touches[0].clientX, e.touches[0].clientY);
+}, {passive: false});
+
+c.addEventListener('touchend', () => bladeActive = false);
+
+c.addEventListener('mousedown', e => {
+  bladeActive = true;
+  addBladePoint(e.clientX, e.clientY);
+});
+
+c.addEventListener('mousemove', e => {
+  if(bladeActive) addBladePoint(e.clientX, e.clientY);
+});
+
+c.addEventListener('mouseup', () => bladeActive = false);
+
+(function loop(){
+  requestAnimationFrame(loop);
+  update();
+  draw();
+})();
+
+updateLivesBar();
+
+async function submitScore(xp){
+  if(!chatId || chatId === '0' || !player.id) return;
+  try{
+    await fetch(`/api/groups/${chatId}/xp`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Authorization':`tma ${tg?.initData||''}`},
+      body:JSON.stringify({user_id:player.id, xp})
+    });
+  }catch(e){}
+}
+</script>
+</body>
+</html>

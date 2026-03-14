@@ -682,11 +682,20 @@
     async function renderGamificationPage(container) {
       const state = getState();
       const chatId = state.activeChatId;
-      
+
       container.innerHTML = '';
       container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
-      
-      if (!chatId) {
+
+      // If no chatId, try to get first available group
+      if (!chatId && state.groups && state.groups.length > 0) {
+        const firstGroup = state.groups[0];
+        state.setActiveChatId(firstGroup.chat_id);
+      }
+
+      // Check again after auto-selecting
+      const finalChatId = getState().activeChatId;
+
+      if (!finalChatId) {
         container.appendChild(EmptyState({ icon: '🏆', title: 'Select a group', description: 'Choose a group to view the leaderboard.' }));
         return;
       }
@@ -702,10 +711,10 @@
       try {
         // Try multiple API endpoints for leaderboard data
         let leaderboardData = [];
-        
+
         // First try the dedicated leaderboard endpoint
         try {
-          const data = await apiFetch(`/api/groups/${chatId}/leaderboard?limit=20`);
+          const data = await apiFetch(`/api/groups/${finalChatId}/leaderboard?limit=20`);
           if (data && data.leaderboard) {
             leaderboardData = data.leaderboard;
           }
@@ -716,7 +725,7 @@
         // Fallback to member-stats endpoint
         if (leaderboardData.length === 0) {
           try {
-            const memberStats = await apiFetch(`/api/groups/${chatId}/member-stats?limit=20`);
+            const memberStats = await apiFetch(`/api/groups/${finalChatId}/member-stats?limit=20`);
             if (memberStats && memberStats.top_members) {
               leaderboardData = memberStats.top_members.map(m => ({
                 user_id: m.user_id,
@@ -757,10 +766,10 @@
         list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
         
         leaderboardData.forEach((user, i) => {
-          const badges = user.badges || [];
+          const badges = Array.isArray(user.badges) ? user.badges : [];
           const badgesHtml = badges.map(b => {
             const badgeMap = {
-              'first_100': '💯', 'first_1000': '🏆', 'streak_7': '🔥', 
+              'first_100': '💯', 'first_1000': '🏆', 'streak_7': '🔥',
               'streak_30': '⚡', 'level_5': '📈', 'level_10': '👑', 'level_25': '🔱'
             };
             return `<span style="margin-left:2px;">${badgeMap[b] || '🏅'}</span>`;
@@ -793,11 +802,20 @@
     async function renderRolesPage(container) {
       const state = getState();
       const chatId = state.activeChatId;
-      
+
       container.innerHTML = '';
       container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
-      
-      if (!chatId) {
+
+      // If no chatId, try to get first available group
+      if (!chatId && state.groups && state.groups.length > 0) {
+        const firstGroup = state.groups[0];
+        state.setActiveChatId(firstGroup.chat_id);
+      }
+
+      // Check again after auto-selecting
+      const finalChatId = getState().activeChatId;
+
+      if (!finalChatId) {
         container.appendChild(EmptyState({ icon: '👑', title: 'Select a group', description: 'Choose a group to manage roles.' }));
         return;
       }
@@ -811,7 +829,7 @@
       `;
       
       try {
-        const data = await apiFetch(`/api/groups/${chatId}/roles`);
+        const data = await apiFetch(`/api/groups/${finalChatId}/roles`);
         
         // Clear loading state
         container.innerHTML = '';

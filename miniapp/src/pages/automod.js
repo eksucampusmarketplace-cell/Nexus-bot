@@ -168,13 +168,23 @@ const AUTOMOD_SECTIONS = [
  * @param {HTMLElement} container - Container element to render into
  */
 export async function renderAutomodPage(container) {
-  const chatId = store.getState().activeChatId;
+  const state = store.getState();
+  const chatId = state.activeChatId;
 
   // Always clear and reset container
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
-  if (!chatId) {
+  // If no chatId, try to get first available group
+  if (!chatId && state.groups && state.groups.length > 0) {
+    const firstGroup = state.groups[0];
+    state.setActiveChatId(firstGroup.chat_id);
+  }
+
+  // Check again after auto-selecting
+  const finalChatId = store.getState().activeChatId;
+
+  if (!finalChatId) {
     container.appendChild(EmptyState({
       icon: '👆',
       title: 'Select a group',
@@ -196,7 +206,7 @@ export async function renderAutomodPage(container) {
   let settings = store.getState().settings || {};
 
   try {
-    const group = await apiFetch(`/api/groups/${chatId}`);
+    const group = await apiFetch(`/api/groups/${finalChatId}`);
     settings = group.settings || {};
     store.getState().setSettings(settings);
   } catch (error) {
@@ -316,7 +326,8 @@ function _renderTemplatesSection() {
  * Render a single automod section
  */
 function _renderSection(section, settings) {
-  const chatId = store.getState().activeChatId;
+  const state = store.getState();
+  const chatId = state.activeChatId || state.groups?.[0]?.chat_id;
 
   const container = document.createElement('div');
   container.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';

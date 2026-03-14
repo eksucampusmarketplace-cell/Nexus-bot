@@ -14,7 +14,7 @@ Key behaviors:
 
 import logging
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CommandHandler
+from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
 
 from config import settings
@@ -177,6 +177,39 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ── Callback handlers for /start buttons ─────────────────────────────────
+async def handle_start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle callback queries from /start buttons.
+    - start_clone: Start the clone conversation flow
+    - help_main: Show help message
+    """
+    query = update.callback_query
+    await query.answer()
+    
+    bot_username = (await context.bot.get_me()).username
+    is_primary = context.bot_data.get("is_primary", False)
+    
+    if query.data == "start_clone":
+        # Only allow clone creation on primary bot
+        if not is_primary:
+            await query.edit_message_text(
+                "⛔ Clone creation is only available on the main Nexus bot.\n\n"
+                f"Please use the main bot to create your own instance.",
+                parse_mode=ParseMode.HTML
+            )
+            return
+        
+        # Import and trigger clone flow
+        from bot.handlers.clone import clone_command_handler
+        await clone_command_handler(update, context)
+        
+    elif query.data == "help_main":
+        # Show help message
+        await handle_help(update, context)
+
+
 # ── Handler objects to register in factory.py ────────────────────────────
 start_handler = CommandHandler("start", handle_start)
 help_handler  = CommandHandler("help",  handle_help)
+start_callback_handler = CallbackQueryHandler(handle_start_callback, pattern=r"^start_clone$|^help_main$")

@@ -38,10 +38,11 @@ class Settings(BaseSettings):
     # Clone bots always use exactly 1 (their own account)
 
     MUSIC_MAX_QUEUE: int = 50
-    MUSIC_MAX_DURATION: int = 3600  # seconds — reject tracks over 1hr
+    MUSIC_MAX_DURATION: int = 1800  # seconds — reject tracks over 30min (bandwidth optimization)
     MUSIC_IDLE_TIMEOUT: int = 180  # seconds — leave VC after idle
     MUSIC_DEFAULT_VOLUME: int = 100  # 0–200
     MUSIC_DOWNLOAD_DIR: str = "/tmp/nexus_music"
+    MUSIC_DOWNLOADS_PER_HOUR: int = 15  # Max downloads per group per hour (bandwidth limit)
     # Temp dir for downloaded audio before streaming
     # Files deleted immediately after streaming begins
 

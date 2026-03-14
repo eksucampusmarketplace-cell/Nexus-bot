@@ -8,6 +8,7 @@ import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from telegram import Update
@@ -211,6 +212,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add GZip compression middleware to reduce outbound bandwidth
+# Compresses responses over 1000 bytes
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Root redirect
 @app.get("/")

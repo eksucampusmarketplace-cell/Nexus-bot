@@ -419,3 +419,129 @@ async def update_bot_access(bot_id: int, request: Request, user: dict = Depends(
     )
     
     return {"status": "updated", "bot_id": bot_id}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Music Userbot Management Routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/{bot_id}/music/userbots")
+async def list_userbots(bot_id: int, user: dict = Depends(get_current_user)):
+    """List all userbot accounts for a bot."""
+    from db.client import db
+    import db.ops.music_new as db_music
+    
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    # Verify ownership
+    bot = await get_bot_by_id(db.pool, bot_id)
+    if not bot or bot["owner_user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    userbots = await db_music.get_music_userbots(db.pool, bot_id)
+    
+    # Decrypt session strings for display (but mask them)
+    for ub in userbots:
+        if ub.get("session_string_encrypted"):
+            ub["has_session"] = True
+            ub.pop("session_string_encrypted", None)
+        else:
+            ub["has_session"] = False
+    
+    return {"userbots": userbots}
+
+
+@router.delete("/{bot_id}/music/userbots/{userbot_id}")
+async def delete_userbot(bot_id: int, userbot_id: int, user: dict = Depends(get_current_user)):
+    """Delete a userbot account."""
+    from db.client import db
+    import db.ops.music_new as db_music
+    
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    # Verify ownership
+    bot = await get_bot_by_id(db.pool, bot_id)
+    if not bot or bot["owner_user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    await db_music.delete_music_userbot(db.pool, bot_id, userbot_id)
+    return {"status": "deleted", "userbot_id": userbot_id}
+
+
+@router.put("/{bot_id}/music/userbot/risk-free")
+async def update_risk_free(
+    bot_id: int, 
+    request: Request,
+    user: dict = Depends(get_current_user)
+):
+    """Update risk-free amount for a userbot."""
+    from db.client import db
+    import db.ops.music_new as db_music
+    
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    # Verify ownership
+    bot = await get_bot_by_id(db.pool, bot_id)
+    if not bot or bot["owner_user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    body = await request.json()
+    userbot_id = body.get("userbot_id", 0)
+    risk_free = body.get("risk_free", 0)
+    
+    await db_music.update_userbot_risk_free(db.pool, userbot_id, risk_free)
+    return {"status": "updated", "risk_free": risk_free}
+
+
+@router.post("/{bot_id}/music/userbot/ban")
+async def ban_userbot_endpoint(
+    bot_id: int, 
+    request: Request,
+    user: dict = Depends(get_current_user)
+):
+    """Ban a userbot account."""
+    from db.client import db
+    import db.ops.music_new as db_music
+    
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    # Verify ownership
+    bot = await get_bot_by_id(db.pool, bot_id)
+    if not bot or bot["owner_user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    body = await request.json()
+    userbot_id = body.get("userbot_id", 0)
+    ban_reason = body.get("ban_reason", "Risk free not paid")
+    
+    await db_music.ban_userbot(db.pool, userbot_id, ban_reason)
+    return {"status": "banned", "userbot_id": userbot_id}
+
+
+@router.post("/{bot_id}/music/userbot/unban")
+async def unban_userbot_endpoint(
+    bot_id: int, 
+    request: Request,
+    user: dict = Depends(get_current_user)
+):
+    """Unban a userbot account."""
+    from db.client import db
+    import db.ops.music_new as db_music
+    
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    # Verify ownership
+    bot = await get_bot_by_id(db.pool, bot_id)
+    if not bot or bot["owner_user_id"] != user["id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    body = await request.json()
+    userbot_id = body.get("userbot_id", 0)
+    
+    await db_music.unban_userbot(db.pool, userbot_id)
+    return {"status": "unbanned", "userbot_id": userbot_id}

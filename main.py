@@ -290,6 +290,7 @@ try:
         messages,
         modules,
         music,
+        music_auth,
         reports,
         roles,
         scheduler,
@@ -325,6 +326,7 @@ try:
     # Other routes with internal prefixes
     app.include_router(broadcast.router)  # prefix="/api/broadcast"
     app.include_router(music.router)  # prefix="/api/music"
+    app.include_router(music_auth.router)  # prefix="/api/bots/{bot_id}/music"
     app.include_router(channels.router)  # prefix="/api/channels"
     app.include_router(member_stats.router)  # prefix="/api/me"
 except ImportError as e:

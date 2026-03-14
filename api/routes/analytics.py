@@ -7,19 +7,16 @@ router = APIRouter(prefix="/api/groups")
 
 
 @router.get("/{chat_id}/analytics")
-async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
+async def group_analytics(chat_id: int, days: int = Query(default=30, ge=7, le=90), user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:
-        # Get current member count from groups table
         group_row = await conn.fetchrow(
             "SELECT member_count FROM groups WHERE chat_id = $1", chat_id
         )
         current_members = group_row["member_count"] if group_row else 0
 
-        # Get date range (last 30 days)
         now = datetime.now()
-        start_date = now - timedelta(days=29)
+        start_date = now - timedelta(days=days - 1)
 
-        # Activity: Aggregate message_count by join date from users table
         activity_rows = await conn.fetch(
             """
             SELECT DATE(join_date) as date, SUM(message_count) as messages
@@ -32,13 +29,11 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
             start_date,
         )
 
-        # Create activity map for quick lookup
         activity_map = {str(row["date"]): row["messages"] or 0 for row in activity_rows}
 
-        # Build activity array for last 30 days
         activity = []
-        for i in range(30):
-            date = (now - timedelta(days=29 - i)).strftime("%Y-%m-%d")
+        for i in range(days):
+            date = (now - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
             messages = activity_map.get(date, 0)
             activity.append({"date": date, "messages": messages})
 
@@ -66,14 +61,11 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
             elif row["event_type"] in ("leave", "kick", "ban"):
                 events_map[date_str]["leaves"] += row["count"]
 
-        # Build growth array (backwards to calculate running total)
         growth = []
         running_total = current_members
-        for i in range(29, -1, -1):
+        for i in range(days - 1, -1, -1):
             date = (now - timedelta(days=i)).strftime("%Y-%m-%d")
             day_events = events_map.get(date, {"joins": 0, "leaves": 0})
-            # For historical data, we work backwards from current count
-            # This is an approximation - in a perfect world we'd track daily snapshots
             joins = day_events["joins"]
             leaves = day_events["leaves"]
             growth.append(
@@ -81,7 +73,6 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
             )
             running_total -= joins - leaves
 
-        # Reverse to get chronological order
         growth.reverse()
 
         # Module Activity: Get action counts from actions_log table
@@ -123,17 +114,16 @@ async def group_analytics(chat_id: int, user: dict = Depends(get_current_user)):
         if not modules:
             modules = [{"name": "no_activity", "actions": 0}]
 
-        # Peak hours analysis (for heatmap)
         hour_rows = await conn.fetch(
             """
             SELECT EXTRACT(hour FROM created_at) as hour,
                    COUNT(*) as count
             FROM member_events
-            WHERE chat_id = $1
-              AND created_at >= NOW() - INTERVAL '30 days'
+            WHERE chat_id = $1 AND created_at >= $2
             GROUP BY EXTRACT(hour FROM created_at)
         """,
             chat_id,
+            start_date,
         )
 
         peak_hours = [0] * 24

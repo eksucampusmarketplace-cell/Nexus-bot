@@ -6,13 +6,13 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>Nexus Bot Panel v1.2</title>
+  <title>Nexus Bot Panel v1.3</title>
   <base href="/miniapp/">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <!-- Design System -->
-  <link rel="stylesheet" href="styles/tokens.css?v=1.2.0">
-  <link rel="stylesheet" href="styles/layout.css?v=1.2.0">
-  <link rel="stylesheet" href="styles/animations.css?v=1.2.0">
+  <link rel="stylesheet" href="styles/tokens.css?v=1.3.0">
+  <link rel="stylesheet" href="styles/layout.css?v=1.3.0">
+  <link rel="stylesheet" href="styles/animations.css?v=1.3.0">
   <style>
     /* ── Additional component styles ───────────────────────────────────── */
     
@@ -422,20 +422,20 @@
   </div>
 
   <script type="module">
-    import { ThemeEngine } from './lib/theme.js?v=1.2.0';
-    import { GroupSwitcher } from './lib/group_switcher.js?v=1.2.0';
-    import { NotificationCenter } from './lib/notifications.js?v=1.2.0';
-    import { SSEClient } from './lib/sse.js?v=1.2.0';
-    import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow, showToast } from './lib/components.js?v=1.2.0';
-    import { useStore } from './store/index.js?v=1.2.0';
-    import { apiFetch } from './lib/api.js?v=1.2.0';
-    import { renderAutomodPage } from './src/pages/automod.js?v=1.2.0';
-    import { renderCommandsPage } from './src/pages/commands.js?v=1.2.0';
-    import { renderMusicPage } from './src/pages/music.js?v=1.2.0';
-    import { renderBotsPage } from './src/pages/bots.js?v=1.2.0';
-    import { renderAnalyticsPage } from './src/pages/analytics.js?v=1.2.0';
-    import { renderWebhooksPage } from './src/pages/webhooks.js?v=1.2.0';
-    import { renderBroadcastPage } from './src/pages/broadcast.js?v=1.2.0';
+    import { ThemeEngine } from './lib/theme.js?v=1.3.0';
+    import { GroupSwitcher } from './lib/group_switcher.js?v=1.3.0';
+    import { NotificationCenter } from './lib/notifications.js?v=1.3.0';
+    import { SSEClient } from './lib/sse.js?v=1.3.0';
+    import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow, showToast } from './lib/components.js?v=1.3.0';
+    import { useStore } from './store/index.js?v=1.3.0';
+    import { apiFetch } from './lib/api.js?v=1.3.0';
+    import { renderAutomodPage } from './src/pages/automod.js?v=1.3.0';
+    import { renderCommandsPage } from './src/pages/commands.js?v=1.3.0';
+    import { renderMusicPage } from './src/pages/music.js?v=1.3.0';
+    import { renderBotsPage } from './src/pages/bots.js?v=1.3.0';
+    import { renderAnalyticsPage } from './src/pages/analytics.js?v=1.3.0';
+    import { renderWebhooksPage } from './src/pages/webhooks.js?v=1.3.0';
+    import { renderBroadcastPage } from './src/pages/broadcast.js?v=1.3.0';
 
     // Initialize theme
     ThemeEngine.init();
@@ -691,8 +691,50 @@
         return;
       }
       
+      // Show loading state
+      container.innerHTML = `
+        <div style="text-align: center; padding: var(--sp-8);">
+          <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
+          <div style="color: var(--text-muted);">Loading leaderboard...</div>
+        </div>
+      `;
+      
       try {
-        const data = await apiFetch(`/api/groups/${chatId}/leaderboard?limit=20`);
+        // Try multiple API endpoints for leaderboard data
+        let leaderboardData = [];
+        
+        // First try the dedicated leaderboard endpoint
+        try {
+          const data = await apiFetch(`/api/groups/${chatId}/leaderboard?limit=20`);
+          if (data && data.leaderboard) {
+            leaderboardData = data.leaderboard;
+          }
+        } catch (e) {
+          console.log('Leaderboard endpoint failed, trying member-stats...');
+        }
+        
+        // Fallback to member-stats endpoint
+        if (leaderboardData.length === 0) {
+          try {
+            const memberStats = await apiFetch(`/api/groups/${chatId}/member-stats?limit=20`);
+            if (memberStats && memberStats.top_members) {
+              leaderboardData = memberStats.top_members.map(m => ({
+                user_id: m.user_id,
+                first_name: m.first_name || m.username || `User ${m.user_id}`,
+                username: m.username,
+                xp: (m.message_count || 0) * 10, // Convert messages to XP approximation
+                level: Math.floor(Math.sqrt((m.message_count || 0) * 10 / 100)) + 1,
+                badges: []
+              }));
+            }
+          } catch (e) {
+            console.log('Member-stats endpoint also failed');
+          }
+        }
+        
+        // Clear loading state
+        container.innerHTML = '';
+        container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
         
         const header = document.createElement('div');
         header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
@@ -705,7 +747,7 @@
         `;
         container.appendChild(header);
         
-        if (!data.leaderboard || data.leaderboard.length === 0) {
+        if (!leaderboardData || leaderboardData.length === 0) {
           container.appendChild(EmptyState({ icon: '🎮', title: 'No XP yet', description: 'Play games to earn XP and climb the leaderboard!' }));
           return;
         }
@@ -714,7 +756,7 @@
         const list = document.createElement('div');
         list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
         
-        data.leaderboard.forEach((user, i) => {
+        leaderboardData.forEach((user, i) => {
           const badges = user.badges || [];
           const badgesHtml = badges.map(b => {
             const badgeMap = {
@@ -743,6 +785,7 @@
         
         container.appendChild(list);
       } catch (err) {
+        container.innerHTML = '';
         container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: err.message }));
       }
     }
@@ -759,8 +802,20 @@
         return;
       }
       
+      // Show loading state
+      container.innerHTML = `
+        <div style="text-align: center; padding: var(--sp-8);">
+          <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
+          <div style="color: var(--text-muted);">Loading roles...</div>
+        </div>
+      `;
+      
       try {
         const data = await apiFetch(`/api/groups/${chatId}/roles`);
+        
+        // Clear loading state
+        container.innerHTML = '';
+        container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
         
         const header = document.createElement('div');
         header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
@@ -772,15 +827,22 @@
         `;
         container.appendChild(header);
         
-        if (!data.roles || data.roles.length === 0) {
-          container.appendChild(EmptyState({ icon: '👑', title: 'No roles yet', description: 'Create custom roles to grant specific permissions to members.' }));
+        // Handle both {roles: [...]} and direct array responses
+        const roles = data.roles || data || [];
+        
+        if (!roles || roles.length === 0) {
+          container.appendChild(EmptyState({ 
+            icon: '👑', 
+            title: 'No roles yet', 
+            description: 'Custom roles allow you to grant specific permissions to members. Use bot commands to create roles.' 
+          }));
           return;
         }
         
         const list = document.createElement('div');
         list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
         
-        data.roles.forEach(role => {
+        roles.forEach(role => {
           const perms = Object.entries(role.permissions || {}).filter(([k,v]) => v).map(([k]) => k).slice(0, 3);
           const row = document.createElement('div');
           row.style.cssText = `
@@ -791,7 +853,7 @@
           row.innerHTML = `
             <div style="width:12px;height:12px;border-radius:50%;background:${role.color || '#64748b'};"></div>
             <div style="flex:1;min-width:0;">
-              <div style="font-weight:600;font-size:14px;">${role.name}</div>
+              <div style="font-weight:600;font-size:14px;">${role.name || 'Unnamed Role'}</div>
               <div style="font-size:12px;color:var(--text-muted);">${perms.length > 0 ? perms.join(', ') : 'No permissions'}</div>
             </div>
           `;
@@ -800,7 +862,9 @@
         
         container.appendChild(list);
       } catch (err) {
-        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: err.message }));
+        container.innerHTML = '';
+        container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load roles', description: err.message || 'The roles feature may not be fully configured yet.' }));
       }
     }
 
@@ -884,6 +948,10 @@
 
       const quickActions = document.createElement('div');
       quickActions.style.cssText = 'margin-bottom: var(--sp-6);';
+      
+      // Build games URL with chat_id if available
+      const gamesUrl = chatId ? `games.html?chat_id=${chatId}` : 'games.html';
+      
       quickActions.innerHTML = `
         <div style="
           background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.1), rgba(var(--accent-rgb), 0.05));
@@ -907,6 +975,9 @@
             <button onclick="document.querySelector('[data-page=\\'analytics\\']').click()" class="btn btn-secondary">
               📊 Analytics
             </button>
+            <a href="${gamesUrl}" class="btn btn-secondary" style="text-decoration:none;display:inline-flex;">
+              🎮 Play Games
+            </a>
           </div>
         </div>
       `;

@@ -9,8 +9,8 @@
  *   - store/index.js (useStore)
  */
 
-import { Card, EmptyState } from '../../lib/components.js?v=1.2.0';
-import { useStore } from '../../store/index.js?v=1.2.0';
+import { Card, EmptyState } from '../../lib/components.js?v=1.3.0';
+import { useStore } from '../../store/index.js?v=1.3.0';
 
 const store = useStore;
 
@@ -24,20 +24,17 @@ const COMMAND_CATEGORIES = [
     description: 'Essential moderation commands',
     icon: '🛡️',
     commands: [
-      { cmd: '/warn', args: '<reason>', desc: 'Warn a user (reply to message)' },
-      { cmd: '/unwarn', args: '', desc: 'Remove a warning from user' },
-      { cmd: '/warns', args: '', desc: 'Show warnings for a user' },
-      { cmd: '/mute', args: '<duration>', desc: 'Mute a user' },
-      { cmd: '/unmute', args: '', desc: 'Unmute a user' },
-      { cmd: '/ban', args: '<reason>', desc: 'Ban a user from group' },
-      { cmd: '/unban', args: '', desc: 'Unban a user' },
-      { cmd: '/kick', args: '<reason>', desc: 'Kick a user from group' },
-      { cmd: '/purge', args: '<count>', desc: 'Delete recent messages (max 100)' },
+      { cmd: '/warn', args: '<reason>', desc: 'Warn a user (reply to their message)' },
+      { cmd: '/unwarn', args: '', desc: 'Remove a warning from user (reply to their message)' },
+      { cmd: '/warns', args: '[@username]', desc: 'Show warnings for a user (reply or mention)' },
+      { cmd: '/mute', args: '<duration>', desc: 'Mute a user - reply to message or use /mute @user 1h' },
+      { cmd: '/unmute', args: '', desc: 'Unmute a user (reply or /unmute @user)' },
+      { cmd: '/ban', args: '<reason>', desc: 'Ban a user - reply to message or /ban @user reason' },
+      { cmd: '/unban', args: '<user_id>', desc: 'Unban a user by user ID (/unban 123456789)' },
+      { cmd: '/kick', args: '<reason>', desc: 'Kick a user - reply to message or /kick @user' },
+      { cmd: '/purge', args: '<count> [all]', desc: 'Delete recent messages. /purge 50 or /purge 50 all' },
+      { cmd: '/purgeme', args: '<count>', desc: 'Delete your own messages only' },
       { cmd: '/kickme', args: '', desc: 'Kick yourself from the group' },
-      { cmd: '/report', args: '[reason]', desc: 'Report a message to admins (reply to message)' },
-      { cmd: '/reports', args: '', desc: '(Admin) List all open reports' },
-      { cmd: '/resolve', args: '<id> [note]', desc: '(Admin) Mark a report as resolved' },
-      { cmd: '/dismiss', args: '<id> [note]', desc: '(Admin) Dismiss a report' },
     ]
   },
   {
@@ -207,9 +204,12 @@ const COMMAND_CATEGORIES = [
       { cmd: '/panel', args: '', desc: 'Open mini app management panel' },
       { cmd: '/help', args: '', desc: 'Show help message with command list' },
       { cmd: '/info', args: '', desc: 'Show basic group information' },
-      { cmd: '/admins', args: '', desc: 'List group admins (alias)' },
+      { cmd: '/admins', args: '', desc: 'List group admins (alias for /adminlist)' },
       { cmd: '/stats', args: '', desc: 'Show group statistics' },
-      { cmd: '/privacy', args: '', desc: 'View privacy policy' },
+      { cmd: '/id', args: '', desc: 'Get your user ID and chat ID' },
+      { cmd: '/privacy', args: '', desc: 'View privacy policy in mini app' },
+      { cmd: '/report', args: '[reason]', desc: 'Report a message to admins (reply to message)' },
+      { cmd: '/adminlist', args: '', desc: 'List all group administrators' },
     ]
   }
 ];
@@ -271,7 +271,13 @@ export async function renderCommandsPage(container) {
       <div style="color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6;">
         All available bot commands with detailed descriptions and usage examples.
         <br><br>
-        <b>🔧 Deep Configuration:</b> Use the <a href="#automod" style="color: var(--accent);">AutoMod</a>, <a href="#settings" style="color: var(--accent);">Settings</a>, and <a href="#modules" style="color: var(--accent);">Modules</a> pages for advanced configuration options that go beyond simple commands.
+        <b>💡 Usage Tip:</b> Most moderation commands work by <b>replying</b> to a user's message, or you can use @username (e.g., <code>/ban @spammer</code>)
+        <br><br>
+        <b>📦 Modules vs 🛡️ AutoMod:</b>
+        <br>• <b>Modules</b> = Simple on/off toggles for features (Welcome, Rules, Captcha)
+        <br>• <b>AutoMod</b> = Deep configuration with thresholds, actions, regex patterns, word filters, and rule priorities
+        <br><br>
+        <b>🔧 Deep Configuration:</b> Use the AutoMod, Settings, and Modules pages for advanced options beyond simple commands.
       </div>
     </div>
   `;

@@ -70,6 +70,8 @@ WEBHOOK_RETRY_DELAY = 5
 
 async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    chat = update.effective_chat
+    
     logger.info(f"[CLONE] /clone initiated | user_id={user.id} username=@{user.username}")
 
     # Access control
@@ -77,16 +79,30 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         logger.warning(f"[CLONE] Access denied | user_id={user.id} | reason=not_owner")
         await update.message.reply_text("⛔ Cloning is restricted to the bot owner.")
         return ConversationHandler.END
+    
+    # Force redirect to PM for clone creation
+    if chat.type != "private":
+        bot_username = (await context.bot.get_me()).username
+        await update.message.reply_text(
+            "🤖 *Create Your Own Bot*\n\n"
+            "To create your own Nexus bot clone, please continue in a private message with me\.",
+            parse_mode=ParseMode.MARKDOWN_V2,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🚀 Continue in PM", url=f"https://t.me/{bot_username}?start=clone")
+            ]])
+        )
+        return ConversationHandler.END
 
     await update.message.reply_text(
-        "🔁 *Clone Nexus Bot*\n\n"
-        "To create a clone:\n\n"
-        "1\. Open @BotFather\n"
-        "2\. Send `/newbot` and finish setup\n"
-        "3\. Copy the token BotFather gives you\n"
-        "4\. Paste it here\n\n"
-        "_Your new bot keeps its own name, username and photo\._\n\n"
-        "⚠️ Only paste tokens for bots *you own*\.",
+        "🔁 *Create Your Own Bot*\n\n"
+        "Follow these steps to create your branded Nexus bot:\n\n"
+        "*Step 1:* Open @BotFather\n"
+        "*Step 2:* Send /newbot and follow the instructions\n"
+        "*Step 3:* Choose a name and username for your bot\n"
+        "*Step 4:* Copy the token BotFather gives you\n"
+        "*Step 5:* Paste the token here\n\n"
+        "_Your bot will keep its own name, username, and photo_\.\n\n"
+        "⚠️ Only paste tokens for bots *you own*\!",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")

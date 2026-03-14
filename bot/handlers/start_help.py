@@ -13,7 +13,7 @@ Key behaviors:
 """
 
 import logging
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CommandHandler
 from telegram.constants import ParseMode
 
@@ -30,8 +30,8 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     /start handler. Works in both private and group chats.
 
     Private chat:
-      - Show welcome message
-      - Buttons: Main bot | Support group | Mini App (if bot has webapp)
+      - Show welcome message with inline clone option
+      - Buttons: Open Panel | Create Your Own Bot | Help
 
     Group chat:
       - Do NOT reply publicly (avoid spam in group)
@@ -44,11 +44,26 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     db_pool = context.bot_data["db_pool"]
     bot_username = (await context.bot.get_me()).username
+    is_primary = context.bot_data.get("is_primary", False)
 
     log.info(f"[START] user={user.id} chat={chat.id} type={chat.type}")
 
     if chat.type == "private":
         # ── PRIVATE CHAT ──────────────────────────────────────────────
+        # Check for start parameter
+        start_param = context.args[0] if context.args else None
+        
+        if start_param == "clone":
+            # Redirect to clone flow
+            from bot.handlers.clone import clone_conversation
+            await update.message.reply_text(
+                "🤖 <b>Create Your Own Bot</b>\n\n"
+                "Let's create your own branded Nexus bot! Follow the steps below:",
+                parse_mode=ParseMode.HTML
+            )
+            # Let the clone handler take over
+            return
+        
         msg = await get_message(
             key="start_private",
             group_id=None,
@@ -61,16 +76,24 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Get miniapp URL for this bot if configured
-        miniapp_url = settings.mini_app_url  # auto-constructed from RENDER_EXTERNAL_URL or MINI_APP_URL
+        miniapp_url = settings.mini_app_url
+
+        # Build keyboard with clone option
+        keyboard = [[InlineKeyboardButton("📱 Open Panel", web_app={"url": miniapp_url})]]
+        
+        # Add "Create Your Own Bot" button for primary bot
+        if is_primary:
+            keyboard.append([InlineKeyboardButton("🤖 Create Your Own Bot", callback_data="start_clone")])
+        
+        keyboard.append([
+            InlineKeyboardButton("❓ Help", callback_data="help_main"),
+            InlineKeyboardButton("💬 Support", url=f"https://t.me/{settings.MAIN_BOT_USERNAME}")
+        ])
 
         await update.message.reply_text(
             text=msg,
             parse_mode=ParseMode.HTML,
-            reply_markup=support_keyboard(
-                include_miniapp=bool(miniapp_url),
-                miniapp_url=miniapp_url,
-                include_docs=bool(settings.DOCS_URL)
-            )
+            reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
     else:

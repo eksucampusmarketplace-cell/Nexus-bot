@@ -522,12 +522,24 @@
 
       // Navigation setup
       setupNavigation();
-      
-      // Render initial page with small delay to ensure all init is complete
+
+      // Render initial page AFTER group switcher has loaded
+      // Wait for group switcher to finish by checking if groups are loaded
+      const waitForGroups = setInterval(() => {
+        const groups = getState().groups || [];
+        if (groups.length > 0) {
+          clearInterval(waitForGroups);
+          const activePage = getState().activePage || 'dashboard';
+          navigateToPage(activePage);
+        }
+      }, 100);
+
+      // Timeout after 5 seconds if no groups found
       setTimeout(() => {
+        clearInterval(waitForGroups);
         const activePage = getState().activePage || 'dashboard';
         navigateToPage(activePage);
-      }, 100);
+      }, 5000);
     });
 
     function setupNavigation() {
@@ -757,10 +769,10 @@
         list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
         
         leaderboardData.forEach((user, i) => {
-          const badges = user.badges || [];
+          const badges = Array.isArray(user.badges) ? user.badges : [];
           const badgesHtml = badges.map(b => {
             const badgeMap = {
-              'first_100': '💯', 'first_1000': '🏆', 'streak_7': '🔥', 
+              'first_100': '💯', 'first_1000': '🏆', 'streak_7': '🔥',
               'streak_30': '⚡', 'level_5': '📈', 'level_10': '👑', 'level_25': '🔱'
             };
             return `<span style="margin-left:2px;">${badgeMap[b] || '🏅'}</span>`;
@@ -829,19 +841,19 @@
         
         // Handle both {roles: [...]} and direct array responses
         const roles = data.roles || data || [];
-        
+
         if (!roles || roles.length === 0) {
-          container.appendChild(EmptyState({ 
-            icon: '👑', 
-            title: 'No roles yet', 
-            description: 'Custom roles allow you to grant specific permissions to members. Use bot commands to create roles.' 
+          container.appendChild(EmptyState({
+            icon: '👑',
+            title: 'No roles yet',
+            description: 'Custom roles allow you to grant specific permissions to members. Use bot commands to create roles.'
           }));
           return;
         }
-        
+
         const list = document.createElement('div');
         list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
-        
+
         roles.forEach(role => {
           const perms = Object.entries(role.permissions || {}).filter(([k,v]) => v).map(([k]) => k).slice(0, 3);
           const row = document.createElement('div');
@@ -859,7 +871,7 @@
           `;
           list.appendChild(row);
         });
-        
+
         container.appendChild(list);
       } catch (err) {
         container.innerHTML = '';

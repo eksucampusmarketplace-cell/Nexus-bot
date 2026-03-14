@@ -235,15 +235,17 @@ async def telegram_webhook(bot_token: str, request: Request):
     return Response(status_code=200)
 
 # Serve Mini App static files
-if os.path.exists("/home/engine/project/miniapp"):
-    app.mount("/miniapp", StaticFiles(directory="/home/engine/project/miniapp"), name="miniapp")
+miniapp_path = os.path.join(os.path.dirname(__file__), "miniapp")
+if os.path.exists(miniapp_path):
+    app.mount("/miniapp", StaticFiles(directory=miniapp_path, html=True), name="miniapp")
 
 # Import and include API routers
 try:
-    from api.routes import auth, groups, bots, automod
+    from api.routes import auth, groups, bots, automod, events
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
     app.include_router(bots.router, prefix="/api/bots", tags=["bots"])
     app.include_router(automod.router, prefix="/api/automod", tags=["automod"])
+    app.include_router(events.router, tags=["events"])
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

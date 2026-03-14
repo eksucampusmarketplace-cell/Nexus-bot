@@ -40,12 +40,21 @@ from telegram.ext import (
 from telegram.constants import ParseMode
 
 from bot.engagement.xp import XPEngine, calculate_level, xp_for_level, xp_to_next_level
-from bot.engagement.reputation import give_rep, get_reputation, get_rep_leaderboard, get_daily_remaining
+from bot.engagement.reputation import (
+    give_rep,
+    get_reputation,
+    get_rep_leaderboard,
+    get_daily_remaining,
+)
 from bot.engagement.badges import get_member_badges, get_all_badges
 from bot.engagement.network import (
-    create_network, join_network, leave_network,
-    get_member_networks, get_network_leaderboard, is_network_owner,
-    broadcast_to_network
+    create_network,
+    join_network,
+    leave_network,
+    get_member_networks,
+    get_network_leaderboard,
+    is_network_owner,
+    broadcast_to_network,
 )
 
 log = logging.getLogger("engage")
@@ -102,7 +111,9 @@ async def cmd_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    progress_bar = "█" * (rank_info["progress_pct"] // 10) + "░" * (10 - rank_info["progress_pct"] // 10)
+    progress_bar = "█" * (rank_info["progress_pct"] // 10) + "░" * (
+        10 - rank_info["progress_pct"] // 10
+    )
 
     text = (
         f"⭐ <b>{target_name}</b> — Level {rank_info['level']}\n\n"
@@ -127,7 +138,7 @@ async def cmd_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not leaderboard:
         await update.message.reply_text(
             "🏆 <b>Leaderboard</b>\n\nNo XP earned yet!\nBe the first to start chatting.",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -135,10 +146,8 @@ async def cmd_top(update: Update, context: ContextTypes.DEFAULT_TYPE):
     medals = ["👑", "⭐", "🌟"]
 
     for i, entry in enumerate(leaderboard, 1):
-        medal = medals[i-1] if i <= 3 else f"{i}."
-        lines.append(
-            f"{medal} User {entry['user_id']} — Lv.{entry['level']} {entry['xp']:,} XP"
-        )
+        medal = medals[i - 1] if i <= 3 else f"{i}."
+        lines.append(f"{medal} User {entry['user_id']} — Lv.{entry['level']} {entry['xp']:,} XP")
 
     lines.append("")
     lines.append("⚡ Powered by Nexus Bot")
@@ -162,7 +171,7 @@ async def cmd_levels(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Lv.50 → 60,000 XP — 👑 Elite",
         "",
         "Earn XP by sending messages, playing games, and daily check-ins!",
-        "⚡ Powered by Nexus Bot"
+        "⚡ Powered by Nexus Bot",
     ]
 
     await update.message.reply_text("\n".join(lines), parse_mode=ParseMode.HTML)
@@ -181,7 +190,7 @@ async def cmd_rep(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "👍 <b>Give Reputation</b>\n\n"
             "Usage: /rep @username [reason]\n"
             "Or reply to a message with /rep [reason]",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -189,8 +198,7 @@ async def cmd_rep(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reason = " ".join(context.args[1:]) if len(context.args) > 1 else None
 
     success, message = await give_rep(
-        pool, chat_id, from_user.id, target_id, bot_id,
-        amount=1, reason=reason, is_admin=False
+        pool, chat_id, from_user.id, target_id, bot_id, amount=1, reason=reason, is_admin=False
     )
 
     if success:
@@ -256,7 +264,9 @@ async def cmd_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             SELECT last_daily_checkin, streak_days FROM member_xp
             WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
             """,
-            chat_id, user_id, bot_id
+            chat_id,
+            user_id,
+            bot_id,
         )
 
         if row and row["last_daily_checkin"] == today:
@@ -283,8 +293,7 @@ async def cmd_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         total_xp = base_xp + streak_bonus
 
         result = await xp_engine.award_xp(
-            pool, redis, context.bot, chat_id, user_id, bot_id,
-            total_xp, "daily"
+            pool, redis, context.bot, chat_id, user_id, bot_id, total_xp, "daily"
         )
 
         # Update checkin
@@ -294,7 +303,11 @@ async def cmd_checkin(update: Update, context: ContextTypes.DEFAULT_TYPE):
             SET last_daily_checkin=$1, streak_days=$2
             WHERE chat_id=$3 AND user_id=$4 AND bot_id=$5
             """,
-            today, streak, chat_id, user_id, bot_id
+            today,
+            streak,
+            chat_id,
+            user_id,
+            bot_id,
         )
 
     streak_emoji = "🔥" if streak >= 7 else "✨"
@@ -330,7 +343,7 @@ async def cmd_badges(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🏅 <b>{target_name}'s Badges</b>\n\n"
             "No badges earned yet!\n"
             "Keep chatting and participating to earn badges.",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -364,7 +377,7 @@ async def cmd_repboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "👍 <b>Reputation Board</b>\n\nNo reputation given yet!\n"
             "Use /rep @username to give rep to helpful members.",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -372,9 +385,7 @@ async def cmd_repboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for i, entry in enumerate(leaderboard, 1):
         medal = "🏆" if i == 1 else f"{i}."
-        lines.append(
-            f"{medal} User {entry['user_id']} — {entry['rep_score']} rep"
-        )
+        lines.append(f"{medal} User {entry['user_id']} — {entry['rep_score']} rep")
 
     lines.append("\n⚡ Powered by Nexus Bot")
 
@@ -382,6 +393,7 @@ async def cmd_repboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ── Admin Commands ────────────────────────────────────────────────────────────
+
 
 async def cmd_givexp(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Admin gives XP to a member."""
@@ -398,9 +410,7 @@ async def cmd_givexp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if len(context.args) < 2:
-        await update.message.reply_text(
-            "Usage: /givexp @username <amount> [reason]"
-        )
+        await update.message.reply_text("Usage: /givexp @username <amount> [reason]")
         return
 
     target_id, _ = _get_target_user(update, context)
@@ -418,8 +428,7 @@ async def cmd_givexp(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     xp_engine = await get_xp_engine(context)
     result = await xp_engine.award_xp(
-        pool, redis, context.bot, chat_id, target_id, bot_id,
-        amount, reason, given_by=admin_id
+        pool, redis, context.bot, chat_id, target_id, bot_id, amount, reason, given_by=admin_id
     )
 
     if result["ok"]:
@@ -463,8 +472,7 @@ async def cmd_removexp(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     xp_engine = await get_xp_engine(context)
     result = await xp_engine.deduct_xp(
-        pool, redis, chat_id, target_id, bot_id,
-        amount, reason, admin_id
+        pool, redis, chat_id, target_id, bot_id, amount, reason, admin_id
     )
 
     if result["ok"]:
@@ -501,13 +509,14 @@ async def cmd_doublexp(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"⚡ <b>Double XP Event Started!</b>\n\n"
             f"All XP earnings are now doubled for {hours} hours!\n"
             f"Chat and earn XP faster! 🚀",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
     else:
         await update.message.reply_text("❌ Failed to start double XP event.")
 
 
 # ── Network Commands ──────────────────────────────────────────────────────────
+
 
 async def cmd_network(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show network status for the group."""
@@ -523,7 +532,7 @@ async def cmd_network(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "This group is not in any networks.\n\n"
             "Join a network with /joinnetwork <code>\n"
             "Create a network with /createnetwork <name>",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
         return
 
@@ -582,7 +591,7 @@ async def cmd_createnetwork(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Name: {name}\n"
             f"Invite code: <code>{result['invite_code']}</code>\n\n"
             f"Share this code with other groups to join your network!",
-            parse_mode=ParseMode.HTML
+            parse_mode=ParseMode.HTML,
         )
     else:
         await update.message.reply_text(f"❌ {result.get('error', 'Failed to create network')}")

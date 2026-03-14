@@ -18,6 +18,7 @@ log = logging.getLogger(__name__)
 
 # ── XP Operations ────────────────────────────────────────────────────────────
 
+
 async def get_member_xp(pool, chat_id: int, user_id: int, bot_id: int) -> dict:
     """Get XP data for a member."""
     async with pool.acquire() as conn:
@@ -26,7 +27,9 @@ async def get_member_xp(pool, chat_id: int, user_id: int, bot_id: int) -> dict:
             SELECT * FROM member_xp
             WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
             """,
-            chat_id, user_id, bot_id
+            chat_id,
+            user_id,
+            bot_id,
         )
 
         if row:
@@ -35,14 +38,13 @@ async def get_member_xp(pool, chat_id: int, user_id: int, bot_id: int) -> dict:
                 "level": row["level"],
                 "total_messages": row["total_messages"],
                 "streak_days": row["streak_days"],
-                "last_daily_checkin": row["last_daily_checkin"]
+                "last_daily_checkin": row["last_daily_checkin"],
             }
         return {"xp": 0, "level": 1, "total_messages": 0, "streak_days": 0}
 
 
 async def upsert_member_xp(
-    pool, chat_id: int, user_id: int, bot_id: int,
-    xp_delta: int = 0, level: int = None
+    pool, chat_id: int, user_id: int, bot_id: int, xp_delta: int = 0, level: int = None
 ) -> dict:
     """Update or insert member XP."""
     async with pool.acquire() as conn:
@@ -57,7 +59,11 @@ async def upsert_member_xp(
                 last_xp_at = NOW()
             RETURNING xp, level
             """,
-            chat_id, user_id, bot_id, xp_delta, level
+            chat_id,
+            user_id,
+            bot_id,
+            xp_delta,
+            level,
         )
         return {"xp": row["xp"], "level": row["level"]}
 
@@ -76,7 +82,10 @@ async def get_xp_leaderboard(
             ORDER BY level DESC, xp DESC
             LIMIT $3 OFFSET $4
             """,
-            chat_id, bot_id, limit, offset
+            chat_id,
+            bot_id,
+            limit,
+            offset,
         )
         return [dict(r) for r in rows]
 
@@ -89,7 +98,8 @@ async def get_xp_settings(pool, chat_id: int, bot_id: int) -> dict:
             SELECT * FROM xp_settings
             WHERE chat_id=$1 AND bot_id=$2
             """,
-            chat_id, bot_id
+            chat_id,
+            bot_id,
         )
 
         if row:
@@ -100,7 +110,7 @@ async def get_xp_settings(pool, chat_id: int, bot_id: int) -> dict:
             "xp_per_message": 1,
             "xp_per_daily": 10,
             "message_cooldown_s": 60,
-            "level_up_announce": True
+            "level_up_announce": True,
         }
 
 
@@ -129,8 +139,7 @@ async def upsert_xp_settings(pool, chat_id: int, bot_id: int, **settings) -> dic
 
 
 async def log_xp_transaction(
-    pool, chat_id: int, user_id: int, bot_id: int,
-    amount: int, reason: str, given_by: int = None
+    pool, chat_id: int, user_id: int, bot_id: int, amount: int, reason: str, given_by: int = None
 ):
     """Log an XP transaction."""
     async with pool.acquire() as conn:
@@ -140,13 +149,16 @@ async def log_xp_transaction(
                 (chat_id, user_id, bot_id, amount, reason, given_by)
             VALUES ($1, $2, $3, $4, $5, $6)
             """,
-            chat_id, user_id, bot_id, amount, reason, given_by
+            chat_id,
+            user_id,
+            bot_id,
+            amount,
+            reason,
+            given_by,
         )
 
 
-async def get_xp_history(
-    pool, chat_id: int, user_id: int, bot_id: int, limit: int = 20
-) -> list:
+async def get_xp_history(pool, chat_id: int, user_id: int, bot_id: int, limit: int = 20) -> list:
     """Get XP transaction history for a member."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -156,7 +168,10 @@ async def get_xp_history(
             ORDER BY created_at DESC
             LIMIT $4
             """,
-            chat_id, user_id, bot_id, limit
+            chat_id,
+            user_id,
+            bot_id,
+            limit,
         )
         return [dict(r) for r in rows]
 
@@ -170,14 +185,13 @@ async def get_level_config(pool, chat_id: int, bot_id: int) -> list:
             WHERE chat_id=$1 AND bot_id=$2
             ORDER BY level
             """,
-            chat_id, bot_id
+            chat_id,
+            bot_id,
         )
         return [dict(r) for r in rows]
 
 
-async def upsert_level_config(
-    pool, chat_id: int, bot_id: int, level: int, **config
-) -> dict:
+async def upsert_level_config(pool, chat_id: int, bot_id: int, level: int, **config) -> dict:
     """Update level configuration."""
     async with pool.acquire() as conn:
         await conn.execute(
@@ -191,10 +205,12 @@ async def upsert_level_config(
                 title = COALESCE($5, level_config.title),
                 unlock_description = COALESCE($6, level_config.unlock_description)
             """,
-            chat_id, bot_id, level,
+            chat_id,
+            bot_id,
+            level,
             config.get("xp_required"),
             config.get("title"),
-            config.get("unlock_description")
+            config.get("unlock_description"),
         )
         return await get_level_config(pool, chat_id, bot_id)
 
@@ -207,14 +223,15 @@ async def get_level_rewards(pool, chat_id: int, bot_id: int, level: int) -> list
             SELECT * FROM level_rewards
             WHERE chat_id=$1 AND bot_id=$2 AND level=$3 AND is_active=TRUE
             """,
-            chat_id, bot_id, level
+            chat_id,
+            bot_id,
+            level,
         )
         return [dict(r) for r in rows]
 
 
 async def add_level_reward(
-    pool, chat_id: int, bot_id: int, level: int,
-    reward_type: str, reward_value: str
+    pool, chat_id: int, bot_id: int, level: int, reward_type: str, reward_value: str
 ) -> bool:
     """Add a reward for a level."""
     async with pool.acquire() as conn:
@@ -224,12 +241,17 @@ async def add_level_reward(
                 (chat_id, bot_id, level, reward_type, reward_value)
             VALUES ($1, $2, $3, $4, $5)
             """,
-            chat_id, bot_id, level, reward_type, reward_value
+            chat_id,
+            bot_id,
+            level,
+            reward_type,
+            reward_value,
         )
         return True
 
 
 # ── Reputation Operations ────────────────────────────────────────────────────
+
 
 async def get_member_rep(pool, chat_id: int, user_id: int, bot_id: int) -> dict:
     """Get reputation for a member."""
@@ -239,21 +261,22 @@ async def get_member_rep(pool, chat_id: int, user_id: int, bot_id: int) -> dict:
             SELECT * FROM member_reputation
             WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
             """,
-            chat_id, user_id, bot_id
+            chat_id,
+            user_id,
+            bot_id,
         )
 
         if row:
             return {
                 "rep_score": row["rep_score"],
                 "total_given": row["total_given"],
-                "total_received": row["total_received"]
+                "total_received": row["total_received"],
             }
         return {"rep_score": 0, "total_given": 0, "total_received": 0}
 
 
 async def update_rep(
-    pool, chat_id: int, from_id: int, to_id: int, bot_id: int,
-    amount: int, reason: str = None
+    pool, chat_id: int, from_id: int, to_id: int, bot_id: int, amount: int, reason: str = None
 ) -> dict:
     """Update reputation between users."""
     async with pool.acquire() as conn:
@@ -264,7 +287,12 @@ async def update_rep(
                 (chat_id, from_user_id, to_user_id, bot_id, amount, reason)
             VALUES ($1, $2, $3, $4, $5, $6)
             """,
-            chat_id, from_id, to_id, bot_id, amount, reason
+            chat_id,
+            from_id,
+            to_id,
+            bot_id,
+            amount,
+            reason,
         )
 
         # Update receiver
@@ -279,7 +307,10 @@ async def update_rep(
                 total_received = member_reputation.total_received + $4
             RETURNING rep_score
             """,
-            chat_id, to_id, bot_id, amount
+            chat_id,
+            to_id,
+            bot_id,
+            amount,
         )
 
         # Update giver
@@ -291,15 +322,16 @@ async def update_rep(
             ON CONFLICT (chat_id, user_id, bot_id)
             DO UPDATE SET total_given = member_reputation.total_given + $4
             """,
-            chat_id, from_id, bot_id, abs(amount)
+            chat_id,
+            from_id,
+            bot_id,
+            abs(amount),
         )
 
         return {"rep_score": row["rep_score"]}
 
 
-async def get_rep_leaderboard(
-    pool, chat_id: int, bot_id: int, limit: int = 10
-) -> list:
+async def get_rep_leaderboard(pool, chat_id: int, bot_id: int, limit: int = 10) -> list:
     """Get reputation leaderboard."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -311,14 +343,14 @@ async def get_rep_leaderboard(
             ORDER BY rep_score DESC
             LIMIT $3
             """,
-            chat_id, bot_id, limit
+            chat_id,
+            bot_id,
+            limit,
         )
         return [dict(r) for r in rows]
 
 
-async def get_daily_rep_count(
-    pool, chat_id: int, user_id: int, bot_id: int, date: date
-) -> int:
+async def get_daily_rep_count(pool, chat_id: int, user_id: int, bot_id: int, date: date) -> int:
     """Get count of rep given today by a user."""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -326,14 +358,15 @@ async def get_daily_rep_count(
             SELECT given_count FROM rep_daily_limits
             WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3 AND date=$4
             """,
-            chat_id, user_id, bot_id, date
+            chat_id,
+            user_id,
+            bot_id,
+            date,
         )
         return row["given_count"] if row else 0
 
 
-async def increment_daily_rep(
-    pool, chat_id: int, user_id: int, bot_id: int, date: date
-):
+async def increment_daily_rep(pool, chat_id: int, user_id: int, bot_id: int, date: date):
     """Increment daily rep count for a user."""
     async with pool.acquire() as conn:
         await conn.execute(
@@ -344,11 +377,15 @@ async def increment_daily_rep(
             ON CONFLICT (chat_id, user_id, bot_id, date)
             DO UPDATE SET given_count = rep_daily_limits.given_count + 1
             """,
-            chat_id, user_id, bot_id, date
+            chat_id,
+            user_id,
+            bot_id,
+            date,
         )
 
 
 # ── Badge Operations ─────────────────────────────────────────────────────────
+
 
 async def get_all_badges(pool, bot_id: int, chat_id: int = None) -> list:
     """Get all badges."""
@@ -363,7 +400,8 @@ async def get_all_badges(pool, bot_id: int, chat_id: int = None) -> list:
                 GROUP BY b.id
                 ORDER BY b.condition_value
                 """,
-                bot_id, chat_id
+                bot_id,
+                chat_id,
             )
         else:
             rows = await conn.fetch(
@@ -375,14 +413,12 @@ async def get_all_badges(pool, bot_id: int, chat_id: int = None) -> list:
                 GROUP BY b.id
                 ORDER BY b.condition_value
                 """,
-                bot_id
+                bot_id,
             )
         return [dict(r) for r in rows]
 
 
-async def get_member_badges(
-    pool, chat_id: int, user_id: int, bot_id: int
-) -> list:
+async def get_member_badges(pool, chat_id: int, user_id: int, bot_id: int) -> list:
     """Get badges earned by a member."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -393,14 +429,15 @@ async def get_member_badges(
             WHERE mb.chat_id=$1 AND mb.user_id=$2 AND mb.bot_id=$3
             ORDER BY mb.earned_at DESC
             """,
-            chat_id, user_id, bot_id
+            chat_id,
+            user_id,
+            bot_id,
         )
         return [dict(r) for r in rows]
 
 
 async def award_badge(
-    pool, chat_id: int, user_id: int, bot_id: int,
-    badge_id: int, granted_by: int = None
+    pool, chat_id: int, user_id: int, bot_id: int, badge_id: int, granted_by: int = None
 ):
     """Award a badge to a member."""
     async with pool.acquire() as conn:
@@ -411,13 +448,15 @@ async def award_badge(
             VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT DO NOTHING
             """,
-            chat_id, user_id, bot_id, badge_id, granted_by
+            chat_id,
+            user_id,
+            bot_id,
+            badge_id,
+            granted_by,
         )
 
 
-async def has_badge(
-    pool, chat_id: int, user_id: int, bot_id: int, badge_id: int
-) -> bool:
+async def has_badge(pool, chat_id: int, user_id: int, bot_id: int, badge_id: int) -> bool:
     """Check if a member has a specific badge."""
     async with pool.acquire() as conn:
         row = await conn.fetchval(
@@ -425,14 +464,15 @@ async def has_badge(
             SELECT COUNT(*) FROM member_badges
             WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3 AND badge_id=$4
             """,
-            chat_id, user_id, bot_id, badge_id
+            chat_id,
+            user_id,
+            bot_id,
+            badge_id,
         )
         return row > 0
 
 
-async def create_custom_badge(
-    pool, bot_id: int, chat_id: int, **badge_data
-) -> dict:
+async def create_custom_badge(pool, bot_id: int, chat_id: int, **badge_data) -> dict:
     """Create a custom badge."""
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
@@ -443,13 +483,14 @@ async def create_custom_badge(
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id
             """,
-            bot_id, chat_id,
+            bot_id,
+            chat_id,
             badge_data.get("name"),
             badge_data.get("emoji"),
             badge_data.get("description"),
             badge_data.get("condition_type"),
             badge_data.get("condition_value", 0),
-            badge_data.get("is_rare", False)
+            badge_data.get("is_rare", False),
         )
         return {"id": row["id"]} if row else None
 
@@ -468,13 +509,17 @@ async def seed_default_badges(pool, bot_id: int):
                 VALUES ($1, $2, $3, $4, $5, $6)
                 ON CONFLICT DO NOTHING
                 """,
-                bot_id, badge["name"], badge["emoji"],
-                badge["description"], badge["condition_type"],
-                badge["condition_value"]
+                bot_id,
+                badge["name"],
+                badge["emoji"],
+                badge["description"],
+                badge["condition_type"],
+                badge["condition_value"],
             )
 
 
 # ── Newsletter Operations ────────────────────────────────────────────────────
+
 
 async def get_newsletter_config(pool, chat_id: int, bot_id: int) -> dict:
     """Get newsletter configuration."""
@@ -484,14 +529,13 @@ async def get_newsletter_config(pool, chat_id: int, bot_id: int) -> dict:
             SELECT * FROM newsletter_config
             WHERE chat_id=$1 AND bot_id=$2
             """,
-            chat_id, bot_id
+            chat_id,
+            bot_id,
         )
         return dict(row) if row else None
 
 
-async def upsert_newsletter_config(
-    pool, chat_id: int, bot_id: int, **config
-) -> dict:
+async def upsert_newsletter_config(pool, chat_id: int, bot_id: int, **config) -> dict:
     """Update newsletter configuration."""
     async with pool.acquire() as conn:
         fields = []
@@ -515,9 +559,7 @@ async def upsert_newsletter_config(
         return await get_newsletter_config(pool, chat_id, bot_id)
 
 
-async def save_newsletter_history(
-    pool, chat_id: int, bot_id: int, message_id: int, stats: dict
-):
+async def save_newsletter_history(pool, chat_id: int, bot_id: int, message_id: int, stats: dict):
     """Save newsletter to history."""
     async with pool.acquire() as conn:
         await conn.execute(
@@ -526,13 +568,14 @@ async def save_newsletter_history(
                 (chat_id, bot_id, message_id, stats_snapshot)
             VALUES ($1, $2, $3, $4)
             """,
-            chat_id, bot_id, message_id, stats
+            chat_id,
+            bot_id,
+            message_id,
+            stats,
         )
 
 
-async def get_newsletter_history(
-    pool, chat_id: int, bot_id: int, limit: int = 10
-) -> list:
+async def get_newsletter_history(pool, chat_id: int, bot_id: int, limit: int = 10) -> list:
     """Get newsletter history."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -542,14 +585,14 @@ async def get_newsletter_history(
             ORDER BY sent_at DESC
             LIMIT $3
             """,
-            chat_id, bot_id, limit
+            chat_id,
+            bot_id,
+            limit,
         )
         return [dict(r) for r in rows]
 
 
-async def get_groups_for_newsletter(
-    pool, day_of_week: int, hour_utc: int
-) -> list:
+async def get_groups_for_newsletter(pool, day_of_week: int, hour_utc: int) -> list:
     """Get groups that should receive newsletter now."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -557,16 +600,17 @@ async def get_groups_for_newsletter(
             SELECT chat_id, bot_id FROM newsletter_config
             WHERE enabled=TRUE AND send_day=$1 AND send_hour_utc=$2
             """,
-            day_of_week, hour_utc
+            day_of_week,
+            hour_utc,
         )
         return [dict(r) for r in rows]
 
 
 # ── Network Operations ───────────────────────────────────────────────────────
 
+
 async def create_network(
-    pool, name: str, description: str,
-    owner_user_id: int, owner_bot_id: int, invite_code: str
+    pool, name: str, description: str, owner_user_id: int, owner_bot_id: int, invite_code: str
 ) -> dict:
     """Create a network."""
     async with pool.acquire() as conn:
@@ -577,7 +621,11 @@ async def create_network(
             VALUES ($1, $2, $3, $4, $5)
             RETURNING id, invite_code
             """,
-            name, description, owner_user_id, owner_bot_id, invite_code
+            name,
+            description,
+            owner_user_id,
+            owner_bot_id,
+            invite_code,
         )
         return dict(row) if row else None
 
@@ -590,7 +638,7 @@ async def get_network_by_code(pool, invite_code: str) -> dict:
             SELECT * FROM group_networks
             WHERE invite_code=$1
             """,
-            invite_code.upper()
+            invite_code.upper(),
         )
         return dict(row) if row else None
 
@@ -604,7 +652,9 @@ async def join_network(pool, network_id: int, chat_id: int, bot_id: int) -> bool
             VALUES ($1, $2, $3)
             ON CONFLICT DO NOTHING
             """,
-            network_id, chat_id, bot_id
+            network_id,
+            chat_id,
+            bot_id,
         )
         await conn.execute(
             """
@@ -612,7 +662,7 @@ async def join_network(pool, network_id: int, chat_id: int, bot_id: int) -> bool
             SET member_count = member_count + 1
             WHERE id=$1
             """,
-            network_id
+            network_id,
         )
         return True
 
@@ -625,7 +675,8 @@ async def leave_network(pool, network_id: int, chat_id: int) -> bool:
             DELETE FROM network_members
             WHERE network_id=$1 AND chat_id=$2
             """,
-            network_id, chat_id
+            network_id,
+            chat_id,
         )
         await conn.execute(
             """
@@ -633,7 +684,7 @@ async def leave_network(pool, network_id: int, chat_id: int) -> bool:
             SET member_count = member_count - 1
             WHERE id=$1
             """,
-            network_id
+            network_id,
         )
         return True
 
@@ -648,7 +699,7 @@ async def get_chat_networks(pool, chat_id: int) -> list:
             JOIN group_networks gn ON nm.network_id = gn.id
             WHERE nm.chat_id=$1
             """,
-            chat_id
+            chat_id,
         )
         return [dict(r) for r in rows]
 
@@ -662,14 +713,12 @@ async def get_network_groups(pool, network_id: int) -> list:
             FROM network_members
             WHERE network_id=$1
             """,
-            network_id
+            network_id,
         )
         return [dict(r) for r in rows]
 
 
-async def get_network_leaderboard(
-    pool, network_id: int, limit: int = 20
-) -> list:
+async def get_network_leaderboard(pool, network_id: int, limit: int = 20) -> list:
     """Get network leaderboard."""
     async with pool.acquire() as conn:
         rows = await conn.fetch(
@@ -681,14 +730,13 @@ async def get_network_leaderboard(
             ORDER BY total_xp DESC
             LIMIT $2
             """,
-            network_id, limit
+            network_id,
+            limit,
         )
         return [dict(r) for r in rows]
 
 
-async def sync_network_xp(
-    pool, network_id: int, user_id: int, xp_delta: int
-):
+async def sync_network_xp(pool, network_id: int, user_id: int, xp_delta: int):
     """Sync XP to network leaderboard."""
     async with pool.acquire() as conn:
         await conn.execute(
@@ -701,13 +749,14 @@ async def sync_network_xp(
                 total_xp = network_xp.total_xp + $3,
                 last_updated = NOW()
             """,
-            network_id, user_id, xp_delta
+            network_id,
+            user_id,
+            xp_delta,
         )
 
 
 async def log_network_broadcast(
-    pool, network_id: int, from_chat_id: int,
-    sent_by: int, message: str
+    pool, network_id: int, from_chat_id: int, sent_by: int, message: str
 ) -> int:
     """Log a network broadcast."""
     async with pool.acquire() as conn:
@@ -718,7 +767,10 @@ async def log_network_broadcast(
             VALUES ($1, $2, $3, $4)
             RETURNING id
             """,
-            network_id, from_chat_id, sent_by, message
+            network_id,
+            from_chat_id,
+            sent_by,
+            message,
         )
         return row["id"] if row else None
 
@@ -733,6 +785,6 @@ async def get_last_broadcast_time(pool, network_id: int) -> datetime:
             ORDER BY sent_at DESC
             LIMIT 1
             """,
-            network_id
+            network_id,
         )
         return row["sent_at"] if row else None

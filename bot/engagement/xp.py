@@ -110,7 +110,7 @@ class XPEngine:
         bot_id: int,
         amount: int,
         reason: str,
-        given_by: int = None
+        given_by: int = None,
     ) -> dict:
         """
         Award XP to a member.
@@ -143,7 +143,9 @@ class XPEngine:
                     SELECT xp, level, total_messages FROM member_xp
                     WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
                     """,
-                    chat_id, user_id, bot_id
+                    chat_id,
+                    user_id,
+                    bot_id,
                 )
 
                 if row:
@@ -176,7 +178,12 @@ class XPEngine:
                         last_message_at = NOW(),
                         last_xp_at = NOW()
                     """,
-                    chat_id, user_id, bot_id, new_xp, new_level, total_messages + 1
+                    chat_id,
+                    user_id,
+                    bot_id,
+                    new_xp,
+                    new_level,
+                    total_messages + 1,
                 )
 
                 # Log transaction
@@ -186,7 +193,12 @@ class XPEngine:
                         (chat_id, user_id, bot_id, amount, reason, given_by)
                     VALUES ($1, $2, $3, $4, $5, $6)
                     """,
-                    chat_id, user_id, bot_id, amount, reason, given_by
+                    chat_id,
+                    user_id,
+                    bot_id,
+                    amount,
+                    reason,
+                    given_by,
                 )
 
             # Handle level up
@@ -195,16 +207,14 @@ class XPEngine:
                     pool, redis, bot, chat_id, user_id, bot_id, new_level, current_level
                 )
 
-            self.log.info(
-                f"[XP] Awarded {amount} XP to user {user_id} in chat {chat_id}"
-            )
+            self.log.info(f"[XP] Awarded {amount} XP to user {user_id} in chat {chat_id}")
 
             return {
                 "ok": True,
                 "new_xp": new_xp,
                 "new_level": new_level,
                 "leveled_up": leveled_up,
-                "previous_level": current_level
+                "previous_level": current_level,
             }
 
         except Exception as e:
@@ -212,8 +222,15 @@ class XPEngine:
             return {"ok": False, "error": str(e)}
 
     async def _handle_level_up(
-        self, pool, redis, bot, chat_id: int, user_id: int,
-        bot_id: int, new_level: int, previous_level: int
+        self,
+        pool,
+        redis,
+        bot,
+        chat_id: int,
+        user_id: int,
+        bot_id: int,
+        new_level: int,
+        previous_level: int,
     ):
         """Handle level up event - check rewards, badges, announce."""
         try:
@@ -224,7 +241,9 @@ class XPEngine:
                     SELECT * FROM level_rewards
                     WHERE chat_id=$1 AND bot_id=$2 AND level=$3 AND is_active=TRUE
                     """,
-                    chat_id, bot_id, new_level
+                    chat_id,
+                    bot_id,
+                    new_level,
                 )
 
                 # Get level title from config
@@ -233,7 +252,9 @@ class XPEngine:
                     SELECT title FROM level_config
                     WHERE chat_id=$1 AND bot_id=$2 AND level=$3
                     """,
-                    chat_id, bot_id, new_level
+                    chat_id,
+                    bot_id,
+                    new_level,
                 )
                 title = level_config["title"] if level_config else f"Level {new_level}"
 
@@ -242,12 +263,10 @@ class XPEngine:
                 await redis.publish(
                     f"nexus:events:{chat_id}",
                     f'{{"type":"level_up","user_id":{user_id},'
-                    f'"new_level":{new_level},"previous_level":{previous_level}}}'
+                    f'"new_level":{new_level},"previous_level":{previous_level}}}',
                 )
 
-            self.log.info(
-                f"[XP] User {user_id} leveled up to {new_level} in chat {chat_id}"
-            )
+            self.log.info(f"[XP] User {user_id} leveled up to {new_level} in chat {chat_id}")
 
         except Exception as e:
             self.log.error(f"[XP] Error handling level up: {e}")
@@ -261,7 +280,7 @@ class XPEngine:
         bot_id: int,
         amount: int,
         reason: str,
-        given_by: int
+        given_by: int,
     ) -> dict:
         """
         Remove XP from a member (admin action or penalty).
@@ -277,7 +296,9 @@ class XPEngine:
                     SELECT xp FROM member_xp
                     WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
                     """,
-                    chat_id, user_id, bot_id
+                    chat_id,
+                    user_id,
+                    bot_id,
                 )
 
                 if not row:
@@ -293,7 +314,11 @@ class XPEngine:
                     SET xp=$1, level=$2
                     WHERE chat_id=$3 AND user_id=$4 AND bot_id=$5
                     """,
-                    new_xp, new_level, chat_id, user_id, bot_id
+                    new_xp,
+                    new_level,
+                    chat_id,
+                    user_id,
+                    bot_id,
                 )
 
                 # Log transaction (negative amount)
@@ -303,7 +328,12 @@ class XPEngine:
                         (chat_id, user_id, bot_id, amount, reason, given_by)
                     VALUES ($1, $2, $3, $4, $5, $6)
                     """,
-                    chat_id, user_id, bot_id, -amount, reason, given_by
+                    chat_id,
+                    user_id,
+                    bot_id,
+                    -amount,
+                    reason,
+                    given_by,
                 )
 
             return {"ok": True, "new_xp": new_xp, "new_level": new_level}
@@ -313,12 +343,7 @@ class XPEngine:
             return {"ok": False, "error": str(e)}
 
     async def get_leaderboard(
-        self,
-        pool,
-        chat_id: int,
-        bot_id: int,
-        limit: int = 10,
-        offset: int = 0
+        self, pool, chat_id: int, bot_id: int, limit: int = 10, offset: int = 0
     ) -> list[dict]:
         """
         Get top members by XP for a group.
@@ -335,7 +360,10 @@ class XPEngine:
                     ORDER BY level DESC, xp DESC
                     LIMIT $3 OFFSET $4
                     """,
-                    chat_id, bot_id, limit, offset
+                    chat_id,
+                    bot_id,
+                    limit,
+                    offset,
                 )
 
                 return [
@@ -343,7 +371,7 @@ class XPEngine:
                         "rank": row["rank"],
                         "user_id": row["user_id"],
                         "xp": row["xp"],
-                        "level": row["level"]
+                        "level": row["level"],
                     }
                     for row in rows
                 ]
@@ -352,13 +380,7 @@ class XPEngine:
             self.log.error(f"[XP] Error getting leaderboard: {e}")
             return []
 
-    async def get_member_rank(
-        self,
-        pool,
-        chat_id: int,
-        user_id: int,
-        bot_id: int
-    ) -> dict:
+    async def get_member_rank(self, pool, chat_id: int, user_id: int, bot_id: int) -> dict:
         """
         Get a specific member's rank position.
         Returns {rank, total_members, xp, level, xp_to_next, progress_pct}
@@ -371,7 +393,9 @@ class XPEngine:
                     SELECT xp, level FROM member_xp
                     WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3
                     """,
-                    chat_id, user_id, bot_id
+                    chat_id,
+                    user_id,
+                    bot_id,
                 )
 
                 if not row:
@@ -385,7 +409,10 @@ class XPEngine:
                     WHERE chat_id=$1 AND bot_id=$2
                     AND (level > $3 OR (level = $3 AND xp > $4))
                     """,
-                    chat_id, bot_id, row["level"], row["xp"]
+                    chat_id,
+                    bot_id,
+                    row["level"],
+                    row["xp"],
                 )
 
                 # Get total members
@@ -394,7 +421,8 @@ class XPEngine:
                     SELECT COUNT(*) as total FROM member_xp
                     WHERE chat_id=$1 AND bot_id=$2
                     """,
-                    chat_id, bot_id
+                    chat_id,
+                    bot_id,
                 )
 
                 xp_needed, next_level_xp = xp_to_next_level(row["xp"])
@@ -411,19 +439,14 @@ class XPEngine:
                     "xp": row["xp"],
                     "level": row["level"],
                     "xp_to_next": xp_needed,
-                    "progress_pct": progress_pct
+                    "progress_pct": progress_pct,
                 }
 
         except Exception as e:
             self.log.error(f"[XP] Error getting member rank: {e}")
             return {"rank": None, "total_members": 0}
 
-    async def is_rate_limited(
-        self,
-        redis,
-        chat_id: int,
-        user_id: int
-    ) -> bool:
+    async def is_rate_limited(self, redis, chat_id: int, user_id: int) -> bool:
         """
         Check if user is in cooldown for XP earning from messages.
         Redis key: nexus:xp:cooldown:{chat_id}:{user_id}
@@ -441,12 +464,10 @@ class XPEngine:
         await redis.setex(key, 60, "1")
         return False
 
-    async def start_double_xp(
-        self, pool, chat_id: int, bot_id: int, hours: int
-    ) -> bool:
+    async def start_double_xp(self, pool, chat_id: int, bot_id: int, hours: int) -> bool:
         """Enable double XP event for a group for N hours."""
         try:
-            until = datetime.now(timezone.utc) + __import__('datetime').timedelta(hours=hours)
+            until = datetime.now(timezone.utc) + __import__("datetime").timedelta(hours=hours)
             async with pool.acquire() as conn:
                 await conn.execute(
                     """
@@ -455,7 +476,9 @@ class XPEngine:
                     ON CONFLICT (chat_id, bot_id)
                     DO UPDATE SET double_xp_active=TRUE, double_xp_until=$3
                     """,
-                    chat_id, bot_id, until
+                    chat_id,
+                    bot_id,
+                    until,
                 )
             return True
         except Exception as e:
@@ -471,7 +494,8 @@ class XPEngine:
                     SELECT double_xp_active, double_xp_until FROM xp_settings
                     WHERE chat_id=$1 AND bot_id=$2
                     """,
-                    chat_id, bot_id
+                    chat_id,
+                    bot_id,
                 )
 
                 if not row or not row["double_xp_active"]:
@@ -486,7 +510,8 @@ class XPEngine:
                         SET double_xp_active=FALSE, double_xp_until=NULL
                         WHERE chat_id=$1 AND bot_id=$2
                         """,
-                        chat_id, bot_id
+                        chat_id,
+                        bot_id,
                     )
                     return False
 
@@ -505,7 +530,8 @@ class XPEngine:
                     SELECT * FROM xp_settings
                     WHERE chat_id=$1 AND bot_id=$2
                     """,
-                    chat_id, bot_id
+                    chat_id,
+                    bot_id,
                 )
 
                 if row:
@@ -516,7 +542,7 @@ class XPEngine:
                         "xp_per_game_win": row["xp_per_game_win"],
                         "xp_per_game_play": row["xp_per_game_play"],
                         "message_cooldown_s": row["message_cooldown_s"],
-                        "level_up_announce": row["level_up_announce"]
+                        "level_up_announce": row["level_up_announce"],
                     }
 
                 # Return defaults
@@ -527,7 +553,7 @@ class XPEngine:
                     "xp_per_game_win": 5,
                     "xp_per_game_play": 1,
                     "message_cooldown_s": 60,
-                    "level_up_announce": True
+                    "level_up_announce": True,
                 }
 
         except Exception as e:
@@ -539,5 +565,5 @@ class XPEngine:
                 "xp_per_game_win": 5,
                 "xp_per_game_play": 1,
                 "message_cooldown_s": 60,
-                "level_up_announce": True
+                "level_up_announce": True,
             }

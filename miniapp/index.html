@@ -771,7 +771,7 @@
       }
 
       const actRow = document.createElement('div');
-      actRow.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+      actRow.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-4);';
       [{label:'📋 View All Clones', page:'bots'},{label:'📢 Broadcast to All', page:'broadcast'}]
         .forEach(a => {
           const btn = document.createElement('button');
@@ -781,6 +781,71 @@
           actRow.appendChild(btn);
         });
       container.appendChild(actRow);
+
+      // ── Dead Clones Warning ─────────────────────────────────────────────
+      try {
+        const deadRes = await apiFetch('/api/bots').catch(() => null);
+        const deadBots = (deadRes?.bots || []).filter(b => b.status === 'dead' || b.status === 'error');
+        if (deadBots.length > 0) {
+          const warn = document.createElement('div');
+          warn.style.cssText = 'background:#FEF9E7;border:1px solid #F39C12;border-radius:var(--r-xl);padding:var(--sp-3);margin-bottom:var(--sp-4);';
+          warn.innerHTML = '<div style="font-weight:700;color:#E67E22;">⚠️ ' + deadBots.length + ' Dead Clone(s)</div>' +
+            deadBots.map(b => '<div style="font-size:0.82rem;color:var(--text-muted);">@' + (b.username || b.bot_id) + ' — ' + (b.death_reason || b.error || 'invalid token') + '</div>').join('');
+          container.appendChild(warn);
+        }
+      } catch(e) {}
+
+      // ── Economy Controls ────────────────────────────────────────────────
+      const econCard = document.createElement('div');
+      econCard.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);margin-bottom:var(--sp-4);';
+      econCard.innerHTML = `
+        <div style="font-weight:700;margin-bottom:var(--sp-3);">💰 Economy Controls</div>
+        <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
+          <div>
+            <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Grant Bonus Stars</div>
+            <div style="display:flex;gap:8px;">
+              <input id="grant-uid" placeholder="User ID" type="number" style="flex:1;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
+              <input id="grant-amt" placeholder="Stars" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
+              <button id="grant-btn" style="padding:var(--sp-2) var(--sp-3);background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;">Grant ⭐</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Create Promo Code</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <input id="promo-code" placeholder="Code (e.g. WELCOME50)" style="flex:1;min-width:8rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
+              <input id="promo-amt" placeholder="Stars" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
+              <input id="promo-uses" placeholder="Max uses" type="number" value="10" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
+              <button id="promo-btn" style="padding:var(--sp-2) var(--sp-3);background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;">Create Promo</button>
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(econCard);
+
+      econCard.querySelector('#grant-btn').addEventListener('click', async () => {
+        const uid = parseInt(econCard.querySelector('#grant-uid').value);
+        const amt = parseInt(econCard.querySelector('#grant-amt').value);
+        if (!uid || !amt) { showToast('Enter user ID and amount', 'error'); return; }
+        try {
+          await apiFetch('/api/billing/grant-bonus', { method: 'POST', body: JSON.stringify({ user_id: uid, amount: amt, reason: 'Owner grant via miniapp' }) });
+          showToast('Granted ' + amt + ' Stars to ' + uid, 'success');
+          econCard.querySelector('#grant-uid').value = '';
+          econCard.querySelector('#grant-amt').value = '';
+        } catch(e) { showToast('Failed: ' + e.message, 'error'); }
+      });
+
+      econCard.querySelector('#promo-btn').addEventListener('click', async () => {
+        const code = econCard.querySelector('#promo-code').value.trim().toUpperCase();
+        const amt = parseInt(econCard.querySelector('#promo-amt').value);
+        const uses = parseInt(econCard.querySelector('#promo-uses').value) || 10;
+        if (!code || !amt) { showToast('Enter code and amount', 'error'); return; }
+        try {
+          await apiFetch('/api/billing/create-promo', { method: 'POST', body: JSON.stringify({ code, amount: amt, max_uses: uses }) });
+          showToast('Promo ' + code + ' created (' + amt + ' Stars, ' + uses + ' uses)', 'success');
+          econCard.querySelector('#promo-code').value = '';
+          econCard.querySelector('#promo-amt').value = '';
+        } catch(e) { showToast('Failed: ' + e.message, 'error'); }
+      });
     }
 
     async function renderReportsPage(container) {
@@ -880,9 +945,10 @@
 
         // Fetch leaderboard data
         try {
-          const data = await apiFetch(`/api/groups/${finalChatId}/leaderboard?limit=20`);
-          if (data && data.leaderboard) {
-            leaderboardData = data.leaderboard;
+          const data = await apiFetch(`/api/groups/${finalChatId}/xp/leaderboard?limit=20`);
+          const leaderboardItems = data?.leaderboard || [];
+          if (leaderboardItems.length) {
+            leaderboardData = leaderboardItems;
           }
         } catch (e) {
           console.error('[Leaderboard] Failed to fetch:', e);
@@ -1500,6 +1566,7 @@
           { id: 'reports',   name: '🚨 Reports',            desc: '/report command',              settingKey: 'reports_enabled',   page: 'reports' },
           { id: 'notes',     name: '📝 Notes',              desc: 'Save and retrieve notes',      settingKey: 'notes_enabled',     page: 'greetings' },
           { id: 'broadcast', name: '📡 Broadcast',          desc: 'Mass message system',          settingKey: 'broadcast_enabled', page: 'broadcast' },
+          { id: 'autodelete', name: '🗑️ Auto-Delete',          desc: 'Delete messages after N seconds', settingKey: 'autodelete_enabled', page: 'settings' },
         ];
         
         moduleList.forEach(m => {
@@ -1797,6 +1864,56 @@
         advancedCard.querySelector('#toggle-silent-commands').appendChild(Toggle({ checked: groupSettings.silent_commands || false, onChange: (v) => _updateGroupSetting('silent_commands', v) }));
         advancedCard.querySelector('#toggle-delete-joinleave').appendChild(Toggle({ checked: groupSettings.delete_join_leave || false, onChange: (v) => _updateGroupSetting('delete_join_leave', v) }));
         advancedCard.querySelector('#toggle-inline-mode').appendChild(Toggle({ checked: groupSettings.inline_mode_enabled || false, onChange: (v) => _updateGroupSetting('inline_mode_enabled', v) }));
+
+        // ── Auto-Delete row ────────────────────────────────────────────────
+        const autoDelSep = document.createElement('hr');
+        autoDelSep.style.cssText = 'border:none;border-top:1px solid var(--border);margin:var(--sp-2) 0;';
+        advancedCard.appendChild(autoDelSep);
+        const autoDelRow = document.createElement('div');
+        autoDelRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;gap:var(--sp-3);';
+        autoDelRow.innerHTML = `
+          <div style="flex:1;">
+            <div style="font-size:var(--text-sm);">🗑️ Auto-Delete Messages</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">Auto-delete bot messages after N seconds (0 = off)</div>
+          </div>
+          <input type="number" id="autodelete-seconds" min="0" max="3600"
+            value="${groupSettings.autodelete_seconds || groupSettings.auto_delete_seconds || 0}"
+            style="width:5rem;padding:4px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
+        `;
+        advancedCard.appendChild(autoDelRow);
+        autoDelRow.querySelector('#autodelete-seconds').addEventListener('change', async (e) => {
+          const secs = parseInt(e.target.value) || 0;
+          await _updateGroupSetting('autodelete_seconds', secs);
+          await _updateGroupSetting('autodelete_enabled', secs > 0);
+        });
+
+        // ── Join Password row ──────────────────────────────────────────────
+        const pwSep = document.createElement('hr');
+        pwSep.style.cssText = 'border:none;border-top:1px solid var(--border);margin:var(--sp-2) 0;';
+        advancedCard.appendChild(pwSep);
+        const joinPwRow = document.createElement('div');
+        joinPwRow.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:var(--sp-2) 0;';
+        joinPwRow.innerHTML = `
+          <div style="font-size:var(--text-sm);font-weight:600;">🔑 Join Password</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">
+            New members must DM the bot with this word before they can chat. Leave empty to disable.
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="join-password-input" placeholder="e.g. nexusrules"
+              value="${groupSettings.join_password || ''}"
+              style="flex:1;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
+            <button id="save-join-password-btn" style="padding:var(--sp-2) var(--sp-3);background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;">
+              Save
+            </button>
+          </div>
+        `;
+        advancedCard.appendChild(joinPwRow);
+        joinPwRow.querySelector('#save-join-password-btn').addEventListener('click', async () => {
+          const val = joinPwRow.querySelector('#join-password-input').value.trim();
+          await _updateGroupSetting('join_password', val || null);
+          await _updateGroupSetting('password_enabled', !!val);
+          showToast(val ? 'Password set' : 'Password cleared', 'success');
+        });
 
         // ── 7. CUSTOM MESSAGES ────────────────────────────────────────────
         const groupMsgsCard = Card({ title: '📝 Group Custom Messages', subtitle: 'Customize responses for this group', children: '<div id="group-messages-container"></div>' });

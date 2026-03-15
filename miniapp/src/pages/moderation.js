@@ -710,7 +710,8 @@ function _connectSSE(chatId) {
   const label = document.getElementById('sse-label');
 
   try {
-    _sseSource = new EventSource(`/api/events/${chatId}`);
+    const token = encodeURIComponent(window.Telegram?.WebApp?.initData || '');
+    _sseSource = new EventSource(`/api/events/moderation/${chatId}?token=${token}`);
 
     _sseSource.onopen = () => {
       if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 1.5s infinite'; }
@@ -719,7 +720,8 @@ function _connectSSE(chatId) {
 
     _sseSource.onerror = () => {
       if (dot) { dot.style.background = 'var(--danger)'; dot.style.animation = ''; }
-      if (label) label.textContent = 'Offline';
+      if (label) label.textContent = 'Reconnecting...';
+      setTimeout(() => { if (document.getElementById('sse-dot')) _connectSSE(chatId); }, 5000);
     };
 
     _sseSource.addEventListener('mod_action', (e) => {

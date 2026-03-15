@@ -143,6 +143,23 @@ async def update_group_settings(chat_id: int, settings: dict):
         )
 
 
+async def set_group_setting(pool, chat_id: int, **kwargs):
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
+        settings = row["settings"] if row else {}
+        if isinstance(settings, str):
+            try:
+                settings = json.loads(settings)
+            except Exception:
+                settings = {}
+        settings = settings or {}
+        settings.update(kwargs)
+        await conn.execute(
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id = $2",
+            json.dumps(settings), chat_id,
+        )
+
+
 async def get_user_managed_groups(user_id: int):
     # In a real scenario, we'd check if the user is an admin in these groups.
     # For now, let's return groups where the user is known.

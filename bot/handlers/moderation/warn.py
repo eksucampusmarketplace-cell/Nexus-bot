@@ -163,3 +163,87 @@ async def warns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{i}. Reason: {row['reason']} — {row['issued_at'].strftime('%b %d')}\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def resetwarns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
+
+    if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
+        await update.message.reply_text(ERRORS["no_permission"])
+        return
+
+    target, _ = await resolve_target(update, context)
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    await db.execute(
+        "UPDATE warnings SET is_active = FALSE WHERE chat_id = $1 AND user_id = $2",
+        chat_id,
+        target.id,
+    )
+    await update.message.reply_text(
+        f"✅ All warnings reset for {await mention_user(target)}", parse_mode="Markdown"
+    )
+    await log_action(
+        chat_id, "resetwarns", target.id, target.full_name, invoker.id, invoker.full_name, "All warns reset"
+    )
+    await publish_event(
+        chat_id,
+        "mod_action",
+        {"action": "resetwarns", "target_id": target.id, "target_name": target.full_name, "admin_id": invoker.id},
+    )
+
+
+async def warnmode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
+
+    if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
+        await update.message.reply_text(ERRORS["no_permission"])
+        return
+
+    valid_modes = ["mute", "kick", "ban"]
+    if not context.args or context.args[0].lower() not in valid_modes:
+        await update.message.reply_text(
+            f"❓ Usage: /warnmode <mode>\nModes: {', '.join(valid_modes)}"
+        )
+        return
+
+    mode = context.args[0].lower()
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO warn_settings (chat_id, warn_action) VALUES ($1, $2) "
+            "ON CONFLICT (chat_id) DO UPDATE SET warn_action = EXCLUDED.warn_action",
+            chat_id, mode,
+        )
+    await update.message.reply_text(f"✅ Warn mode set to: *{mode}*", parse_mode="Markdown")
+
+
+async def warnlimit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
+
+    if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
+        await update.message.reply_text(ERRORS["no_permission"])
+        return
+
+    if not context.args or not context.args[0].isdigit():
+        await update.message.reply_text("❓ Usage: /warnlimit <number> (1-10)")
+        return
+
+    limit = max(1, min(10, int(context.args[0])))
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO warn_settings (chat_id, max_warns) VALUES ($1, $2) "
+            "ON CONFLICT (chat_id) DO UPDATE SET max_warns = EXCLUDED.max_warns",
+            chat_id, limit,
+        )
+    await update.message.reply_text(f"✅ Warn limit set to: *{limit}*", parse_mode="Markdown")

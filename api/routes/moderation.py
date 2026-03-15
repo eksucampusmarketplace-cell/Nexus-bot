@@ -14,7 +14,21 @@ logger = logging.getLogger(__name__)
 
 
 async def verify_admin(chat_id: int, user: dict):
-    pass
+    user_id = user.get("id")
+    if not user_id:
+        raise HTTPException(403, "Not authenticated")
+    from bot.registry import get_all
+    bots = get_all()
+    if not bots:
+        raise HTTPException(503, "Bot unavailable")
+    for bot_id, app in bots.items():
+        try:
+            member = await app.bot.get_chat_member(chat_id, user_id)
+            if member.status in ("administrator", "creator"):
+                return
+        except Exception:
+            continue
+    raise HTTPException(403, "You are not an admin of this group")
 
 
 class BanRequest(BaseModel):
@@ -49,6 +63,14 @@ class BulkActionRequest(BaseModel):
 @router.post("/bans")
 async def ban_user(chat_id: int, req: BanRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
+    from bot.registry import get_all
+    bots = get_all()
+    for bid, app in bots.items():
+        try:
+            await app.bot.ban_chat_member(chat_id, req.user_id)
+            break
+        except Exception:
+            continue
     await mod_db.ban_user(chat_id, req.user_id, user.get("id", 0), req.reason)
     await publish_event(
         chat_id,
@@ -274,6 +296,33 @@ async def get_mutes(chat_id: int, user: dict = Depends(get_current_user)):
 @router.post("/mutes")
 async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
+    from bot.registry import get_all
+    from telegram import ChatPermissions
+    import re
+    from datetime import datetime, timedelta, timezone
+
+    unmute_dt = None
+    if req.duration:
+        match = re.match(r"^(\d+)([smhd])$", req.duration)
+        if match:
+            val, unit = int(match.group(1)), match.group(2)
+            delta = {"s": timedelta(seconds=val), "m": timedelta(minutes=val), "h": timedelta(hours=val), "d": timedelta(days=val)}.get(unit)
+            if delta:
+                unmute_dt = datetime.now(tz=timezone.utc) + delta
+
+    bots = get_all()
+    for bid, app in bots.items():
+        try:
+            await app.bot.restrict_chat_member(
+                chat_id=chat_id,
+                user_id=req.user_id,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=unmute_dt,
+            )
+            break
+        except Exception:
+            continue
+
     async with db.pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO moderation_log (chat_id, user_id, action, reason, by_user_id) VALUES ($1,$2,'mute',$3,$4)",
@@ -286,6 +335,28 @@ async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_cur
 @router.delete("/mutes/{target_user_id}")
 async def unmute_user(chat_id: int, target_user_id: int, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
+    from bot.registry import get_all
+    from telegram import ChatPermissions
+
+    bots = get_all()
+    for bid, app in bots.items():
+        try:
+            await app.bot.restrict_chat_member(
+                chat_id=chat_id,
+                user_id=target_user_id,
+                permissions=ChatPermissions(
+                    can_send_messages=True,
+                    can_send_media_messages=True,
+                    can_send_polls=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True,
+                    can_invite_users=True,
+                ),
+            )
+            break
+        except Exception:
+            continue
+
     async with db.pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO moderation_log (chat_id, user_id, action, reason, by_user_id) VALUES ($1,$2,'unmute','Manual unmute via API',$3)",
@@ -298,6 +369,15 @@ async def unmute_user(chat_id: int, target_user_id: int, user: dict = Depends(ge
 @router.post("/actions/kick")
 async def kick_user(chat_id: int, req: KickRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
+    from bot.registry import get_all
+    bots = get_all()
+    for bid, app in bots.items():
+        try:
+            await app.bot.ban_chat_member(chat_id, req.user_id)
+            await app.bot.unban_chat_member(chat_id, req.user_id)
+            break
+        except Exception:
+            continue
     async with db.pool.acquire() as conn:
         await conn.execute(
             "INSERT INTO moderation_log (chat_id, user_id, action, reason, by_user_id) VALUES ($1,$2,'kick',$3,$4)",

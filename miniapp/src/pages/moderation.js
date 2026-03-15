@@ -1,8 +1,8 @@
 /**
  * miniapp/src/pages/moderation.js
  *
- * Moderation management page — COMPLETE REWRITE.
- * Fixes: wrong store API, Tailwind classes, SSE URL, broken endpoints, empty stubs.
+ * Moderation management page with 5 tabs:
+ * Members / Actions / Warns / Locks / Filters
  */
 
 import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js?v=1.5.0';
@@ -43,7 +43,7 @@ export async function renderModerationPage(container) {
   `;
   container.appendChild(header);
 
-  const tabs = ['Actions', 'Warns', 'Locks', 'Filters'];
+  const tabs = ['Members', 'Actions', 'Warns', 'Locks', 'Filters'];
   const tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:var(--sp-1);margin-bottom:var(--sp-4);background:var(--bg-input);padding:4px;border-radius:var(--r-xl);overflow-x:auto;';
   tabs.forEach((t, i) => {
@@ -60,7 +60,7 @@ export async function renderModerationPage(container) {
   content.id = 'mod-tab-content';
   container.appendChild(content);
 
-  await switchTab('actions', container, chatId);
+  await switchTab('members', container, chatId);
   _connectSSE(chatId);
 }
 
@@ -76,11 +76,380 @@ function switchTab(tab, container, chatId) {
   content.innerHTML = '';
 
   switch (tab) {
+    case 'members': return _renderMembersTab(content, chatId);
     case 'actions': return _renderActionsTab(content, chatId);
     case 'warns':   return _renderWarnsTab(content, chatId);
     case 'locks':   return _renderLocksTab(content, chatId);
     case 'filters': return _renderFiltersTab(content, chatId);
   }
+}
+
+async function _renderMembersTab(container, chatId) {
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading members...</div>`;
+
+  let members = [];
+  let bans = [];
+
+  try {
+    [members, bans] = await Promise.all([
+      apiFetch(`/api/groups/${chatId}/members`).catch(() => []),
+      apiFetch(`/api/groups/${chatId}/bans`).then(r => r?.data || []).catch(() => []),
+    ]);
+  } catch (e) {
+    container.innerHTML = '';
+    container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load members', description: e.message }));
+    return;
+  }
+
+  container.innerHTML = '';
+
+  const filterRow = document.createElement('div');
+  filterRow.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3);';
+  filterRow.innerHTML = `
+    <input type="text" id="member-search" class="input" placeholder="🔍 Search by name, @username or ID" style="width:100%;">
+    <div style="display:flex;gap:var(--sp-2);flex-wrap:wrap;">
+      ${['All','Admins','Banned','Muted','Warned'].map((f,i) => `<button data-filter="${f.toLowerCase()}" style="padding:4px 12px;border-radius:var(--r-full);border:1px solid var(--border);font-size:var(--text-xs);cursor:pointer;background:${i===0?'var(--accent)':'var(--bg-input)'};color:${i===0?'white':'var(--text-muted)'};">${f}</button>`).join('')}
+    </div>
+  `;
+  container.appendChild(filterRow);
+
+  const feed = document.createElement('div');
+  feed.id = 'members-feed';
+  feed.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+  container.appendChild(feed);
+
+  let currentFilter = 'all';
+  let searchQuery = '';
+  let page = 1;
+  const perPage = 20;
+
+  const renderMembers = () => {
+    feed.innerHTML = '';
+
+    let filtered = members.filter(m => {
+      const q = searchQuery.toLowerCase();
+      if (q && !`${m.first_name || ''} ${m.username || ''} ${m.user_id}`.toLowerCase().includes(q)) return false;
+      if (currentFilter === 'admins') return m.is_admin;
+      if (currentFilter === 'banned') return m.is_banned;
+      if (currentFilter === 'muted') return m.is_muted;
+      if (currentFilter === 'warned') return Array.isArray(m.warns) ? m.warns.length > 0 : (m.warns > 0);
+      return true;
+    });
+
+    const paginated = filtered.slice(0, page * perPage);
+
+    if (paginated.length === 0) {
+      feed.appendChild(EmptyState({ icon: '👥', title: 'No members found', description: 'Try a different filter.' }));
+      return;
+    }
+
+    paginated.forEach(m => feed.appendChild(_buildMemberCard(m, chatId)));
+
+    if (filtered.length > paginated.length) {
+      const loadMore = document.createElement('button');
+      loadMore.className = 'btn btn-secondary';
+      loadMore.textContent = `Load more (${filtered.length - paginated.length} remaining)`;
+      loadMore.style.cssText = 'width:100%;margin-top:var(--sp-2);';
+      loadMore.onclick = () => { page++; renderMembers(); };
+      feed.appendChild(loadMore);
+    }
+  };
+
+  filterRow.querySelector('#member-search').addEventListener('input', e => {
+    searchQuery = e.target.value;
+    page = 1;
+    renderMembers();
+  });
+
+  filterRow.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentFilter = btn.dataset.filter;
+      page = 1;
+      filterRow.querySelectorAll('[data-filter]').forEach(b => {
+        b.style.background = b === btn ? 'var(--accent)' : 'var(--bg-input)';
+        b.style.color = b === btn ? 'white' : 'var(--text-muted)';
+      });
+      renderMembers();
+    });
+  });
+
+  renderMembers();
+
+  if (bans.length > 0) {
+    const banSection = document.createElement('div');
+    banSection.style.marginTop = 'var(--sp-6)';
+    const banHeader = document.createElement('div');
+    banHeader.style.cssText = 'font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--sp-2);';
+    banHeader.textContent = `🚫 Ban List (${bans.length})`;
+    banSection.appendChild(banHeader);
+
+    bans.forEach(ban => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:var(--sp-2);';
+      row.innerHTML = `
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:var(--text-sm);font-weight:var(--fw-medium);">${ban.target_first_name || ban.target_username || ban.user_id || 'Unknown'}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">${ban.reason || 'No reason'} · ${_timeAgo(ban.created_at)}</div>
+        </div>
+        <button class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);" data-unban="${ban.user_id}">Unban</button>
+      `;
+      row.querySelector('[data-unban]').addEventListener('click', async () => {
+        try {
+          await apiFetch(`/api/groups/${chatId}/bans/${ban.user_id}`, { method: 'DELETE' });
+          showToast('User unbanned', 'success');
+          row.remove();
+        } catch (e) {
+          showToast('Failed to unban: ' + e.message, 'error');
+        }
+      });
+      banSection.appendChild(row);
+    });
+    container.appendChild(banSection);
+  }
+}
+
+function _buildMemberCard(m, chatId) {
+  const trustColor = m.trust_score >= 70 ? 'var(--success)' : m.trust_score >= 40 ? 'var(--warning)' : 'var(--danger)';
+  const warnCount = Array.isArray(m.warns) ? m.warns.length : (m.warns || 0);
+  const initials = (m.first_name || m.username || '?')[0].toUpperCase();
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-3);';
+
+  const statusChips = [];
+  if (m.is_muted) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--warning);color:white;font-size:var(--text-xs);">🔇 Muted</span>`);
+  if (m.is_banned) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--danger);color:white;font-size:var(--text-xs);">🚫 Banned</span>`);
+  if (warnCount > 0) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--warning);color:white;font-size:var(--text-xs);">⚠️ ${warnCount} Warn${warnCount > 1 ? 's' : ''}</span>`);
+  if (m.is_admin) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--accent);color:white;font-size:var(--text-xs);">${m.is_owner ? '👑 Owner' : '⭐ Admin'}</span>`);
+
+  card.innerHTML = `
+    <div style="display:flex;align-items:flex-start;gap:var(--sp-3);">
+      <div style="width:40px;height:40px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-weight:var(--fw-bold);font-size:var(--text-lg);flex-shrink:0;">${initials}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;">
+          <span style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">${m.first_name || m.username || 'Unknown'}</span>
+          ${m.username ? `<span style="color:var(--text-muted);font-size:var(--text-xs);">@${m.username}</span>` : ''}
+          ${statusChips.join('')}
+        </div>
+        <div style="display:flex;align-items:center;gap:var(--sp-2);margin-top:4px;">
+          <span style="font-size:var(--text-xs);color:var(--text-muted);">Trust:</span>
+          <div style="flex:1;height:4px;background:var(--bg-overlay);border-radius:2px;max-width:80px;">
+            <div style="height:100%;border-radius:2px;background:${trustColor};width:${m.trust_score || 50}%;"></div>
+          </div>
+          <span style="font-size:var(--text-xs);color:${trustColor};">${m.trust_score || 50}</span>
+        </div>
+      </div>
+    </div>
+    <div class="member-actions" style="display:flex;gap:var(--sp-2);margin-top:var(--sp-2);flex-wrap:wrap;"></div>
+    <div class="member-input-area" style="margin-top:var(--sp-2);display:none;"></div>
+  `;
+
+  const actionsRow = card.querySelector('.member-actions');
+  const inputArea = card.querySelector('.member-input-area');
+
+  const actionBtns = [
+    { label: '⚠️ Warn', action: 'warn', style: 'background:var(--warning);color:white;' },
+    { label: '🔇 Mute', action: 'mute', style: 'background:var(--bg-overlay);' },
+    { label: '👢 Kick', action: 'kick', style: 'background:var(--bg-overlay);' },
+    { label: '🚫 Ban', action: 'ban', style: 'background:var(--danger);color:white;' },
+    { label: 'ℹ️ Info', action: 'info', style: 'background:var(--bg-overlay);' },
+  ];
+
+  actionBtns.forEach(({ label, action, style }) => {
+    const btn = document.createElement('button');
+    btn.textContent = label;
+    btn.style.cssText = `padding:var(--sp-1) var(--sp-3);border-radius:var(--r-full);border:1px solid var(--border);font-size:var(--text-xs);cursor:pointer;${style}`;
+    btn.onclick = () => _handleMemberAction(action, m, chatId, inputArea, card);
+    actionsRow.appendChild(btn);
+  });
+
+  return card;
+}
+
+async function _handleMemberAction(action, member, chatId, inputArea, card) {
+  inputArea.style.display = 'block';
+  inputArea.innerHTML = '';
+
+  if (action === 'info') {
+    _showUserProfilePanel(member.user_id, chatId, member);
+    inputArea.style.display = 'none';
+    return;
+  }
+
+  if (action === 'warn') {
+    inputArea.innerHTML = `
+      <div style="display:flex;gap:var(--sp-2);">
+        <input type="text" class="input action-reason" placeholder="Reason (optional)" style="flex:1;">
+        <button class="btn btn-primary action-confirm" style="font-size:var(--text-xs);">Warn</button>
+        <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
+      </div>
+    `;
+    inputArea.querySelector('.action-confirm').onclick = async () => {
+      const reason = inputArea.querySelector('.action-reason').value.trim();
+      try {
+        await apiFetch(`/api/groups/${chatId}/warnings`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Warned via Mini App' }) });
+        showToast('Warning issued', 'success');
+        inputArea.style.display = 'none';
+      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    };
+  } else if (action === 'mute') {
+    inputArea.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:var(--sp-2);">
+        <div style="display:flex;gap:var(--sp-2);flex-wrap:wrap;">
+          ${['10m','1h','12h','1d','7d'].map(d => `<button class="btn btn-secondary duration-btn" data-dur="${d}" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);">${d}</button>`).join('')}
+        </div>
+        <div style="display:flex;gap:var(--sp-2);">
+          <input type="text" class="input action-reason" placeholder="Reason (optional)" style="flex:1;">
+          <button class="btn btn-primary action-confirm" style="font-size:var(--text-xs);">Mute</button>
+          <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
+        </div>
+      </div>
+    `;
+    let selectedDuration = '1h';
+    inputArea.querySelectorAll('.duration-btn').forEach(b => {
+      b.onclick = () => {
+        selectedDuration = b.dataset.dur;
+        inputArea.querySelectorAll('.duration-btn').forEach(x => x.style.background = 'var(--bg-overlay)');
+        b.style.background = 'var(--accent)';
+        b.style.color = 'white';
+      };
+    });
+    inputArea.querySelector('.action-confirm').onclick = async () => {
+      const reason = inputArea.querySelector('.action-reason').value.trim();
+      try {
+        await apiFetch(`/api/groups/${chatId}/mutes`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Muted via Mini App', duration: selectedDuration }) });
+        showToast('User muted', 'success');
+        inputArea.style.display = 'none';
+      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    };
+  } else if (action === 'kick') {
+    inputArea.innerHTML = `
+      <div style="display:flex;align-items:center;gap:var(--sp-2);">
+        <span style="font-size:var(--text-sm);">Kick this user?</span>
+        <button class="btn btn-danger action-confirm" style="font-size:var(--text-xs);">Kick</button>
+        <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
+      </div>
+    `;
+    inputArea.querySelector('.action-confirm').onclick = async () => {
+      try {
+        await apiFetch(`/api/groups/${chatId}/actions/kick`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id }) });
+        showToast('User kicked', 'success');
+        card.remove();
+      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    };
+  } else if (action === 'ban') {
+    inputArea.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:var(--sp-2);">
+        <div style="display:flex;gap:var(--sp-2);">
+          <input type="text" class="input action-reason" placeholder="Reason (optional)" style="flex:1;">
+          <button class="btn btn-danger action-confirm" style="font-size:var(--text-xs);">Ban</button>
+          <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
+        </div>
+      </div>
+    `;
+    inputArea.querySelector('.action-confirm').onclick = async () => {
+      const reason = inputArea.querySelector('.action-reason').value.trim();
+      try {
+        await apiFetch(`/api/groups/${chatId}/bans`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Banned via Mini App' }) });
+        showToast('User banned', 'success');
+        card.remove();
+      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    };
+  }
+
+  inputArea.querySelector('.action-cancel')?.addEventListener('click', () => {
+    inputArea.style.display = 'none';
+    inputArea.innerHTML = '';
+  });
+}
+
+function _showUserProfilePanel(userId, chatId, memberData) {
+  const existing = document.getElementById('user-profile-panel');
+  if (existing) existing.remove();
+
+  const panel = document.createElement('div');
+  panel.id = 'user-profile-panel';
+  panel.style.cssText = 'position:fixed;top:0;right:0;width:320px;height:100vh;background:var(--bg-card);border-left:1px solid var(--border);z-index:1000;overflow-y:auto;display:flex;flex-direction:column;transition:transform .3s;';
+
+  const member = memberData || {};
+  const initials = (member.first_name || member.username || '?')[0].toUpperCase();
+  const trustColor = member.trust_score >= 70 ? 'var(--success)' : member.trust_score >= 40 ? 'var(--warning)' : 'var(--danger)';
+  const warnCount = Array.isArray(member.warns) ? member.warns.length : (member.warns || 0);
+
+  panel.innerHTML = `
+    <div style="padding:var(--sp-4);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:var(--fw-bold);">User Profile</span>
+      <button id="close-profile" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);">✕</button>
+    </div>
+    <div style="padding:var(--sp-4);">
+      <div style="text-align:center;margin-bottom:var(--sp-4);">
+        <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:var(--fw-bold);margin:0 auto var(--sp-2);">${initials}</div>
+        <div style="font-weight:var(--fw-bold);font-size:var(--text-lg);">${member.first_name || member.username || 'Unknown'}</div>
+        ${member.username ? `<div style="color:var(--text-muted);font-size:var(--text-sm);">@${member.username}</div>` : ''}
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;cursor:pointer;" onclick="navigator.clipboard.writeText('${userId}');showToast && showToast('ID copied', 'success');">ID: <code>${userId}</code> 📋</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
+        <div style="background:var(--bg-input);border-radius:var(--r-lg);padding:var(--sp-3);">
+          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--sp-2);">STATS</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);">
+            <div><div style="font-size:var(--text-xs);color:var(--text-muted);">Messages</div><div style="font-weight:var(--fw-semibold);">${member.message_count || 0}</div></div>
+            <div><div style="font-size:var(--text-xs);color:var(--text-muted);">Warnings</div><div style="font-weight:var(--fw-semibold);color:${warnCount > 0 ? 'var(--warning)' : 'inherit'};">${warnCount}</div></div>
+          </div>
+          <div style="margin-top:var(--sp-2);">
+            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:4px;">Trust Score</div>
+            <div style="height:8px;background:var(--bg-overlay);border-radius:4px;">
+              <div style="height:100%;border-radius:4px;background:${trustColor};width:${member.trust_score || 50}%;"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--sp-2);" id="profile-actions">
+          ${!member.is_muted ? `<button class="btn btn-secondary profile-action" data-action="mute" style="font-size:var(--text-sm);">🔇 Mute</button>` : `<button class="btn btn-secondary profile-action" data-action="unmute" style="font-size:var(--text-sm);">🔊 Unmute</button>`}
+          ${!member.is_banned ? `<button class="btn btn-danger profile-action" data-action="ban" style="font-size:var(--text-sm);">🚫 Ban</button>` : `<button class="btn btn-secondary profile-action" data-action="unban" style="font-size:var(--text-sm);">✅ Unban</button>`}
+          <button class="btn btn-secondary profile-action" data-action="warn" style="font-size:var(--text-sm);">⚠️ Warn</button>
+          <button class="btn btn-secondary profile-action" data-action="kick" style="font-size:var(--text-sm);">👢 Kick</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  panel.querySelector('#close-profile').onclick = () => panel.remove();
+
+  panel.querySelectorAll('.profile-action').forEach(btn => {
+    btn.onclick = async () => {
+      const action = btn.dataset.action;
+      try {
+        if (action === 'warn') {
+          await apiFetch(`/api/groups/${chatId}/warnings`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+          showToast('Warning issued', 'success');
+        } else if (action === 'mute') {
+          await apiFetch(`/api/groups/${chatId}/mutes`, { method: 'POST', body: JSON.stringify({ user_id: userId, duration: '1h' }) });
+          showToast('User muted', 'success');
+        } else if (action === 'unmute') {
+          await apiFetch(`/api/groups/${chatId}/mutes/${userId}`, { method: 'DELETE' });
+          showToast('User unmuted', 'success');
+        } else if (action === 'ban') {
+          await apiFetch(`/api/groups/${chatId}/bans`, { method: 'POST', body: JSON.stringify({ user_id: userId, reason: 'Banned via Mini App' }) });
+          showToast('User banned', 'success');
+        } else if (action === 'unban') {
+          await apiFetch(`/api/groups/${chatId}/bans/${userId}`, { method: 'DELETE' });
+          showToast('User unbanned', 'success');
+        } else if (action === 'kick') {
+          await apiFetch(`/api/groups/${chatId}/actions/kick`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+          showToast('User kicked', 'success');
+        }
+        panel.remove();
+      } catch (e) {
+        showToast('Failed: ' + e.message, 'error');
+      }
+    };
+  });
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:999;';
+  overlay.onclick = () => { panel.remove(); overlay.remove(); };
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
 }
 
 async function _renderActionsTab(container, chatId) {
@@ -289,13 +658,80 @@ async function _renderLocksTab(container, chatId) {
 async function _renderFiltersTab(container, chatId) {
   container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading filters...</div>`;
 
+  let filters = [];
   let blacklist = [];
   try {
-    const res = await apiFetch(`/api/groups/${chatId}/blacklist`);
-    blacklist = res?.words || res || [];
+    [filters, blacklist] = await Promise.all([
+      apiFetch(`/api/groups/${chatId}/filters`).then(r => Array.isArray(r) ? r : []).catch(() => []),
+      apiFetch(`/api/groups/${chatId}/blacklist`).then(r => r?.words || []).catch(() => []),
+    ]);
   } catch (_) {}
 
   container.innerHTML = '';
+
+  const filtersCard = Card({ title: '🔑 Keyword Auto-Replies', subtitle: 'Respond automatically to specific keywords' });
+
+  const filtersList = document.createElement('div');
+  filtersList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3);';
+
+  const renderFilters = (items) => {
+    filtersList.innerHTML = '';
+    if (items.length === 0) {
+      filtersList.innerHTML = '<div style="color:var(--text-muted);font-size:var(--text-sm);text-align:center;padding:var(--sp-2);">No keyword filters yet</div>';
+      return;
+    }
+    items.forEach(f => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);';
+      row.innerHTML = `
+        <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);padding:2px 8px;background:var(--accent);color:white;border-radius:var(--r-full);">${f.keyword}</span>
+        <span style="color:var(--text-muted);font-size:var(--text-xs);">→</span>
+        <span style="flex:1;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.reply_content || ''}</span>
+        <button data-id="${f.id}" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;line-height:1;">×</button>
+      `;
+      row.querySelector('[data-id]').onclick = async () => {
+        try {
+          await apiFetch(`/api/groups/${chatId}/filters/${f.id}`, { method: 'DELETE' });
+          filters = filters.filter(x => x.id !== f.id);
+          renderFilters(filters);
+          showToast('Filter removed', 'success');
+        } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+      };
+      filtersList.appendChild(row);
+    });
+  };
+
+  renderFilters(filters);
+
+  const addFilterRow = document.createElement('div');
+  addFilterRow.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+  addFilterRow.innerHTML = `
+    <div style="display:flex;gap:var(--sp-2);">
+      <input type="text" id="filter-keyword" class="input" placeholder="Keyword" style="flex:1;">
+      <input type="text" id="filter-response" class="input" placeholder="Response" style="flex:2;">
+      <button id="add-filter-btn" class="btn btn-primary" style="white-space:nowrap;">Add</button>
+    </div>
+  `;
+
+  filtersCard.appendChild(filtersList);
+  filtersCard.appendChild(addFilterRow);
+  container.appendChild(filtersCard);
+
+  setTimeout(() => {
+    filtersCard.querySelector('#add-filter-btn')?.addEventListener('click', async () => {
+      const keyword = filtersCard.querySelector('#filter-keyword').value.trim().toLowerCase();
+      const response = filtersCard.querySelector('#filter-response').value.trim();
+      if (!keyword || !response) { showToast('Keyword and response required', 'error'); return; }
+      try {
+        const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, { method: 'POST', body: JSON.stringify({ keyword, reply: response }) });
+        filters.push({ keyword, reply_content: response, id: newFilter?.id || Date.now() });
+        renderFilters(filters);
+        filtersCard.querySelector('#filter-keyword').value = '';
+        filtersCard.querySelector('#filter-response').value = '';
+        showToast('Filter added', 'success');
+      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    });
+  }, 0);
 
   const blacklistCard = Card({ title: '🚫 Word Blacklist', subtitle: 'Automatically act on these words' });
 
@@ -308,7 +744,7 @@ async function _renderFiltersTab(container, chatId) {
     words.forEach(word => {
       const chip = document.createElement('span');
       chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--bg-overlay);border:1px solid var(--border);border-radius:var(--r-full);font-size:var(--text-xs);';
-      chip.innerHTML = `${word} <button onclick="this.parentElement.remove();removeBlacklistWord('${chatId}','${word}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:14px;line-height:1;">&times;</button>`;
+      chip.innerHTML = `${word} <button onclick="this.parentElement.remove();window._removeBlacklistWord('${chatId}','${word}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:14px;line-height:1;">&times;</button>`;
       chipsContainer.appendChild(chip);
     });
   };
@@ -337,10 +773,8 @@ async function _renderFiltersTab(container, chatId) {
     }
   };
 
-  blacklistCard.querySelector ? null : null;
   blacklistCard.appendChild(chipsContainer);
   blacklistCard.appendChild(addRow);
-  blacklistCard.insertAdjacentHTML('beforeend', '');
 
   container.appendChild(blacklistCard);
 
@@ -349,7 +783,7 @@ async function _renderFiltersTab(container, chatId) {
     blacklistCard.querySelector('#blacklist-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') addWord(); });
   }, 0);
 
-  window.removeBlacklistWord = async (cid, word) => {
+  window._removeBlacklistWord = async (cid, word) => {
     try {
       await apiFetch(`/api/groups/${cid}/blacklist/${encodeURIComponent(word)}`, { method: 'DELETE' });
       blacklist = blacklist.filter(w => w !== word);
@@ -370,7 +804,6 @@ function _connectSSE(chatId) {
   const label = document.getElementById('sse-label');
 
   try {
-    const initData = window.Telegram?.WebApp?.initData || '';
     _sseSource = new EventSource(`/api/events/${chatId}`);
 
     _sseSource.onopen = () => {

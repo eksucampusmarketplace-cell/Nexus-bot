@@ -271,7 +271,9 @@ try:
     from api.routes import moderation as moderation_api
     from api.routes import (
         admin,
+        antiraid as antiraid_api,
         modules,
+        notes as notes_api,
         reports,
         roles,
         scheduler,
@@ -325,5 +327,7 @@ try:
     app.include_router(broadcast.router)  # prefix="/api/broadcast"
     app.include_router(channels.router)  # prefix="/api/channels"
     app.include_router(member_stats.router)  # prefix="/api/me"
+    app.include_router(antiraid_api.router)  # prefix="/api/groups/{chat_id}/antiraid"
+    app.include_router(notes_api.router)  # prefix="/api/groups/{chat_id}/notes"
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

@@ -9,8 +9,9 @@ API endpoints for the engagement system:
 - Network
 """
 
-from fastapi import APIRouter, Depends, HTTPException
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import require_auth
 from db.client import db
@@ -44,8 +45,8 @@ async def get_xp_leaderboard(
 async def get_member_xp_profile(chat_id: int, user_id: int, user=Depends(require_auth)):
     """Full XP profile for a member."""
     pool = await get_pool()
+    from bot.engagement.xp import calculate_level, xp_to_next_level
     from db.ops.engagement import get_member_xp
-    from bot.engagement.xp import xp_to_next_level, calculate_level
 
     xp_data = await get_member_xp(pool, chat_id, user_id, user["bot_id"])
     xp_needed, next_level_xp = xp_to_next_level(xp_data["xp"])
@@ -292,8 +293,9 @@ async def send_newsletter_now(chat_id: int, user=Depends(require_auth)):
 async def preview_newsletter(chat_id: int, user=Depends(require_auth)):
     """Preview this week's newsletter without sending."""
     pool = await get_pool()
-    from bot.engagement.newsletter import generate_newsletter
     from datetime import date, timedelta
+
+    from bot.engagement.newsletter import generate_newsletter
 
     today = date.today()
     week_end = today - timedelta(days=today.weekday() + 1)

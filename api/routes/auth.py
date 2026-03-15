@@ -17,15 +17,39 @@ Logs prefix: [AUTH]
 import base64
 import json
 import logging
-from fastapi import APIRouter, Request, HTTPException
-from pyrogram import Client
-from pyrogram.storage import MemoryStorage
 
-from config import settings
+from fastapi import APIRouter, HTTPException, Request
+
+try:
+    from pyrogram import Client
+    from pyrogram.storage import MemoryStorage
+
+    PYROGRAM_AVAILABLE = True
+except ImportError:
+    PYROGRAM_AVAILABLE = False
+    Client = None
+    MemoryStorage = None
+
 from bot.utils.crypto import encrypt_token
-from db.ops.music_new import save_music_userbot
+from config import settings
+
+try:
+    from db.ops.music_new import save_music_userbot
+
+    MUSIC_NEW_AVAILABLE = True
+except ImportError:
+    MUSIC_NEW_AVAILABLE = False
+    save_music_userbot = None
+
 from bot.registry import get
-from bot.userbot.music_worker import MusicWorker
+
+try:
+    from bot.userbot.music_worker import MusicWorker
+
+    MUSIC_WORKER_AVAILABLE = True
+except ImportError:
+    MUSIC_WORKER_AVAILABLE = False
+    MusicWorker = None
 
 log = logging.getLogger("auth_api")
 router = APIRouter()
@@ -52,6 +76,18 @@ async def validate_session(request: Request):
       6. Save to music_userbots
       7. Reload MusicWorker for the clone
     """
+    if not PYROGRAM_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Pyrogram is not installed. Session validation is unavailable.",
+        )
+
+    if not MUSIC_NEW_AVAILABLE:
+        raise HTTPException(
+            status_code=503,
+            detail="Music module is not available.",
+        )
+
     owner_id = request.state.user_id
     db = request.app.state.db
     body = await request.json()
@@ -150,6 +186,10 @@ async def _to_pyrogram_session(raw: str) -> str | None:
 
 async def _reload_music_worker(bot_id: int, session_string: str, db):
     """Reload the MusicWorker for a clone bot after new session added."""
+    if not PYROGRAM_AVAILABLE or not MUSIC_WORKER_AVAILABLE:
+        log.warning(f"[AUTH] Cannot reload MusicWorker - dependencies not available")
+        return
+
     try:
         clone_app = get(bot_id)
         if not clone_app:

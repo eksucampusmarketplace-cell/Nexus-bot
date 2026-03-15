@@ -1,10 +1,12 @@
 import hashlib
 import hmac
 import json
-from urllib.parse import parse_qs
-from fastapi import Request, HTTPException, Depends
-from config import settings
 import logging
+from urllib.parse import parse_qs
+
+from fastapi import Depends, HTTPException, Request
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -97,3 +99,31 @@ async def get_current_user(request: Request):
         raise HTTPException(
             status_code=401, detail={"error": "Invalid or expired initData", "code": "AUTH_FAILED"}
         )
+
+
+async def require_auth(request: Request):
+    """
+    Enhanced auth that includes user_id and bot_id for engagement routes.
+    Returns a dict with user_id, bot_id, and other user info.
+    """
+    user = await get_current_user(request)
+
+    # Add user_id alias for compatibility with engagement routes
+    user["user_id"] = user.get("id")
+
+    # Try to get bot_id from request state or default to primary bot
+    bot_id = getattr(request.state, "bot_id", None)
+    if bot_id:
+        user["bot_id"] = bot_id
+    else:
+        # Default to primary bot id
+        from bot.registry import get_all
+
+        bots = get_all()
+        if bots:
+            # Get first bot's id (typically primary)
+            user["bot_id"] = list(bots.keys())[0]
+        else:
+            user["bot_id"] = 0
+
+    return user

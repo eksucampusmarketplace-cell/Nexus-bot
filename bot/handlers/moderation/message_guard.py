@@ -173,52 +173,46 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 
-async def _send_filter_reply(message, reply_text: str):
+async def _send_filter_reply(message, reply: str):
     """
     Send filter reply with support for HTML, Markdown, and inline buttons.
-    Button syntax: --- separates rows, | separates buttons in a row
-    Example: "Hello! --- Button1|Button2"
+    1. If '---' in reply: split on first ---, parse [Label](URL) lines as InlineKeyboardButton rows
+    2. Detect parse mode: HTML if <b>/<i>/<code> found, MARKDOWN_V2 if **/__/``` found
+    3. Try with parse_mode first, fall back to plain text on error
+    4. Pass reply_markup=InlineKeyboardMarkup(rows) if buttons were parsed
     """
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    from telegram.constants import ParseMode
+    import re
 
-    # Check for button syntax
-    if " --- " in reply_text:
-        parts = reply_text.split(" --- ")
+    text_part = reply
+    rows = []
+
+    if "---" in reply:
+        parts = reply.split("---", 1)
         text_part = parts[0].strip()
-        button_part = parts[1].strip() if len(parts) > 1 else ""
+        button_part = parts[1].strip()
 
-        keyboard = []
-        if button_part:
-            # Parse button rows (separated by |)
-            buttons = []
-            for btn_text in button_part.split("|"):
-                btn_text = btn_text.strip()
-                if btn_text:
-                    buttons.append(InlineKeyboardButton(btn_text, callback_data=f"filter_btn:{btn_text}"))
-            if buttons:
-                keyboard.append(buttons)
+        for line in button_part.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            matches = re.findall(r"\[(.*?)\]\((.*?)\)", line)
+            if matches:
+                row = [InlineKeyboardButton(label, url=url) for label, url in matches]
+                rows.append(row)
 
-        # Detect parse mode
-        parse_mode = None
-        if any(tag in text_part for tag in ["<b>", "<i>", "<code>", "<pre>", "<a href"]):
-            parse_mode = "HTML"
-        elif any(tag in text_part for tag in ["*", "_", "`", "["]):
-            parse_mode = "Markdown"
+    # Detect parse mode
+    parse_mode = None
+    if any(tag in text_part for tag in ["<b>", "<i>", "<code>"]):
+        parse_mode = ParseMode.HTML
+    elif any(tag in text_part for tag in ["**", "__", "```"]):
+        parse_mode = ParseMode.MARKDOWN_V2
 
-        try:
-            await message.reply_text(text_part, parse_mode=parse_mode, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
-        except Exception:
-            # Fallback without parse mode
-            await message.reply_text(text_part, reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None)
-    else:
-        # No buttons, just text
-        parse_mode = None
-        if any(tag in reply_text for tag in ["<b>", "<i>", "<code>", "<pre>", "<a href"]):
-            parse_mode = "HTML"
-        elif any(tag in reply_text for tag in ["**", "__", "*", "_", "`"]):
-            parse_mode = "Markdown"
+    reply_markup = InlineKeyboardMarkup(rows) if rows else None
 
-        try:
-            await message.reply_text(reply_text, parse_mode=parse_mode)
-        except Exception:
-            await message.reply_text(reply_text)
+    try:
+        await message.reply_text(text_part, parse_mode=parse_mode, reply_markup=reply_markup)
+    except Exception:
+        # Fallback to plain text on error
+        await message.reply_text(text_part, reply_markup=reply_markup)

@@ -194,6 +194,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Failed to load clones: {e}")
 
+    # Fix 14: Check privacy mode for all bots (including clones)
+    for bot_id, bot_app in registry_get_all().items():
+        try:
+            me = await bot_app.bot.get_me()
+            if getattr(me, "can_read_all_group_messages", None) is False:
+                logger.warning(f"[STARTUP] ⚠️ PRIVACY MODE ON for @{me.username}")
+                logger.warning("[STARTUP] Fix: @BotFather → /mybots → Bot Settings → Group Privacy → Turn OFF")
+        except Exception:
+            pass
+
     logger.info("=" * 60)
     logger.info("[STARTUP] ✅ All services started")
     logger.info("=" * 60)

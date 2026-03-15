@@ -27,12 +27,18 @@ class ResolveRequest(BaseModel):
 
 
 @router.get("")
-async def list_open_reports(
+async def list_reports(
     chat_id: int,
+    status: str | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
     user: dict = Depends(get_current_user),
 ):
-    """Return all open reports for the group."""
-    rows = await db_reports.get_open_reports(db.pool, chat_id)
+    """Return reports for the group, defaulting to open ones."""
+    if status and status != "open":
+        rows = await db_reports.get_all_reports(db.pool, chat_id, limit=limit)
+        rows = [r for r in rows if r["status"] == status]
+    else:
+        rows = await db_reports.get_open_reports(db.pool, chat_id)
     return {"reports": rows, "count": len(rows)}
 
 

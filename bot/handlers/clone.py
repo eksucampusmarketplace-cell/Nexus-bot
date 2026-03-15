@@ -115,8 +115,8 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
     # Force redirect to PM for clone creation
     if chat.type != "private":
         reply_text = (
-            "🤖 *Create Your Own Bot*\n\n"
-            "To create your own Nexus bot clone, please continue in a private message with me\.",
+            r"🤖 *Create Your Own Bot*" + "\n\n" +
+            r"To create your own Nexus bot clone, please continue in a private message with me\."
         )
         keyboard = InlineKeyboardMarkup(
             [
@@ -150,15 +150,15 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         reply_method = update.message.reply_text
 
     await reply_method(
-        "🔁 *Create Your Own Bot*\n\n"
+        r"🔁 *Create Your Own Bot*" + "\n\n" +
         "Follow these steps to create your branded Nexus bot:\n\n"
         "*Step 1:* Open @BotFather\n"
         "*Step 2:* Send /newbot and follow the instructions\n"
         "*Step 3:* Choose a name and username for your bot\n"
         "*Step 4:* Copy the token BotFather gives you\n"
         "*Step 5:* Paste the token here\n\n"
-        "_Your bot will keep its own name, username, and photo_\.\n\n"
-        "⚠️ Only paste tokens for bots *you own*\!",
+        r"_Your bot will keep its own name, username, and photo_\.\n\n"
+        r"⚠️ Only paste tokens for bots *you own*\!",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")]]
@@ -182,7 +182,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     logger.info(f"[CLONE] Token received | user_id={user.id} | " f"masked={mask_token(token)}")
 
     processing = await update.message.reply_text(
-        "🔍 Checking token\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
+        r"🔍 Checking token\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
     )
     db_pool = context.bot_data["db_pool"]
 
@@ -194,7 +194,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await log_clone_attempt(db_pool, user.id, False, "rate_limited")
         logger.warning(f"[CLONE] Rate limited | user_id={user.id} | attempts={attempts}")
         await processing.edit_text(
-            f"⏱ Too many attempts\. Max {CLONE_RATE_LIMIT} per hour\. Try again later\.",
+            rf"⏱ Too many attempts\. Max {CLONE_RATE_LIMIT} per hour\. Try again later\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
         return ConversationHandler.END
@@ -204,9 +204,9 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await log_clone_attempt(db_pool, user.id, False, "invalid_format")
         logger.warning(f"[CLONE] Invalid format | user_id={user.id} | masked={mask_token(token)}")
         await processing.edit_text(
-            "❌ Invalid token format\.\n\n"
-            "It should look like: `1234567890:ABCdef\.\.\.`\n\n"
-            "Send /clone to try again\.",
+            r"❌ Invalid token format\.\n\n"
+            r"It should look like: `1234567890:ABCdef\.\.\.`\n\n"
+            r"Send /clone to try again\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
         return ConversationHandler.END
@@ -225,19 +225,19 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if existing["status"] == "dead":
             await processing.edit_text(
-                f"⚠️ @{existing['username']} is already registered but its token was revoked\.\n\n"
-                f"Send /myclones and use *Re\-authenticate* to fix it\.",
+                rf"⚠️ @{existing['username']} is already registered but its token was revoked\.\n\n"
+                r"Send /myclones and use *Re\-authenticate* to fix it\.",
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
         else:
             await processing.edit_text(
-                f"⚠️ This token belongs to @{existing['username']} which is already a registered clone\.",
+                rf"⚠️ This token belongs to @{existing['username']} which is already a registered clone\.",
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
         return ConversationHandler.END
 
     # ── Layer 4: Live Telegram validation ──────────────────────────────────
-    await processing.edit_text("🔍 Verifying with Telegram\.\.\.", parse_mode=ParseMode.MARKDOWN_V2)
+    await processing.edit_text(r"🔍 Verifying with Telegram\.\.\.", parse_mode=ParseMode.MARKDOWN_V2)
     logger.info(f"[CLONE] Calling getMe | masked={mask_token(token)}")
 
     try:
@@ -248,14 +248,14 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await log_clone_attempt(db_pool, user.id, False, "telegram_timeout", token_hash)
         logger.error(f"[CLONE] getMe timed out | user_id={user.id} | masked={mask_token(token)}")
         await processing.edit_text(
-            "⏱ Telegram didn't respond\. Please try again\.", parse_mode=ParseMode.MARKDOWN_V2
+            r"⏱ Telegram didn't respond\. Please try again\.", parse_mode=ParseMode.MARKDOWN_V2
         )
         return ConversationHandler.END
     except Exception as e:
         await log_clone_attempt(db_pool, user.id, False, f"network_error: {e}", token_hash)
         logger.error(f"[CLONE] getMe network error | user_id={user.id} | error={e}")
         await processing.edit_text(
-            "❌ Network error\. Please try again\.", parse_mode=ParseMode.MARKDOWN_V2
+            r"❌ Network error\. Please try again\.", parse_mode=ParseMode.MARKDOWN_V2
         )
         return ConversationHandler.END
 
@@ -268,7 +268,7 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"[CLONE] Token rejected by Telegram | user_id={user.id} | reason={err_desc}"
         )
         await processing.edit_text(
-            f"❌ Telegram rejected this token:\n_{err_desc}_\n\nSend /clone to try again\.",
+            rf"❌ Telegram rejected this token:\n_{err_desc}_\n\nSend /clone to try again\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
         return ConversationHandler.END
@@ -348,20 +348,20 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     await registry_register(reauth_bot_id, clone_app)
 
                     await processing.edit_text(
-                        f"✅ *@{cloned_username} re\-authenticated\!*\n\n"
-                        f"Your bot is now active again\.",
+                        rf"✅ *@{cloned_username} re\-authenticated\!*\n\n"
+                        r"Your bot is now active again\.",
                         parse_mode=ParseMode.MARKDOWN_V2,
                     )
                     logger.info(f"[CLONE] Reauth complete | bot_id={reauth_bot_id}")
                 else:
                     await processing.edit_text(
-                        f"⚠️ Token updated but webhook setup failed\. Please contact support\.",
+                        r"⚠️ Token updated but webhook setup failed\. Please contact support\.",
                         parse_mode=ParseMode.MARKDOWN_V2,
                     )
             except Exception as e:
                 logger.error(f"[CLONE] Reauth failed | bot_id={reauth_bot_id} | error={e}")
                 await processing.edit_text(
-                    f"❌ Re\-authentication failed: _{e}_", parse_mode=ParseMode.MARKDOWN_V2
+                    rf"❌ Re\-authentication failed: _{e}_", parse_mode=ParseMode.MARKDOWN_V2
                 )
 
             context.user_data.pop("reauth_bot_id", None)
@@ -387,11 +387,11 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         limit_row.append(InlineKeyboardButton("∞ Unlimited", callback_data="clone:limit:0"))
 
     await processing.edit_text(
-        f"✅ *Token verified\!*\n\n"
-        f"🤖 @{cloned_username}\n"
-        f"📛 {cloned_name}\n\n"
-        f"How many groups should this bot work in?\n"
-        f"Default: 1",
+        r"✅ *Token verified\!*\n\n"
+        rf"🤖 @{cloned_username}\n"
+        rf"📛 {cloned_name}\n\n"
+        r"How many groups should this bot work in?\n"
+        r"Default: 1",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [
@@ -435,9 +435,9 @@ async def on_limit_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         "Who can add this bot to groups?\n\n"
-        "🔒 *Only me*: Only you can add this bot\.\n"
-        "✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\.\n"
-        "🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group\.",
+        r"🔒 *Only me*: Only you can add this bot\.\n"
+        r"✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\.\n"
+        r"🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [
@@ -519,12 +519,12 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not pending:
         logger.warning(f"[CLONE] Confirm with no pending data | user_id={user.id}")
         await query.edit_message_text(
-            "❌ Session expired\. Send /clone to try again\.", parse_mode=ParseMode.MARKDOWN_V2
+            r"❌ Session expired\. Send /clone to try again\.", parse_mode=ParseMode.MARKDOWN_V2
         )
         return ConversationHandler.END
 
     await query.edit_message_text(
-        f"⚙️ Registering @{pending['username']}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
+        rf"⚙️ Registering @{pending['username']}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
     )
 
     try:
@@ -536,7 +536,7 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await log_clone_attempt(db_pool, user.id, False, str(e), pending.get("token_hash"))
         logger.error(f"[CLONE] Registration failed | user_id={user.id} | error={e}", exc_info=True)
         await query.edit_message_text(
-            f"❌ Registration failed:\n_{e}_\n\nSend /clone to try again\.",
+            rf"❌ Registration failed:\n_{e}_\n\nSend /clone to try again\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
 
@@ -557,7 +557,7 @@ async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"[CLONE] Cancelled | user_id={user.id}")
     try:
         await query.edit_message_text(
-            "❎ Clone setup cancelled\.",
+            r"❎ Clone setup cancelled\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
     except Exception:
@@ -577,14 +577,14 @@ async def _show_final_confirmation(query, context):
     cloned_bot_id = pending["bot_id"]
 
     await query.edit_message_text(
-        f"✅ *Settings saved\!*\n\n"
-        f"🤖 @{cloned_username}\n"
-        f"🆔 `{cloned_bot_id}`\n\n"
-        f"*Summary:*\n"
-        f"👥 Group limit: {pending.get('group_limit', 1)}\n"
-        f"🛡️ Policy: {pending.get('group_access_policy', 'blocked')}\n"
-        f"🔔 Notify: {'Yes' if pending.get('bot_add_notifications') else 'No'}\n\n"
-        f"Confirm to register this bot as a Nexus clone?",
+        rf"✅ *Settings saved\!*\n\n"
+        rf"🤖 @{cloned_username}\n"
+        rf"🆔 `{cloned_bot_id}`\n\n"
+        r"*Summary:*\n"
+        rf"👥 Group limit: {pending.get('group_limit', 1)}\n"
+        rf"🛡️ Policy: {pending.get('group_access_policy', 'blocked')}\n"
+        rf"🔔 Notify: {'Yes' if pending.get('bot_add_notifications') else 'No'}\n\n"
+        r"Confirm to register this bot as a Nexus clone?",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [
@@ -633,13 +633,13 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
         if not bot_record or bot_record["owner_user_id"] != user.id:
             logger.warning(f"[CLONE] Remove denied | user_id={user.id} | target={target_bot_id}")
             await query.edit_message_text(
-                "❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2
+                r"❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2
             )
             return
 
         await query.edit_message_text(
-            f"⚠️ *Remove @{bot_record['username']}?*\n\n"
-            f"This stops the bot, deletes its webhook, and removes all data\. Cannot be undone\.",
+            rf"⚠️ *Remove @{bot_record['username']}?*\n\n"
+            r"This stops the bot, deletes its webhook, and removes all data\. Cannot be undone\.",
             parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=InlineKeyboardMarkup(
                 [
@@ -661,19 +661,19 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
 
         if not bot_record or bot_record["owner_user_id"] != user.id:
             await query.edit_message_text(
-                "❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2
+                r"❌ Bot not found or you don't own it\.", parse_mode=ParseMode.MARKDOWN_V2
             )
             return
 
         if bot_record.get("is_primary"):
             logger.warning(f"[CLONE] Attempt to remove primary bot | user_id={user.id}")
             await query.edit_message_text(
-                "❌ You cannot remove the primary bot\.", parse_mode=ParseMode.MARKDOWN_V2
+                r"❌ You cannot remove the primary bot\.", parse_mode=ParseMode.MARKDOWN_V2
             )
             return
 
         await query.edit_message_text(
-            f"🗑️ Removing @{bot_record['username']}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
+            rf"🗑️ Removing @{bot_record['username']}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
         )
 
         try:
@@ -682,14 +682,14 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
                 f"[CLONE] Removed | bot_id={target_bot_id} | username=@{bot_record['username']} | by=user_id={user.id}"
             )
             await query.edit_message_text(
-                f"✅ @{bot_record['username']} has been removed\.", parse_mode=ParseMode.MARKDOWN_V2
+                rf"✅ @{bot_record['username']} has been removed\.", parse_mode=ParseMode.MARKDOWN_V2
             )
         except Exception as e:
             logger.error(
                 f"[CLONE] Removal failed | bot_id={target_bot_id} | error={e}", exc_info=True
             )
             await query.edit_message_text(
-                f"❌ Removal failed: _{e}_", parse_mode=ParseMode.MARKDOWN_V2
+                rf"❌ Removal failed: _{e}_", parse_mode=ParseMode.MARKDOWN_V2
             )
         return
 
@@ -703,7 +703,7 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
         target_bot_id = int(parts[2])
         context.user_data["reauth_bot_id"] = target_bot_id
         await query.edit_message_text(
-            f"Paste the new token for this bot from @BotFather:",
+            "Paste the new token for this bot from @BotFather:",
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel_entry")]]
             ),
@@ -713,7 +713,7 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
     # ── cancel_entry (cancel from entry point) ────────────────────────────
     if action == "cancel_entry":
         context.user_data.pop("reauth_bot_id", None)
-        await query.edit_message_text("❎ Cancelled\.")
+        await query.edit_message_text(r"❎ Cancelled\.")
         return ConversationHandler.END
 
 
@@ -730,18 +730,18 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
 
     if not clones:
         await update.message.reply_text(
-            "You have no clones yet\.\n\nSend /clone to add your first one\.",
+            r"You have no clones yet\.\n\nSend /clone to add your first one\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
         return
 
-    text = f"🤖 *Your Bots* \({len(clones)}\)\n\n"
+    text = rf"🤖 *Your Bots* \({len(clones)}\)\n\n"
     keyboard = []
 
     for bot in clones:
         status_icon = "👑" if bot["is_primary"] else ("🟢" if bot["status"] == "active" else "🔴")
         webhook_icon = "🔗" if bot["webhook_active"] else "⚠️"
-        label = " \(Primary\)" if bot["is_primary"] else ""
+        label = r" \(Primary\)" if bot["is_primary"] else ""
 
         text += (
             f"{status_icon} *@{bot['username']}*{label}\n"
@@ -787,10 +787,10 @@ async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not args or len(args) < 2:
         await update.message.reply_text(
-            "📖 *Usage:*\n"
-            "`/cloneset limit <1-5>`\n"
-            "`/cloneset policy open|approval|blocked`\n"
-            "`/cloneset notify on|off`",
+            r"📖 *Usage:*\n"
+            r"`/cloneset limit <1-5>`\n"
+            r"`/cloneset policy open|approval|blocked`\n"
+            r"`/cloneset notify on|off`",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
         return
@@ -953,11 +953,11 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
     # Step 5: Send success message
     logger.info(f"[CLONE][REGISTER] ✅ Complete | bot_id={bot_id} | @{username}")
     await edit_message.edit_text(
-        f"🚀 *@{username} is live\!*\n\n"
-        f"📛 {pending['display_name']}\n"
-        f"🆔 `{bot_id}`\n"
-        f"🔗 Webhook: active\n\n"
-        f"Add it to any group as admin — it will appear in your Mini App dashboard\.",
+        rf"🚀 *@{username} is live\!*\n\n"
+        rf"📛 {pending['display_name']}\n"
+        rf"🆔 `{bot_id}`\n"
+        r"🔗 Webhook: active\n\n"
+        r"Add it to any group as admin — it will appear in your Mini App dashboard\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("🚀 Open Mini App", web_app={"url": f"{render_url}/miniapp"})]]

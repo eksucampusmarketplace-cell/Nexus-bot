@@ -8,29 +8,22 @@ from db.client import db
 
 log = logging.getLogger("[MOD_LOCKS]")
 
-# Valid lock types with miniapp-compatible column names
+# Valid lock types with miniapp-compatible column names (canonical names only)
 VALID_LOCKS = [
-    "media", "photo", "video",
-    "stickers", "sticker",
-    "gifs", "gif",
-    "links", "link",
-    "forwards", "forward",
-    "polls", "poll",
-    "games",
-    "voice",
-    "video_notes",
-    "contacts", "contact",
+    "photo", "video", "sticker", "gif", "voice", "audio", "document", 
+    "link", "forward", "poll", "contact", "video_note"
 ]
 
 # Map legacy names to new column names
 LOCK_COLUMN_MAP = {
-    "media": "photo",  # Legacy command uses 'media', DB column is 'photo'
+    "media": "photo",
     "stickers": "sticker",
     "gifs": "gif",
     "links": "link",
     "forwards": "forward",
     "polls": "poll",
     "contacts": "contact",
+    "video_notes": "video_note"
 }
 
 
@@ -41,29 +34,27 @@ async def lock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not context.args:
         await update.message.reply_text(
-            "❌ Specify what to lock: media, stickers, gifs, links, etc."
+            f"❌ Specify what to lock: {', '.join(VALID_LOCKS[:6])}..."
         )
         return
 
     lock_type = context.args[0].lower()
+    
+    # Normalize user input before DB write
+    lock_type = LOCK_COLUMN_MAP.get(lock_type, lock_type)
 
-    # Update DB
     if lock_type not in VALID_LOCKS and lock_type != "all":
-        await update.message.reply_text(f"❌ Invalid lock type. Valid: {', '.join(VALID_LOCKS[:10])}...")
+        await update.message.reply_text(f"❌ Invalid lock type. Valid: {', '.join(VALID_LOCKS)}")
         return
 
-    # For simplicity, we'll just update the DB. Actual enforcement should be in message_guard.py
     if lock_type == "all":
-        # Use new column names for all locks
         updates = {
             "photo": True, "video": True, "sticker": True, "gif": True,
-            "link": True, "forward": True, "poll": True, "games": True,
-            "voice": True, "video_notes": True, "contact": True
+            "link": True, "forward": True, "poll": True,
+            "voice": True, "video_note": True, "contact": True
         }
     else:
-        # Map legacy name to column name if needed
-        column = LOCK_COLUMN_MAP.get(lock_type, lock_type)
-        updates = {column: True}
+        updates = {lock_type: True}
 
     # Build query using proper asyncpg context
     columns = ", ".join(updates.keys())
@@ -92,16 +83,18 @@ async def unlock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return
     lock_type = context.args[0].lower()
+    
+    # Normalize user input before DB write
+    lock_type = LOCK_COLUMN_MAP.get(lock_type, lock_type)
 
     if lock_type == "all":
         updates = {
             "photo": False, "video": False, "sticker": False, "gif": False,
-            "link": False, "forward": False, "poll": False, "games": False,
-            "voice": False, "video_notes": False, "contact": False
+            "link": False, "forward": False, "poll": False,
+            "voice": False, "video_note": False, "contact": False
         }
     elif lock_type in VALID_LOCKS:
-        column = LOCK_COLUMN_MAP.get(lock_type, lock_type)
-        updates = {column: False}
+        updates = {lock_type: False}
     else:
         return
 

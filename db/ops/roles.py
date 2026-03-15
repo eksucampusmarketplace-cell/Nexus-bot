@@ -34,6 +34,10 @@ PERMISSIONS = {
     "manage_webhooks",
     "manage_automod",
     "manage_games",
+    "exempt_automod",
+    "exempt_antiflood",
+    "can_delete_messages",
+    "can_add_filters",
 }
 
 

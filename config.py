@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     MEMORY_WARN_MB: int = 800
     MEMORY_CRITICAL_MB: int = 1200
 
+    # ── Telegram MTProto API (for session generator) ──────────────────────
+    TG_API_ID: Optional[int] = None    # From my.telegram.org/apps
+    TG_API_HASH: Optional[str] = None  # From my.telegram.org/apps
+
     # ── Stars Economy ──────────────────────────────────────────────────────
     REFERRAL_BONUS_STARS: int = 100
     REFERRAL_REFERRED_BONUS: int = 50

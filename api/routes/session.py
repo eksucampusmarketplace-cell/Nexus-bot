@@ -13,6 +13,7 @@ import struct
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import get_current_user
+from config import settings
 
 router = APIRouter(tags=["session"])
 log = logging.getLogger(__name__)
@@ -49,3 +50,12 @@ async def convert_session(body: dict, user: dict = Depends(get_current_user)):
     except Exception as e:
         log.warning(f"[SESSION] Conversion failed: {type(e).__name__}")
         raise HTTPException(400, f"Invalid session format: {str(e)}")
+
+
+@router.get("/api/session/config")
+async def get_session_config():
+    """Public config for MTProto client. api_id is not secret."""
+    return {
+        "api_id": int(settings.TG_API_ID or 0),
+        "api_hash": settings.TG_API_HASH or "",
+    }

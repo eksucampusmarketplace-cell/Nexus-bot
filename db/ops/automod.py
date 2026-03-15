@@ -4,8 +4,6 @@ db/ops/automod.py
 All database operations for advanced automod features.
 """
 
-from db.client import db
-
 # ── Rule Time Windows ───────────────────────────────────────────────────────
 
 
@@ -359,7 +357,7 @@ async def update_group_setting(pool, chat_id: int, key: str, value):
             if isinstance(settings, str):
                 try:
                     settings = json.loads(settings)
-                except:
+                except Exception:
                     settings = {}
             elif settings is None:
                 settings = {}
@@ -451,7 +449,7 @@ async def bulk_update_group_settings(pool, chat_id: int, settings: dict):
                 if isinstance(row["settings"], str):
                     try:
                         current = json.loads(row["settings"])
-                    except:
+                    except Exception:
                         current = {}
                 else:
                     current = dict(row["settings"])
@@ -488,7 +486,7 @@ async def set_timed_lock(pool, chat_id: int, rule_key: str, start_time: str, end
         elif isinstance(row["settings"], str):
             try:
                 settings = json.loads(row["settings"])
-            except:
+            except Exception:
                 settings = {}
         else:
             settings = dict(row["settings"]) or {}
@@ -514,7 +512,7 @@ async def remove_timed_lock(pool, chat_id: int, rule_key: str):
         if isinstance(row["settings"], str):
             try:
                 settings = json.loads(row["settings"])
-            except:
+            except Exception:
                 return
         else:
             settings = dict(row["settings"]) or {}
@@ -564,9 +562,10 @@ async def get_user_warning_count(pool, chat_id: int, user_id: int) -> int:
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             """
-            SELECT COUNT(*) FROM user_warnings
+            SELECT COUNT(*) FROM warnings
             WHERE chat_id=$1 AND user_id=$2
-            AND created_at > NOW() - INTERVAL '7 days'
+            AND is_active = TRUE
+            AND issued_at > NOW() - INTERVAL '7 days'
             """,
             chat_id,
             user_id,
@@ -588,7 +587,7 @@ async def get_group_settings(pool, chat_id: int) -> dict:
     if isinstance(settings_json, str):
         try:
             settings_json = json.loads(settings_json)
-        except:
+        except Exception:
             settings_json = {}
 
     # Also get modules
@@ -596,7 +595,7 @@ async def get_group_settings(pool, chat_id: int) -> dict:
     if isinstance(modules_json, str):
         try:
             modules_json = json.loads(modules_json)
-        except:
+        except Exception:
             modules_json = {}
     if modules_json is None:
         modules_json = {}

@@ -1,14 +1,11 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 
 from api.auth import get_current_user
-from config import settings
-from db.client import db
 
 log = logging.getLogger("sse")
 router = APIRouter(prefix="/api/events")
@@ -16,13 +13,15 @@ router = APIRouter(prefix="/api/events")
 
 @router.get("/moderation/{chat_id}")
 async def moderation_events(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
+    redis = getattr(request.app.state, "redis", None)
+
     async def event_stream():
-        if not db.redis:
+        if not redis:
             yield 'data: {"error": "Redis not available"}\n\n'
             return
 
         channel = f"nexus:events:{chat_id}"
-        pubsub = db.redis.pubsub()
+        pubsub = redis.pubsub()
         await pubsub.subscribe(channel)
 
         try:

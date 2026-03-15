@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
         raise
 
     pool = db.pool
+    app.state.db = pool
+    app.state.redis = None
 
     # Run all pending migrations before anything else
     try:
@@ -66,6 +68,7 @@ async def lifespan(app: FastAPI):
 
         redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         await redis_client.ping()
+        app.state.redis = redis_client
         logger.info("[STARTUP] ✅ Redis connected")
     except Exception as e:
         logger.warning(f"[STARTUP] ⚠️ Failed to connect to Redis: {e}")
@@ -136,6 +139,8 @@ async def lifespan(app: FastAPI):
             status="active",
         )
         await registry_register(primary_me.id, primary_app)
+        app.state.bot = primary_app.bot
+        app.state.lazy_manager = None
 
     except Exception as e:
         logger.critical(f"[STARTUP] ❌ Failed to start primary bot: {e}")
@@ -268,7 +273,6 @@ try:
         channel_gate,
         channels,
         engagement,
-        events,
         events_new,
         games,
         groups,
@@ -303,7 +307,6 @@ try:
 
     # Routes with full paths defined in the router (no prefix needed)
     app.include_router(automod.router, tags=["automod"])
-    app.include_router(events.router, tags=["events"])
     app.include_router(events_new.router, tags=["events_new"])
     app.include_router(scheduler.router, tags=["scheduler"])
     app.include_router(log_channel.router, tags=["log_channel"])

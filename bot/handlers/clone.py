@@ -1012,7 +1012,7 @@ clone_conversation = ConversationHandler(
     states={
         WAITING_FOR_TOKEN: [
             MessageHandler(
-                filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d{8,12}:[\w-]{35,50}$"),
+                filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d{8,12}:[\w\-]{35,50}$"),
                 token_input_handler,
             ),
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel$"),

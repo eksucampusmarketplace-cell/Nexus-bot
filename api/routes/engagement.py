@@ -33,11 +33,31 @@ async def get_pool():
 async def get_xp_leaderboard(
     chat_id: int, limit: int = 10, offset: int = 0, user=Depends(require_auth)
 ):
-    """Get paginated XP leaderboard for a group."""
+    """Get paginated XP leaderboard for a group with enriched user data."""
     pool = await get_pool()
     from db.ops.engagement import get_xp_leaderboard as get_lb
 
     leaderboard = await get_lb(pool, chat_id, user["bot_id"], limit, offset)
+    
+    # Enrich with user display names and badges from users table
+    async with pool.acquire() as conn:
+        for entry in leaderboard:
+            user_id = entry.get("user_id")
+            if user_id:
+                user_row = await conn.fetchrow(
+                    "SELECT first_name, username FROM users WHERE user_id = $1 AND chat_id = $2",
+                    user_id, chat_id
+                )
+                if user_row:
+                    entry["first_name"] = user_row.get("first_name") or entry.get("first_name", "Unknown")
+                    entry["username"] = user_row.get("username") or entry.get("username", "")
+                # Get badges for user
+                badge_rows = await conn.fetch(
+                    "SELECT badge_id FROM user_badges WHERE user_id = $1 AND chat_id = $2",
+                    user_id, chat_id
+                )
+                entry["badges"] = [r["badge_id"] for r in badge_rows]
+    
     return {"leaderboard": leaderboard}
 
 

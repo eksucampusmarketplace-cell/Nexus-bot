@@ -8,6 +8,31 @@ from db.client import db
 
 log = logging.getLogger("[MOD_LOCKS]")
 
+# Valid lock types with miniapp-compatible column names
+VALID_LOCKS = [
+    "media", "photo", "video",
+    "stickers", "sticker",
+    "gifs", "gif",
+    "links", "link",
+    "forwards", "forward",
+    "polls", "poll",
+    "games",
+    "voice",
+    "video_notes",
+    "contacts", "contact",
+]
+
+# Map legacy names to new column names
+LOCK_COLUMN_MAP = {
+    "media": "photo",  # Legacy command uses 'media', DB column is 'photo'
+    "stickers": "sticker",
+    "gifs": "gif",
+    "links": "link",
+    "forwards": "forward",
+    "polls": "poll",
+    "contacts": "contact",
+}
+
 
 async def lock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -23,39 +48,37 @@ async def lock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lock_type = context.args[0].lower()
 
     # Update DB
-    valid_locks = [
-        "media",
-        "stickers",
-        "gifs",
-        "links",
-        "forwards",
-        "polls",
-        "games",
-        "voice",
-        "video_notes",
-        "contacts",
-    ]
-    if lock_type not in valid_locks and lock_type != "all":
-        await update.message.reply_text(f"❌ Invalid lock type. Valid: {', '.join(valid_locks)}")
+    if lock_type not in VALID_LOCKS and lock_type != "all":
+        await update.message.reply_text(f"❌ Invalid lock type. Valid: {', '.join(VALID_LOCKS[:10])}...")
         return
 
     # For simplicity, we'll just update the DB. Actual enforcement should be in message_guard.py
     if lock_type == "all":
-        updates = {lock_item: True for lock_item in valid_locks}
+        # Use new column names for all locks
+        updates = {
+            "photo": True, "video": True, "sticker": True, "gif": True,
+            "link": True, "forward": True, "poll": True, "games": True,
+            "voice": True, "video_notes": True, "contact": True
+        }
     else:
-        updates = {lock_type: True}
+        # Map legacy name to column name if needed
+        column = LOCK_COLUMN_MAP.get(lock_type, lock_type)
+        updates = {column: True}
 
-    # Build query
+    # Build query using proper asyncpg context
     columns = ", ".join(updates.keys())
-    values = ", ".join(["True"] * len(updates))
+    placeholders = ", ".join([f"${i+2}" for i in range(len(updates))])
+    values = list(updates.values())
 
-    await db.execute(
-        f"""
-        INSERT INTO locks (chat_id, {columns}) VALUES ($1, {values})
-        ON CONFLICT (chat_id) DO UPDATE SET {", ".join([f"{k}=True" for k in updates.keys()])}
-    """,
-        chat_id,
-    )
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            f"""
+            INSERT INTO locks (chat_id, {columns}) VALUES ($1, {placeholders})
+            ON CONFLICT (chat_id) DO UPDATE SET {", ".join([f"{k}=EXCLUDED.{k}" for k in updates.keys()])}
+            """,
+            chat_id,
+            *values
+        )
 
     await update.message.reply_text(f"🔒 Locked: {lock_type}")
     await publish_event(chat_id, "lock_change", {"lock_type": lock_type, "enabled": True})
@@ -70,33 +93,29 @@ async def unlock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     lock_type = context.args[0].lower()
 
-    valid_locks = [
-        "media",
-        "stickers",
-        "gifs",
-        "links",
-        "forwards",
-        "polls",
-        "games",
-        "voice",
-        "video_notes",
-        "contacts",
-    ]
-
     if lock_type == "all":
-        updates = {lock_item: False for lock_item in valid_locks}
-    elif lock_type in valid_locks:
-        updates = {lock_type: False}
+        updates = {
+            "photo": False, "video": False, "sticker": False, "gif": False,
+            "link": False, "forward": False, "poll": False, "games": False,
+            "voice": False, "video_notes": False, "contact": False
+        }
+    elif lock_type in VALID_LOCKS:
+        column = LOCK_COLUMN_MAP.get(lock_type, lock_type)
+        updates = {column: False}
     else:
         return
 
-    await db.execute(
-        f"""
-        INSERT INTO locks (chat_id, {", ".join(updates.keys())}) VALUES ($1, {", ".join(["False"] * len(updates))})
-        ON CONFLICT (chat_id) DO UPDATE SET {", ".join([f"{k}=False" for k in updates.keys()])}
-    """,
-        chat_id,
-    )
+    async with db.pool.acquire() as conn:
+        placeholders = ", ".join([f"${i+2}" for i in range(len(updates))])
+        values = list(updates.values())
+        await conn.execute(
+            f"""
+            INSERT INTO locks (chat_id, {", ".join(updates.keys())}) VALUES ($1, {placeholders})
+            ON CONFLICT (chat_id) DO UPDATE SET {", ".join([f"{k}=EXCLUDED.{k}" for k in updates.keys()])}
+            """,
+            chat_id,
+            *values
+        )
 
     await update.message.reply_text(f"🔓 Unlocked: {lock_type}")
     await publish_event(chat_id, "lock_change", {"lock_type": lock_type, "enabled": False})

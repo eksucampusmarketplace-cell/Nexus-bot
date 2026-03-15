@@ -571,6 +571,12 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(h)
     logger.info("[FACTORY] Engagement handlers registered")
 
+    # ── CAPTCHA Callback Handlers ──────────────────────────────────────────
+    # CRITICAL: Register captcha callback handlers so button clicks work
+    from bot.handlers.captcha_callback import handle_captcha_callback
+    app.add_handler(CallbackQueryHandler(handle_captcha_callback, pattern=r"^captcha:"))
+    logger.info("[FACTORY] CAPTCHA callback handlers registered")
+
     logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
     return app
 

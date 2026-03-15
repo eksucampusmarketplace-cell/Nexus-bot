@@ -105,25 +105,42 @@ async def require_auth(request: Request):
     """
     Enhanced auth that includes user_id and bot_id for engagement routes.
     Returns a dict with user_id, bot_id, and other user info.
+    Derives bot_id from validated_bot_token when possible.
     """
     user = await get_current_user(request)
 
     # Add user_id alias for compatibility with engagement routes
     user["user_id"] = user.get("id")
 
-    # Try to get bot_id from request state or default to primary bot
-    bot_id = getattr(request.state, "bot_id", None)
-    if bot_id:
-        user["bot_id"] = bot_id
-    else:
-        # Default to primary bot id
+    # Derive bot_id from validated_bot_token if available
+    validated_token = user.get("validated_bot_token")
+    if validated_token:
         from bot.registry import get_all
-
+        from bot.utils.crypto import hash_token
+        
+        token_hash = hash_token(validated_token)
         bots = get_all()
-        if bots:
-            # Get first bot's id (typically primary)
-            user["bot_id"] = list(bots.keys())[0]
+        for bot_id, bot_app in bots.items():
+            if bot_app.bot.token == validated_token:
+                user["bot_id"] = bot_id
+                break
         else:
-            user["bot_id"] = 0
+            # Fallback: use hash prefix as bot_id if no match
+            user["bot_id"] = int(token_hash[:10], 16) % (10**10)
+    else:
+        # Try to get bot_id from request state or default to primary bot
+        bot_id = getattr(request.state, "bot_id", None)
+        if bot_id:
+            user["bot_id"] = bot_id
+        else:
+            # Default to primary bot id
+            from bot.registry import get_all
+
+            bots = get_all()
+            if bots:
+                # Get first bot's id (typically primary)
+                user["bot_id"] = list(bots.keys())[0]
+            else:
+                user["bot_id"] = 0
 
     return user

@@ -69,10 +69,12 @@ async def lifespan(app: FastAPI):
         redis_client = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
         await redis_client.ping()
         app.state.redis = redis_client
+        db.redis = redis_client  # Make Redis available via db client
         logger.info("[STARTUP] ✅ Redis connected")
     except Exception as e:
         logger.warning(f"[STARTUP] ⚠️ Failed to connect to Redis: {e}")
         redis_client = None
+        db.redis = None
 
     # Primary bot
     primary_token = settings.PRIMARY_BOT_TOKEN
@@ -115,6 +117,13 @@ async def lifespan(app: FastAPI):
         logger.info(
             f"[STARTUP] ✅ Primary bot @{primary_me.username} (ID: {primary_me.id}) is online"
         )
+
+        # Check privacy mode (critical for group message handling)
+        can_read_all = getattr(primary_me, 'can_read_all_group_messages', None)
+        if can_read_all is False:
+            logger.warning("[STARTUP] ⚠️ PRIVACY MODE IS ON — Bot can only see messages that start with /")
+            logger.warning("[STARTUP] ⚠️ To fix: Open @BotFather → Bot Settings → Group Privacy → Turn OFF")
+            logger.warning("[STARTUP] ⚠️ Without this: automod, filters, and blacklist will NOT work in groups")
 
         # Auto-set MAIN_BOT_USERNAME if not configured
         if not settings.MAIN_BOT_USERNAME:

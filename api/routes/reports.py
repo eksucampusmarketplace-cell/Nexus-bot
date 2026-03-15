@@ -45,8 +45,17 @@ async def list_all_reports(
 ):
     """Return all reports for the group with optional status filter."""
     rows = await db_reports.get_all_reports(db.pool, chat_id, limit=limit)
+    # Filter by status if provided
     if status:
-        rows = [r for r in rows if r["status"] == status]
+        status_lower = status.lower()
+        if status_lower == "open":
+            rows = [r for r in rows if r.get("status") in (None, "open", "pending")]
+        elif status_lower == "resolved":
+            rows = [r for r in rows if r.get("status") == "resolved"]
+        elif status_lower == "dismissed":
+            rows = [r for r in rows if r.get("status") == "dismissed"]
+        else:
+            rows = [r for r in rows if r.get("status") == status_lower]
     return {"reports": rows, "count": len(rows)}
 
 

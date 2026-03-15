@@ -611,12 +611,13 @@ async function _renderFiltersTab(container, chatId) {
 
   const addFilterRow = document.createElement('div');
   addFilterRow.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+  // Use textarea for response to support multiline and button syntax
   addFilterRow.innerHTML = `
     <div style="display:flex;gap:var(--sp-2);">
       <input type="text" id="filter-keyword" class="input" placeholder="Keyword" style="flex:1;">
-      <input type="text" id="filter-response" class="input" placeholder="Response" style="flex:2;">
       <button id="add-filter-btn" class="btn btn-primary" style="white-space:nowrap;">Add</button>
     </div>
+    <textarea id="filter-response" class="input" placeholder="Response text (supports HTML, Markdown, and inline buttons via --- syntax: e.g., 'Hello! --- Button1|Button2')" rows="3" style="width:100%;resize:vertical;"></textarea>
   `;
 
   filtersCard.appendChild(filtersList);

@@ -185,6 +185,9 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     else:
         role = "stranger"
 
+    # Check if user is the owner (for owner panel gating)
+    is_sudo = user_id == settings.OWNER_ID
+
     # Build user object
     user_obj = {
         "id": user_id,
@@ -209,6 +212,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         "user": user_obj,
         "user_id": user_id,
         "role": role,
+        "is_sudo": is_sudo,
         "groups": all_managed_groups,
         "admin_groups": admin_groups,
         "mod_groups": mod_groups,
@@ -220,7 +224,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     }
 
     logger.info(
-        f"[ME] User context ready | user_id={user_id} role={role} "
+        f"[ME] User context ready | user_id={user_id} role={role} is_sudo={is_sudo} "
         f"admin={len(admin_groups)} member={len(member_groups)}"
     )
 

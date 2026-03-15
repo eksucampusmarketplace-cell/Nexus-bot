@@ -28,12 +28,21 @@ export class GroupSwitcher {
     let data = {};
     try {
       data = await apiFetch('/api/me');
-      this._store.setState({ userContext: data });
+      // Store full response as userContext (includes is_sudo, bot_info, role)
+      this._store.setState({ 
+        userContext: data,
+        user: data.user,
+        is_sudo: data.is_sudo,
+        role: data.role,
+        bot_info: data.bot_info
+      });
       console.log('[GroupSwitcher] Received user data:', {
         admin_groups: data.admin_groups?.length || 0,
         mod_groups: data.mod_groups?.length || 0,
         member_groups: data.member_groups?.length || 0,
-        groups: data.groups?.length || 0
+        groups: data.groups?.length || 0,
+        is_sudo: data.is_sudo,
+        role: data.role
       });
     } catch (e) {
       console.error('[GroupSwitcher] Failed to load /api/me:', e.message);

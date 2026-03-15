@@ -230,3 +230,33 @@ async def export_activity_log(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/api/groups/{chat_id}/log-channel/test")
+async def test_log_channel(chat_id: int, request: Request):
+    """Send a test message to the configured log channel."""
+    pool = _get_pool(request)
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id=$1", chat_id)
+    if not row:
+        return {"ok": False, "error": "Group not found"}
+    settings = row["settings"] or {}
+    if isinstance(settings, str):
+        try:
+            settings = json.loads(settings)
+        except Exception:
+            settings = {}
+    log_channel_id = settings.get("log_channel_id")
+    if not log_channel_id:
+        return {"ok": False, "error": "No log channel configured"}
+    from bot.registry import get_all
+    for bid, app_instance in get_all().items():
+        try:
+            await app_instance.bot.send_message(
+                chat_id=int(log_channel_id),
+                text="✅ Test message from Nexus Bot — log channel is working!",
+            )
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    return {"ok": False, "error": "No active bot"}

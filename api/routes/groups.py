@@ -118,3 +118,34 @@ async def copy_settings_to_groups(
             results.append({"chat_id": target_id, "ok": False, "error": str(e)})
 
     return {"ok": True, "results": results}
+
+
+@router.post("/{chat_id}/actions/slowmode")
+async def set_slowmode(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
+    seconds = max(0, min(3600, int(body.get("seconds", 0))))
+    from bot.registry import get_all
+    for bid, app_instance in get_all().items():
+        try:
+            await app_instance.bot.set_chat_slow_mode_delay(chat_id, seconds)
+            break
+        except Exception:
+            continue
+    return {"ok": True, "seconds": seconds}
+
+
+@router.delete("/{chat_id}/settings/reset")
+async def reset_settings(chat_id: int, user: dict = Depends(get_current_user)):
+    await update_group_settings(chat_id, {})
+    return {"ok": True}
+
+
+@router.post("/{chat_id}/actions/leave")
+async def leave_group(chat_id: int, user: dict = Depends(get_current_user)):
+    from bot.registry import get_all
+    for bid, app_instance in get_all().items():
+        try:
+            await app_instance.bot.leave_chat(chat_id)
+            break
+        except Exception:
+            continue
+    return {"ok": True}

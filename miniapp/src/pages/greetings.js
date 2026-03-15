@@ -192,6 +192,9 @@ export async function renderGreetingsPage(container) {
     const card = _buildMessageCard(msgType, textConfig, chatId, initData);
     container.appendChild(card);
   });
+
+  const notesSection = await _renderNotesSection(chatId);
+  container.appendChild(notesSection);
 }
 
 function _buildMessageCard(msgType, textConfig, chatId, initData) {
@@ -350,6 +353,36 @@ function _populateCardBody(body, msgType, displayText, isCustomized, textConfig,
     });
     dmRow.appendChild(Toggle_el);
     editorWrap.appendChild(dmRow);
+  }
+
+  if (msgType.id === 'welcome') {
+    const currentDeleteVal = textConfig.welcome_delete_after || 0;
+    const deleteRow = document.createElement('div');
+    deleteRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-top:var(--sp-2);padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border:1px solid var(--border);';
+    const deleteOpts = [{v:0,l:'Never'},{v:30,l:'30 sec'},{v:60,l:'1 min'},{v:300,l:'5 min'},{v:600,l:'10 min'}];
+    deleteRow.innerHTML = `
+      <div>
+        <div style="font-size:var(--text-sm);font-weight:var(--fw-medium);">Auto-delete welcome</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">Delete welcome message after sending</div>
+      </div>
+      <select class="input" id="welcome-delete-select" style="width:auto;padding:var(--sp-2) var(--sp-3);">
+        ${deleteOpts.map(o => `<option value="${o.v}" ${currentDeleteVal == o.v ? 'selected' : ''}>${o.l}</option>`).join('')}
+      </select>
+    `;
+    deleteRow.querySelector('#welcome-delete-select').onchange = async (e) => {
+      try {
+        await apiFetch(`/api/groups/${chatId}/text-config`, {
+          method: 'PUT',
+          body: JSON.stringify({ welcome_delete_after: parseInt(e.target.value) }),
+        });
+        showToast('Auto-delete saved', 'success');
+      } catch (err) {
+        showToast('Failed to save', 'error');
+      }
+    };
+    editorWrap.appendChild(deleteRow);
+
+    _renderButtonBuilder(editorWrap, textConfig, chatId);
   }
 
   body.appendChild(editorWrap);
@@ -545,4 +578,151 @@ function _showPreviewModal(title, htmlContent) {
   overlay.onclick = e => { if (e.target === overlay) close(); };
   overlay.appendChild(box);
   document.body.appendChild(overlay);
+}
+
+function _renderButtonBuilder(container, textConfig, chatId) {
+  const buttons = textConfig.welcome_buttons || [];
+
+  const section = document.createElement('div');
+  section.style.cssText = 'margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--border);';
+  section.innerHTML = `
+    <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">
+      Inline Buttons (optional)
+    </div>
+    <div id="btn-list" style="display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-2);"></div>
+    <button id="add-btn-row" class="btn btn-secondary" style="font-size:var(--text-xs);width:100%;">+ Add Button</button>
+  `;
+
+  const btnList = section.querySelector('#btn-list');
+  let currentButtons = buttons.map(b => ({ ...b }));
+
+  const renderBtnList = () => {
+    btnList.innerHTML = '';
+    currentButtons.forEach((b, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:var(--sp-2);align-items:center;';
+      row.innerHTML = `
+        <input class="input" value="${b.text || ''}" placeholder="Button label" style="flex:1;">
+        <input class="input" value="${b.url || ''}" placeholder="https://..." style="flex:2;">
+        <button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;">×</button>
+      `;
+      row.querySelectorAll('input')[0].oninput = e => { currentButtons[i].text = e.target.value; };
+      row.querySelectorAll('input')[1].oninput = e => { currentButtons[i].url = e.target.value; };
+      row.querySelector('button').onclick = () => {
+        currentButtons.splice(i, 1);
+        renderBtnList();
+        _saveButtons(chatId, currentButtons);
+      };
+      btnList.appendChild(row);
+    });
+  };
+
+  section.querySelector('#add-btn-row').onclick = () => {
+    currentButtons.push({ text: '', url: '' });
+    renderBtnList();
+  };
+
+  section.addEventListener('focusout', () => _saveButtons(chatId, currentButtons));
+
+  renderBtnList();
+  container.appendChild(section);
+}
+
+async function _saveButtons(chatId, buttons) {
+  const valid = buttons.filter(b => b.text && b.url);
+  try {
+    await apiFetch(`/api/groups/${chatId}/text-config`, {
+      method: 'PUT',
+      body: JSON.stringify({ welcome_buttons: valid }),
+    });
+  } catch (e) {
+    showToast('Failed to save buttons', 'error');
+  }
+}
+
+async function _renderNotesSection(chatId) {
+  const wrapper = document.createElement('div');
+
+  let notes = [];
+  try {
+    const res = await apiFetch(`/api/groups/${chatId}/notes`);
+    notes = res.data || res.notes || res || [];
+  } catch (e) {
+    notes = [];
+  }
+
+  const card = Card({
+    title: '📝 Saved Notes',
+    subtitle: 'Notes are retrieved with /note <name> or via inline mode',
+  });
+
+  const form = document.createElement('div');
+  form.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3);';
+  form.innerHTML = `
+    <div style="display:flex;gap:var(--sp-2);">
+      <input id="note-name" class="input" placeholder="Note name (e.g. rules, faq)" style="flex:1;">
+    </div>
+    <textarea id="note-content" class="input" placeholder="Note content..." style="min-height:60px;resize:vertical;font-family:inherit;"></textarea>
+    <button id="note-save-btn" class="btn btn-primary" style="align-self:flex-start;">💾 Save Note</button>
+  `;
+  card.appendChild(form);
+
+  const notesList = document.createElement('div');
+  notesList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+
+  const renderNotes = (noteData) => {
+    notesList.innerHTML = '';
+    if (!noteData.length) {
+      notesList.innerHTML = '<div style="color:var(--text-muted);font-size:var(--text-sm);text-align:center;padding:var(--sp-3);">No notes yet</div>';
+      return;
+    }
+    noteData.forEach(n => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border:1px solid var(--border);';
+      row.innerHTML = `
+        <div style="flex:1;min-width:0;">
+          <span style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">#${n.name}</span>
+          <span style="color:var(--text-muted);font-size:var(--text-xs);margin-left:var(--sp-2);">${n.media_type ? '📎 ' + n.media_type : (n.content || '').slice(0, 60)}</span>
+        </div>
+        <button data-del="${n.name}" style="background:none;border:1px solid var(--danger);border-radius:var(--r-lg);padding:2px 8px;font-size:var(--text-xs);color:var(--danger);cursor:pointer;">Delete</button>
+      `;
+      row.querySelector('[data-del]').onclick = async () => {
+        try {
+          await apiFetch(`/api/groups/${chatId}/notes/${n.name}`, { method: 'DELETE' });
+          showToast(`Note #${n.name} deleted`, 'success');
+          notes = notes.filter(x => x.name !== n.name);
+          renderNotes(notes);
+        } catch (e) {
+          showToast('Failed to delete note', 'error');
+        }
+      };
+      notesList.appendChild(row);
+    });
+  };
+
+  card.appendChild(notesList);
+  renderNotes(notes);
+
+  form.querySelector('#note-save-btn').onclick = async () => {
+    const name = form.querySelector('#note-name').value.trim().toLowerCase();
+    const content = form.querySelector('#note-content').value.trim();
+    if (!name) { showToast('Note name required', 'error'); return; }
+    try {
+      await apiFetch(`/api/groups/${chatId}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ name, content }),
+      });
+      showToast(`Note #${name} saved`, 'success');
+      form.querySelector('#note-name').value = '';
+      form.querySelector('#note-content').value = '';
+      const res = await apiFetch(`/api/groups/${chatId}/notes`);
+      notes = res.data || res.notes || res || [];
+      renderNotes(notes);
+    } catch (e) {
+      showToast('Failed to save note', 'error');
+    }
+  };
+
+  wrapper.appendChild(card);
+  return wrapper;
 }

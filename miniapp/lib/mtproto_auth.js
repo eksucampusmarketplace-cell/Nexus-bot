@@ -19,20 +19,43 @@
 
 import MTProto from '@mtproto/core';
 
-const API_ID   = import.meta.env.VITE_TG_API_ID;
-const API_HASH = import.meta.env.VITE_TG_API_HASH;
-// These are the SAME api_id/api_hash used by your Pyrogram clients
-// Safe to expose in frontend — Telegram API ID is not secret
+let _cachedConfig = null;
+async function _getConfig() {
+  if (_cachedConfig) return _cachedConfig;
+  try {
+    const res = await fetch('/api/session/config');
+    if (res.ok) {
+      _cachedConfig = await res.json();
+    } else {
+      _cachedConfig = { api_id: 0, api_hash: '' };
+    }
+  } catch (e) {
+    _cachedConfig = { api_id: 0, api_hash: '' };
+  }
+  return _cachedConfig;
+}
 
 export class MtprotoAuth {
-  constructor() {
-    this.mtproto = new MTProto({
-      api_id:   parseInt(API_ID),
-      api_hash: API_HASH,
-    });
+  constructor(apiId, apiHash) {
+    this._apiId   = apiId   || 0;
+    this._apiHash = apiHash || '';
+    this.mtproto  = null;
     this._phone      = '';
     this._phone_hash = '';
     this._password   = null;
+  }
+
+  async _init() {
+    if (this.mtproto) return;
+    if (!this._apiId || !this._apiHash) {
+      const cfg = await _getConfig();
+      this._apiId   = cfg.api_id;
+      this._apiHash = cfg.api_hash;
+    }
+    this.mtproto = new MTProto({
+      api_id:   parseInt(this._apiId),
+      api_hash: this._apiHash,
+    });
   }
 
 
@@ -42,12 +65,13 @@ export class MtprotoAuth {
      * Sends OTP to the phone number via Telegram.
      * FROM USER'S BROWSER IP — zero server involvement.
      */
+    await this._init();
     this._phone = phone.trim().replace(/\s/g, '');
     try {
       const result = await this.mtproto.call('auth.sendCode', {
         phone_number:   this._phone,
-        api_id:         parseInt(API_ID),
-        api_hash:       API_HASH,
+        api_id:         parseInt(this._apiId),
+        api_hash:       this._apiHash,
         settings:       { _: 'codeSettings' },
       });
       this._phone_hash = result.phone_code_hash;
@@ -134,10 +158,11 @@ export class MtprotoAuth {
      * Returns QR URL to render as QR code image.
      * Poll checkQR() every 5s until scanned.
      */
+    await this._init();
     try {
       const result = await this.mtproto.call('auth.exportLoginToken', {
-        api_id:        parseInt(API_ID),
-        api_hash:      API_HASH,
+        api_id:        parseInt(this._apiId),
+        api_hash:      this._apiHash,
         except_ids:    [],
       });
 
@@ -211,7 +236,7 @@ export class MtprotoAuth {
       dc_id:    dcId   || 2,
       auth_key: authKey ? Array.from(authKey) : [],
       user_id:  userId || 0,
-      api_id:   parseInt(API_ID),
+      api_id:   parseInt(this._apiId),
     };
 
     return btoa(JSON.stringify(sessionData));

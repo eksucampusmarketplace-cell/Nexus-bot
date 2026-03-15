@@ -292,6 +292,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.blacklist import blacklist_command, unblacklist_command, blacklistmode_command
 
     app.add_handler(CommandHandler("filter", filter_command, filters=GROUP))
+    app.add_handler(CommandHandler("filters", filters_list_command, filters=GROUP))
     app.add_handler(CommandHandler("stop", stop_filter_command, filters=GROUP))
     app.add_handler(CommandHandler("stopall", stopall_command, filters=GROUP))
     app.add_handler(CommandHandler("blacklist", blacklist_command, filters=GROUP))

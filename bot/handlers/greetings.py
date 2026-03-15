@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from telegram import Chat, Update, User
+from telegram import Chat, InlineKeyboardButton, InlineKeyboardMarkup, Update, User
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
@@ -19,40 +19,49 @@ async def _delete_after(message, seconds: int):
         pass
 
 
-async def send_welcome_in_group(update, context, user, chat, processed_welcome, media=None):
+async def send_welcome_in_group(update, context, user, chat, processed_welcome, media=None, reply_markup=None, delete_after=0):
+    sent_message = None
     try:
         if media:
             file_id = media["file_id"]
             media_type = media["type"]
             if media_type == "photo":
-                await context.bot.send_photo(
+                sent_message = await context.bot.send_photo(
                     chat_id=chat.id,
                     photo=file_id,
                     caption=processed_welcome,
                     parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
                 )
             elif media_type == "video":
-                await context.bot.send_video(
+                sent_message = await context.bot.send_video(
                     chat_id=chat.id,
                     video=file_id,
                     caption=processed_welcome,
                     parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
                 )
             elif media_type == "animation":
-                await context.bot.send_animation(
+                sent_message = await context.bot.send_animation(
                     chat_id=chat.id,
                     animation=file_id,
                     caption=processed_welcome,
                     parse_mode=ParseMode.HTML,
+                    reply_markup=reply_markup,
                 )
         else:
-            await context.bot.send_message(
-                chat_id=chat.id, text=processed_welcome, parse_mode=ParseMode.HTML
+            sent_message = await context.bot.send_message(
+                chat_id=chat.id, text=processed_welcome, parse_mode=ParseMode.HTML,
+                reply_markup=reply_markup,
             )
 
         logger.info(
             f"[WELCOME] Sent | chat_id={chat.id} | user_id={user.id} | mode=group | media={'photo' if media else 'none'}"
         )
+
+        if delete_after and delete_after > 0 and sent_message:
+            asyncio.create_task(_delete_after(sent_message, delete_after))
+
     except Exception as e:
         logger.error(f"[WELCOME] Failed to send in group: {e}")
 
@@ -89,6 +98,15 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         media = text_config.get("welcome_media")  # {file_id: x, type: photo}
         send_as_dm = text_config.get("welcome_dm", False)
+        delete_after = text_config.get("welcome_delete_after", 0) or 0
+
+        buttons_config = text_config.get("welcome_buttons", [])
+        reply_markup = None
+        if buttons_config:
+            keyboard = [[InlineKeyboardButton(b["text"], url=b["url"])
+                         for b in buttons_config if b.get("text") and b.get("url")]]
+            if keyboard and keyboard[0]:
+                reply_markup = InlineKeyboardMarkup(keyboard)
 
         if send_as_dm:
             try:
@@ -102,9 +120,9 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.info(f"[WELCOME] Sent | chat_id={chat.id} | user_id={user.id} | mode=dm")
             except Exception as e:
                 logger.info(f"[WELCOME] DM blocked fallback | user_id={user.id}")
-                await send_welcome_in_group(update, context, user, chat, processed_welcome, media)
+                await send_welcome_in_group(update, context, user, chat, processed_welcome, media, reply_markup, delete_after)
         else:
-            await send_welcome_in_group(update, context, user, chat, processed_welcome, media)
+            await send_welcome_in_group(update, context, user, chat, processed_welcome, media, reply_markup, delete_after)
 
 
 async def goodbye_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

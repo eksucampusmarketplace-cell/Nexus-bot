@@ -19,7 +19,6 @@ On ADD — decision tree:
 On REMOVE — mark group as left in DB.
 """
 
-import hashlib
 import logging
 
 from telegram import ChatMemberUpdated, Update
@@ -38,6 +37,7 @@ from db.ops.clone_groups import (
     mark_group_left,
     register_group,
 )
+from bot.utils.crypto import hash_token
 from db.ops.groups import upsert_group
 
 log = logging.getLogger("group_lifecycle")
@@ -127,13 +127,11 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 is_owner_group=True,
                 access_status="active",
             )
-            # Also register in main groups table
-            token_hash = hashlib.sha256(context.bot.token.encode()).hexdigest()[:10]
+            token_hash = hash_token(context.bot.token)
             try:
                 member_count = await chat.get_member_count()
             except Exception:
                 member_count = 0
-            # Fetch group photo
             photo_big = None
             photo_small = None
             try:
@@ -184,13 +182,11 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 is_owner_group=False,
                 access_status="active",
             )
-            # Also register in main groups table
-            token_hash = hashlib.sha256(context.bot.token.encode()).hexdigest()[:10]
+            token_hash = hash_token(context.bot.token)
             try:
                 member_count = await chat.get_member_count()
             except Exception:
                 member_count = 0
-            # Fetch group photo
             photo_big = None
             photo_small = None
             try:

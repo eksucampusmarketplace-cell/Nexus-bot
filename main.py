@@ -277,9 +277,11 @@ try:
         reports,
         roles,
         scheduler,
+        session as session_api,
         text_config,
         webhooks,
     )
+    from api.routes.antiraid import global_router as antiraid_global_router
 
     # Core API routers (need prefix since routes don't include it)
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
@@ -328,6 +330,8 @@ try:
     app.include_router(channels.router)  # prefix="/api/channels"
     app.include_router(member_stats.router)  # prefix="/api/me"
     app.include_router(antiraid_api.router)  # prefix="/api/groups/{chat_id}/antiraid"
+    app.include_router(antiraid_global_router)  # /api/antiraid/banlist
     app.include_router(notes_api.router)  # prefix="/api/groups/{chat_id}/notes"
+    app.include_router(session_api.router)  # /api/session/convert
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

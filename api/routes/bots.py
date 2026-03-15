@@ -476,6 +476,40 @@ async def update_bot_access(bot_id: int, request: Request, user: dict = Depends(
     return {"status": "updated", "bot_id": bot_id}
 
 
+@router.put("/{bot_id}/config")
+async def update_bot_config(bot_id: int, request: Request, user: dict = Depends(get_current_user)):
+    """Update clone bot config (group_limit, group_access_policy, bot_add_notifications)."""
+    from db.client import db
+    from db.ops.bots import update_bot_access_settings
+
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    user_id = user.get("id")
+    bot_record = await get_bot_by_id(db.pool, bot_id)
+
+    if not bot_record:
+        raise HTTPException(status_code=404, detail={"error": "Bot not found"})
+
+    if bot_record["owner_user_id"] != user_id:
+        raise HTTPException(status_code=403, detail={"error": "Not authorized"})
+
+    body = await request.json()
+    group_limit = body.get("group_limit")
+    group_access_policy = body.get("group_access_policy")
+    bot_add_notifications = body.get("bot_add_notifications")
+
+    await update_bot_access_settings(
+        db.pool,
+        bot_id,
+        group_limit=group_limit,
+        group_access_policy=group_access_policy,
+        bot_add_notifications=bot_add_notifications,
+    )
+
+    return {"ok": True, "bot_id": bot_id}
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Music Userbot Management Routes
 # ─────────────────────────────────────────────────────────────────────────────

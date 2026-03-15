@@ -96,11 +96,21 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     async with db_pool.acquire() as db:
-        # Load clone config
-        config = await get_clone_config(db, bot_id)
-        if not config:
-            log.error(f"[LIFECYCLE] Clone config not found | bot={bot_id}")
-            return
+        # Primary bot: unlimited groups, open policy, owner is OWNER_ID
+        is_primary_bot = context.bot_data.get("is_primary", False)
+        if is_primary_bot:
+            from config import settings as _settings
+            config = {
+                "owner_id": _settings.OWNER_ID,
+                "group_limit": 0,
+                "group_access_policy": "open",
+                "bot_add_notifications": False,
+            }
+        else:
+            config = await get_clone_config(db, bot_id)
+            if not config:
+                log.error(f"[LIFECYCLE] Clone config not found | bot={bot_id}")
+                return
 
         owner_id = config["owner_id"]
         group_limit = config["group_limit"]  # 1–5
@@ -401,7 +411,7 @@ async def _notify_owner_limit_hit(context, owner_id: int, chat, actor):
                 f"⚠️ <b>Group limit reached</b>\n\n"
                 f"Your bot was added to <b>{chat.title}</b> but had to leave "
                 f"because you've reached your group limit.\n\n"
-                f"To increase your limit (up to 5), update it with /cloneset."
+                f"To increase your limit, update it with /cloneset."
                 f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}"
             ),
             parse_mode=ParseMode.HTML,

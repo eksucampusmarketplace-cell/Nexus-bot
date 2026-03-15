@@ -114,6 +114,7 @@ async def upsert_bot(
 
     # Primary bot has unlimited groups (0 = unlimited), clones default to 1
     group_limit = 0 if is_primary else 1
+    group_policy = "open" if is_primary else "blocked"
 
     start = time.monotonic()
     async with pool.acquire() as conn:
@@ -131,6 +132,9 @@ async def upsert_bot(
                 token_hash = EXCLUDED.token_hash,
                 is_primary = EXCLUDED.is_primary,
                 status = EXCLUDED.status,
+                owner_user_id = COALESCE(EXCLUDED.owner_user_id, bots.owner_user_id),
+                group_access_policy = CASE WHEN bots.is_primary THEN 'open'
+                                           ELSE EXCLUDED.group_access_policy END,
                 updated_at = NOW()
             RETURNING *
             """,
@@ -145,7 +149,7 @@ async def upsert_bot(
             status,
             False,  # webhook_active default
             group_limit,  # 0 for primary (unlimited), 1 for clones
-            "blocked",  # group_access_policy default
+            group_policy,  # "open" for primary, "blocked" for clones
             False,  # bot_add_notifications default
         )
     duration = (time.monotonic() - start) * 1000

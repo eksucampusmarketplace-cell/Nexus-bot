@@ -42,64 +42,51 @@ async def group_details(chat_id: int, user: dict = Depends(get_current_user)):
     return group
 
 
+@router.get("/{chat_id}/settings")
+async def get_settings(chat_id: int, user=Depends(get_current_user)):
+    from db.ops.automod import get_group_settings
+    s = await get_group_settings(db.pool, chat_id)
+    return {"status": "ok", "settings": s}
+
+
+def _normalize_settings(incoming: dict, existing: dict):
+    if "locks" not in existing:
+        existing["locks"] = {}
+    for k, v in list(incoming.items()):
+        if k.startswith("lock_"):
+            existing["locks"][k[5:]] = v
+    incoming["locks"] = existing["locks"]
+
+    if "antiflood_limit" in incoming:
+        incoming["flood_threshold"] = incoming.pop("antiflood_limit")
+    if "antiflood_window" in incoming:
+        incoming["flood_window_sec"] = incoming.pop("antiflood_window")
+    if incoming.get("antiflood") is False:
+        incoming["flood_threshold"] = 0
+
+    if "automod" not in existing:
+        existing["automod"] = {}
+    if "antiflood" in incoming:
+        if "antiflood" not in existing["automod"]: existing["automod"]["antiflood"] = {}
+        existing["automod"]["antiflood"]["enabled"] = incoming["antiflood"]
+        if "flood_threshold" in incoming:
+            existing["automod"]["antiflood"]["flood_threshold"] = incoming["flood_threshold"]
+        if "flood_window_sec" in incoming:
+            existing["automod"]["antiflood"]["flood_window_sec"] = incoming["flood_window_sec"]
+    if "antilink" in incoming:
+        if "antilink" not in existing["automod"]: existing["automod"]["antilink"] = {}
+        existing["automod"]["antilink"]["enabled"] = incoming["antilink"]
+    incoming["automod"] = existing["automod"]
+
+
 @router.put("/{chat_id}/settings")
 async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get_current_user)):
-    # In a real app, verify user is admin in chat_id
-    await update_group_settings(chat_id, settings)
-    
-    # Dual-write column keys for captcha/antiraid settings (legacy compatibility)
-    import json
-    async with db.pool.acquire() as conn:
-        # Sync captcha_enabled to column if present
-        if "captcha_enabled" in settings:
-            await conn.execute(
-                "UPDATE groups SET captcha_enabled = $1 WHERE chat_id = $2",
-                bool(settings["captcha_enabled"]), chat_id
-            )
-        # Sync antiraid settings to columns if present
-        if "antiraid_enabled" in settings:
-            await conn.execute(
-                "UPDATE groups SET antiraid_enabled = $1 WHERE chat_id = $2",
-                bool(settings["antiraid_enabled"]), chat_id
-            )
-        # Sync legacy automod nested path for antiflood/antispam/antilink
-        current_row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
-        if current_row:
-            current_settings = current_row["settings"] or {}
-            if isinstance(current_settings, str):
-                try:
-                    current_settings = json.loads(current_settings)
-                except Exception:
-                    current_settings = {}
-            
-            # Ensure automod nested object exists
-            if "automod" not in current_settings:
-                current_settings["automod"] = {}
-            
-            # Sync antiflood settings
-            if "antiflood" in settings:
-                current_settings["automod"]["antiflood"] = settings["antiflood"]
-            if "antiflood_enabled" in settings:
-                current_settings["automod"]["antiflood"]["enabled"] = settings["antiflood_enabled"]
-            
-            # Sync antispam settings
-            if "antispam" in settings:
-                current_settings["automod"]["antispam"] = settings["antispam"]
-            if "antispam_enabled" in settings:
-                current_settings["automod"]["antispam"]["enabled"] = settings["antispam_enabled"]
-            
-            # Sync antilink settings
-            if "antilink" in settings:
-                current_settings["automod"]["antilink"] = settings["antilink"]
-            if "antilink_enabled" in settings:
-                current_settings["automod"]["antilink"]["enabled"] = settings["antilink_enabled"]
-            
-            # Update settings JSON
-            await conn.execute(
-                "UPDATE groups SET settings = $1 WHERE chat_id = $2",
-                json.dumps(current_settings), chat_id
-            )
-    
+    from db.ops.automod import get_group_settings, bulk_update_group_settings
+    existing = await get_group_settings(db.pool, chat_id)
+    incoming = settings.copy()
+    _normalize_settings(incoming, existing)
+
+    await bulk_update_group_settings(db.pool, chat_id, incoming)
     return {"status": "ok"}
 
 

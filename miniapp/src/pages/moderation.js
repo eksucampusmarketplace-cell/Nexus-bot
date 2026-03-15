@@ -589,11 +589,18 @@ async function _renderFiltersTab(container, chatId) {
     items.forEach(f => {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);';
+      
+      const reply = f.reply_content || '';
+      const hasButtons = reply.includes('---');
+      const truncated = reply.slice(0, 60) + (reply.length > 60 ? '…' : '');
+
       row.innerHTML = `
         <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);padding:2px 8px;background:var(--accent);color:white;border-radius:var(--r-full);">${f.keyword}</span>
         <span style="color:var(--text-muted);font-size:var(--text-xs);">→</span>
-        <span style="flex:1;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.reply_content || ''}</span>
-        <button data-id="${f.id}" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;line-height:1;">×</button>
+        <span style="flex:1;font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${reply.replace(/"/g, '&quot;')}">
+          ${hasButtons ? '🔘 ' : ''}${truncated}
+        </span>
+        <button data-id="${f.id}" style="color:var(--danger); border:1px solid var(--danger); background:none; border-radius:4px; padding:2px 6px; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center;">🗑️</button>
       `;
       row.querySelector('[data-id]').onclick = async () => {
         try {
@@ -617,7 +624,10 @@ async function _renderFiltersTab(container, chatId) {
       <input type="text" id="filter-keyword" class="input" placeholder="Keyword" style="flex:1;">
       <button id="add-filter-btn" class="btn btn-primary" style="white-space:nowrap;">Add</button>
     </div>
-    <textarea id="filter-response" class="input" placeholder="Response text (supports HTML, Markdown, and inline buttons via --- syntax: e.g., 'Hello! --- Button1|Button2')" rows="3" style="width:100%;resize:vertical;"></textarea>
+    <textarea id="filter-response" class="input" placeholder="Response text. Supports HTML/Markdown.\nAdd buttons after --- on new lines:\n---\n[Button Label](https://example.com)" rows="3" style="width:100%;resize:vertical;"></textarea>
+    <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;">
+      💡 Tip: Use [Label](URL) for each button. Separate multiple button rows with a blank line.
+    </div>
   `;
 
   filtersCard.appendChild(filtersList);

@@ -20,7 +20,10 @@ ADMIN_CACHE_TTL = 60  # 60 seconds
 
 
 async def verify_admin(chat_id: int, user: dict):
+    from config import settings as _cfg
     user_id = user.get("id")
+    if user_id and user_id == _cfg.OWNER_ID:
+        return
     if not user_id:
         raise HTTPException(403, "Not authenticated")
     
@@ -146,11 +149,22 @@ async def get_locks(chat_id: int, user: dict = Depends(get_current_user)):
     }
 
 
+VALID_LOCK_KEYS = {
+    "photo", "video", "sticker", "gif", "voice", "audio", "document",
+    "link", "forward", "poll", "contact", "video_note", "all"
+}
+
+
 @router.put("/locks")
 async def update_locks(chat_id: int, locks: dict, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
     if not locks:
         return {"ok": True}
+
+    # Validate lock types
+    for lock_type in locks.keys():
+        if lock_type not in VALID_LOCK_KEYS:
+            raise HTTPException(400, detail=f"Invalid lock type: {lock_type}")
 
     valid_locks = {k: v for k, v in locks.items() if isinstance(v, bool)}
     if not valid_locks:
@@ -167,19 +181,21 @@ async def update_locks(chat_id: int, locks: dict, user: dict = Depends(get_curre
     async with db.pool.acquire() as conn:
         await conn.execute(query, chat_id, *values)
         
-        # Also sync to settings JSON for legacy compatibility
+        # Also sync to settings JSON for engine to read settings['locks']
         settings_row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
         import json
-        settings = settings_row["settings"] if settings_row else {}
-        if isinstance(settings, str):
+        settings_json = settings_row["settings"] if settings_row else {}
+        if isinstance(settings_json, str):
             try:
-                settings = json.loads(settings)
+                settings_json = json.loads(settings_json)
             except Exception:
-                settings = {}
-        # Sync lock settings
-        for k, v in valid_locks.items():
-            settings[f"lock_{k}"] = v
-        await conn.execute("UPDATE groups SET settings = $1 WHERE chat_id = $2", json.dumps(settings), chat_id)
+                settings_json = {}
+        
+        # Sync lock settings to nested 'locks' object
+        locks_dict = settings_json.setdefault("locks", {})
+        locks_dict.update(valid_locks)
+        
+        await conn.execute("UPDATE groups SET settings = $1::jsonb WHERE chat_id = $2", json.dumps(settings_json), chat_id)
 
     for k, v in valid_locks.items():
         await publish_event(chat_id, "lock_change", {"lock_type": k, "enabled": v})

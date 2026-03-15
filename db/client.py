@@ -1,5 +1,7 @@
-import asyncpg
 import logging
+
+import asyncpg
+
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -58,6 +60,26 @@ class Database:
         if self.pool:
             await self.pool.close()
             logger.info("Database connection closed")
+
+    async def fetch(self, query: str, *args):
+        async with self.pool.acquire() as conn:
+            return await conn.fetch(query, *args)
+
+    async def fetchrow(self, query: str, *args):
+        async with self.pool.acquire() as conn:
+            return await conn.fetchrow(query, *args)
+
+    async def execute(self, query: str, *args):
+        async with self.pool.acquire() as conn:
+            return await conn.execute(query, *args)
+
+    async def fetchval(self, query: str, *args, column: int = 0):
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(query, *args, column=column)
+
+    async def executemany(self, query: str, args):
+        async with self.pool.acquire() as conn:
+            return await conn.executemany(query, args)
 
     async def init_db(self):
         async with self.pool.acquire() as conn:

@@ -85,127 +85,32 @@ function switchTab(tab, container, chatId) {
 }
 
 async function _renderMembersTab(container, chatId) {
-  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading members...</div>`;
-
-  let members = [];
-  let bans = [];
-
-  try {
-    [members, bans] = await Promise.all([
-      apiFetch(`/api/groups/${chatId}/members`).catch(() => []),
-      apiFetch(`/api/groups/${chatId}/bans`).then(r => r?.data || []).catch(() => []),
-    ]);
-  } catch (e) {
-    container.innerHTML = '';
-    container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load members', description: e.message }));
-    return;
-  }
-
   container.innerHTML = '';
-
-  const filterRow = document.createElement('div');
-  filterRow.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3);';
-  filterRow.innerHTML = `
-    <input type="text" id="member-search" class="input" placeholder="🔍 Search by name, @username or ID" style="width:100%;">
-    <div style="display:flex;gap:var(--sp-2);flex-wrap:wrap;">
-      ${['All','Admins','Banned','Muted','Warned'].map((f,i) => `<button data-filter="${f.toLowerCase()}" style="padding:4px 12px;border-radius:var(--r-full);border:1px solid var(--border);font-size:var(--text-xs);cursor:pointer;background:${i===0?'var(--accent)':'var(--bg-input)'};color:${i===0?'white':'var(--text-muted)'};">${f}</button>`).join('')}
+  const msg = document.createElement('div');
+  msg.style.cssText = 'text-align:center;padding:var(--sp-8);';
+  msg.innerHTML = `
+    <div style='font-size:2.5rem;margin-bottom:var(--sp-4);'>👥</div>
+    <div style='font-weight:700;font-size:var(--text-lg);margin-bottom:var(--sp-2);'>Member Management</div>
+    <div style='color:var(--text-muted);font-size:var(--text-sm);margin-bottom:var(--sp-6);line-height:1.5;'>
+      Use the dedicated Members page for full member management,<br>
+      including search, advanced filters, and profile details.
     </div>
+    <button id="go-to-members" class="btn btn-primary" style="padding:var(--sp-3) var(--sp-6);">
+      Go to Members Page →
+    </button>
   `;
-  container.appendChild(filterRow);
+  container.appendChild(msg);
 
-  const feed = document.createElement('div');
-  feed.id = 'members-feed';
-  feed.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
-  container.appendChild(feed);
-
-  let currentFilter = 'all';
-  let searchQuery = '';
-  let page = 1;
-  const perPage = 20;
-
-  const renderMembers = () => {
-    feed.innerHTML = '';
-
-    let filtered = members.filter(m => {
-      const q = searchQuery.toLowerCase();
-      if (q && !`${m.first_name || ''} ${m.username || ''} ${m.user_id}`.toLowerCase().includes(q)) return false;
-      if (currentFilter === 'admins') return m.is_admin;
-      if (currentFilter === 'banned') return m.is_banned;
-      if (currentFilter === 'muted') return m.is_muted;
-      if (currentFilter === 'warned') return Array.isArray(m.warns) ? m.warns.length > 0 : (m.warns > 0);
-      return true;
-    });
-
-    const paginated = filtered.slice(0, page * perPage);
-
-    if (paginated.length === 0) {
-      feed.appendChild(EmptyState({ icon: '👥', title: 'No members found', description: 'Try a different filter.' }));
-      return;
-    }
-
-    paginated.forEach(m => feed.appendChild(_buildMemberCard(m, chatId)));
-
-    if (filtered.length > paginated.length) {
-      const loadMore = document.createElement('button');
-      loadMore.className = 'btn btn-secondary';
-      loadMore.textContent = `Load more (${filtered.length - paginated.length} remaining)`;
-      loadMore.style.cssText = 'width:100%;margin-top:var(--sp-2);';
-      loadMore.onclick = () => { page++; renderMembers(); };
-      feed.appendChild(loadMore);
+  msg.querySelector('#go-to-members').onclick = () => {
+    // Assuming window.navigateToPage is available or we use the store
+    if (window.navigateToPage) {
+      window.navigateToPage('members');
+    } else {
+      // Fallback if navigateToPage is not global
+      const navBtn = document.querySelector('[data-page="members"]');
+      if (navBtn) navBtn.click();
     }
   };
-
-  filterRow.querySelector('#member-search').addEventListener('input', e => {
-    searchQuery = e.target.value;
-    page = 1;
-    renderMembers();
-  });
-
-  filterRow.querySelectorAll('[data-filter]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentFilter = btn.dataset.filter;
-      page = 1;
-      filterRow.querySelectorAll('[data-filter]').forEach(b => {
-        b.style.background = b === btn ? 'var(--accent)' : 'var(--bg-input)';
-        b.style.color = b === btn ? 'white' : 'var(--text-muted)';
-      });
-      renderMembers();
-    });
-  });
-
-  renderMembers();
-
-  if (bans.length > 0) {
-    const banSection = document.createElement('div');
-    banSection.style.marginTop = 'var(--sp-6)';
-    const banHeader = document.createElement('div');
-    banHeader.style.cssText = 'font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--sp-2);';
-    banHeader.textContent = `🚫 Ban List (${bans.length})`;
-    banSection.appendChild(banHeader);
-
-    bans.forEach(ban => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);margin-bottom:var(--sp-2);';
-      row.innerHTML = `
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:var(--text-sm);font-weight:var(--fw-medium);">${ban.target_first_name || ban.target_username || ban.user_id || 'Unknown'}</div>
-          <div style="font-size:var(--text-xs);color:var(--text-muted);">${ban.reason || 'No reason'} · ${_timeAgo(ban.created_at)}</div>
-        </div>
-        <button class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);" data-unban="${ban.user_id}">Unban</button>
-      `;
-      row.querySelector('[data-unban]').addEventListener('click', async () => {
-        try {
-          await apiFetch(`/api/groups/${chatId}/bans/${ban.user_id}`, { method: 'DELETE' });
-          showToast('User unbanned', 'success');
-          row.remove();
-        } catch (e) {
-          showToast('Failed to unban: ' + e.message, 'error');
-        }
-      });
-      banSection.appendChild(row);
-    });
-    container.appendChild(banSection);
-  }
 }
 
 function _buildMemberCard(m, chatId) {
@@ -456,7 +361,7 @@ async function _renderActionsTab(container, chatId) {
   container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading actions...</div>`;
 
   try {
-    const logs = await apiFetch(`/api/groups/${chatId}/logs?limit=50`);
+    const logs = await apiFetch(`/api/groups/${chatId}/mod-log?limit=50`);
     container.innerHTML = '';
 
     const header = document.createElement('div');
@@ -500,20 +405,20 @@ function _buildActionRow(log) {
     <div style="flex:1;min-width:0;">
       <div style="display:flex;align-items:center;gap:var(--sp-2);">
         <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);padding:2px 8px;border-radius:var(--r-full);background:${colors[action] || 'var(--bg-overlay)'};color:white;">${action.toUpperCase()}</span>
-        <span style="font-size:var(--text-sm);font-weight:var(--fw-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${log.target_username || log.user_id || 'Unknown'}</span>
+        <span style="font-size:var(--text-sm);font-weight:var(--fw-medium);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${log.target_name || log.target_username || log.target_id || 'Unknown'}</span>
       </div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">
-        by ${log.by_username || 'System'}${log.reason ? ` · "${log.reason}"` : ''}
+        by ${log.admin_name || log.admin_username || 'System'}${log.reason ? ` · "${log.reason}"` : ''}
       </div>
     </div>
-    <span style="font-size:var(--text-xs);color:var(--text-muted);white-space:nowrap;">${_timeAgo(log.timestamp || log.created_at)}</span>
+    <span style="font-size:var(--text-xs);color:var(--text-muted);white-space:nowrap;">${_timeAgo(log.done_at || log.timestamp || log.created_at)}</span>
   `;
   return row;
 }
 
 function _exportLogsCSV(logs) {
   const rows = [['Action', 'Target', 'Admin', 'Reason', 'Time']];
-  logs.forEach(l => rows.push([l.action, l.target_username || l.user_id, l.by_username || 'System', l.reason || '', l.timestamp || l.created_at || '']));
+  logs.forEach(l => rows.push([l.action, l.target_name || l.target_username || l.target_id, l.admin_name || l.admin_username || 'System', l.reason || '', l.done_at || l.timestamp || l.created_at || '']));
   const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -576,9 +481,10 @@ async function _renderWarnsTab(container, chatId) {
     const action = settingsCard.querySelector('#warn-action-select').value;
     const expiry = settingsCard.querySelector('#warn-expiry-select').value;
     try {
-      const group = await apiFetch(`/api/groups/${chatId}`);
-      const newSettings = { ...(group?.settings || {}), warn_max: max, warn_action: action, warn_expiry: expiry };
-      await apiFetch(`/api/groups/${chatId}/settings`, { method: 'PUT', body: JSON.stringify(newSettings) });
+      await apiFetch(`/api/groups/${chatId}/warn-settings`, {
+        method: 'PUT',
+        body: JSON.stringify({ warn_max: max, warn_action: action, warn_expiry: expiry })
+      });
       showToast('Warn settings saved', 'success');
     } catch (e) {
       showToast('Failed to save: ' + e.message, 'error');
@@ -723,7 +629,7 @@ async function _renderFiltersTab(container, chatId) {
       const response = filtersCard.querySelector('#filter-response').value.trim();
       if (!keyword || !response) { showToast('Keyword and response required', 'error'); return; }
       try {
-        const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, { method: 'POST', body: JSON.stringify({ keyword, reply: response }) });
+        const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, { method: 'POST', body: JSON.stringify({ keyword, reply_content: response }) });
         filters.push({ keyword, reply_content: response, id: newFilter?.id || Date.now() });
         renderFilters(filters);
         filtersCard.querySelector('#filter-keyword').value = '';

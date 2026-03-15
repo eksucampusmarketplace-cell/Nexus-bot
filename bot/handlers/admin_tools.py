@@ -19,20 +19,18 @@ Advanced admin tools and utilities:
 Logs prefix: [ADMIN_CMD]
 """
 
-import logging
 import json
-import asyncio
-from datetime import datetime, timedelta, timezone
-from telegram import Update, ChatPermissions, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CommandHandler
-from telegram.constants import ParseMode
+import logging
+from datetime import datetime, timezone
 
-from config import settings
-from bot.utils.permissions import is_admin, command_enabled
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import CommandHandler, ContextTypes
+
 from bot.utils.format import format_user
-from bot.utils.input_sanitizer import validate_input, sanitize_text
+from bot.utils.input_sanitizer import sanitize_text, validate_input
+from bot.utils.permissions import is_admin
 from db.ops.groups import get_group, update_group_settings
-from db.ops.logs import log_action
 
 log = logging.getLogger("admin_cmd")
 
@@ -65,7 +63,7 @@ async def cmd_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not is_valid:
         await update.message.reply_text(
-            f"❌ {error_msg}\n" f"Please use appropriate language and avoid suspicious patterns."
+            f"❌ {error_msg}\n" "Please use appropriate language and avoid suspicious patterns."
         )
         log.warning(
             f"[ADMIN_CMD] Announcement blocked | chat={update.effective_chat.id} | reason={error_msg}"
@@ -77,7 +75,7 @@ async def cmd_announce(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Send announcement with special formatting
     announcement = (
-        f"📢 <b>ANNOUNCEMENT</b>\n"
+        "📢 <b>ANNOUNCEMENT</b>\n"
         f"{'=' * 20}\n\n"
         f"{message}\n\n"
         f"<i>Posted by {update.effective_user.first_name}</i>"
@@ -389,7 +387,7 @@ async def cmd_exportsettings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
     else:
         await update.message.reply_text(
-            f"📁 <b>Settings Export</b>\n\n" f"<pre>{json_str}</pre>", parse_mode=ParseMode.HTML
+            "📁 <b>Settings Export</b>\n\n" f"<pre>{json_str}</pre>", parse_mode=ParseMode.HTML
         )
 
     log.info(f"[ADMIN_CMD] Settings exported | chat={chat_id}")
@@ -423,7 +421,7 @@ async def cmd_importsettings(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update_group_settings(chat_id, new_settings)
 
         await update.message.reply_text(
-            f"✅ Settings imported successfully\n"
+            "✅ Settings imported successfully\n"
             f"Imported at: {import_data.get('exported_at', 'unknown')}"
         )
         log.info(f"[ADMIN_CMD] Settings imported | chat={chat_id}")
@@ -454,7 +452,7 @@ async def cmd_admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             else:
                 admin_list.append(admin.user)
 
-        text = f"📊 <b>Group Admin Info</b>\n\n"
+        text = "📊 <b>Group Admin Info</b>\n\n"
         text += f"<b>Name:</b> {chat.title}\n"
         text += f"<b>Type:</b> {chat.type}\n"
         text += f"<b>ID:</b> <code>{chat_id}</code>\n"
@@ -473,8 +471,8 @@ async def cmd_admininfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Get group settings summary
         group = await get_group(chat_id)
         if group:
-            text += f"\n<b>Bot Settings:</b>\n"
-            text += f"  • Registered: Yes\n"
+            text += "\n<b>Bot Settings:</b>\n"
+            text += "  • Registered: Yes\n"
             text += f"  • Premium: {'Yes' if group.get('is_premium') else 'No'}\n"
 
         await update.message.reply_text(text, parse_mode=ParseMode.HTML)
@@ -521,7 +519,6 @@ admin_tool_handlers = [
     CommandHandler("announce", cmd_announce),
     CommandHandler("pinmessage", cmd_pinmessage),
     CommandHandler("slowmode", cmd_slowmode),
-    CommandHandler("filters", cmd_filters),
     CommandHandler("addfilter", cmd_addfilter),
     CommandHandler("delfilter", cmd_delfilter),
     CommandHandler("setflood", cmd_setflood),

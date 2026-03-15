@@ -40,23 +40,6 @@ const AUTOMOD_SECTIONS = [
     ],
   },
   {
-    id: 'antiraid',
-    title: 'Anti-Raid',
-    description: 'Protect group from organized raids',
-    icon: '🛡️',
-    settings: [
-      { key: 'antiraid_enabled', label: 'Enable Anti-Raid', type: 'toggle' },
-      { key: 'antiraid_mode', label: 'Mode', type: 'select', options: [
-        { value: 'restrict', label: 'Restrict new members' },
-        { value: 'kick', label: 'Kick new members' },
-        { value: 'lock', label: 'Lock group' },
-      ], default: 'restrict' },
-      { key: 'antiraid_threshold', label: 'Join threshold (per min)', type: 'number', min: 3, max: 50, default: 10 },
-      { key: 'auto_antiraid_enabled', label: 'Auto-activate Anti-Raid', type: 'toggle' },
-      { key: 'lock_admins', label: 'Apply rules to admins', type: 'toggle' },
-    ],
-  },
-  {
     id: 'antispam',
     title: 'Anti-Spam',
     description: 'Block known spam patterns and bots',
@@ -141,24 +124,6 @@ const AUTOMOD_SECTIONS = [
       { key: 'lock_hashtag', label: 'Block hashtags', type: 'toggle' },
       { key: 'lock_unofficial_tg', label: 'Block unofficial Telegram', type: 'toggle' },
       { key: 'lock_userbots', label: 'Block userbots', type: 'toggle' },
-    ],
-  },
-  {
-    id: 'warnings',
-    title: 'Warnings System',
-    description: 'Configure warning thresholds and actions',
-    icon: '⚠️',
-    settings: [
-      { key: 'warn_enabled', label: 'Enable Warnings', type: 'toggle' },
-      { key: 'warn_max', label: 'Max warns before action', type: 'number', min: 1, max: 10, default: 3 },
-      { key: 'warn_action', label: 'Action after max warns', type: 'select', options: [
-        { value: 'mute_1h', label: 'Mute for 1 hour' },
-        { value: 'mute_12h', label: 'Mute for 12 hours' },
-        { value: 'mute_24h', label: 'Mute for 24 hours' },
-        { value: 'kick', label: 'Kick' },
-        { value: 'ban', label: 'Ban' },
-        { value: 'ban_permanent', label: 'Permanent ban' },
-      ], default: 'mute_24h' },
     ],
   },
 ];

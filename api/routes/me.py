@@ -86,13 +86,11 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     if not bot_app:
         raise HTTPException(status_code=503, detail="Bot service unavailable")
 
-    import hashlib
+    from bot.utils.crypto import hash_token
 
-    token_hash = hashlib.sha256(bot_app.bot.token.encode()).hexdigest()[:10]
+    token_hash = hash_token(bot_app.bot.token)
 
     async with db.pool.acquire() as conn:
-        # Find all groups managed by this bot
-        # First get all groups for this bot
         all_groups = await conn.fetch(
             """
             SELECT chat_id, title, member_count, settings, photo_big, photo_small 
@@ -103,24 +101,21 @@ async def get_user_context(user: dict = Depends(get_current_user)):
             token_hash,
         )
 
-        # If no groups found for this bot, try getting all groups (fallback for legacy)
         if not all_groups:
-            all_groups = await conn.fetch("""
-                SELECT chat_id, title, member_count, settings, photo_big, photo_small 
-                FROM groups 
-                ORDER BY title
-                LIMIT 100
-            """)
+            logger.warning(
+                f"[ME] No groups found for bot token_hash={token_hash[:8]}... — check hash consistency"
+            )
+            all_groups = []
 
-    # Check Telegram status for each group
+    import asyncio
+
     admin_groups = []
     mod_groups = []
     member_groups = []
 
-    for group_row in all_groups:
+    async def _process_group(group_row):
         chat_id = group_row["chat_id"]
         title = group_row["title"]
-        username = None
         member_count = group_row["member_count"]
         photo_big = group_row.get("photo_big")
         group_settings = group_row["settings"] or {}
@@ -131,9 +126,19 @@ async def get_user_context(user: dict = Depends(get_current_user)):
                 group_settings = {}
 
         status = await get_user_telegram_status(bot_app.bot, chat_id, user_id)
+        return chat_id, title, member_count, photo_big, group_settings, status
+
+    results = await asyncio.gather(
+        *[_process_group(row) for row in all_groups], return_exceptions=True
+    )
+
+    for result in results:
+        if isinstance(result, Exception):
+            logger.warning(f"[ME] Error processing group: {result}")
+            continue
+        chat_id, title, member_count, photo_big, group_settings, status = result
 
         if status in ["owner", "admin"]:
-            # Build admin group info
             boost_settings = group_settings.get("member_boost", {})
             channel_settings = group_settings.get("channel_gate", {})
 
@@ -141,7 +146,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
                 {
                     "chat_id": chat_id,
                     "title": title,
-                    "username": username,
+                    "username": None,
                     "member_count": member_count or 0,
                     "photo_big": photo_big,
                     "is_owner": status == "owner",
@@ -150,7 +155,6 @@ async def get_user_context(user: dict = Depends(get_current_user)):
                 }
             )
         elif status == "member":
-            # Build member group info with their specific stats
             boost_record = await get_member_boost_stats(chat_id, user_id)
             channel_record = await get_member_channel_status(chat_id, user_id)
             trust_score = await get_member_trust_score(chat_id, user_id)

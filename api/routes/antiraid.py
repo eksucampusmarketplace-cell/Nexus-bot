@@ -13,6 +13,7 @@ from db.client import db
 from db.ops.automod import update_group_setting
 
 router = APIRouter(prefix="/api/groups/{chat_id}/antiraid", tags=["antiraid"])
+global_router = APIRouter(tags=["antiraid"])
 logger = logging.getLogger(__name__)
 
 
@@ -216,4 +217,70 @@ async def antiraid_stats(chat_id: int, user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"[AntiRaid API] antiraid_stats error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@global_router.get("/api/antiraid/banlist")
+async def get_global_banlist(page: int = 1, user: dict = Depends(get_current_user)):
+    try:
+        offset = (page - 1) * 50
+        async with db.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                SELECT user_id, flagged_at, flagged_by_chat, reason, is_active
+                FROM raid_ban_list
+                WHERE is_active = TRUE
+                ORDER BY flagged_at DESC
+                LIMIT 50 OFFSET $1
+                """,
+                offset,
+            )
+            total = await conn.fetchval(
+                "SELECT COUNT(*) FROM raid_ban_list WHERE is_active = TRUE"
+            ) or 0
+        return {
+            "ok": True,
+            "ban_list": [dict(r) for r in rows],
+            "total": total,
+            "page": page,
+        }
+    except Exception as e:
+        logger.error(f"[AntiRaid API] get_global_banlist error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@global_router.post("/api/antiraid/banlist")
+async def add_to_global_banlist(body: dict, user: dict = Depends(get_current_user)):
+    user_id = body.get("user_id")
+    if not user_id:
+        raise HTTPException(400, "user_id required")
+    try:
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """
+                INSERT INTO raid_ban_list (user_id, flagged_at, flagged_by_chat, reason, is_active)
+                VALUES ($1, NOW(), $2, $3, TRUE)
+                ON CONFLICT (user_id) DO UPDATE
+                SET is_active = TRUE, reason = EXCLUDED.reason
+                """,
+                user_id,
+                body.get("chat_id"),
+                body.get("reason", ""),
+            )
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[AntiRaid API] add_to_global_banlist error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@global_router.delete("/api/antiraid/banlist/{user_id}")
+async def remove_from_global_banlist(user_id: int, user: dict = Depends(get_current_user)):
+    try:
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                "UPDATE raid_ban_list SET is_active = FALSE WHERE user_id = $1", user_id
+            )
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"[AntiRaid API] remove_from_global_banlist error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

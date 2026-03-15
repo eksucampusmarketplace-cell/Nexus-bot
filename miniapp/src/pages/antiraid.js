@@ -37,7 +37,7 @@ export async function renderAntiraidPage(container) {
   `;
   container.appendChild(header);
 
-  const tabs = ['Status', 'Settings', 'Incidents', 'Raiders'];
+  const tabs = ['Status', 'Settings', 'Incidents', 'Raiders', 'Global List'];
   const tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:var(--sp-1);margin-bottom:var(--sp-4);background:var(--bg-input);padding:4px;border-radius:var(--r-xl);overflow-x:auto;';
   tabs.forEach((t, i) => {
@@ -64,10 +64,11 @@ function switchTab(tab, container, chatId, tabBar) {
   });
   container.innerHTML = '';
   switch (tab) {
-    case 'status':   return _renderStatusTab(container, chatId);
-    case 'settings': return _renderSettingsTab(container, chatId);
-    case 'incidents': return _renderIncidentsTab(container, chatId);
-    case 'raiders':  return _renderRaidersTab(container, chatId);
+    case 'status':      return _renderStatusTab(container, chatId);
+    case 'settings':    return _renderSettingsTab(container, chatId);
+    case 'incidents':   return _renderIncidentsTab(container, chatId);
+    case 'raiders':     return _renderRaidersTab(container, chatId);
+    case 'global list': return _renderGlobalListTab(container, chatId);
   }
 }
 
@@ -301,6 +302,86 @@ async function _renderRaidersTab(container, chatId) {
   });
 
   container.appendChild(list);
+}
+
+async function _renderGlobalListTab(container, chatId) {
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading global ban list...</div>`;
+
+  let banList = [];
+  try {
+    const res = await apiFetch('/api/antiraid/banlist');
+    banList = res?.ban_list || [];
+  } catch (_) {}
+
+  container.innerHTML = '';
+
+  const infoBanner = document.createElement('div');
+  infoBanner.style.cssText = 'background:rgba(var(--accent-rgb),0.08);border:1px solid rgba(var(--accent-rgb),0.2);border-radius:var(--r-lg);padding:var(--sp-3);margin-bottom:var(--sp-3);font-size:var(--text-xs);color:var(--text-secondary);';
+  infoBanner.textContent = 'Users on this list are auto-kicked from all groups using Nexus Bot.';
+  container.appendChild(infoBanner);
+
+  const addCard = Card({ title: '➕ Add to Global List', subtitle: 'Flag a user across all groups' });
+  addCard.style.cssText += 'margin-bottom:var(--sp-3);';
+  const addForm = document.createElement('div');
+  addForm.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+  addForm.innerHTML = `
+    <input type="number" id="gbl-user-id" class="input" placeholder="User ID (e.g. 123456789)">
+    <input type="text" id="gbl-reason" class="input" placeholder="Reason (optional)">
+    <button id="gbl-add-btn" class="btn btn-danger" style="width:100%;justify-content:center;">🚫 Add to Global Ban List</button>
+  `;
+  addCard.appendChild(addForm);
+  container.appendChild(addCard);
+
+  const listCard = Card({ title: `🌍 Global Ban List (${banList.length})`, subtitle: 'Users banned across all groups' });
+  const listEl = document.createElement('div');
+  listEl.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+
+  const renderList = (items) => {
+    listEl.innerHTML = '';
+    if (items.length === 0) {
+      listEl.innerHTML = '<div style="color:var(--text-muted);font-size:var(--text-sm);text-align:center;padding:var(--sp-3);">No users on the global ban list</div>';
+      return;
+    }
+    items.forEach(entry => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);';
+      row.innerHTML = `
+        <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);padding:2px 8px;background:var(--danger);color:white;border-radius:var(--r-full);flex-shrink:0;">${entry.user_id}</span>
+        <span style="flex:1;font-size:var(--text-sm);color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${entry.reason || 'No reason'}</span>
+        <span style="font-size:var(--text-xs);color:var(--text-muted);flex-shrink:0;">${entry.flagged_at ? new Date(entry.flagged_at).toLocaleDateString() : ''}</span>
+        <button data-uid="${entry.user_id}" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:18px;line-height:1;padding:0 var(--sp-1);">×</button>
+      `;
+      row.querySelector('[data-uid]').onclick = async () => {
+        try {
+          await apiFetch(`/api/antiraid/banlist/${entry.user_id}`, { method: 'DELETE' });
+          banList = banList.filter(x => x.user_id !== entry.user_id);
+          renderList(banList);
+          showToast('User removed from global list', 'success');
+        } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+      };
+      listEl.appendChild(row);
+    });
+  };
+
+  renderList(banList);
+  listCard.appendChild(listEl);
+  container.appendChild(listCard);
+
+  setTimeout(() => {
+    container.querySelector('#gbl-add-btn')?.addEventListener('click', async () => {
+      const uid = parseInt(container.querySelector('#gbl-user-id').value.trim());
+      const reason = container.querySelector('#gbl-reason').value.trim();
+      if (!uid) { showToast('Enter a valid user ID', 'error'); return; }
+      try {
+        await apiFetch('/api/antiraid/banlist', { method: 'POST', body: JSON.stringify({ user_id: uid, chat_id: chatId, reason }) });
+        banList.push({ user_id: uid, reason, flagged_at: new Date().toISOString(), is_active: true });
+        renderList(banList);
+        container.querySelector('#gbl-user-id').value = '';
+        container.querySelector('#gbl-reason').value = '';
+        showToast('User added to global ban list', 'success');
+      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    });
+  }, 0);
 }
 
 function _timeAgo(ts) {

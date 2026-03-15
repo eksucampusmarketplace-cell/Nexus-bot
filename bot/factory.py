@@ -271,6 +271,45 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     app.add_handler(CommandHandler("stats", stats_handler, filters=GROUP))
 
+    from bot.handlers.moderation.warn import resetwarns_command, warnmode_command, warnlimit_command
+    from bot.handlers.moderation.mute import smute_command, restrict_command, unrestrict_command
+    from bot.handlers.moderation.kick import skick_command
+    from bot.handlers.moderation.promote import title_command
+    from bot.handlers.moderation.purge import delall_command, purgeme_command
+
+    app.add_handler(CommandHandler("resetwarns", resetwarns_command, filters=GROUP))
+    app.add_handler(CommandHandler("warnmode", warnmode_command, filters=GROUP))
+    app.add_handler(CommandHandler("warnlimit", warnlimit_command, filters=GROUP))
+    app.add_handler(CommandHandler("smute", smute_command, filters=GROUP))
+    app.add_handler(CommandHandler("restrict", restrict_command, filters=GROUP))
+    app.add_handler(CommandHandler("unrestrict", unrestrict_command, filters=GROUP))
+    app.add_handler(CommandHandler("skick", skick_command, filters=GROUP))
+    app.add_handler(CommandHandler("title", title_command, filters=GROUP))
+    app.add_handler(CommandHandler("delall", delall_command, filters=GROUP))
+    app.add_handler(CommandHandler("purgeme", purgeme_command, filters=GROUP))
+
+    from bot.handlers.filters import filter_command, filters_list_command, stop_filter_command, stopall_command
+    from bot.handlers.blacklist import blacklist_command, unblacklist_command, blacklistmode_command
+
+    app.add_handler(CommandHandler("filter", filter_command, filters=GROUP))
+    app.add_handler(CommandHandler("stop", stop_filter_command, filters=GROUP))
+    app.add_handler(CommandHandler("stopall", stopall_command, filters=GROUP))
+    app.add_handler(CommandHandler("blacklist", blacklist_command, filters=GROUP))
+    app.add_handler(CommandHandler("unblacklist", unblacklist_command, filters=GROUP))
+    app.add_handler(CommandHandler("blacklistmode", blacklistmode_command, filters=GROUP))
+
+    from bot.handlers.notes import savenote_command, note_command, delnote_command, notes_list_command
+
+    app.add_handler(CommandHandler("savenote", savenote_command, filters=GROUP))
+    app.add_handler(CommandHandler("note", note_command, filters=GROUP))
+    app.add_handler(CommandHandler("delnote", delnote_command, filters=GROUP))
+    app.add_handler(CommandHandler("notes", notes_list_command, filters=GROUP))
+
+    from bot.handlers.onboarding import onboarding_handler, setup_command
+
+    app.add_handler(onboarding_handler)
+    app.add_handler(setup_command)
+
     # Message handler for message_guard (checks locks, filters, etc.)
     app.add_handler(MessageHandler(GROUP & filters.ALL, message_guard), group=0)
 

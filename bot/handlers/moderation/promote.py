@@ -131,3 +131,35 @@ async def admins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, parse_mode="Markdown")
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to fetch admins: {e}")
+
+
+async def title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_OWNER:
+        await update.message.reply_text("❌ Only the group owner can set admin titles.")
+        return
+
+    target, title = await resolve_target(update, context)
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    if not title:
+        await update.message.reply_text("❓ Usage: /title @user <title>")
+        return
+
+    try:
+        await context.bot.set_chat_administrator_custom_title(chat_id, target.id, title[:16])
+        await db.execute(
+            "INSERT INTO admin_titles (chat_id, user_id, title, set_by) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (chat_id, user_id) DO UPDATE SET title=EXCLUDED.title",
+            chat_id, target.id, title[:16], invoker.id,
+        )
+        await update.message.reply_text(
+            f"📛 Title set to *{title[:16]}* for {await mention_user(target)}", parse_mode="Markdown"
+        )
+        await publish_event(chat_id, "mod_action", {"action": "title", "target_id": target.id, "title": title[:16], "admin_id": invoker.id})
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to set title: {e}")

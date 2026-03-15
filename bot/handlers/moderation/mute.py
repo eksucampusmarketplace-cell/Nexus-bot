@@ -169,3 +169,108 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to unmute: {e}")
+
+
+async def smute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    target, reason = await resolve_target(update, context)
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
+    if not allowed:
+        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        return
+
+    reason = reason or "No reason provided"
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat_id, target.id, permissions=ChatPermissions(can_send_messages=False)
+        )
+        await update.message.reply_to_message.delete() if update.message.reply_to_message else None
+        try:
+            await update.message.delete()
+        except Exception:
+            pass
+
+        await db.execute(
+            "INSERT INTO mutes (chat_id, user_id, muted_by, reason) VALUES ($1, $2, $3, $4) "
+            "ON CONFLICT (chat_id, user_id) DO UPDATE SET muted_by=EXCLUDED.muted_by, reason=EXCLUDED.reason, muted_at=NOW(), is_active=TRUE, unmute_at=NULL",
+            chat_id, target.id, invoker.id, reason,
+        )
+        await log_action(chat_id, "smute", target.id, target.full_name, invoker.id, invoker.full_name, reason)
+        await publish_event(chat_id, "mod_action", {"action": "smute", "target_id": target.id, "target_name": target.full_name, "admin_id": invoker.id, "reason": reason})
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to smute: {e}")
+
+
+async def restrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    target, reason = await resolve_target(update, context)
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
+    if not allowed:
+        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        return
+
+    reason = reason or "No reason provided"
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat_id,
+            target.id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=False,
+                can_send_polls=False,
+                can_send_other_messages=False,
+                can_add_web_page_previews=False,
+            ),
+        )
+        await update.message.reply_text(
+            f"🔒 Restricted | {await mention_user(target)}\n📋 Reason: {reason}\n👮 By: {await mention_user(invoker)}",
+            parse_mode="Markdown",
+        )
+        await log_action(chat_id, "restrict", target.id, target.full_name, invoker.id, invoker.full_name, reason)
+        await publish_event(chat_id, "mod_action", {"action": "restrict", "target_id": target.id, "target_name": target.full_name, "admin_id": invoker.id, "reason": reason})
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to restrict: {e}")
+
+
+async def unrestrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    invoker = update.effective_user
+
+    target, _ = await resolve_target(update, context)
+    if not target:
+        await update.message.reply_text(ERRORS["no_target"])
+        return
+
+    try:
+        await context.bot.restrict_chat_member(
+            chat_id,
+            target.id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+            ),
+        )
+        await update.message.reply_text(
+            f"🔓 Unrestricted | {await mention_user(target)}", parse_mode="Markdown"
+        )
+        await log_action(chat_id, "unrestrict", target.id, target.full_name, invoker.id, invoker.full_name, "Unrestricted")
+        await publish_event(chat_id, "mod_action", {"action": "unrestrict", "target_id": target.id, "target_name": target.full_name, "admin_id": invoker.id})
+    except Exception as e:
+        await update.message.reply_text(f"❌ Failed to unrestrict: {e}")

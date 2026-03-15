@@ -7,7 +7,7 @@ import logging
 from typing import Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes, ConversationTypes
+from telegram.ext import ContextTypes, ConversationHandler
 
 import db.ops.groups as db_groups
 
@@ -216,7 +216,7 @@ async def cmd_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Export conversation handler
-from telegram.ext import ConversationHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import CallbackQueryHandler, CommandHandler, ConversationHandler, MessageHandler, filters
 
 onboarding_handler = ConversationHandler(
     entry_points=[

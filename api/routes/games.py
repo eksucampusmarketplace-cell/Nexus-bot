@@ -43,16 +43,38 @@ async def award_game_xp_endpoint(chat_id: int, body: dict, user: dict = Depends(
 
 @router.get("/{chat_id}/leaderboard")
 async def get_leaderboard_endpoint(
-    chat_id: int, limit: int = 10, user: dict = Depends(get_current_user)
+    chat_id: int, limit: int = 10, user: dict = Depends(require_auth)
 ):
     """
     Get XP leaderboard for a group.
     Returns top users by XP with their levels and badges.
+    Reads from member_xp table (not dead users table).
     """
     if limit < 1 or limit > 50:
         limit = 10
 
-    leaderboard = await get_leaderboard(chat_id, limit)
+    # Use db.pool to read from member_xp table
+    async with db.pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT user_id, xp, level, messages_count 
+               FROM member_xp 
+               WHERE chat_id = $1 
+               ORDER BY xp DESC 
+               LIMIT $2""",
+            chat_id, limit
+        )
+        leaderboard = []
+        for row in rows:
+            entry = dict(row)
+            # Get user display info
+            user_row = await conn.fetchrow(
+                "SELECT first_name, username FROM users WHERE user_id = $1 AND chat_id = $2",
+                entry["user_id"], chat_id
+            )
+            if user_row:
+                entry["first_name"] = user_row.get("first_name", "Unknown")
+                entry["username"] = user_row.get("username", "")
+            leaderboard.append(entry)
 
     return {"chat_id": chat_id, "leaderboard": leaderboard, "count": len(leaderboard)}
 

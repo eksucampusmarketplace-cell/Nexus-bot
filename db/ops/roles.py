@@ -9,17 +9,22 @@ import json
 from db.client import db
 from typing import Optional, List, Dict
 
-# Permission constants
+# Permission constants - aligned with miniapp key names
 PERMISSIONS = {
-    # Moderation
+    # Moderation (legacy and miniapp names)
     "warn_members",
     "mute_members",
     "kick_members",
     "ban_members",
     "unban_members",
     "purge_messages",
+    "can_warn",      # miniapp name
+    "can_mute",      # miniapp name
+    "can_kick",      # miniapp name
+    "can_ban",       # miniapp name
     # Content
     "pin_messages",
+    "can_pin",       # miniapp name
     "post_channel",
     "schedule_posts",
     # Admin

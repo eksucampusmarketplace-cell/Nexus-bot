@@ -576,7 +576,14 @@
       ];
 
       // Build sidebar nav (owner panel only shown if API confirms ownership)
-      const ownerStatsOk = await apiFetch('/api/admin/stats').then(() => true).catch(() => false);
+      const userContext = getState().userContext || {};
+      const isSudo = userContext.is_sudo || getState().is_sudo || false;
+      // Skip extra API call for non-owners - use is_sudo from /api/me
+      let ownerStatsOk = isSudo;
+      if (isSudo) {
+        // Only check admin stats if already identified as owner
+        ownerStatsOk = await apiFetch('/api/admin/stats').then(() => true).catch(() => false);
+      }
       const visiblePages = pages.filter(p => !p.ownerOnly || ownerStatsOk);
       sidebarNav.innerHTML = visiblePages.map(p => `
         <div class="sidebar-item ${getState().activePage === p.id ? 'active' : ''}" data-page="${p.id}">
@@ -704,6 +711,8 @@
           await renderWebhooksPage(container);
           break;
         case 'broadcast':
+          await renderBroadcastPage(container);
+          break;
         case 'booster':
           await renderBoosterPage(container);
           break;
@@ -712,8 +721,6 @@
           break;
         case 'channel-gate':
           await renderChannelGatePage(container);
-          break;
-          await renderBroadcastPage(container);
           break;
         case 'greetings':
           await renderGreetingsPage(container);
@@ -785,7 +792,9 @@
       // ── Dead Clones Warning ─────────────────────────────────────────────
       try {
         const deadRes = await apiFetch('/api/bots').catch(() => null);
-        const deadBots = (deadRes?.bots || []).filter(b => b.status === 'dead' || b.status === 'error');
+        // Handle both array and {bots:[]} response formats
+        const botsArray = Array.isArray(deadRes) ? deadRes : (deadRes?.bots || []);
+        const deadBots = botsArray.filter(b => b.status === 'dead' || b.status === 'error');
         if (deadBots.length > 0) {
           const warn = document.createElement('div');
           warn.style.cssText = 'background:#FEF9E7;border:1px solid #F39C12;border-radius:var(--r-xl);padding:var(--sp-3);margin-bottom:var(--sp-4);';

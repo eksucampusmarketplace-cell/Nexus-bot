@@ -1,5 +1,7 @@
 import logging
 from typing import List, Optional
+from functools import lru_cache
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -12,11 +14,27 @@ from db.client import db
 router = APIRouter(prefix="/api/groups/{chat_id}", tags=["moderation"])
 logger = logging.getLogger(__name__)
 
+# Cache for admin verification: {chat_id:user_id} -> (timestamp, is_admin)
+_admin_cache = {}
+ADMIN_CACHE_TTL = 60  # 60 seconds
+
 
 async def verify_admin(chat_id: int, user: dict):
     user_id = user.get("id")
     if not user_id:
         raise HTTPException(403, "Not authenticated")
+    
+    cache_key = f"{chat_id}:{user_id}"
+    now = time.time()
+    
+    # Check cache
+    if cache_key in _admin_cache:
+        cached_time, is_admin = _admin_cache[cache_key]
+        if now - cached_time < ADMIN_CACHE_TTL:
+            if not is_admin:
+                raise HTTPException(403, "You are not an admin of this group")
+            return
+    
     from bot.registry import get_all
 
     bots = get_all()
@@ -26,9 +44,12 @@ async def verify_admin(chat_id: int, user: dict):
         try:
             member = await app.bot.get_chat_member(chat_id, user_id)
             if member.status in ("administrator", "creator"):
+                _admin_cache[cache_key] = (now, True)
                 return
         except Exception:
             continue
+    
+    _admin_cache[cache_key] = (now, False)
     raise HTTPException(403, "You are not an admin of this group")
 
 
@@ -145,6 +166,20 @@ async def update_locks(chat_id: int, locks: dict, user: dict = Depends(get_curre
     """
     async with db.pool.acquire() as conn:
         await conn.execute(query, chat_id, *values)
+        
+        # Also sync to settings JSON for legacy compatibility
+        settings_row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
+        import json
+        settings = settings_row["settings"] if settings_row else {}
+        if isinstance(settings, str):
+            try:
+                settings = json.loads(settings)
+            except Exception:
+                settings = {}
+        # Sync lock settings
+        for k, v in valid_locks.items():
+            settings[f"lock_{k}"] = v
+        await conn.execute("UPDATE groups SET settings = $1 WHERE chat_id = $2", json.dumps(settings), chat_id)
 
     for k, v in valid_locks.items():
         await publish_event(chat_id, "lock_change", {"lock_type": k, "enabled": v})
@@ -500,7 +535,10 @@ async def get_filters(chat_id: int, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
     async with db.pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM filters WHERE chat_id=$1 ORDER BY created_at DESC", chat_id
+            """SELECT id, chat_id, keyword, 
+                      COALESCE(reply_content, response) as reply_content,
+                      added_by, added_at, created_at 
+               FROM filters WHERE chat_id=$1 ORDER BY created_at DESC NULLS LAST""", chat_id
         )
     return [dict(r) for r in rows]
 

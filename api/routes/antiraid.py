@@ -18,18 +18,25 @@ logger = logging.getLogger(__name__)
 
 
 async def _get_antiraid_settings(chat_id: int) -> dict:
-    import json
-    async with db.pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
-    if not row:
-        return {}
-    settings = row["settings"] or {}
-    if isinstance(settings, str):
-        try:
-            settings = json.loads(settings)
-        except Exception:
-            settings = {}
-    return settings
+    """Get merged antiraid settings from columns and JSON."""
+    from db.ops.automod import get_group_settings
+    try:
+        settings = await get_group_settings(db.pool, chat_id)
+        return settings
+    except Exception:
+        # Fallback to raw settings
+        import json
+        async with db.pool.acquire() as conn:
+            row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
+        if not row:
+            return {}
+        settings = row["settings"] or {}
+        if isinstance(settings, str):
+            try:
+                settings = json.loads(settings)
+            except Exception:
+                settings = {}
+        return settings
 
 
 @router.get("")

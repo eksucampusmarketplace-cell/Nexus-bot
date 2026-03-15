@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 class Database:
     def __init__(self):
         self.pool = None
+        self.redis = None
 
     async def connect(self):
         """Connect to the database with retry logic and better error messages."""

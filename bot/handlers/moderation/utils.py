@@ -215,21 +215,62 @@ async def send_and_auto_delete(message, text: str, delay: int = 30):
     return sent_msg
 
 
-async def publish_event(chat_id: int, event_type: str, data: dict):
-    """
-    Publish event to Redis pubsub channel.
-    Miniapp SSE endpoint picks it up and forwards to browser.
-    """
-    if not db.redis:
-        return
-    try:
+class EventBus:
+    """In-memory event bus for single-process deployments without Redis."""
+    _handlers = {}
+    
+    @classmethod
+    def subscribe(cls, chat_id: int, handler):
+        if chat_id not in cls._handlers:
+            cls._handlers[chat_id] = []
+        cls._handlers[chat_id].append(handler)
+    
+    @classmethod
+    def unsubscribe(cls, chat_id: int, handler):
+        if chat_id in cls._handlers:
+            cls._handlers[chat_id] = [h for h in cls._handlers[chat_id] if h != handler]
+    
+    @classmethod
+    async def publish(cls, chat_id: int, event_type: str, data: dict):
         payload = {
             "type": event_type,
             "chat_id": chat_id,
             "timestamp": datetime.utcnow().isoformat(),
             **data,
         }
-        await db.redis.publish(f"nexus:events:{chat_id}", json.dumps(payload))
+        if chat_id in cls._handlers:
+            for handler in cls._handlers[chat_id]:
+                try:
+                    await handler(payload)
+                except Exception:
+                    pass
+        return payload
+
+
+async def publish_event(chat_id: int, event_type: str, data: dict):
+    """
+    Publish event to Redis pubsub channel.
+    Miniapp SSE endpoint picks it up and forwards to browser.
+    Falls back to in-memory EventBus if Redis is not available.
+    """
+    payload = {
+        "type": event_type,
+        "chat_id": chat_id,
+        "timestamp": datetime.utcnow().isoformat(),
+        **data,
+    }
+    
+    # Try Redis first
+    if db.redis:
+        try:
+            await db.redis.publish(f"nexus:events:{chat_id}", json.dumps(payload))
+            return
+        except Exception as e:
+            log.debug(f"[EVENTS] Redis publish failed: {e}")
+    
+    # Fall back to in-memory event bus
+    try:
+        await EventBus.publish(chat_id, event_type, data)
     except Exception as e:
         log.debug(f"[EVENTS] Failed to publish event: {e}")
 

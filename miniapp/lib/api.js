@@ -59,7 +59,10 @@ export async function apiFetch(path, options = {}) {
     options.body = JSON.stringify(options.body);
   }
 
-  const res = await fetch(path, {
+  // Use absolute URL to bypass <base href> resolution
+  const absoluteUrl = window.location.origin + path;
+
+  const res = await fetch(absoluteUrl, {
     ...options,
     headers: mergedHeaders,
   });

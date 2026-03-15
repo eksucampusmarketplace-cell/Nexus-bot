@@ -3,6 +3,7 @@ from api.auth import get_current_user
 from db.client import db
 from db.ops.groups import get_user_managed_groups, get_group, update_group_settings
 from db.ops.logs import get_recent_logs
+from bot.utils.crypto import hash_token
 import json
 
 router = APIRouter()
@@ -15,9 +16,7 @@ async def list_groups(user: dict = Depends(get_current_user)):
         # Fallback to all groups if no bot context (unlikely with get_current_user)
         return await get_user_managed_groups(user["id"])
 
-    import hashlib
-
-    token_hash = hashlib.sha256(bot_token.encode()).hexdigest()[:10]
+    token_hash = hash_token(bot_token)
 
     async with db.pool.acquire() as conn:
         rows = await conn.fetch("SELECT * FROM groups WHERE bot_token_hash = $1", token_hash)

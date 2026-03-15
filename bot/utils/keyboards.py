@@ -6,6 +6,7 @@ These keyboards are used in messages from every bot instance.
 """
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
 from config import settings
 
 
@@ -45,9 +46,10 @@ def support_keyboard(
         ]
     )
 
-    # Documentation button (if configured)
-    if include_docs and settings.DOCS_URL:
-        buttons.append([InlineKeyboardButton("📚 Documentation", url=settings.DOCS_URL)])
+    # Documentation button (if configured, fallback to main bot support link)
+    if include_docs:
+        docs_url = settings.DOCS_URL or f"https://t.me/{settings.MAIN_BOT_USERNAME}"
+        buttons.append([InlineKeyboardButton("📚 Help & Docs", url=docs_url)])
 
     # Privacy Policy button - show a link to online version if available
     if include_privacy:

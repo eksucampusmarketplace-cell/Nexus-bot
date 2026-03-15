@@ -1,89 +1,119 @@
 import logging
-import json
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.constants import ParseMode
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
 
 logger = logging.getLogger(__name__)
 
 HELP_CATEGORIES = {
     "🛡️ Moderation": [
-        "/warn - Warn a user",
-        "/unwarn - Remove a warning",
-        "/mute - Mute a user",
-        "/unmute - Unmute a user",
-        "/ban - Ban a user",
-        "/unban - Unban a user",
-        "/kick - Kick a user",
-        "/purge - Delete recent messages",
-        "/pin - Pin a message",
-        "/unpin - Unpin the pinned message",
+        "/warn [@user|reply] [reason] — Warn a user",
+        "/unwarn [@user|reply] — Remove a warning",
+        "/warns [@user|reply] — Show user warnings",
+        "/resetwarns [@user|reply] — Clear all warnings",
+        "/warnlimit <1-10> — Set max warnings before action",
+        "/warnmode <mute|kick|ban> — Set action at max warns",
+        "/mute [@user|reply] [duration] [reason] — Mute a user",
+        "/unmute [@user|reply] — Unmute a user",
+        "/tmute [@user|reply] <duration> — Temp mute",
+        "/smute [@user|reply] [reason] — Silent mute",
+        "/ban [@user|reply] [reason] — Ban a user",
+        "/unban [@user|reply] — Unban a user",
+        "/tban [@user|reply] <duration> — Temp ban",
+        "/sban [@user|reply] [reason] — Silent ban",
+        "/kick [@user|reply] [reason] — Kick a user",
+        "/skick [@user|reply] [reason] — Silent kick",
+        "/purge [count] — Delete recent messages",
+        "/del — Delete replied message",
+        "/delall [@user|reply] — Delete user's recent messages",
+        "/purgeme <count> — Delete your own messages",
+        "/restrict [@user|reply] — Restrict user (no media)",
+        "/unrestrict [@user|reply] — Remove restrictions",
     ],
-    "🚫 Anti-Spam": [
-        "!antispam - Enable anti-spam",
-        "!!antispam - Disable anti-spam",
-        "!antiflood - Enable anti-flood",
-        "!antilink - Enable anti-link",
+    "👮 Admin Tools": [
+        "/promote [@user|reply] — Promote to admin",
+        "/demote [@user|reply] — Demote admin",
+        "/title [@user|reply] <title> — Set admin title",
+        "/admins — List all admins",
+        "/pinmsg — Pin replied message",
+        "/unpinmsg — Unpin pinned message",
+        "/unpinall — Unpin all messages",
+        "/id — Show user/chat ID",
+        "/info — Show user/group info",
+        "/groupinfo — Detailed group info",
+        "/stats — Group statistics",
+        "/invitelink — Get invite link",
+        "/revoke — Revoke and regenerate invite link",
+    ],
+    "🔒 Locks & Filters": [
+        "/lock <type> — Lock a message type",
+        "/unlock <type> — Unlock a message type",
+        "/locks — Show all lock states",
+        "/filter <keyword> <response> — Add keyword auto-reply",
+        "/filters — List all keyword filters",
+        "/stop <keyword> — Remove a keyword filter",
+        "/stopall — Remove all filters (owner only)",
+        "/blacklist <word> — Add word to blacklist",
+        "/unblacklist <word> — Remove word from blacklist",
+        "/blacklistmode <action> — Set blacklist action",
     ],
     "👋 Greetings": [
-        "/setwelcome - Set welcome message",
-        "/setgoodbye - Set goodbye message",
-        "/welcome - Preview welcome message",
-        "/goodbye - Preview goodbye message",
-        "/rules - Show group rules",
-        "/setrules - Set group rules",
+        "/setwelcome [text] — Set welcome message",
+        "/setgoodbye [text] — Set goodbye message",
+        "/setrules [text] — Set group rules",
+        "/welcome — Preview welcome message",
+        "/goodbye — Preview goodbye message",
+        "/rules — Show group rules",
+        "/resetwelcome — Reset to default welcome",
+        "/resetgoodbye — Reset to default goodbye",
+        "/resetrules — Reset to default rules",
     ],
-    "🔒 Security": [
-        "!captcha - Enable captcha",
-        "!antiraid - Enable anti-raid mode",
-        "/slowmode - Set slow mode delay",
-        "/setflood - Set flood limit",
-        "/addfilter - Add word filter",
-        "/delfilter - Remove word filter",
+    "🛡️ Security": [
+        "!captcha on/off — Enable/disable captcha",
+        "!antiraid on/off — Enable/disable anti-raid",
+        "!antispam on/off — Enable/disable anti-spam",
+        "!antiflood on/off — Enable/disable anti-flood",
+        "!antilink on/off — Enable/disable anti-link",
+        "/setpassword <pass> — Set group entry password",
+        "/clearpassword — Remove entry password",
+        "/antiraid — Manage anti-raid settings",
+        "/captcha — Configure captcha",
     ],
-    "📢 Channel": [
-        "/channelpost - Post to linked channel",
-        "/schedulepost - Schedule a channel post",
-        "/announce - Send announcement",
-        "/pinmessage - Pin custom message",
+    "📝 Notes": [
+        "/savenote <name> [text] — Save a note (reply to save media)",
+        "/note <name> — Retrieve a saved note",
+        "/notes — List all saved notes",
+        "/delnote <name> — Delete a note",
     ],
-    "📊 Analytics": [
-        "/stats - Show group statistics",
-        "/admininfo - Show detailed group info",
-        "/exportsettings - Export settings",
+    "📢 Channel & Schedule": [
+        "/channelpost — Post to linked channel",
+        "/schedulepost — Schedule a channel post",
+        "/approvepost — Approve pending post",
+        "/cancelpost — Cancel scheduled post",
+        "/editpost — Edit a scheduled post",
+        "/deletepost — Delete a scheduled post",
+        "/setlog <channel> — Set log channel",
+        "/unsetlog — Remove log channel",
     ],
-    "📝 Content": [
-        "/filters - List word filters",
-        "/poll - Create a poll",
+    "📊 Stats & Info": [
+        "/stats — Group statistics",
+        "/info [@user|reply] — Show user info",
+        "/id — Show chat/user ID",
+        "/groupinfo — Group info",
+        "/adminlist — List all admins",
+        "/staff — Same as /adminlist",
+        "/time — Show current time",
     ],
-    "🎮 Fun": [
-        "/afk - Set AFK status",
-        "/back - Clear AFK status",
-        "/dice - Roll a dice",
-        "/coin - Flip a coin",
-        "/choose - Randomly choose",
-        "/8ball - Magic 8-ball",
-        "/roll - Roll random number",
-        "/joke - Get a joke",
-        "/quote - Get a quote",
-        "/roast - Playful roast",
-        "/compliment - Give compliment",
-        "/calc - Calculator",
-    ],
-    "🔧 Utilities": [
-        "/panel - Open mini app panel",
-        "/help - Show this help",
-        "/id - Get chat/user ID",
-        "/info - Show group info",
-        "/admins - List admins",
-        "/report - Report a message",
-        "/privacy - View privacy policy",
-    ],
-    "📢 Admin Requests": [
-        "@admins - Mention to request admin help",
-        "/admin_requests - View open requests (admin)",
-        "/admin_req_stats - Request statistics (admin)",
-        "/set_admin_requests - Configure @admins (admin)",
+    "⚙️ Bot Management": [
+        "/panel — Open Mini App control panel",
+        "/setup — Re-run setup wizard",
+        "/copysettings — Copy settings to another group",
+        "/export — Export group settings",
+        "/import — Import group settings",
+        "/reset — Reset all settings",
+        "/help — Show this message",
+        "/privacy — View privacy policy",
     ],
 }
 
@@ -91,134 +121,57 @@ HELP_CATEGORIES = {
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from config import settings
 
-    # Get miniapp URL
     miniapp_url = settings.mini_app_url
+    bot_username = context.bot.bot.username
 
-    if context.args:
-        arg = context.args[0].lower()
-        if arg == "modules":
-            await help_modules(update, context)
-            return
+    keyboard = []
+    row = []
+    for i, category in enumerate(HELP_CATEGORIES.keys()):
+        row.append(InlineKeyboardButton(category, callback_data=f"help:{i}"))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
 
-        # Check if it is a category
-        for cat, cmds in HELP_CATEGORIES.items():
-            if arg in cat.lower():
-                text = f"⚡ *Nexus Help: {cat}*\n\n" + "\n".join(cmds)
-                text += (
-                    f'\n\n📱 <a href="{miniapp_url}">Open Mini App for detailed configuration</a>'
-                    if miniapp_url
-                    else ""
-                )
-                await update.message.reply_text(
-                    text, parse_mode=ParseMode.MARKDOWN, disable_web_page_preview=True
-                )
-                return
-
-        # Check if it is a command
-        await update.message.reply_text(
-            f"Detailed help for `{arg}` is coming soon. Use the Mini App for complete command documentation.",
-            parse_mode=ParseMode.MARKDOWN,
-        )
-        return
-
-    keyboard = [
-        [InlineKeyboardButton("📱 Open Mini App", url=miniapp_url)] if miniapp_url else [],
-        [
-            InlineKeyboardButton("🛡️ Moderation", callback_data="help_mod"),
-            InlineKeyboardButton("🚫 Anti-Spam", callback_data="help_spam"),
-        ],
-        [
-            InlineKeyboardButton("👋 Greetings", callback_data="help_greet"),
-            InlineKeyboardButton("🔒 Security", callback_data="help_sec"),
-        ],
-        [
-            InlineKeyboardButton("📢 Channel", callback_data="help_chan"),
-            InlineKeyboardButton("📊 Analytics", callback_data="help_ana"),
-        ],
-        [
-            InlineKeyboardButton("📝 Content", callback_data="help_cont"),
-            InlineKeyboardButton("🎮 Fun", callback_data="help_fun"),
-        ],
-        [
-            InlineKeyboardButton("🔧 Utilities", callback_data="help_util"),
-            InlineKeyboardButton("📢 Admin Requests", callback_data="help_areq"),
-        ],
-        [InlineKeyboardButton("⌨️ All Commands", callback_data="help_all")],
-    ]
-
-    # Filter out empty rows
-    keyboard = [row for row in keyboard if row]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    help_text = (
-        "⚡ *Nexus Help System*\n\nChoose a category or open the Mini App for detailed configuration:\n\n"
-        + (
-            f"📱 Full command documentation with descriptions and examples available in the [Mini App]({miniapp_url})"
-            if miniapp_url
-            else ""
-        )
-    )
+    keyboard.append([InlineKeyboardButton("📱 Open Panel", web_app=WebAppInfo(url=miniapp_url))])
 
     await update.message.reply_text(
-        help_text,
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.MARKDOWN,
-        disable_web_page_preview=True,
+        f"⚡ <b>{bot_username} Help</b>\n\nChoose a category:",
+        parse_mode=ParseMode.HTML,
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
-
-
-async def help_modules(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    db_pool = context.bot_data["db_pool"]
-    chat_id = update.effective_chat.id
-
-    async with db_pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT modules FROM groups WHERE chat_id = $1", chat_id)
-        modules = {}
-        if row and row["modules"]:
-            modules = row["modules"]
-            if isinstance(modules, str):
-                modules = json.loads(modules)
-
-    text = "📦 *Nexus Modules Status*\n\n"
-    for mod, enabled in modules.items():
-        status = "✅ ON" if enabled else "❌ OFF"
-        text += f"• `{mod}`: {status}\n"
-
-    if not modules:
-        text += "No modules configured yet."
-
-    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 
 async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    cat_map = {
-        "help_mod": "🛡️ Moderation",
-        "help_spam": "🚫 Anti-Spam",
-        "help_greet": "👋 Greetings",
-        "help_sec": "🔒 Security",
-        "help_chan": "📢 Channel",
-        "help_ana": "📊 Analytics",
-        "help_cont": "📝 Content",
-        "help_fun": "🎮 Fun",
-        "help_util": "🔧 Utilities",
-        "help_areq": "📢 Admin Requests",
-    }
+    data = query.data
 
-    cat = cat_map.get(query.data)
-    if cat:
-        cmds = HELP_CATEGORIES[cat]
-        text = f"⚡ *Nexus Help: {cat}*\n\n" + "\n".join(cmds)
-        await query.edit_message_text(
-            text, parse_mode=ParseMode.MARKDOWN, reply_markup=query.message.reply_markup
-        )
-    elif query.data == "help_all":
-        text = "⚡ *Nexus All Commands*\n\n"
-        for cat, cmds in HELP_CATEGORIES.items():
-            text += f"*{cat}*:\n" + "\n".join(cmds) + "\n\n"
-        await query.edit_message_text(
-            text, parse_mode=ParseMode.MARKDOWN, reply_markup=query.message.reply_markup
-        )
+    if data.startswith("help:"):
+        parts = data.split(":")
+        if len(parts) == 2:
+            idx = parts[1]
+            if idx == "back":
+                await help_handler(update, context)
+                return
+            try:
+                idx = int(idx)
+                categories = list(HELP_CATEGORIES.items())
+                if 0 <= idx < len(categories):
+                    name, cmds = categories[idx]
+                    text = f"<b>{name}</b>\n\n" + "\n".join(f"• {c}" for c in cmds)
+                    back_btn = InlineKeyboardButton("← Back", callback_data="help:back")
+                    await query.edit_message_text(
+                        text,
+                        parse_mode=ParseMode.HTML,
+                        reply_markup=InlineKeyboardMarkup([[back_btn]]),
+                    )
+            except (ValueError, IndexError):
+                pass
+
+
+# Export handlers
+help_command = CommandHandler("help", help_handler)
+help_callback = CallbackQueryHandler(help_callback_handler, pattern="^help:")

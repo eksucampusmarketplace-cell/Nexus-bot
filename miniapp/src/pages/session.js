@@ -24,16 +24,22 @@ export async function renderSessionPage(container) {
       </div>
       <div style="margin-bottom:var(--sp-4);">
         <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Generate for</div>
-        <div style="display:flex;gap:var(--sp-2);">
-          <button data-lib="gramjs" style="flex:1;padding:var(--sp-3);border:1px solid var(--accent);border-radius:var(--r-lg);background:var(--accent-dim);color:var(--accent);font-weight:var(--fw-semibold);cursor:pointer;font-size:var(--text-sm);">
-            GramJS / Telethon
+        <div style="display:flex;flex-direction:column;gap:var(--sp-2);">
+          <button data-lib="gramjs" style="flex:1;padding:var(--sp-3);border:1px solid var(--accent);border-radius:var(--r-lg);background:var(--accent-dim);color:var(--accent);font-weight:var(--fw-semibold);cursor:pointer;font-size:var(--text-sm);text-align:left;">
+            GramJS (JavaScript)
           </button>
-          <button data-lib="pyrogram" style="flex:1;padding:var(--sp-3);border:1px solid var(--border);border-radius:var(--r-lg);background:transparent;color:var(--text-muted);cursor:pointer;font-size:var(--text-sm);">
-            Pyrogram
+          <button data-lib="telethon" style="flex:1;padding:var(--sp-3);border:1px solid var(--border);border-radius:var(--r-lg);background:transparent;color:var(--text-muted);cursor:pointer;font-size:var(--text-sm);text-align:left;">
+            Telethon (Python)
+          </button>
+          <button data-lib="pyrogram" style="flex:1;padding:var(--sp-3);border:1px solid var(--border);border-radius:var(--r-lg);background:transparent;color:var(--text-muted);cursor:pointer;font-size:var(--text-sm);text-align:left;">
+            Pyrogram (Python)
           </button>
         </div>
         <div id="pyrogram-note" style="display:none;font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-2);">
           Pyrogram uses a different session format. We'll convert it server-side (not stored).
+        </div>
+        <div id="telethon-note" style="display:none;font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-2);">
+          Telethon uses a different session format. We'll convert it server-side (not stored).
         </div>
       </div>
       <button id="consent-btn" class="btn btn-primary" style="width:100%;justify-content:center;">
@@ -53,6 +59,7 @@ export async function renderSessionPage(container) {
         b.style.color = b === btn ? 'var(--accent)' : 'var(--text-muted)';
       });
       document.getElementById('pyrogram-note').style.display = selectedLib === 'pyrogram' ? 'block' : 'none';
+      document.getElementById('telethon-note').style.display = selectedLib === 'telethon' ? 'block' : 'none';
     };
   });
 
@@ -181,14 +188,25 @@ function _render2FAStep(container, auth, library) {
 
 async function _showSessionResult(container, session, library, auth) {
   let displaySession = session;
+  let targetFormat = null;
 
   if (library === 'pyrogram') {
+    targetFormat = 'pyrogram';
+  } else if (library === 'telethon') {
+    targetFormat = 'telethon';
+  }
+
+  if (targetFormat) {
     try {
       const res = await apiFetch('/api/session/convert', {
         method: 'POST',
-        body: JSON.stringify({ gramjs_session: session }),
+        body: JSON.stringify({ gramjs_session: session, target: targetFormat }),
       });
-      displaySession = res.pyrogram_session || session;
+      if (targetFormat === 'pyrogram') {
+        displaySession = res.pyrogram_session || res.session || session;
+      } else {
+        displaySession = res.telethon_session || res.session || session;
+      }
     } catch (_) {
       showToast('Conversion failed, showing GramJS session', 'warning');
     }
@@ -196,6 +214,7 @@ async function _showSessionResult(container, session, library, auth) {
 
   const usageCode = {
     gramjs: `const { TelegramClient } = require("telegram");\nconst { StringSession } = require("telegram/sessions");\n\nconst client = new TelegramClient(\n  new StringSession("${displaySession}"),\n  API_ID, API_HASH, {}\n);\nawait client.connect();`,
+    telethon: `from telethon import TelegramClient\nfrom telethon.sessions import StringSession\n\nclient = TelegramClient(\n  StringSession("${displaySession}"),\n  API_ID,\n  API_HASH\n)\n\nasync with client:\n    print(await client.get_me())`,
     pyrogram: `from pyrogram import Client\n\napp = Client(\n  "my_account",\n  api_id=API_ID,\n  api_hash="API_HASH",\n  session_string="${displaySession}"\n)\n\nasync with app:\n    print(await app.get_me())`,
   };
 

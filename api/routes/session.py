@@ -2,7 +2,7 @@
 api/routes/session.py
 
 Session string conversion endpoint.
-Converts GramJS/Telethon session strings to Pyrogram format.
+Converts GramJS browser session to Telethon or Pyrogram format.
 STATELESS — session content is never logged or stored.
 """
 
@@ -22,11 +22,14 @@ log = logging.getLogger(__name__)
 @router.post("/api/session/convert")
 async def convert_session(body: dict, user: dict = Depends(get_current_user)):
     """
-    Convert GramJS/Telethon session string to Pyrogram format.
+    Convert GramJS browser session to Telethon or Pyrogram format.
+    Neither is compatible with GramJS directly.
     STATELESS — session string is never logged or stored anywhere.
     Processed in memory and immediately discarded.
     """
     gramjs_session = body.get("gramjs_session", "")
+    target = body.get("target", "pyrogram")  # "telethon" or "pyrogram"
+
     if not gramjs_session:
         raise HTTPException(400, "Missing gramjs_session")
 
@@ -36,19 +39,35 @@ async def convert_session(body: dict, user: dict = Depends(get_current_user)):
         if len(decoded) < 267:
             raise ValueError("Session string too short")
 
+        # GramJS StringSession format: version(1) + dc_id(4) + ip_bytes(4) + port(2) + auth_key(256)
+        version = decoded[0]
         dc_id = struct.unpack_from(">I", decoded, 1)[0]
         ip_bytes = decoded[5:9]
         port = struct.unpack_from(">H", decoded, 9)[0]
         auth_key = decoded[11:267]
 
-        pyrogram_bytes = struct.pack(">BI4sH", 1, dc_id, ip_bytes, port) + auth_key
-        pyrogram_session = base64.urlsafe_b64encode(pyrogram_bytes).decode().rstrip("=")
+        if target == "telethon":
+            # Telethon StringSession format: version(1) + dc_id(4) + ip_bytes(4) + port(2) + auth_key(256)
+            # Same layout as GramJS but different base64 encoding (standard vs urlsafe)
+            telethon_bytes = bytes([1]) + struct.pack(">I", dc_id) + ip_bytes + struct.pack(">H", port) + auth_key
+            result = base64.b64encode(telethon_bytes).decode()  # standard base64 for Telethon
+            log.info(f"[SESSION] Converted to Telethon for user {user.get('id')} (content not logged)")
+            return {"telethon_session": result, "session": result, "format": "telethon"}
 
-        log.info(f"[SESSION] Converted session for user {user.get('id')} (content not logged)")
+        elif target == "pyrogram":
+            # Pyrogram StringSession format: version(1) + dc_id(4) + ip_bytes(4) + port(2) + auth_key(256)
+            pyrogram_bytes = struct.pack(">BI4sH", 1, dc_id, ip_bytes, port) + auth_key
+            result = base64.urlsafe_b64encode(pyrogram_bytes).decode().rstrip("=")
+            log.info(f"[SESSION] Converted to Pyrogram for user {user.get('id')} (content not logged)")
+            return {"pyrogram_session": result, "session": result, "format": "pyrogram"}
 
-        return {"pyrogram_session": pyrogram_session}
+        else:
+            raise HTTPException(400, f"Unknown target format: {target}")
+
+    except HTTPException:
+        raise
     except Exception as e:
-        log.warning(f"[SESSION] Conversion failed: {type(e).__name__}")
+        log.warning(f"[SESSION] Conversion failed: {type(e).__name__}: {e}")
         raise HTTPException(400, f"Invalid session format: {str(e)}")
 
 

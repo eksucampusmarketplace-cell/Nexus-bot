@@ -1,4 +1,3 @@
-import os
 import sys
 from typing import List, Optional
 
@@ -22,8 +21,10 @@ class Settings(BaseSettings):
 
     # ── Bot Display & Support ────────────────────────────────────────────────
     BOT_DISPLAY_NAME: str = "Nexus"  # Displayed in "Powered by {bot_name}"
-    MAIN_BOT_USERNAME: str = "NexusBot"  # Username for support redirects
-    SUPPORT_GROUP_ID: int = 0  # Internal alerts group (0 = disabled)
+    MAIN_BOT_USERNAME: str = (
+        ""  # Username for support redirects (auto-detected on startup if empty)
+    )
+    SUPPORT_GROUP_ID: int = 0  # Internal alerts channel (0 = disabled)
     DOCS_URL: Optional[str] = None  # Documentation link for help messages
     MINI_APP_URL: Optional[str] = (
         None  # Base URL for the Mini App (if not set, defaults to RENDER_EXTERNAL_URL/miniapp)
@@ -45,7 +46,7 @@ class Settings(BaseSettings):
     MEMORY_CRITICAL_MB: int = 1200
 
     # ── Telegram MTProto API (for session generator) ──────────────────────
-    TG_API_ID: Optional[int] = None    # From my.telegram.org/apps
+    TG_API_ID: Optional[int] = None  # From my.telegram.org/apps
     TG_API_HASH: Optional[str] = None  # From my.telegram.org/apps
 
     # ── Stars Economy ──────────────────────────────────────────────────────

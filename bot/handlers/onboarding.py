@@ -4,10 +4,16 @@ Guides admins through initial bot setup
 """
 
 import logging
-from typing import Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import (
+    CallbackQueryHandler,
+    CommandHandler,
+    ConversationHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 import db.ops.groups as db_groups
 
@@ -63,7 +69,6 @@ async def handle_language(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("✅ Enable All", callback_data="modules:all")],
         [InlineKeyboardButton("🛡️ Moderation Only", callback_data="modules:mod")],
-        [InlineKeyboardButton("🎵 Music Only", callback_data="modules:music")],
         [InlineKeyboardButton("🎮 Games Only", callback_data="modules:games")],
         [InlineKeyboardButton("⏭️ Skip", callback_data="skip")],
     ]
@@ -216,8 +221,6 @@ async def cmd_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # Export conversation handler
-from telegram.ext import CallbackQueryHandler, CommandHandler, ConversationHandler, MessageHandler, filters
-
 onboarding_handler = ConversationHandler(
     entry_points=[
         MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, start_onboarding),

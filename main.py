@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -77,9 +78,10 @@ async def lifespan(app: FastAPI):
     token_pattern = r"^\d{8,12}:[\w-]{35,50}$"
     if not re.match(token_pattern, primary_token):
         logger.error(
-            f"[STARTUP] ❌ Invalid PRIMARY_BOT_TOKEN format. "
-            f"Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz (bot ID: 8-12 digits, token: 35-50 chars). "
-            f"Please check your environment variables."
+            "[STARTUP] ❌ Invalid PRIMARY_BOT_TOKEN format. "
+            "Expected format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz "
+            "(bot ID: 8-12 digits, token: 35-50 chars). "
+            "Please check your environment variables."
         )
         raise ValueError("Invalid bot token format. Bot tokens should be in format: BOT_ID:TOKEN")
 
@@ -110,6 +112,11 @@ async def lifespan(app: FastAPI):
         logger.info(
             f"[STARTUP] ✅ Primary bot @{primary_me.username} (ID: {primary_me.id}) is online"
         )
+
+        # Auto-set MAIN_BOT_USERNAME if not configured
+        if not settings.MAIN_BOT_USERNAME:
+            settings.MAIN_BOT_USERNAME = primary_me.username
+            logger.info(f"[STARTUP] ✅ Auto-detected MAIN_BOT_USERNAME: @{primary_me.username}")
 
         # Cache bot info to reduce API calls
         primary_app.bot_data["cached_bot_info"] = {
@@ -246,7 +253,11 @@ if os.path.exists(miniapp_path):
 # Import and include API routers
 try:
     from api.routes import (
+        admin,
         analytics,
+    )
+    from api.routes import antiraid as antiraid_api
+    from api.routes import (
         auth,
         automod,
         backup,
@@ -266,18 +277,20 @@ try:
         member_stats,
         members,
         messages,
-        stats,
     )
     from api.routes import moderation as moderation_api
     from api.routes import (
-        admin,
-        antiraid as antiraid_api,
         modules,
-        notes as notes_api,
+    )
+    from api.routes import notes as notes_api
+    from api.routes import (
         reports,
         roles,
         scheduler,
-        session as session_api,
+    )
+    from api.routes import session as session_api
+    from api.routes import (
+        stats,
         text_config,
         webhooks,
     )

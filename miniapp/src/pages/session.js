@@ -5,8 +5,8 @@
  * Uses MtprotoAuth for browser-side auth — credentials never touch the server.
  */
 
-import { Card, EmptyState, showToast } from '../../lib/components.js?v=1.5.0';
-import { apiFetch } from '../../lib/api.js?v=1.5.0';
+import { Card, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
 
 export async function renderSessionPage(container) {
   container.innerHTML = '';
@@ -99,7 +99,7 @@ function _renderPhoneStep(container, library) {
     }
 
     try {
-      const { MtprotoAuth } = await import('../../lib/mtproto_auth.js?v=1.5.0');
+      const { MtprotoAuth } = await import('../../lib/mtproto_auth.js?v=1.6.0');
       const auth = new MtprotoAuth();
       const res = await auth.sendCode(phone);
       if (!res.ok) {

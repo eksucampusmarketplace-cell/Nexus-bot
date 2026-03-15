@@ -62,7 +62,8 @@ DEFAULTS = {
         "<b>🛡️ Quick Reference:</b>\n\n"
         "<b>Moderation:</b> /warn, /ban, /mute, /kick, /purge, /pin\n"
         "<b>Security:</b> !antispam, !antiflood, !antilink, !captcha\n"
-        "<b>Music:</b> /play, /skip, /queue, /volume, /loop\n\n"
+        "<b>Notes:</b> /note, /notes, /savenote, /delnote\n"
+        "<b>Anti-Raid:</b> /antiraid, !captcha, !antiflood\n\n"
         "<b>💡 Tip:</b> Use /panel to open the full management interface."
     ),
     # Shown when a member is muted

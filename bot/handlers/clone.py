@@ -376,27 +376,46 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         "display_name": cloned_name,
     }
 
+    is_owner = context.bot_data.get("is_primary", False) and user.id == settings.OWNER_ID
+    limit_row = [
+        InlineKeyboardButton("1", callback_data="clone:limit:1"),
+        InlineKeyboardButton("5", callback_data="clone:limit:5"),
+        InlineKeyboardButton("10", callback_data="clone:limit:10"),
+        InlineKeyboardButton("20", callback_data="clone:limit:20"),
+    ]
+    if is_owner:
+        limit_row.append(InlineKeyboardButton("∞ Unlimited", callback_data="clone:limit:0"))
+
     await processing.edit_text(
         f"✅ *Token verified\!*\n\n"
         f"🤖 @{cloned_username}\n"
         f"📛 {cloned_name}\n\n"
-        f"How many groups should this bot work in? \(1–5\)\n"
+        f"How many groups should this bot work in?\n"
         f"Default: 1",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [
-                [
-                    InlineKeyboardButton("1", callback_data="clone:limit:1"),
-                    InlineKeyboardButton("2", callback_data="clone:limit:2"),
-                    InlineKeyboardButton("3", callback_data="clone:limit:3"),
-                    InlineKeyboardButton("4", callback_data="clone:limit:4"),
-                    InlineKeyboardButton("5", callback_data="clone:limit:5"),
-                ],
+                limit_row,
                 [InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel")],
             ]
         ),
     )
     return WAITING_FOR_LIMIT
+
+
+# ─── State: WAITING_FOR_TOKEN (catch-all for non-token text) ─────────────────
+
+
+async def handle_bad_token_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "⚠️ That doesn't look like a bot token.\n\n"
+        "A token looks like: 1234567890:ABCdefGHIjklMNOpqrsTUVwxyz\n\n"
+        "1. Open @BotFather\n"
+        "2. Send /mybots → select your bot → API Token\n"
+        "3. Copy and paste the full token here.\n\n"
+        "Send /cancel to stop.",
+    )
+    return WAITING_FOR_TOKEN
 
 
 # ─── State: WAITING_FOR_LIMIT ─────────────────────────────────────────────────
@@ -536,7 +555,16 @@ async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("reauth_bot_id", None)
 
     logger.info(f"[CLONE] Cancelled | user_id={user.id}")
-    await query.edit_message_text("❎ Clone cancelled\.", parse_mode=ParseMode.MARKDOWN_V2)
+    try:
+        await query.edit_message_text(
+            "❎ Clone setup cancelled\.",
+            parse_mode=ParseMode.MARKDOWN_V2,
+        )
+    except Exception:
+        try:
+            await query.answer("✓ Cancelled", show_alert=False)
+        except Exception:
+            pass
     return ConversationHandler.END
 
 
@@ -989,6 +1017,7 @@ clone_conversation = ConversationHandler(
             ),
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel$"),
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel_entry$"),
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_bad_token_input),
         ],
         WAITING_FOR_LIMIT: [
             CallbackQueryHandler(on_limit_chosen, pattern=r"^clone:limit:\d+$"),

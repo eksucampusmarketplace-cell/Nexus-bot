@@ -339,12 +339,15 @@ def create_application(token: str, is_primary: bool = False) -> Application:
             cloneset_handler,
             myclones_command_handler,
         )
+        from bot.handlers.owner_dashboard import owner_dashboard_handler
 
         # ConversationHandler for /clone flow (must be added before other clone handlers)
         app.add_handler(clone_conversation)
         # Non-conversation commands
         app.add_handler(CommandHandler("myclones", myclones_command_handler, filters=PRIVATE))
         app.add_handler(CommandHandler("cloneset", cloneset_handler, filters=PRIVATE))
+        # Owner dashboard command
+        app.add_handler(owner_dashboard_handler)
         # Management callbacks outside of conversation (remove, confirm_remove, keep)
         app.add_handler(
             CallbackQueryHandler(

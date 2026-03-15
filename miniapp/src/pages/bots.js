@@ -178,6 +178,54 @@ export async function renderBotsPage(container) {
           });
         }
 
+        if (!isPrimary) {
+          const botId = bot.bot_id || bot.id;
+
+          const settingsBtn = document.createElement('button');
+          settingsBtn.textContent = '⚙️ Bot Settings';
+          settingsBtn.style.cssText = 'margin-top:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;font-size:var(--text-xs);';
+
+          const settingsPanel = document.createElement('div');
+          settingsPanel.style.cssText = 'display:none;margin-top:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);padding:var(--sp-3);';
+          settingsPanel.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size:var(--text-xs);">Group Limit (0 = unlimited)</span>
+              <input type="number" id="gl-${botId}" min="0" max="100" value="${bot.group_limit || 1}"
+                style="width:4rem;padding:4px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--text-primary);text-align:center;font-size:var(--text-xs);">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <span style="font-size:var(--text-xs);">Access Policy</span>
+              <select id="ap-${botId}" style="padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--text-primary);font-size:var(--text-xs);">
+                <option value="open" ${bot.group_access_policy === 'open' ? 'selected' : ''}>Open (anyone)</option>
+                <option value="approval" ${bot.group_access_policy === 'approval' ? 'selected' : ''}>Approval required</option>
+                <option value="blocked" ${bot.group_access_policy === 'blocked' ? 'selected' : ''}>Blocked</option>
+              </select>
+            </div>
+            <button id="save-cfg-${botId}" style="width:100%;padding:var(--sp-2);background:var(--accent);color:#000;border:none;border-radius:4px;cursor:pointer;font-size:var(--text-xs);font-weight:var(--fw-medium);">Save</button>
+          `;
+
+          settingsBtn.addEventListener('click', () => {
+            settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+          });
+
+          settingsPanel.querySelector(`#save-cfg-${botId}`).addEventListener('click', async () => {
+            const limit = parseInt(settingsPanel.querySelector(`#gl-${botId}`).value) || 0;
+            const policy = settingsPanel.querySelector(`#ap-${botId}`).value;
+            try {
+              await apiFetch(`/api/bots/${botId}/config`, {
+                method: 'PUT',
+                body: JSON.stringify({ group_limit: limit, group_access_policy: policy }),
+              });
+              showToast('Settings saved', 'success');
+            } catch (e) {
+              showToast('Failed: ' + e.message, 'error');
+            }
+          });
+
+          card.appendChild(settingsBtn);
+          card.appendChild(settingsPanel);
+        }
+
         grid.appendChild(card);
       });
 

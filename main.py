@@ -137,6 +137,7 @@ async def lifespan(app: FastAPI):
             token=primary_token,
             is_primary=True,
             status="active",
+            owner_user_id=settings.OWNER_ID,
         )
         await registry_register(primary_me.id, primary_app)
         app.state.bot = primary_app.bot

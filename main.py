@@ -350,5 +350,8 @@ try:
     app.include_router(antiraid_global_router)  # /api/antiraid/banlist
     app.include_router(notes_api.router)  # prefix="/api/groups/{chat_id}/notes"
     app.include_router(session_api.router)  # /api/session/convert
+
+    from api.routes import pins as pins_api
+    app.include_router(pins_api.router)  # prefix="/api/groups/{chat_id}/pins"
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

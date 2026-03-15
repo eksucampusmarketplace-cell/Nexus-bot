@@ -500,6 +500,12 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("delpin", cmd_delpin, filters=GROUP))
     logger.info("[FACTORY] Pin handlers registered")
 
+    # ── Auto-delete handler ───────────────────────────────────────────────
+    from bot.handlers.autodelete import autodelete_command
+
+    app.add_handler(autodelete_command)
+    logger.info("[FACTORY] Auto-delete handler registered")
+
     # ── Password management handlers ──────────────────────────────────────
     from bot.handlers.password import cmd_clearpassword, cmd_setpassword, handle_password_dm
 

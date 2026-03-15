@@ -193,6 +193,39 @@ async def list_incidents(chat_id: int, page: int = 1, user: dict = Depends(get_c
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/raiders")
+async def list_raiders(chat_id: int, page: int = 1, user: dict = Depends(get_current_user)):
+    """List users flagged as raiders for this group."""
+    try:
+        offset = (page - 1) * 20
+        async with db.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT rm.user_id, rm.username, rm.first_name, rm.joined_at,
+                          rm.was_banned, ars.triggered_at as raid_time
+                   FROM raid_members rm
+                   JOIN antiraid_sessions ars ON rm.session_id = ars.id
+                   WHERE ars.chat_id = $1
+                   ORDER BY rm.joined_at DESC
+                   LIMIT 20 OFFSET $2""",
+                chat_id, offset,
+            )
+            total = await conn.fetchval(
+                """SELECT COUNT(*) FROM raid_members rm
+                   JOIN antiraid_sessions ars ON rm.session_id = ars.id
+                   WHERE ars.chat_id = $1""",
+                chat_id,
+            ) or 0
+        return {
+            "ok": True,
+            "raiders": [dict(r) for r in rows],
+            "total": total,
+            "page": page,
+        }
+    except Exception as e:
+        logger.error(f"[AntiRaid API] list_raiders error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/stats")
 async def antiraid_stats(chat_id: int, user: dict = Depends(get_current_user)):
     try:

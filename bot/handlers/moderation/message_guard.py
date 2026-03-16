@@ -1,9 +1,9 @@
+import asyncio
 import logging
 import re
-import asyncio
 from datetime import datetime, timedelta, timezone
 
-from telegram import ChatPermissions, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
@@ -27,9 +27,54 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_message or not update.effective_user:
         return
 
+    chat_id = update.effective_chat.id
+    message = update.effective_message
+    user_id = update.effective_user.id
+    text = message.text or message.caption or ""
+
     # 1. Is sender an admin?
-    rank = await get_user_rank(context.bot, update.effective_chat.id, update.effective_user.id)
-    if rank >= RANK_ADMIN:
+    rank = await get_user_rank(context.bot, chat_id, user_id)
+    is_admin = rank >= RANK_ADMIN
+
+    # Admins skip enforcement (locks, flood, blacklist) but NOT keyword filters.
+    # Filters (auto-replies) run for everyone including admins.
+    if is_admin:
+        if text:
+            try:
+                async with db.pool.acquire() as conn:
+                    filter_rows = await conn.fetch(
+                        "SELECT keyword, reply_content, response FROM filters WHERE chat_id = $1",
+                        chat_id,
+                    )
+                    for filter_row in filter_rows:
+                        keyword = filter_row["keyword"]
+                        if keyword.isalpha():
+                            pattern = (
+                                r"(?<![a-zA-Z0-9_])" + re.escape(keyword) + r"(?![a-zA-Z0-9_])"
+                            )
+                            if re.search(pattern, text, re.IGNORECASE):
+                                reply = (
+                                    filter_row.get("reply_content")
+                                    or filter_row.get("response")
+                                    or ""
+                                )
+                                if reply:
+                                    await _send_filter_reply(message, reply)
+                                break
+                        else:
+                            if keyword.lower() in text.lower():
+                                reply = (
+                                    filter_row.get("reply_content")
+                                    or filter_row.get("response")
+                                    or ""
+                                )
+                                if reply:
+                                    await _send_filter_reply(message, reply)
+                                break
+            except Exception as e:
+                log.error(
+                    f"[MSG_GUARD] Filter check failed for admin in {chat_id}: {e}", exc_info=True
+                )
         return
 
     # Guard: ensure db.pool is available
@@ -43,7 +88,7 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if message_text and db:
         try:
             from bot.utils.lang_detect import auto_detect_and_store
-            
+
             pool = context.bot_data.get("db") or db.pool
             if pool:
                 asyncio.create_task(
@@ -54,7 +99,7 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         telegram_code=update.effective_user.language_code,
                         first_name=update.effective_user.first_name,
                         last_name=update.effective_user.last_name,
-                        message_text=message_text
+                        message_text=message_text,
                     )
                 )
         except Exception:
@@ -62,16 +107,11 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
     # ───────────────────────────────────────────────────────────────────────
 
-    chat_id = update.effective_chat.id
-    message = update.effective_message
-    user_id = update.effective_user.id
-    text = message.text or message.caption or ""
-
     # ── Phase 1 & 3: Spam Signal Collection & ML Classifier ───────────────
     try:
         from bot.handlers.community_vote import detect_scam, start_community_vote
         from bot.ml.signal_collector import record_pattern_match, record_spam_signal
-        
+
         # 1. Scam pattern detection (if not already handled by MessageHandler)
         # Note: auto_detect_scam runs in group 5, we are in group 0.
         # If we detect it here, we might want to trigger it early.
@@ -84,21 +124,24 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # 2. ML Classifier
         from bot.ml.spam_classifier import classifier
+
         if classifier.is_trained and text and len(text) > 10:
             ml_result = classifier.predict(text)
-            if ml_result['label'] == 'spam' and ml_result['confidence'] > 0.85:
+            if ml_result["label"] == "spam" and ml_result["confidence"] > 0.85:
                 # High confidence spam — trigger vote automatically
                 await start_community_vote(
-                    update, context, message,
-                    scam_type='ml_classifier',
+                    update,
+                    context,
+                    message,
+                    scam_type="ml_classifier",
                     scam_description="🤖 ML Classifier: High confidence spam",
                     trigger_text=text[:200],
-                    is_auto=True
+                    is_auto=True,
                 )
                 asyncio.create_task(
-                    record_spam_signal(user_id, chat_id, text,
-                                      'ml_classifier', 'spam',
-                                      ml_result['confidence'])
+                    record_spam_signal(
+                        user_id, chat_id, text, "ml_classifier", "spam", ml_result["confidence"]
+                    )
                 )
                 # Since we started a vote, we might want to stop further checks
                 # but usually we let message_guard continue unless we delete the message.
@@ -109,10 +152,12 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. Flood check (Redis-backed counter with in-memory fallback)
     try:
         from bot.utils.flood_counter import flood_counter
+
         # Settings: 5 messages in 5 seconds
         if await flood_counter.is_flooding(chat_id, user_id, limit=5, window_secs=5):
             # Auto-mute 5 mins
             from telegram import ChatPermissions
+
             until = datetime.now(timezone.utc) + timedelta(minutes=5)
             await context.bot.restrict_chat_member(
                 chat_id,
@@ -131,16 +176,16 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         delete = False
 
         # Use new canonical names (matches what PUT /api/groups/{id}/locks saves)
-        photo_locked   = bool(locks.get("photo"))
-        video_locked   = bool(locks.get("video"))
+        photo_locked = bool(locks.get("photo"))
+        video_locked = bool(locks.get("video"))
         sticker_locked = bool(locks.get("sticker"))
-        gif_locked     = bool(locks.get("gif"))
-        voice_locked   = bool(locks.get("voice"))
-        audio_locked   = bool(locks.get("audio"))
+        gif_locked = bool(locks.get("gif"))
+        voice_locked = bool(locks.get("voice"))
+        audio_locked = bool(locks.get("audio"))
         document_locked = bool(locks.get("document"))
-        link_locked    = bool(locks.get("link"))
+        link_locked = bool(locks.get("link"))
         forward_locked = bool(locks.get("forward"))
-        poll_locked    = bool(locks.get("poll"))
+        poll_locked = bool(locks.get("poll"))
         contact_locked = bool(locks.get("contact"))
         video_notes_locked = bool(locks.get("video_note"))
 
@@ -181,7 +226,9 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 4. Blacklist check (using blacklist table)
     try:
         async with db.pool.acquire() as conn:
-            blacklist_rows = await conn.fetch("SELECT word, action FROM blacklist WHERE chat_id = $1", chat_id)
+            blacklist_rows = await conn.fetch(
+                "SELECT word, action FROM blacklist WHERE chat_id = $1", chat_id
+            )
             for row in blacklist_rows:
                 word = row["word"].lower()
                 if word in text.lower():
@@ -192,15 +239,18 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     elif action == "mute":
                         until = datetime.utcnow() + timedelta(minutes=10)
                         await context.bot.restrict_chat_member(
-                            chat_id, user_id,
+                            chat_id,
+                            user_id,
                             permissions=ChatPermissions(can_send_messages=False),
-                            until_date=until
+                            until_date=until,
                         )
-                        await message.reply_text(f"🚫 Blacklisted word detected. You are muted for 10 minutes.")
+                        await message.reply_text(
+                            "🚫 Blacklisted word detected. You are muted for 10 minutes."
+                        )
                         return
                     elif action == "ban":
                         await context.bot.ban_chat_member(chat_id, user_id)
-                        await message.reply_text(f"🚫 Blacklisted word detected. You are banned.")
+                        await message.reply_text("🚫 Blacklisted word detected. You are banned.")
                         return
     except Exception as e:
         log.error(f"[MSG_GUARD] Blacklist check FAILED for chat {chat_id}: {e}", exc_info=True)
@@ -212,23 +262,26 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Get all filters for this group
                 filter_rows = await conn.fetch(
                     "SELECT keyword, reply_content, response FROM filters WHERE chat_id = $1",
-                    chat_id
+                    chat_id,
                 )
                 for filter_row in filter_rows:
                     keyword = filter_row["keyword"]
                     # Use word-boundary regex for alpha keywords; substring match for non-alpha
                     if keyword.isalpha():
-                        import re
-                        pattern = r'(?<![a-zA-Z0-9_])' + re.escape(keyword) + r'(?![a-zA-Z0-9_])'
+                        pattern = r"(?<![a-zA-Z0-9_])" + re.escape(keyword) + r"(?![a-zA-Z0-9_])"
                         if re.search(pattern, text, re.IGNORECASE):
-                            reply = filter_row.get("reply_content") or filter_row.get("response") or ""
+                            reply = (
+                                filter_row.get("reply_content") or filter_row.get("response") or ""
+                            )
                             if reply:
                                 await _send_filter_reply(message, reply)
                             break
                     else:
                         # Non-alpha keywords use substring match (original behavior)
                         if keyword.lower() in text.lower():
-                            reply = filter_row.get("reply_content") or filter_row.get("response") or ""
+                            reply = (
+                                filter_row.get("reply_content") or filter_row.get("response") or ""
+                            )
                             if reply:
                                 await _send_filter_reply(message, reply)
                             break
@@ -239,6 +292,7 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Award XP for sending a message (non-blocking, create_task)
     try:
         import asyncio
+
         from bot.engagement.xp import XPEngine
 
         xp_engine = XPEngine()
@@ -270,9 +324,10 @@ async def _send_filter_reply(message, reply: str):
     3. Try with parse_mode first, fall back to plain text on error
     4. Pass reply_markup=InlineKeyboardMarkup(rows) if buttons were parsed
     """
+    import re
+
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     from telegram.constants import ParseMode
-    import re
 
     text_part = reply
     rows = []

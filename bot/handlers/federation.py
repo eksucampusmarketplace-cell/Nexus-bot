@@ -439,12 +439,36 @@ async def cmd_trustban(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     fed["id"]
                 )
                 
+                failed_groups = []
                 for g in groups:
                     try:
                         await context.bot.ban_chat_member(g["chat_id"], target.id)
                         banned_count += 1
                     except Exception:
-                        pass  # Bot might not be admin in all groups
+                        # Track failed bans for notification
+                        failed_groups.append(g["chat_id"])
+
+                # Notify clone owner if some bans failed
+                if failed_groups:
+                    try:
+                        from bot.utils.error_notifier import notify_clone_owner
+                        db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+                        asyncio.create_task(
+                            notify_clone_owner(
+                                context.bot,
+                                context.bot.id,
+                                "FED_BAN_PROPAGATION_FAILED",
+                                context={
+                                    "fed_name": fed["name"],
+                                    "target_user": target.id,
+                                    "failed_count": len(failed_groups),
+                                    "total_groups": len(groups)
+                                },
+                                pool=db_pool
+                            )
+                        )
+                    except Exception as notify_err:
+                        log.debug(f"[FED] FED_BAN_PROPAGATION_FAILED notification skipped: {notify_err}")
             
             # Log action
             await log_event(

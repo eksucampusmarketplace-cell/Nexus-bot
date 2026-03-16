@@ -247,6 +247,7 @@ async def lifespan(app: FastAPI):
         logger.error(f"[STARTUP] ❌ Failed to load clones: {e}")
 
     # Fix 14 + Bug F: Check privacy mode for ALL bots (primary + clones)
+    # Also send DM notifications to clone owners
     for bot_id, bot_app in registry_get_all().items():
         try:
             me = await bot_app.bot.get_me()
@@ -259,6 +260,14 @@ async def lifespan(app: FastAPI):
                     "[STARTUP] Without this: automod, filters, and blacklist will NOT work "
                     "for this clone"
                 )
+                # Send DM notification to clone owner (not just log)
+                try:
+                    from bot.utils.error_notifier import notify_privacy_mode_on
+                    asyncio.create_task(
+                        notify_privacy_mode_on(bot_app.bot, me.id, me.username, pool)
+                    )
+                except Exception as notify_err:
+                    logger.debug(f"[STARTUP] Privacy mode notification skipped: {notify_err}")
         except Exception:
             pass
 
@@ -284,13 +293,33 @@ async def lifespan(app: FastAPI):
     # ───────────────────────────────────────────────────────────────────────
 
     # ── Phase 4: Analytics Background Jobs ────────────────────────────────
+    # Track consecutive failures for persistent error notification
+    analytics_failure_counts = {"hourly": 0, "daily": 0}
+
     async def _hourly_analytics_job():
         while True:
             try:
                 from bot.analytics.aggregator import aggregate_hourly
                 await aggregate_hourly(pool)
+                analytics_failure_counts["hourly"] = 0  # Reset on success
             except Exception as e:
                 logger.error(f"[ANALYTICS] Hourly job error: {e}")
+                analytics_failure_counts["hourly"] += 1
+                # Notify owner if 3 consecutive failures
+                if analytics_failure_counts["hourly"] >= 3:
+                    try:
+                        from bot.utils.error_notifier import notify_owner
+                        asyncio.create_task(
+                            notify_owner(
+                                primary_app.bot,
+                                settings.OWNER_ID,
+                                "ANALYTICS_ERROR",
+                                context={"failures": analytics_failure_counts["hourly"], "error": str(e)},
+                                pool=pool
+                            )
+                        )
+                    except Exception:
+                        pass
             await asyncio.sleep(3600)
 
     async def _daily_analytics_job():
@@ -298,8 +327,10 @@ async def lifespan(app: FastAPI):
             try:
                 from bot.analytics.aggregator import aggregate_daily
                 await aggregate_daily(pool)
+                analytics_failure_counts["daily"] = 0  # Reset on success
             except Exception as e:
                 logger.error(f"[ANALYTICS] Daily job error: {e}")
+                analytics_failure_counts["daily"] += 1
             await asyncio.sleep(86400)
 
     asyncio.create_task(_hourly_analytics_job())

@@ -3,18 +3,408 @@ bot/utils/error_notifier.py
 
 Error notification and health check utilities for v22.
 Sends DM alerts to bot owner on permission issues or startup problems.
+Implements the Error Catalogue with 16 error types, deduplication,
+and owner preferences support.
 """
 
+import asyncio
 import logging
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, Any
 
 from telegram import Bot
 from telegram.constants import ParseMode
 
 logger = logging.getLogger(__name__)
 
+# Global cache for warnings time column detection
+_WARNINGS_TIME_COL = None
 
-async def run_startup_health_check(bot: Bot, owner_id: int) -> dict:
+# ═══════════════════════════════════════════════════════════════════════════════
+# ERROR CATALOG - 16 error types with title, why, fix steps, and send_to
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ERROR_CATALOG: Dict[str, Dict[str, Any]] = {
+    "PRIVACY_MODE_ON": {
+        "title": "⚠️ Privacy Mode Is ON",
+        "why": "Your bot can only see messages starting with / — automod, filters, flood detection will NOT work.",
+        "steps": [
+            "Open Telegram → @BotFather",
+            "Send /mybots and select your bot",
+            "Tap Bot Settings → Group Privacy → Turn OFF",
+            "Restart bot or send /sync in each group"
+        ],
+        "send_to": "clone_owner"
+    },
+    "WEBHOOK_FAILED": {
+        "title": "🔴 Webhook Setup Failed",
+        "why": "The bot could not register its webhook with Telegram. Updates may not be received.",
+        "steps": [
+            "Check RENDER_EXTERNAL_URL is set correctly",
+            "Verify the bot token is valid",
+            "Check Render service is running and accessible",
+            "Try restarting the bot"
+        ],
+        "send_to": "clone_owner"
+    },
+    "WEBHOOK_MISSING_UPDATES": {
+        "title": "⚠️ Webhook Registered But No Updates",
+        "why": "The webhook is set but no updates are arriving from Telegram.",
+        "steps": [
+            "Check webhook URL is publicly accessible",
+            "Verify SSL certificate is valid",
+            "Check Telegram can reach your server (use getWebhookInfo)",
+            "Try deleting and re-setting the webhook"
+        ],
+        "send_to": "clone_owner"
+    },
+    "BOT_NOT_ADMIN": {
+        "title": "🔴 Bot Is Not Admin",
+        "why": "The bot was added to a group but doesn't have admin rights.",
+        "steps": [
+            "Go to the group settings",
+            "Administrators → Add Administrator",
+            "Select your bot and grant all permissions",
+            "Bot will automatically detect the change"
+        ],
+        "send_to": "clone_owner"
+    },
+    "BOT_CANT_DELETE": {
+        "title": "⚠️ Bot Cannot Delete Messages",
+        "why": "The bot is admin but missing the 'Delete Messages' permission.",
+        "steps": [
+            "Go to group settings → Administrators",
+            "Find your bot in the list",
+            "Enable 'Delete Messages' permission",
+            "Save changes"
+        ],
+        "send_to": "clone_owner"
+    },
+    "BOT_CANT_RESTRICT": {
+        "title": "⚠️ Bot Cannot Restrict Members",
+        "why": "The bot is admin but missing the 'Restrict Members' permission needed for mutes/bans.",
+        "steps": [
+            "Go to group settings → Administrators",
+            "Find your bot in the list",
+            "Enable 'Restrict Members' permission",
+            "Save changes"
+        ],
+        "send_to": "clone_owner"
+    },
+    "BOT_KICKED": {
+        "title": "👢 Bot Was Removed From Group",
+        "why": "Your bot was kicked from a group. All settings for that group are preserved.",
+        "steps": [
+            "Contact the group admin if this was accidental",
+            "Re-add the bot if needed",
+            "Bot will restore previous settings automatically"
+        ],
+        "send_to": "clone_owner"
+    },
+    "GROUPS_NOT_APPEARING": {
+        "title": "⚠️ Groups Missing From Dashboard",
+        "why": "Some groups aren't showing in the Mini App dashboard.",
+        "steps": [
+            "Send /sync in the missing group",
+            "Ensure bot is still admin in that group",
+            "Check the bot hasn't been blocked",
+            "Wait a few minutes for cache to refresh"
+        ],
+        "send_to": "clone_owner"
+    },
+    "FED_BAN_PROPAGATION_FAILED": {
+        "title": "⚠️ TrustNet Ban Could Not Be Enforced",
+        "why": "A federation ban was issued but could not be applied in all groups.",
+        "steps": [
+            "Check the bot is still admin in affected groups",
+            "Verify federation membership is active",
+            "The ban will retry automatically",
+            "Manually ban if urgent"
+        ],
+        "send_to": "clone_owner"
+    },
+    "CAPTCHA_WEBAPP_URL_MISSING": {
+        "title": "🔴 Captcha WebApp URL Not Set",
+        "why": "Captcha is set to WebApp mode but RENDER_EXTERNAL_URL is not configured.",
+        "steps": [
+            "Set RENDER_EXTERNAL_URL in your environment",
+            "Should be: https://your-service.onrender.com",
+            "Restart the bot",
+            "Or switch captcha to 'button' mode instead"
+        ],
+        "send_to": "clone_owner"
+    },
+    "INVALID_TOKEN": {
+        "title": "🔴 Invalid Bot Token",
+        "why": "Telegram rejected the bot token. The bot cannot start.",
+        "steps": [
+            "Verify token format: 123456789:ABCdef...",
+            "Get a new token from @BotFather if needed",
+            "Update the token in your environment",
+            "Restart the bot"
+        ],
+        "send_to": "clone_owner"
+    },
+    "MISSING_ENV_VAR": {
+        "title": "🔴 Missing Required Environment Variable",
+        "why": "A required environment variable is not set. Bot cannot start.",
+        "steps": [
+            "Check the error message for the missing variable",
+            "Add it to your Render environment variables",
+            "Common: PRIMARY_BOT_TOKEN, SUPABASE_URL, SECRET_KEY",
+            "Restart the bot after adding"
+        ],
+        "send_to": "main_owner"
+    },
+    "SUPABASE_CONNECTION_FAILED": {
+        "title": "🔴 Database Connection Failed",
+        "why": "Cannot connect to Supabase/PostgreSQL. Bot cannot start.",
+        "steps": [
+            "Check SUPABASE_CONNECTION_STRING is correct",
+            "Verify Supabase is running (check status page)",
+            "Check firewall/network settings",
+            "Contact support if persistent"
+        ],
+        "send_to": "main_owner"
+    },
+    "ML_TRAINING_COMPLETE": {
+        "title": "✅ ML Training Complete",
+        "why": "The spam classifier has been successfully trained.",
+        "steps": [
+            "New model is now active",
+            "Spam detection accuracy improved",
+            "No action needed"
+        ],
+        "send_to": "main_owner"
+    },
+    "ML_TRAINING_FAILED": {
+        "title": "🔴 ML Training Failed",
+        "why": "Could not train the spam classifier. Insufficient data or error.",
+        "steps": [
+            "Need at least 100 labeled samples (spam + ham)",
+            "Use /report to mark more messages",
+            "Wait for more group activity",
+            "Retry training later"
+        ],
+        "send_to": "main_owner"
+    },
+    "ANALYTICS_ERROR": {
+        "title": "🔴 Analytics Job Persistent Errors",
+        "why": "The hourly/daily analytics aggregation has failed multiple times.",
+        "steps": [
+            "Check database connection",
+            "Verify analytics tables exist",
+            "Check logs for specific errors",
+            "Contact support if persistent"
+        ],
+        "send_to": "main_owner"
+    }
+}
+
+
+def _format_error_message(error_type: str, context: Dict[str, Any] = None) -> str:
+    """Format error message from catalog with context substitution."""
+    catalog_entry = ERROR_CATALOG.get(error_type, {
+        "title": f"⚠️ {error_type}",
+        "why": "An error occurred.",
+        "steps": ["Check logs for details."],
+        "send_to": "main_owner"
+    })
+
+    text = f"<b>{catalog_entry['title']}</b>\n\n"
+    text += f"<b>Why:</b> {catalog_entry['why']}\n\n"
+    text += "<b>How to fix:</b>\n"
+    for i, step in enumerate(catalog_entry['steps'], 1):
+        text += f"{i}. {step}\n"
+
+    # Add context if provided
+    if context:
+        text += f"\n<b>Details:</b>\n"
+        for key, value in context.items():
+            text += f"• {key}: {value}\n"
+
+    text += "\n<i>This message won't repeat for 24 hours.</i>"
+    return text
+
+
+async def _should_send_notification(
+    pool,
+    bot_id: int,
+    error_type: str,
+    owner_id: int
+) -> bool:
+    """
+    Check if we should send this notification based on:
+    1. Owner preferences (muted types)
+    2. Deduplication (same error+bot in last 24h)
+    """
+    try:
+        async with pool.acquire() as conn:
+            # Check owner preferences
+            pref = await conn.fetchrow(
+                """SELECT notify_dm FROM owner_error_prefs
+                   WHERE owner_id = $1 AND error_type = $2""",
+                owner_id, error_type
+            )
+            # If preference exists and notify_dm is False, don't send
+            if pref and not pref['notify_dm']:
+                return False
+
+            # Check deduplication - same bot+error in last 24h
+            yesterday = datetime.now(timezone.utc) - timedelta(hours=24)
+            recent = await conn.fetchrow(
+                """SELECT 1 FROM error_notifications
+                   WHERE owner_id = $1 AND error_type = $2 AND sent_at > $3""",
+                owner_id, error_type, yesterday
+            )
+            if recent:
+                return False
+
+            return True
+    except Exception as e:
+        logger.warning(f"[NOTIFIER] Failed to check notification rules: {e}")
+        # Default to sending if we can't check
+        return True
+
+
+async def _record_notification(
+    pool,
+    owner_id: int,
+    error_type: str,
+    message: str,
+    bot_id: Optional[int] = None
+) -> None:
+    """Record that a notification was sent for deduplication."""
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO error_notifications (owner_id, error_type, message, bot_id)
+                   VALUES ($1, $2, $3, $4)""",
+                owner_id, error_type, message[:1000], bot_id
+            )
+    except Exception as e:
+        logger.warning(f"[NOTIFIER] Failed to record notification: {e}")
+
+
+async def notify_owner(
+    bot: Bot,
+    owner_id: int,
+    error_type: str,
+    bot_id: Optional[int] = None,
+    context: Dict[str, Any] = None,
+    pool=None
+) -> bool:
+    """
+    Send error notification to main bot owner.
+
+    Args:
+        bot: Bot instance to send message with
+        owner_id: Owner user ID
+        error_type: Key from ERROR_CATALOG
+        bot_id: Optional bot ID for context
+        context: Optional additional context
+        pool: Database pool for deduplication and prefs
+
+    Returns:
+        True if notification was sent successfully
+    """
+    # Skip if not in catalog
+    if error_type not in ERROR_CATALOG:
+        logger.warning(f"[NOTIFIER] Unknown error type: {error_type}")
+
+    # Check deduplication and preferences if pool available
+    if pool:
+        should_send = await _should_send_notification(pool, bot_id or 0, error_type, owner_id)
+        if not should_send:
+            logger.debug(f"[NOTIFIER] Skipping {error_type} for {owner_id} (dedup or muted)")
+            return False
+
+    text = _format_error_message(error_type, context)
+
+    try:
+        await bot.send_message(
+            chat_id=owner_id,
+            text=text,
+            parse_mode=ParseMode.HTML
+        )
+        logger.info(f"[NOTIFIER] Sent {error_type} to owner {owner_id}")
+
+        # Record notification
+        if pool:
+            await _record_notification(pool, owner_id, error_type, text, bot_id)
+
+        return True
+    except Exception as e:
+        logger.warning(f"[NOTIFIER] Failed to notify owner {owner_id}: {e}")
+        return False
+
+
+async def notify_clone_owner(
+    bot: Bot,
+    clone_bot_id: int,
+    error_type: str,
+    context: Dict[str, Any] = None,
+    pool=None
+) -> bool:
+    """
+    Send error notification to a clone bot's owner.
+    Looks up owner from bots table.
+
+    Args:
+        bot: Bot instance to send message with
+        clone_bot_id: The clone bot's Telegram ID
+        error_type: Key from ERROR_CATALOG
+        context: Optional additional context
+        pool: Database pool for owner lookup and deduplication
+
+    Returns:
+        True if notification was sent successfully
+    """
+    if not pool:
+        logger.warning(f"[NOTIFIER] No pool available for clone owner lookup")
+        return False
+
+    try:
+        async with pool.acquire() as conn:
+            # Look up clone owner - bots table uses 'id' or 'bot_id' for Telegram ID
+            row = await conn.fetchrow(
+                """SELECT owner_user_id FROM bots
+                   WHERE (id = $1 OR bot_id = $1) AND is_primary = FALSE""",
+                clone_bot_id
+            )
+
+            if not row:
+                logger.warning(f"[NOTIFIER] No clone found for bot_id {clone_bot_id}")
+                return False
+
+            owner_id = row['owner_user_id']
+            if not owner_id:
+                logger.warning(f"[NOTIFIER] Clone {clone_bot_id} has no owner_user_id")
+                return False
+
+            # Send to the clone owner
+            return await notify_owner(bot, owner_id, error_type, clone_bot_id, context, pool)
+
+    except Exception as e:
+        logger.warning(f"[NOTIFIER] Failed to notify clone owner: {e}")
+        return False
+
+
+async def notify_privacy_mode_on(
+    bot: Bot,
+    clone_bot_id: int,
+    username: str,
+    pool=None
+) -> bool:
+    """
+    Specialized notification for privacy mode being ON.
+    Routes to clone owner, not main owner.
+    """
+    context = {"bot_username": username}
+    return await notify_clone_owner(bot, clone_bot_id, "PRIVACY_MODE_ON", context, pool)
+
+
+async def run_startup_health_check(bot: Bot, owner_id: int, pool=None) -> dict:
     """
     Run health checks at bot startup.
     Returns dict with status info.
@@ -25,84 +415,100 @@ async def run_startup_health_check(bot: Bot, owner_id: int) -> dict:
         "permissions_ok": False,
         "errors": []
     }
-    
+
     try:
         me = await bot.get_me()
         results["bot_info_ok"] = bool(me and me.id)
         results["bot_username"] = me.username if me else None
     except Exception as e:
         results["errors"].append(f"Bot info fetch failed: {e}")
-    
+
     return results
 
 
 async def check_group_permissions(
-    bot: Bot, 
-    chat_id: int, 
+    bot: Bot,
+    chat_id: int,
     owner_id: int,
-    required_permissions: list = None
+    required_permissions: list = None,
+    pool=None
 ) -> dict:
     """
     Check if bot has required permissions in a group.
     Sends DM to owner if permissions are missing.
-    
+
     Args:
         bot: Bot instance
         chat_id: Group chat ID to check
         owner_id: Owner user ID to notify
         required_permissions: List of required permission strings
-        
+        pool: Database pool for notifications
+
     Returns:
         Dict with permission status
     """
     if required_permissions is None:
         required_permissions = ["can_delete_messages", "can_restrict_members"]
-    
+
     results = {
         "has_permissions": False,
         "missing": [],
         "chat_member": None
     }
-    
+
     try:
         me = await bot.get_me()
         chat_member = await bot.get_chat_member(chat_id, me.id)
         results["chat_member"] = chat_member
-        
+
         # Check admin status
         if chat_member.status not in ["administrator", "creator"]:
             results["missing"].append("administrator")
-            await _notify_permission_issue(bot, owner_id, chat_id, results["missing"])
+            await _notify_permission_issue(bot, owner_id, chat_id, results["missing"], pool)
             return results
-        
+
         # Check specific permissions
         for perm in required_permissions:
             if not getattr(chat_member, perm, False):
                 results["missing"].append(perm)
-        
+
         results["has_permissions"] = len(results["missing"]) == 0
-        
+
         if results["missing"]:
-            await _notify_permission_issue(bot, owner_id, chat_id, results["missing"])
-            
+            await _notify_permission_issue(bot, owner_id, chat_id, results["missing"], pool)
+
     except Exception as e:
         logger.warning(f"Permission check failed for chat {chat_id}: {e}")
         results["error"] = str(e)
-    
+
     return results
 
 
 async def _notify_permission_issue(
-    bot: Bot, 
-    owner_id: int, 
-    chat_id: int, 
-    missing: list
+    bot: Bot,
+    owner_id: int,
+    chat_id: int,
+    missing: list,
+    pool=None
 ) -> bool:
     """
-    Send DM to owner about missing permissions.
-    
+    Send DM to owner about missing permissions using error catalog.
+
     Returns True if message was sent successfully.
     """
+    # Map missing permissions to error types
+    error_type = None
+    if "administrator" in missing:
+        error_type = "BOT_NOT_ADMIN"
+    elif "can_delete_messages" in missing:
+        error_type = "BOT_CANT_DELETE"
+    elif "can_restrict_members" in missing:
+        error_type = "BOT_CANT_RESTRICT"
+
+    if error_type and pool:
+        return await notify_owner(bot, owner_id, error_type, context={"chat_id": chat_id}, pool=pool)
+
+    # Fallback to legacy message format if not in catalog
     perm_descriptions = {
         "administrator": "🔴 <b>Admin Status</b> — Bot is not an admin",
         "can_delete_messages": "🗑 <b>Delete Messages</b> — Cannot delete spam",
@@ -111,12 +517,12 @@ async def _notify_permission_issue(
         "can_invite_users": "➕ <b>Invite Users</b> — Cannot add members",
         "can_promote_members": "⬆️ <b>Promote Members</b> — Cannot manage admins"
     }
-    
+
     missing_text = "\n".join(
-        perm_descriptions.get(p, f"❓ {p}") 
+        perm_descriptions.get(p, f"❓ {p}")
         for p in missing
     )
-    
+
     text = (
         f"⚠️ <b>Permission Warning</b>\n\n"
         f"Bot is missing required permissions in group:\n"
@@ -127,7 +533,7 @@ async def _notify_permission_issue(
         f"2. Administrators → Bot\n"
         f"3. Enable the missing permissions"
     )
-    
+
     try:
         await bot.send_message(
             chat_id=owner_id,
@@ -146,29 +552,36 @@ async def notify_startup_error(
     owner_id: int,
     error_type: str,
     error_message: str,
-    severity: str = "warning"
+    severity: str = "warning",
+    pool=None
 ) -> bool:
     """
     Send startup error notification to owner.
-    
+
     Args:
         bot: Bot instance
         owner_id: Owner user ID
         error_type: Type of error (e.g., "DB_CONNECTION", "WEBHOOK")
         error_message: Detailed error message
         severity: "warning" or "critical"
-        
+        pool: Database pool for deduplication
+
     Returns:
         True if notification sent successfully
     """
+    # Use catalog if available
+    if error_type in ERROR_CATALOG:
+        return await notify_owner(bot, owner_id, error_type, context={"message": error_message}, pool=pool)
+
+    # Fallback format
     emoji = "🔴" if severity == "critical" else "⚠️"
-    
+
     text = (
         f"{emoji} <b>Startup {severity.upper()}</b>\n\n"
         f"<b>Error Type:</b> {error_type}\n"
         f"<b>Message:</b>\n<code>{error_message[:500]}</code>"
     )
-    
+
     try:
         await bot.send_message(
             chat_id=owner_id,

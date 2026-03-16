@@ -431,6 +431,7 @@
       <div id="page-history" class="page"></div>
       <div id="page-language" class="page"></div>
       <div id="page-persona" class="page"></div>
+      <div id="page-notifications" class="page"></div>
     </div>
 
     <!-- Bottom Nav (mobile) -->
@@ -583,6 +584,7 @@
         { id: 'antiraid', label: 'Anti-Raid', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>' },
         { id: 'session', label: 'Session', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' },
         { id: 'owner', label: 'Owner Panel', icon: '👑', ownerOnly: true },
+        { id: 'notifications', label: 'Alerts', icon: '🔔' },
       { id: 'trustnet', label: 'TrustNet', icon: '🌐' },
         { id: 'captcha', label: 'Captcha', icon: '🤖' },
         { id: 'community-vote', label: 'Community Vote', icon: '⚖️' },
@@ -781,6 +783,10 @@
         case 'language':
           const { renderLanguagePage } = await import('./src/pages/language.js?v=1.6.0');
           await renderLanguagePage(container);
+          break;
+        case 'notifications':
+          const { renderNotificationsPage } = await import('./src/pages/notifications.js?v=1.6.0');
+          await renderNotificationsPage(container);
           break;
         case 'persona':
           const { renderPersonaPage } = await import('./src/pages/persona.js?v=1.6.0');

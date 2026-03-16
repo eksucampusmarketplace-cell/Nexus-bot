@@ -1,8 +1,9 @@
 /**
  * miniapp/src/pages/moderation.js
  *
- * Moderation management page with 5 tabs:
- * Members / Actions / Warns / Locks / Filters
+ * Moderation management page with 4 tabs:
+ * Members | Actions | Warns | Filters
+ * (Locks tab removed — locks are handled in AutoMod page)
  */
 
 import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
@@ -43,7 +44,8 @@ export async function renderModerationPage(container) {
   `;
   container.appendChild(header);
 
-  const tabs = ['Members', 'Actions', 'Warns', 'Locks', 'Filters'];
+  // Tabs: Members, Actions, Warns, Filters (Locks removed)
+  const tabs = ['Members', 'Actions', 'Warns', 'Filters'];
   const tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:var(--sp-1);margin-bottom:var(--sp-4);background:var(--bg-input);padding:4px;border-radius:var(--r-xl);overflow-x:auto;';
   tabs.forEach((t, i) => {
@@ -79,30 +81,34 @@ function switchTab(tab, container, chatId) {
     case 'members': return _renderMembersTab(content, chatId);
     case 'actions': return _renderActionsTab(content, chatId);
     case 'warns':   return _renderWarnsTab(content, chatId);
-    case 'locks':   return _renderLocksTab(content, chatId);
     case 'filters': return _renderFiltersTab(content, chatId);
   }
 }
 
 async function _renderMembersTab(container, chatId) {
   container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading members...</div>`;
-  
+
   try {
+    console.debug('[Moderation] Loading members from /api/groups/' + chatId + '/members');
     const members = await apiFetch(`/api/groups/${chatId}/members`);
+    console.debug('[Moderation] Members loaded:', members);
     container.innerHTML = '';
-    
+
     const list = document.createElement('div');
     list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
-    
+
     if (!members || members.length === 0) {
       container.appendChild(EmptyState({ icon: '👥', title: 'No members', description: 'No members found in this group.' }));
       return;
     }
 
     members.forEach(m => {
-      container.appendChild(_buildMemberCard(m, chatId));
+      list.appendChild(_buildMemberCard(m, chatId));
     });
+
+    container.appendChild(list);
   } catch (e) {
+    console.error('[Moderation] Failed to load members:', e);
     container.innerHTML = '';
     container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: e.message }));
   }
@@ -187,7 +193,11 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
     inputArea.querySelector('.action-confirm').onclick = async () => {
       const reason = inputArea.querySelector('.action-reason').value.trim();
       try {
-        await apiFetch(`/api/groups/${chatId}/warnings`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Warned via Mini App' }) });
+        await apiFetch(`/api/groups/${chatId}/warnings`, {
+          method: 'POST',
+          validate: false,
+          body: { user_id: member.user_id, reason: reason || 'Warned via Mini App' }
+        });
         showToast('Warning issued', 'success');
         inputArea.style.display = 'none';
       } catch (e) { _handleActionError(e); }
@@ -217,7 +227,11 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
     inputArea.querySelector('.action-confirm').onclick = async () => {
       const reason = inputArea.querySelector('.action-reason').value.trim();
       try {
-        await apiFetch(`/api/groups/${chatId}/mutes`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Muted via Mini App', duration: selectedDuration }) });
+        await apiFetch(`/api/groups/${chatId}/mutes`, {
+          method: 'POST',
+          validate: false,
+          body: { user_id: member.user_id, reason: reason || 'Muted via Mini App', duration: selectedDuration }
+        });
         showToast('User muted', 'success');
         inputArea.style.display = 'none';
       } catch (e) { _handleActionError(e); }
@@ -232,7 +246,11 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
     `;
     inputArea.querySelector('.action-confirm').onclick = async () => {
       try {
-        await apiFetch(`/api/groups/${chatId}/actions/kick`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id }) });
+        await apiFetch(`/api/groups/${chatId}/actions/kick`, {
+          method: 'POST',
+          validate: false,
+          body: { user_id: member.user_id }
+        });
         showToast('User kicked', 'success');
         card.remove();
       } catch (e) { _handleActionError(e); }
@@ -250,7 +268,11 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
     inputArea.querySelector('.action-confirm').onclick = async () => {
       const reason = inputArea.querySelector('.action-reason').value.trim();
       try {
-        await apiFetch(`/api/groups/${chatId}/bans`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Banned via Mini App' }) });
+        await apiFetch(`/api/groups/${chatId}/bans`, {
+          method: 'POST',
+          validate: false,
+          body: { user_id: member.user_id, reason: reason || 'Banned via Mini App' }
+        });
         showToast('User banned', 'success');
         card.remove();
       } catch (e) { _handleActionError(e); }
@@ -319,22 +341,44 @@ function _showUserProfilePanel(userId, chatId, memberData) {
       const action = btn.dataset.action;
       try {
         if (action === 'warn') {
-          await apiFetch(`/api/groups/${chatId}/warnings`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+          await apiFetch(`/api/groups/${chatId}/warnings`, {
+            method: 'POST',
+            validate: false,
+            body: { user_id: userId }
+          });
           showToast('Warning issued', 'success');
         } else if (action === 'mute') {
-          await apiFetch(`/api/groups/${chatId}/mutes`, { method: 'POST', body: JSON.stringify({ user_id: userId, duration: '1h' }) });
+          await apiFetch(`/api/groups/${chatId}/mutes`, {
+            method: 'POST',
+            validate: false,
+            body: { user_id: userId, duration: '1h' }
+          });
           showToast('User muted', 'success');
         } else if (action === 'unmute') {
-          await apiFetch(`/api/groups/${chatId}/mutes/${userId}`, { method: 'DELETE' });
+          await apiFetch(`/api/groups/${chatId}/mutes/${userId}`, {
+            method: 'DELETE',
+            validate: false
+          });
           showToast('User unmuted', 'success');
         } else if (action === 'ban') {
-          await apiFetch(`/api/groups/${chatId}/bans`, { method: 'POST', body: JSON.stringify({ user_id: userId, reason: 'Banned via Mini App' }) });
+          await apiFetch(`/api/groups/${chatId}/bans`, {
+            method: 'POST',
+            validate: false,
+            body: { user_id: userId, reason: 'Banned via Mini App' }
+          });
           showToast('User banned', 'success');
         } else if (action === 'unban') {
-          await apiFetch(`/api/groups/${chatId}/bans/${userId}`, { method: 'DELETE' });
+          await apiFetch(`/api/groups/${chatId}/bans/${userId}`, {
+            method: 'DELETE',
+            validate: false
+          });
           showToast('User unbanned', 'success');
         } else if (action === 'kick') {
-          await apiFetch(`/api/groups/${chatId}/actions/kick`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+          await apiFetch(`/api/groups/${chatId}/actions/kick`, {
+            method: 'POST',
+            validate: false,
+            body: { user_id: userId }
+          });
           showToast('User kicked', 'success');
         }
         panel.remove();
@@ -356,7 +400,9 @@ async function _renderActionsTab(container, chatId) {
   container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading actions...</div>`;
 
   try {
+    console.debug('[Moderation] Loading mod-log from /api/groups/' + chatId + '/mod-log?limit=50');
     const logs = await apiFetch(`/api/groups/${chatId}/mod-log?limit=50`);
+    console.debug('[Moderation] Mod-log loaded:', logs);
     container.innerHTML = '';
 
     const header = document.createElement('div');
@@ -383,6 +429,7 @@ async function _renderActionsTab(container, chatId) {
 
     document.getElementById('export-logs-btn')?.addEventListener('click', () => _exportLogsCSV(logList));
   } catch (e) {
+    console.error('[Moderation] Failed to load actions:', e);
     container.innerHTML = '';
     container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: e.message }));
   }
@@ -427,14 +474,17 @@ async function _renderWarnsTab(container, chatId) {
 
   let warnSettings = { warn_max: 3, warn_action: 'mute_24h', warn_expiry: 'never' };
   try {
-    const group = await apiFetch(`/api/groups/${chatId}`);
-    const s = group?.settings || {};
+    console.debug('[Moderation] Loading warn-settings from /api/groups/' + chatId + '/warn-settings');
+    const res = await apiFetch(`/api/groups/${chatId}/warn-settings`);
+    console.debug('[Moderation] Warn-settings loaded:', res);
     warnSettings = {
-      warn_max: s.warn_max || 3,
-      warn_action: s.warn_action || 'mute_24h',
-      warn_expiry: s.warn_expiry || 'never',
+      warn_max: res.warn_max || 3,
+      warn_action: res.warn_action || 'mute_24h',
+      warn_expiry: res.warn_expiry || 'never',
     };
-  } catch (_) {}
+  } catch (e) {
+    console.error('[Moderation] Failed to load warn-settings:', e);
+  }
 
   container.innerHTML = '';
 
@@ -478,97 +528,59 @@ async function _renderWarnsTab(container, chatId) {
     try {
       await apiFetch(`/api/groups/${chatId}/warn-settings`, {
         method: 'PUT',
-        body: JSON.stringify({ warn_max: max, warn_action: action, warn_expiry: expiry })
+        validate: false,
+        body: { warn_max: max, warn_action: action, warn_expiry: expiry }
       });
       showToast('Warn settings saved', 'success');
     } catch (e) {
       showToast('Failed to save: ' + e.message, 'error');
     }
   });
-}
 
-async function _renderLocksTab(container, chatId) {
-  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading locks...</div>`;
+  // Load warned users
+  const warningsCard = Card({ title: '⚠️ Warned Users', subtitle: 'Users with active warnings' });
+  warningsCard.insertAdjacentHTML('beforeend', `<div id="warned-users-list" style="display:flex;flex-direction:column;gap:var(--sp-2);"><div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);">Loading...</div></div>`);
+  container.appendChild(warningsCard);
 
-  let locks = {};
   try {
-    const res = await apiFetch(`/api/groups/${chatId}/locks`);
-    locks = res?.data || res || {};
-  } catch (_) {}
+    console.debug('[Moderation] Loading warnings from /api/groups/' + chatId + '/warnings');
+    const warnedUsers = await apiFetch(`/api/groups/${chatId}/warnings`);
+    console.debug('[Moderation] Warnings loaded:', warnedUsers);
+    const warnedList = warningsCard.querySelector('#warned-users-list');
+    warnedList.innerHTML = '';
 
-  container.innerHTML = '';
-
-  const lockTypes = [
-    { id: 'photo',    label: '📸 Photos',    group: 'media' },
-    { id: 'video',    label: '🎬 Videos',    group: 'media' },
-    { id: 'sticker',  label: '🎭 Stickers',  group: 'media' },
-    { id: 'gif',      label: '🎞️ GIFs',      group: 'media' },
-    { id: 'voice',    label: '🎙️ Voice',     group: 'media' },
-    { id: 'audio',    label: '🎵 Audio',     group: 'media' },
-    { id: 'document', label: '📄 Documents', group: 'media' },
-    { id: 'link',     label: '🔗 Links',     group: 'comm' },
-    { id: 'forward',  label: '↩️ Forwards',  group: 'comm' },
-    { id: 'poll',     label: '📊 Polls',     group: 'comm' },
-    { id: 'contact',  label: '📞 Contacts',  group: 'comm' },
-  ];
-
-  let debounceTimer = null;
-  const pendingLocks = { ...locks };
-
-  const saveLocks = async () => {
-    try {
-      await apiFetch(`/api/groups/${chatId}/locks`, { method: 'PUT', body: JSON.stringify(pendingLocks) });
-    } catch (e) {
-      showToast('Failed to save lock: ' + e.message, 'error');
-    }
-  };
-
-  const buildGroup = (groupId, title, types) => {
-    const section = document.createElement('div');
-    section.style.marginBottom = 'var(--sp-4)';
-    section.innerHTML = `<div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:var(--sp-2);">${title}</div>`;
-
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);';
-
-    types.filter(t => t.group === groupId).forEach(lock => {
-      const isActive = !!locks[lock.id];
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);';
-      row.innerHTML = `
-        <div style="display:flex;flex-direction:column;gap:2px;">
-          <span style="font-size:var(--text-sm);">${lock.label}</span>
-          <span class="lock-status-${lock.id}" style="
-            font-size:10px;font-weight:600;
-            color:${isActive ? 'var(--danger)' : 'var(--text-muted)'};
-          ">${isActive ? '🔴 LOCKED' : '🟢 OPEN'}</span>
-        </div>
-      `;
-
-      const toggle = Toggle({
-        checked: isActive,
-        onChange: (checked) => {
-          pendingLocks[lock.id] = checked;
-          // Update status label immediately (no wait for save)
-          const statusEl = row.querySelector('.lock-status-' + lock.id);
-          if (statusEl) {
-            statusEl.textContent = checked ? '🔴 LOCKED' : '🟢 OPEN';
-            statusEl.style.color = checked ? 'var(--danger)' : 'var(--text-muted)';
+    if (!warnedUsers || warnedUsers.length === 0) {
+      warnedList.innerHTML = '<div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);">No warned users</div>';
+    } else {
+      warnedUsers.forEach(w => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);';
+        row.innerHTML = `
+          <div>
+            <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">${w.first_name || w.username || 'Unknown'}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">${w.count} warnings</div>
+          </div>
+          <button class="btn btn-secondary reset-warn-btn" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);" data-user-id="${w.user_id}">Reset</button>
+        `;
+        row.querySelector('.reset-warn-btn').onclick = async () => {
+          try {
+            await apiFetch(`/api/groups/${chatId}/warnings/${w.user_id}/all`, {
+              method: 'DELETE',
+              validate: false
+            });
+            showToast('Warnings reset', 'success');
+            row.remove();
+          } catch (e) {
+            showToast('Failed: ' + e.message, 'error');
           }
-          clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(saveLocks, 300);
-        }
+        };
+        warnedList.appendChild(row);
       });
-      row.appendChild(toggle);
-      grid.appendChild(row);
-    });
-
-    section.appendChild(grid);
-    return section;
-  };
-
-  container.appendChild(buildGroup('media', '📸 Media', lockTypes));
-  container.appendChild(buildGroup('comm', '💬 Communication', lockTypes));
+    }
+  } catch (e) {
+    console.error('[Moderation] Failed to load warnings:', e);
+    warningsCard.querySelector('#warned-users-list').innerHTML = '<div style="text-align:center;padding:var(--sp-4);color:var(--danger);">Failed to load warnings</div>';
+  }
 }
 
 async function _renderFiltersTab(container, chatId) {
@@ -577,14 +589,17 @@ async function _renderFiltersTab(container, chatId) {
   let filters = [];
   let blacklist = [];
   try {
+    console.debug('[Moderation] Loading filters and blacklist');
     [filters, blacklist] = await Promise.all([
       apiFetch(`/api/groups/${chatId}/filters`).then(r => Array.isArray(r) ? r : []).catch(() => []),
       apiFetch(`/api/groups/${chatId}/blacklist`).then(r => r?.words || []).catch(() => []),
     ]);
+    console.debug('[Moderation] Filters loaded:', filters, 'Blacklist loaded:', blacklist);
   } catch (_) {}
 
   container.innerHTML = '';
 
+  // Keyword Auto-Replies
   const filtersCard = Card({ title: '🔑 Keyword Auto-Replies', subtitle: 'Respond automatically to specific keywords' });
 
   const filtersList = document.createElement('div');
@@ -599,7 +614,7 @@ async function _renderFiltersTab(container, chatId) {
     items.forEach(f => {
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);';
-      
+
       const reply = f.reply_content || '';
       const hasButtons = reply.includes('---');
       const truncated = reply.slice(0, 60) + (reply.length > 60 ? '…' : '');
@@ -614,7 +629,7 @@ async function _renderFiltersTab(container, chatId) {
       `;
       row.querySelector('[data-id]').onclick = async () => {
         try {
-          await apiFetch(`/api/groups/${chatId}/filters/${f.id}`, { method: 'DELETE' });
+          await apiFetch(`/api/groups/${chatId}/filters/${f.id}`, { method: 'DELETE', validate: false });
           filters = filters.filter(x => x.id !== f.id);
           renderFilters(filters);
           showToast('Filter removed', 'success');
@@ -650,7 +665,11 @@ async function _renderFiltersTab(container, chatId) {
       const response = filtersCard.querySelector('#filter-response').value.trim();
       if (!keyword || !response) { showToast('Keyword and response required', 'error'); return; }
       try {
-        const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, { method: 'POST', body: JSON.stringify({ keyword, reply_content: response }) });
+        const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, {
+          method: 'POST',
+          validate: false,
+          body: { keyword, reply_content: response }
+        });
         filters.push({ keyword, reply_content: response, id: newFilter?.id || Date.now() });
         renderFilters(filters);
         filtersCard.querySelector('#filter-keyword').value = '';
@@ -660,6 +679,7 @@ async function _renderFiltersTab(container, chatId) {
     });
   }, 0);
 
+  // Word Blacklist
   const blacklistCard = Card({ title: '🚫 Word Blacklist', subtitle: 'Automatically act on these words' });
 
   const chipsContainer = document.createElement('div');
@@ -690,7 +710,11 @@ async function _renderFiltersTab(container, chatId) {
     const word = input.value.trim().toLowerCase();
     if (!word) return;
     try {
-      await apiFetch(`/api/groups/${chatId}/blacklist`, { method: 'POST', body: JSON.stringify({ word }) });
+      await apiFetch(`/api/groups/${chatId}/blacklist`, {
+        method: 'POST',
+        validate: false,
+        body: { word }
+      });
       blacklist.push(word);
       renderChips(blacklist);
       input.value = '';
@@ -712,7 +736,10 @@ async function _renderFiltersTab(container, chatId) {
 
   window._removeBlacklistWord = async (cid, word) => {
     try {
-      await apiFetch(`/api/groups/${cid}/blacklist/${encodeURIComponent(word)}`, { method: 'DELETE' });
+      await apiFetch(`/api/groups/${cid}/blacklist/${encodeURIComponent(word)}`, {
+        method: 'DELETE',
+        validate: false
+      });
       blacklist = blacklist.filter(w => w !== word);
       showToast('Word removed', 'success');
     } catch (e) {
@@ -801,7 +828,7 @@ function _handleActionError(e) {
     // Extract the part after the last colon if it exists
     const parts = msg.split(':');
     const cleanMsg = parts.length > 1 ? parts[parts.length - 1].trim() : msg;
-    showToast('Telegram refused the action: ' + cleanMsg, 'error');
+    showToast('Telegram refused action: ' + cleanMsg, 'error');
   } else if (msg.includes('401') || msg.includes('Unauthorized')) {
     showToast('Session expired — reopen the Mini App', 'error');
   } else {

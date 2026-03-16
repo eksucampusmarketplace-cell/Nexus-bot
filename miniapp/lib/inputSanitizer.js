@@ -47,7 +47,8 @@ const COMMAND_INJECTION_PATTERNS = [
   /\$\(/,           // $(  — command substitution
   /\n|\r/,          // newlines — can split commands
   /\\[nrt]/,        // escaped newlines/tabs
-  /;\s*(rm|curl|wget|bash|sh|python|perl|ruby)\s/i,  // ; followed by shell commands only
+  // Removed /[;&|`$]/ and ;\s*(rm|curl...) — too broad, causes false positives
+  // on plain text like "Banned via Mini App"
 ];
 
 // ============================================================================

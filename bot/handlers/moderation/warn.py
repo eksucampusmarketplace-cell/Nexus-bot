@@ -103,6 +103,12 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await log_action(
         chat_id, "warn", target.id, target.full_name, invoker.id, invoker.full_name, reason
     )
+    
+    # Phase 1: Record signal for ML pipeline
+    from bot.ml.signal_collector import record_mod_action
+    import asyncio
+    asyncio.create_task(record_mod_action(target.id, chat_id, 'warn', reason))
+    
     await publish_event(
         chat_id,
         "mod_action",

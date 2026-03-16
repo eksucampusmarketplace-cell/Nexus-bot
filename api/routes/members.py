@@ -44,6 +44,30 @@ async def _fetch_admins_from_telegram(chat_id: int) -> list:
         return []
 
 
+@router.get("/risk/{user_id}")
+async def get_user_risk_score(chat_id: int, user_id: int, user: dict = Depends(get_current_user)):
+    """Returns the risk score breakdown for a user."""
+    async with db.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT * FROM user_risk_scores WHERE user_id = $1",
+            user_id
+        )
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Risk score not found for this user")
+            
+        breakdown = row['score_breakdown']
+        if isinstance(breakdown, str):
+            breakdown = json.loads(breakdown)
+            
+        return {
+            "user_id": user_id,
+            "risk_score": row['risk_score'],
+            "breakdown": breakdown,
+            "last_scored": row['last_scored'],
+            "updated_at": row['updated_at']
+        }
+
 @router.get("/members")
 async def list_members(chat_id: int, user: dict = Depends(get_current_user)):
     """

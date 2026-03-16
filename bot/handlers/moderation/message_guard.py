@@ -1,7 +1,7 @@
 import logging
 import re
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from telegram import ChatPermissions, Update
 from telegram.ext import ContextTypes
@@ -62,27 +62,63 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = message.text or message.caption or ""
 
-    # 2. Flood check (Redis counter)
-    if db.redis:
-        flood_key = f"nexus:flood:{chat_id}:{user_id}"
-        count = await db.redis.incr(flood_key)
-        if count == 1:
-            await db.redis.expire(flood_key, 5)  # 5 second window
+    # ── Phase 1 & 3: Spam Signal Collection & ML Classifier ───────────────
+    try:
+        from bot.handlers.community_vote import detect_scam, start_community_vote
+        from bot.ml.signal_collector import record_pattern_match, record_spam_signal
+        
+        # 1. Scam pattern detection (if not already handled by MessageHandler)
+        # Note: auto_detect_scam runs in group 5, we are in group 0.
+        # If we detect it here, we might want to trigger it early.
+        scam_result = detect_scam(text)
+        if scam_result:
+            scam_type, scam_desc = scam_result
+            asyncio.create_task(record_pattern_match(user_id, chat_id, text, scam_type))
+            # We don't trigger the vote here to avoid duplication with auto_detect_scam
+            # unless we want to return early. Let's just record the signal.
 
-        if count > 5:  # More than 5 messages in 5 seconds
-            try:
-                # Auto-mute 5 mins
-                until = datetime.utcnow() + timedelta(minutes=5)
-                await context.bot.restrict_chat_member(
-                    chat_id,
-                    user_id,
-                    permissions=ChatPermissions(can_send_messages=False),
-                    until_date=until,
+        # 2. ML Classifier
+        from bot.ml.spam_classifier import classifier
+        if classifier.is_trained and text and len(text) > 10:
+            ml_result = classifier.predict(text)
+            if ml_result['label'] == 'spam' and ml_result['confidence'] > 0.85:
+                # High confidence spam — trigger vote automatically
+                await start_community_vote(
+                    update, context, message,
+                    scam_type='ml_classifier',
+                    scam_description="🤖 ML Classifier: High confidence spam",
+                    trigger_text=text[:200],
+                    is_auto=True
                 )
-                await message.reply_text("🚫 Flood detected. You are muted for 5 minutes.")
-                return
-            except Exception:
-                pass
+                asyncio.create_task(
+                    record_spam_signal(user_id, chat_id, text,
+                                      'ml_classifier', 'spam',
+                                      ml_result['confidence'])
+                )
+                # Since we started a vote, we might want to stop further checks
+                # but usually we let message_guard continue unless we delete the message.
+    except Exception as e:
+        log.debug(f"Spam pipeline error: {e}")
+    # ───────────────────────────────────────────────────────────────────────
+
+    # 2. Flood check (Redis-backed counter with in-memory fallback)
+    try:
+        from bot.utils.flood_counter import flood_counter
+        # Settings: 5 messages in 5 seconds
+        if await flood_counter.is_flooding(chat_id, user_id, limit=5, window_secs=5):
+            # Auto-mute 5 mins
+            from telegram import ChatPermissions
+            until = datetime.now(timezone.utc) + timedelta(minutes=5)
+            await context.bot.restrict_chat_member(
+                chat_id,
+                user_id,
+                permissions=ChatPermissions(can_send_messages=False),
+                until_date=until,
+            )
+            await message.reply_text("🚫 Flood detected. You are muted for 5 minutes.")
+            return
+    except Exception as e:
+        log.debug(f"Flood check failed: {e}")
 
     # 3. Lock checks (support both old and new column names)
     locks = await db.fetchrow("SELECT * FROM locks WHERE chat_id = $1", chat_id)

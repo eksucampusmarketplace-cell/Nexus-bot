@@ -1402,11 +1402,18 @@
 
       if (finalChatId) {
         try {
-          const [group, logs, analyticsData] = await Promise.all([
+          const [group, logsRaw, analyticsData] = await Promise.all([
             apiFetch(`/api/groups/${finalChatId}`),
             apiFetch(`/api/groups/${finalChatId}/logs`),
             apiFetch(`/api/groups/${finalChatId}/analytics`).catch(() => ({ activity: [] }))
           ]);
+
+          // Normalize logs regardless of response shape
+          const logs = Array.isArray(logsRaw)
+            ? logsRaw
+            : Array.isArray(logsRaw?.logs)
+              ? logsRaw.logs
+              : [];
           
           const memberCount = group?.member_count || 0;
           const activity = analyticsData?.activity || [];
@@ -1414,7 +1421,14 @@
           const stats = [
             { label: 'Total Members', value: memberCount.toLocaleString(), icon: '👥', color: 'accent' },
             { label: 'Messages Today', value: todayMessages.toLocaleString(), icon: '💬', color: 'success' },
-            { label: 'Actions Today', value: (Array.isArray(logs) ? logs : []).length.toLocaleString(), icon: '⚡', color: 'warning' },
+            { label: 'Actions Today', value: (() => {
+              const today = new Date().toDateString();
+              const actionsToday = (Array.isArray(logs) ? logs : []).filter(log => {
+                const logDate = new Date(log.timestamp || log.created_at);
+                return logDate.toDateString() === today;
+              }).length;
+              return actionsToday.toLocaleString();
+            })(), icon: '⚡', color: 'warning' },
           ];
 
           statsGrid.innerHTML = '';

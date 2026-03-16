@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS user_lang_prefs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id BIGINT NOT NULL UNIQUE,
     language_code TEXT NOT NULL DEFAULT 'en',  -- en, ar, es, fr, hi, pt, ru, tr, id, de
+    auto_detected BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 

@@ -119,11 +119,17 @@ async def lifespan(app: FastAPI):
         )
 
         # Check privacy mode (critical for group message handling)
-        can_read_all = getattr(primary_me, 'can_read_all_group_messages', None)
+        can_read_all = getattr(primary_me, "can_read_all_group_messages", None)
         if can_read_all is False:
-            logger.warning("[STARTUP] ⚠️ PRIVACY MODE IS ON — Bot can only see messages that start with /")
-            logger.warning("[STARTUP] ⚠️ To fix: Open @BotFather → Bot Settings → Group Privacy → Turn OFF")
-            logger.warning("[STARTUP] ⚠️ Without this: automod, filters, and blacklist will NOT work in groups")
+            logger.warning(
+                "[STARTUP] ⚠️ PRIVACY MODE IS ON — Bot can only see messages that start with /"
+            )
+            logger.warning(
+                "[STARTUP] ⚠️ To fix: Open @BotFather → Bot Settings → Group Privacy → Turn OFF"
+            )
+            logger.warning(
+                "[STARTUP] ⚠️ Without this: automod, filters, and blacklist will NOT work in groups"
+            )
 
         # Auto-set MAIN_BOT_USERNAME if not configured
         if not settings.MAIN_BOT_USERNAME:
@@ -154,10 +160,16 @@ async def lifespan(app: FastAPI):
 
         # Register webhook for primary bot (Bug D fix)
         try:
-            webhook_url = f"{settings.RENDER_EXTERNAL_URL}/webhook/{primary_token}"
+            webhook_url = f"{settings.webhook_url}/webhook/{primary_token}"
             await primary_app.bot.set_webhook(
                 url=webhook_url,
-                allowed_updates=["message", "callback_query", "chat_member", "my_chat_member", "inline_query"]
+                allowed_updates=[
+                    "message",
+                    "callback_query",
+                    "chat_member",
+                    "my_chat_member",
+                    "inline_query",
+                ],
             )
             logger.info(f"[STARTUP] ✅ Primary bot webhook set → {webhook_url}")
         except Exception as e:
@@ -206,17 +218,27 @@ async def lifespan(app: FastAPI):
 
                     token_hash = hash_token(clone_token)
                     async with pool.acquire() as sync_conn:
-                        synced_count = await sync_conn.fetchval(
-                            """UPDATE groups SET bot_token_hash = $1
-                               WHERE chat_id IN (SELECT chat_id FROM clone_bot_groups WHERE bot_id = $2)
+                        synced_count = (
+                            await sync_conn.fetchval(
+                                """UPDATE groups SET bot_token_hash = $1
+                               WHERE chat_id IN (
+                                   SELECT chat_id FROM clone_bot_groups WHERE bot_id = $2
+                               )
                                AND (bot_token_hash IS NULL OR bot_token_hash != $1)
                                RETURNING COUNT(*)""",
-                            token_hash, me.id
-                        ) or 0
+                                token_hash,
+                                me.id,
+                            )
+                            or 0
+                        )
                     if synced_count > 0:
-                        logger.info(f"[STARTUP] ✅ Synced {synced_count} groups for clone @{me.username}")
+                        logger.info(
+                            f"[STARTUP] ✅ Synced {synced_count} groups for clone @{me.username}"
+                        )
                 except Exception as sync_err:
-                    logger.debug(f"[STARTUP] Clone group sync skipped for @{me.username}: {sync_err}")
+                    logger.debug(
+                        f"[STARTUP] Clone group sync skipped for @{me.username}: {sync_err}"
+                    )
 
             except Exception as ce:
                 logger.error(f"[STARTUP] ⚠️ Failed to start clone {clone_row['bot_id']}: {ce}")
@@ -230,14 +252,20 @@ async def lifespan(app: FastAPI):
             me = await bot_app.bot.get_me()
             if getattr(me, "can_read_all_group_messages", None) is False:
                 logger.warning(f"[STARTUP] ⚠️ CLONE @{me.username} has PRIVACY MODE ON")
-                logger.warning("[STARTUP] Fix: @BotFather → /mybots → Bot Settings → Group Privacy → Turn OFF")
-                logger.warning("[STARTUP] Without this: automod, filters, and blacklist will NOT work for this clone")
+                logger.warning(
+                    "[STARTUP] Fix: @BotFather → /mybots → Bot Settings → Group Privacy → Turn OFF"
+                )
+                logger.warning(
+                    "[STARTUP] Without this: automod, filters, and blacklist will NOT work "
+                    "for this clone"
+                )
         except Exception:
             pass
 
     # Start night mode scheduler (v21)
     try:
         from bot.handlers.night_mode import start_night_mode_scheduler
+
         await start_night_mode_scheduler(primary_app)
         logger.info("[STARTUP] ✅ Night mode scheduler started")
     except Exception as e:
@@ -410,17 +438,18 @@ try:
     app.include_router(session_api.router)  # /api/session/convert
 
     from api.routes import pins as pins_api
+
     app.include_router(pins_api.router)  # prefix="/api/groups/{chat_id}/pins"
-    
+
     # v21 New API routes
     from api.routes import federation as federation_api
-    from api.routes import users as users_api
     from api.routes import i18n as i18n_api
-    
+    from api.routes import users as users_api
+
     app.include_router(federation_api.router, prefix="/api/federation", tags=["federation"])
     app.include_router(users_api.router, prefix="/api/users", tags=["users"])
     app.include_router(i18n_api.router, tags=["i18n"])
-    
+
     logger.info("[STARTUP] ✅ All v21 API routes registered")
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

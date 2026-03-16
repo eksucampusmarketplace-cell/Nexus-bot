@@ -7,10 +7,22 @@
 
 import { t, showToast } from '../lib/i18n.js?v=1.6.0';
 import { apiFetch } from '../lib/api.js?v=1.6.0';
+import { useStore } from '../store/index.js?v=1.6.0';
 
 export async function renderCaptchaConfigPage(container) {
+  const chatId = useStore.getState().activeChatId;
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+
+  if (!chatId) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">
+        <div style="font-size:3rem;margin-bottom:var(--sp-3)">🤖</div>
+        <div>Select a group first</div>
+      </div>
+    `;
+    return;
+  }
 
   const header = document.createElement('div');
   header.innerHTML = `
@@ -99,7 +111,7 @@ export async function renderCaptchaConfigPage(container) {
     
     try {
       showToast(t('loading', 'Saving...'));
-      await apiFetch('/api/groups/{chat_id}/captcha', {
+      await apiFetch(`/api/groups/${chatId}/captcha`, {
         method: 'POST',
         body: JSON.stringify({ enabled, mode, timeout, kickFailures })
       });
@@ -113,7 +125,7 @@ export async function renderCaptchaConfigPage(container) {
 
 async function loadCaptchaSettings(section) {
   try {
-    const settings = await apiFetch('/api/groups/{chat_id}/captcha');
+    const settings = await apiFetch(`/api/groups/${chatId}/captcha`);
     if (settings) {
       const toggle = section.querySelector('#captcha-toggle');
       if (settings.enabled) {

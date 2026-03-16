@@ -1,0 +1,103 @@
+/**
+ * miniapp/src/pages/trustnet.js
+ * 
+ * TrustNet / Federation management page.
+ */
+
+import { t, showToast } from '../lib/i18n.js?v=1.6.0';
+import { apiFetch } from '../lib/api.js?v=1.6.0';
+
+export async function renderTrustnetPage(container) {
+  container.innerHTML = '';
+  container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+
+  const header = document.createElement('div');
+  header.innerHTML = `
+    <div style="display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-5);">
+      <div style="font-size:2rem">🌐</div>
+      <div>
+        <div style="font-size:1.2rem;font-weight:700">${t('nav_trustnet', 'TrustNet')}</div>
+        <div style="font-size:0.85rem;color:var(--text-muted)">Cross-group ban sharing network</div>
+      </div>
+    </div>
+  `;
+  container.appendChild(header);
+
+  // Loading
+  const loading = document.createElement('div');
+  loading.style.cssText = 'text-align:center;padding:var(--sp-8);color:var(--text-muted);';
+  loading.textContent = t('loading', 'Loading...');
+  container.appendChild(loading);
+
+  try {
+    const feds = await apiFetch('/api/federation/my').catch(() => []);
+    loading.replaceWith(createFederationList(feds, container));
+  } catch (err) {
+    loading.textContent = t('error', 'Failed to load federations');
+  }
+
+  // Create new federation button
+  const createBtn = document.createElement('button');
+  createBtn.textContent = '+ Create Federation';
+  createBtn.style.cssText = `
+    position:fixed;bottom:20px;right:20px;
+    width:56px;height:56px;border-radius:50%;
+    background:var(--accent);color:#000;
+    font-weight:700;font-size:24px;border:none;
+    cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    display:flex;align-items:center;justify-content:center;
+  `;
+  container.appendChild(createBtn);
+}
+
+function createFederationList(feds, container) {
+  if (!feds || feds.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'text-align:center;padding:var(--sp-8);color:var(--text-muted);';
+    empty.innerHTML = `
+      <div style="font-size:3rem;margin-bottom:var(--sp-3)">🌐</div>
+      <div>No federations yet</div>
+      <div style="font-size:0.85rem;margin-top:var(--sp-2)">Create a federation to share bans across groups</div>
+    `;
+    return empty;
+  }
+
+  const list = document.createElement('div');
+  list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-3);';
+
+  feds.forEach(fed => {
+    const card = document.createElement('div');
+    card.style.cssText = `
+      background:var(--bg-card);border:1px solid var(--border);
+      border-radius:var(--r-xl);padding:var(--sp-4);
+    `;
+    card.innerHTML = `
+      <div style="font-weight:600;font-size:1rem;margin-bottom:var(--sp-2)">${fed.name || 'Unnamed Federation'}</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-1)">
+        📊 ${fed.member_count || 0} groups
+      </div>
+      ${fed.invite_code ? `
+        <div style="font-size:0.85rem;color:var(--text-muted);display:flex;align-items:center;gap:var(--sp-2)">
+          🔑 ${fed.invite_code}
+          <button class="copy-btn" data-code="${fed.invite_code}" style="background:none;border:none;color:var(--accent);cursor:pointer;">
+            📋
+          </button>
+        </div>
+      ` : ''}
+    `;
+    
+    card.querySelector('.copy-btn')?.addEventListener('click', async (e) => {
+      const code = e.target.dataset.code;
+      try {
+        await navigator.clipboard.writeText(`/jointrust ${code}`);
+        showToast('Copied invite command!');
+      } catch (err) {
+        showToast('Failed to copy');
+      }
+    });
+
+    list.appendChild(card);
+  });
+
+  return list;
+}

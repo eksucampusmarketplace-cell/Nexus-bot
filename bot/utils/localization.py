@@ -296,6 +296,24 @@ def get_trust_level(score: int) -> str:
         return "Untrusted 🔴"
 
 
+# Compatibility aliases for v21 upload code
+LANGUAGES = SUPPORTED_LANGUAGES
+
+
+def get_locale(language_code: Optional[str] = None) -> LocaleProxy:
+    """Get a locale proxy for the given language code (compatibility alias)."""
+    return LocaleProxy(language_code or DEFAULT_LANG)
+
+
+def get_user_lang(pool, user_id: int, chat_id: Optional[int] = None) -> str:
+    """
+    Get user's preferred language (compatibility wrapper).
+    Delegates to get_user_language.
+    """
+    from bot.utils.lang_detect import get_user_lang as detect_lang
+    return detect_lang(pool, user_id, chat_id)
+
+
 # Export for convenience
 __all__ = [
     "LocaleProxy",
@@ -306,4 +324,6 @@ __all__ = [
     "SUPPORTED_LANGUAGES",
     "DEFAULT_LANG",
     "get_trust_level",
+    "LANGUAGES",  # Alias for upload compatibility
+    "get_user_lang",  # Compatibility wrapper
 ]

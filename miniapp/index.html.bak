@@ -423,14 +423,6 @@
       <div id="page-channel-gate" class="page"></div>
       <div id="page-notes" class="page"></div>
       <div id="page-owner" class="page"></div>
-      <!-- v21 pages -->
-      <div id="page-trustnet" class="page"></div>
-      <div id="page-captcha" class="page"></div>
-      <div id="page-community-vote" class="page"></div>
-      <div id="page-night-mode" class="page"></div>
-      <div id="page-history" class="page"></div>
-      <div id="page-language" class="page"></div>
-      <div id="page-persona" class="page"></div>
     </div>
 
     <!-- Bottom Nav (mobile) -->
@@ -581,13 +573,6 @@
         { id: 'antiraid', label: 'Anti-Raid', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>' },
         { id: 'session', label: 'Session', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' },
         { id: 'owner', label: 'Owner Panel', icon: '👑', ownerOnly: true },
-      { id: 'trustnet', label: 'TrustNet', icon: '🌐' },
-        { id: 'captcha', label: 'Captcha', icon: '🤖' },
-        { id: 'community-vote', label: 'Community Vote', icon: '⚖️' },
-        { id: 'night-mode', label: 'Night Mode', icon: '🌙' },
-        { id: 'history', label: 'Name History', icon: '📜' },
-        { id: 'language', label: 'Language', icon: '🌍' },
-        { id: 'persona', label: 'Bot Persona', icon: '🎭' },
       ];
 
       // Build sidebar nav (owner panel only shown if API confirms ownership)
@@ -756,35 +741,6 @@
         case 'owner':
           await renderOwnerPage(container);
           break;
-        case 'trustnet':
-          const { renderTrustnetPage } = await import('./src/pages/trustnet.js?v=1.6.0');
-          await renderTrustnetPage(container);
-          break;
-        case 'captcha':
-          const { renderCaptchaPage } = await import('./src/pages/captcha.js?v=1.6.0');
-          await renderCaptchaPage(container);
-          break;
-        case 'community-vote':
-          const { renderCommunityVotePage } = await import('./src/pages/community_vote.js?v=1.6.0');
-          await renderCommunityVotePage(container);
-          break;
-        case 'night-mode':
-          const { renderNightModePage } = await import('./src/pages/night_mode.js?v=1.6.0');
-          await renderNightModePage(container);
-          break;
-        case 'history':
-          const { renderHistoryPage } = await import('./src/pages/history.js?v=1.6.0');
-          await renderHistoryPage(container);
-          break;
-        case 'language':
-          const { renderLanguagePage } = await import('./src/pages/language.js?v=1.6.0');
-          await renderLanguagePage(container);
-          break;
-        case 'persona':
-          const { renderPersonaPage } = await import('./src/pages/persona.js?v=1.6.0');
-          await renderPersonaPage(container);
-          break;
-
       }
     }
 

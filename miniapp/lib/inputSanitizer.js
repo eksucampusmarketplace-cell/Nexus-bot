@@ -43,12 +43,11 @@ const XSS_PATTERNS = [
 // Command Injection Detection Patterns
 // ============================================================================
 const COMMAND_INJECTION_PATTERNS = [
-  /[;&|`$]/,
-  /\$\(/,
-  /\n/,
-  /\r/,
-  /\t/,
-  /\\[\\nrt]/,
+  /`/,              // backtick — genuine shell injection risk
+  /\$\(/,           // $(  — command substitution
+  /\n|\r/,          // newlines — can split commands
+  /\\[nrt]/,        // escaped newlines/tabs
+  /;\s*(rm|curl|wget|bash|sh|python|perl|ruby)\s/i,  // ; followed by shell commands only
 ];
 
 // ============================================================================

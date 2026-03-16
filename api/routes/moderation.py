@@ -50,11 +50,25 @@ async def verify_admin(chat_id: int, user: dict):
             if member.status in ("administrator", "creator"):
                 _admin_cache[cache_key] = (now, True)
                 return
-        except Exception:
+        except Exception as e:
+            logger.warning(f'[verify_admin] Bot {bot_id} failed for chat {chat_id} user {user_id}: {e}')
             continue
 
+    # Fallback: check DB for owner_id
+    try:
+        async with db.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT owner_id FROM groups WHERE chat_id=$1", chat_id
+            )
+            if row and row['owner_id'] == user_id:
+                logger.info(f'[verify_admin] Allowing owner {user_id} via DB fallback')
+                return  # owner is always allowed
+    except Exception as e:
+        logger.warning(f'[verify_admin] DB fallback failed: {e}')
+
     _admin_cache[cache_key] = (now, False)
-    raise HTTPException(403, "You are not an admin of this group")
+    logger.error(f'[verify_admin] All bots failed admin check for chat={chat_id} user={user_id}')
+    raise HTTPException(403, 'Could not verify admin status — ensure the bot is an admin in the group')
 
 
 class BanRequest(BaseModel):
@@ -90,30 +104,45 @@ class BulkActionRequest(BaseModel):
 async def ban_user(chat_id: int, req: BanRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
     from bot.registry import get_all
+    admin_name = user.get('first_name', 'Admin')
+    reason     = req.reason or 'Banned via Mini App'
+    target_name = f'User {req.user_id}'
+    tg_success  = False
 
     bots = get_all()
+    if not bots:
+        raise HTTPException(503, 'Bot not running — cannot execute action')
+
+    last_error = None
     for bid, app in bots.items():
         try:
+            member = await app.bot.get_chat_member(chat_id, req.user_id)
+            target_name = member.user.mention_html()
             await app.bot.ban_chat_member(chat_id, req.user_id)
+            # Send confirmation message to group
+            await app.bot.send_message(
+                chat_id=chat_id,
+                text=f'🚫 <b>Banned</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}',
+                parse_mode='HTML'
+            )
+            tg_success = True
             break
-        except Exception:
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f'[BAN] Telegram error for bot {bid}: {e}')
             continue
-    await mod_db.ban_user(chat_id, req.user_id, user.get("id", 0), req.reason)
-    await publish_event(
-        chat_id,
-        "mod_action",
-        {
-            "action": "ban",
-            "target_id": req.user_id,
-            "reason": req.reason,
-            "admin_id": user.get("id", 0),
-            "admin_name": user.get("first_name", "Admin"),
-        },
-    )
-    logger.info(
-        f"[API][moderation][BAN] chat_id={chat_id} target={req.user_id} by={user.get('id')}"
-    )
-    return {"ok": True}
+
+    if not tg_success:
+        logger.error(f'[BAN] All bots failed. Last error: {last_error}')
+        raise HTTPException(502, f'Telegram action failed: {last_error}')
+
+    await mod_db.ban_user(chat_id, req.user_id, user.get('id', 0), reason)
+    await publish_event(chat_id, 'mod_action', {
+        'action': 'ban', 'target_id': req.user_id,
+        'reason': reason, 'admin_id': user.get('id', 0),
+        'admin_name': admin_name,
+    })
+    return {'ok': True}
 
 
 @router.get("/bans")
@@ -308,6 +337,8 @@ async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_cur
     await verify_admin(chat_id, user)
     admin_name = user.get("first_name", "Admin")
     reason = req.reason or "Warned via Mini App"
+    tg_success = False
+    last_error = None
 
     # 1. Write to DB with proper error handling
     try:
@@ -333,6 +364,9 @@ async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_cur
     from bot.registry import get_all
     target_name = f"User {req.user_id}"
     bots = get_all()
+    if not bots:
+        raise HTTPException(503, 'Bot unavailable')
+
     for bid, app in bots.items():
         try:
             member = await app.bot.get_chat_member(chat_id, req.user_id)
@@ -349,9 +383,14 @@ async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_cur
                 text=warn_text,
                 parse_mode="HTML"
             )
+            tg_success = True
             break
         except Exception as tg_err:
-            logger.warning(f"[warn_user] Telegram send failed: {tg_err}")
+            last_error = str(tg_err)
+            logger.warning(f"[warn_user] Telegram send failed for bot {bid}: {tg_err}")
+
+    if not tg_success:
+        raise HTTPException(502, f'Telegram action failed: {last_error}')
 
     await publish_event(chat_id, "warn_change", {"user_id": req.user_id, "action": "warn"})
     return {"ok": True, "warn_count": warn_count}
@@ -447,6 +486,13 @@ async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_cur
 
     from bot.registry import get_all
 
+    admin_name = user.get("first_name", "Admin")
+    reason = req.reason or "No reason"
+    duration_str = req.duration or "indefinite"
+    target_name = "User"
+    tg_success = False
+    last_error = None
+
     unmute_dt = None
     if req.duration:
         match = re.match(r"^(\d+)([smhd])$", req.duration)
@@ -462,20 +508,39 @@ async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_cur
                 unmute_dt = datetime.now(tz=timezone.utc) + delta
 
     bots = get_all()
-    target_name = "User"
+    if not bots:
+        raise HTTPException(503, 'Bot not running')
+
     for bid, app in bots.items():
         try:
             member = await app.bot.get_chat_member(chat_id, req.user_id)
-            target_name = member.user.full_name
+            target_name = member.user.mention_html()
             await app.bot.restrict_chat_member(
                 chat_id=chat_id,
                 user_id=req.user_id,
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=unmute_dt,
             )
+            await app.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    f'🔇 <b>Muted</b>\n'
+                    f'User: {target_name}\n'
+                    f'Duration: {duration_str}\n'
+                    f'Reason: {reason}\n'
+                    f'By: {admin_name}'
+                ),
+                parse_mode='HTML'
+            )
+            tg_success = True
             break
-        except Exception:
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f'[MUTE] Telegram error for bot {bid}: {e}')
             continue
+
+    if not tg_success:
+        raise HTTPException(502, f'Mute failed: {last_error}')
 
     async with db.pool.acquire() as conn:
         await conn.execute(
@@ -483,9 +548,9 @@ async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_cur
             chat_id,
             req.user_id,
             target_name,
-            req.reason or "",
+            reason,
             user.get("id", 0),
-            user.get("first_name", "Admin"),
+            admin_name,
             req.duration,
         )
     await publish_event(
@@ -546,34 +611,46 @@ async def unmute_user(chat_id: int, target_user_id: int, user: dict = Depends(ge
 async def kick_user(chat_id: int, req: KickRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
     from bot.registry import get_all
+    admin_name  = user.get('first_name', 'Admin')
+    reason      = req.reason or 'Kicked via Mini App'
+    target_name = f'User {req.user_id}'
+    tg_success  = False
 
     bots = get_all()
-    target_name = "User"
+    if not bots:
+        raise HTTPException(503, 'Bot not running')
+
+    last_error = None
     for bid, app in bots.items():
         try:
             member = await app.bot.get_chat_member(chat_id, req.user_id)
-            target_name = member.user.full_name
+            target_name = member.user.mention_html()
             await app.bot.ban_chat_member(chat_id, req.user_id)
-            await app.bot.unban_chat_member(chat_id, req.user_id)
+            await app.bot.unban_chat_member(chat_id, req.user_id)  # kick = ban+unban
+            await app.bot.send_message(
+                chat_id=chat_id,
+                text=f'👢 <b>Kicked</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}',
+                parse_mode='HTML'
+            )
+            tg_success = True
             break
-        except Exception:
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f'[KICK] Telegram error for bot {bid}: {e}')
             continue
+
+    if not tg_success:
+        raise HTTPException(502, f'Telegram action failed: {last_error}')
+
     async with db.pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO mod_logs (chat_id, target_id, target_name, action, reason, admin_id, admin_name) VALUES ($1,$2,$3,'kick',$4,$5,$6)",
-            chat_id,
-            req.user_id,
-            target_name,
-            req.reason or "",
-            user.get("id", 0),
-            user.get("first_name", "Admin"),
+            "INSERT INTO mod_logs (chat_id,target_id,target_name,action,reason,admin_id,admin_name)"
+            " VALUES ($1,$2,$3,'kick',$4,$5,$6)",
+            chat_id, req.user_id, target_name, reason,
+            user.get('id',0), admin_name
         )
-    await publish_event(
-        chat_id,
-        "mod_action",
-        {"action": "kick", "target_id": req.user_id, "admin_id": user.get("id", 0)},
-    )
-    return {"ok": True}
+    await publish_event(chat_id,'mod_action',{'action':'kick','target_id':req.user_id,'admin_id':user.get('id',0)})
+    return {'ok': True}
 
 
 @router.post("/bulk-action")

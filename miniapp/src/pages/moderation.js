@@ -190,7 +190,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/warnings`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Warned via Mini App' }) });
         showToast('Warning issued', 'success');
         inputArea.style.display = 'none';
-      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+      } catch (e) { _handleActionError(e); }
     };
   } else if (action === 'mute') {
     inputArea.innerHTML = `
@@ -220,7 +220,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/mutes`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Muted via Mini App', duration: selectedDuration }) });
         showToast('User muted', 'success');
         inputArea.style.display = 'none';
-      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+      } catch (e) { _handleActionError(e); }
     };
   } else if (action === 'kick') {
     inputArea.innerHTML = `
@@ -235,7 +235,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/actions/kick`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id }) });
         showToast('User kicked', 'success');
         card.remove();
-      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+      } catch (e) { _handleActionError(e); }
     };
   } else if (action === 'ban') {
     inputArea.innerHTML = `
@@ -253,7 +253,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/bans`, { method: 'POST', body: JSON.stringify({ user_id: member.user_id, reason: reason || 'Banned via Mini App' }) });
         showToast('User banned', 'success');
         card.remove();
-      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+      } catch (e) { _handleActionError(e); }
     };
   }
 
@@ -339,7 +339,7 @@ function _showUserProfilePanel(userId, chatId, memberData) {
         }
         panel.remove();
       } catch (e) {
-        showToast('Failed: ' + e.message, 'error');
+        _handleActionError(e);
       }
     };
   });
@@ -783,4 +783,28 @@ function _timeAgo(ts) {
   if (mins < 60) return `${mins}m ago`;
   if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
   return new Date(ts).toLocaleDateString();
+}
+
+/**
+ * Human-readable error handler for moderation actions
+ */
+function _handleActionError(e) {
+  const msg = e.message || 'Unknown error';
+  console.error('[Moderation] Action failed:', e);
+
+  // Translate common errors to friendly messages
+  if (msg.includes('command injection') || msg.includes('restricted keywords')) {
+    showToast('Action blocked by input filter — use simpler reason text', 'error');
+  } else if (msg.includes('not an admin') || msg.includes('403')) {
+    showToast('Bot needs admin rights in this group', 'error');
+  } else if (msg.includes('502') || msg.includes('Telegram action failed')) {
+    // Extract the part after the last colon if it exists
+    const parts = msg.split(':');
+    const cleanMsg = parts.length > 1 ? parts[parts.length - 1].trim() : msg;
+    showToast('Telegram refused the action: ' + cleanMsg, 'error');
+  } else if (msg.includes('401') || msg.includes('Unauthorized')) {
+    showToast('Session expired — reopen the Mini App', 'error');
+  } else {
+    showToast('Failed: ' + msg, 'error');
+  }
 }

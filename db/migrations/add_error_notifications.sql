@@ -26,8 +26,11 @@ CREATE TABLE IF NOT EXISTS error_notifications (
     acknowledged BOOLEAN DEFAULT FALSE
 );
 
+-- Bug fix: Add bot_id column if table exists but column doesn't (from old migration)
+ALTER TABLE error_notifications ADD COLUMN IF NOT EXISTS bot_id BIGINT;
+
 -- Index for error notifications (dedup query - Bug #6)
-CREATE INDEX IF NOT EXISTS idx_error_notifications_dedup 
+CREATE INDEX IF NOT EXISTS idx_error_notifications_dedup
     ON error_notifications(owner_id, error_type, bot_id, sent_at);
 
 -- Index for owner lookups

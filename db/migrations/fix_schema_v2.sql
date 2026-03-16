@@ -2,6 +2,15 @@
 -- Fixes lock column names, filters schema, and adds created_at columns
 -- IDEMPOTENT - safe to run multiple times
 
+-- Safe RENAME blocks for Fix 5 - DO THIS FIRST to avoid conflicts
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'stickers') THEN ALTER TABLE locks RENAME COLUMN stickers TO sticker; END IF; END $$;
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'gifs') THEN ALTER TABLE locks RENAME COLUMN gifs TO gif; END IF; END $$;
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'links') THEN ALTER TABLE locks RENAME COLUMN links TO link; END IF; END $$;
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'forwards') THEN ALTER TABLE locks RENAME COLUMN forwards TO forward; END IF; END $$;
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'polls') THEN ALTER TABLE locks RENAME COLUMN polls TO poll; END IF; END $$;
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'contacts') THEN ALTER TABLE locks RENAME COLUMN contacts TO contact; END IF; END $$;
+DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'video_notes') THEN ALTER TABLE locks RENAME COLUMN video_notes TO video_note; END IF; END $$;
+
 -- Fix locks table column names (align with miniapp expectations)
 -- The miniapp uses: photo, video, sticker, gif, voice, audio, document, link, forward, poll, contact
 ALTER TABLE locks ADD COLUMN IF NOT EXISTS photo BOOLEAN DEFAULT FALSE;
@@ -63,12 +72,3 @@ CREATE TABLE IF NOT EXISTS antiraid_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_antiraid_sessions_chat_active ON antiraid_sessions(chat_id, is_active);
-
--- Safe RENAME blocks for Fix 5
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'stickers') THEN ALTER TABLE locks RENAME COLUMN stickers TO sticker; END IF; END $$;
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'gifs') THEN ALTER TABLE locks RENAME COLUMN gifs TO gif; END IF; END $$;
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'links') THEN ALTER TABLE locks RENAME COLUMN links TO link; END IF; END $$;
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'forwards') THEN ALTER TABLE locks RENAME COLUMN forwards TO forward; END IF; END $$;
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'polls') THEN ALTER TABLE locks RENAME COLUMN polls TO poll; END IF; END $$;
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'contacts') THEN ALTER TABLE locks RENAME COLUMN contacts TO contact; END IF; END $$;
-DO $$ BEGIN IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'locks' AND column_name = 'video_notes') THEN ALTER TABLE locks RENAME COLUMN video_notes TO video_note; END IF; END $$;

@@ -73,6 +73,7 @@ async def upsert_group(
     member_count: int = 0,
     photo_big: str = None,
     photo_small: str = None,
+    chat_type: str = None,
 ):
     if settings is None:
         # ... (keep existing settings default logic)
@@ -114,15 +115,16 @@ async def upsert_group(
     async with db.pool.acquire() as conn:
         await conn.execute(
             """
-            INSERT INTO groups (chat_id, title, bot_token_hash, settings, member_count, photo_big, photo_small)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO groups (chat_id, title, bot_token_hash, settings, member_count, photo_big, photo_small, chat_type)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (chat_id) DO UPDATE
-            SET title = EXCLUDED.title, 
-                bot_token_hash = EXCLUDED.bot_token_hash, 
+            SET title = EXCLUDED.title,
+                bot_token_hash = EXCLUDED.bot_token_hash,
                 settings = EXCLUDED.settings,
                 member_count = CASE WHEN EXCLUDED.member_count > 0 THEN EXCLUDED.member_count ELSE groups.member_count END,
                 photo_big = CASE WHEN EXCLUDED.photo_big IS NOT NULL AND EXCLUDED.photo_big != '' THEN EXCLUDED.photo_big ELSE groups.photo_big END,
-                photo_small = CASE WHEN EXCLUDED.photo_small IS NOT NULL AND EXCLUDED.photo_small != '' THEN EXCLUDED.photo_small ELSE groups.photo_small END
+                photo_small = CASE WHEN EXCLUDED.photo_small IS NOT NULL AND EXCLUDED.photo_small != '' THEN EXCLUDED.photo_small ELSE groups.photo_small END,
+                chat_type = CASE WHEN EXCLUDED.chat_type IS NOT NULL THEN EXCLUDED.chat_type ELSE groups.chat_type END
         """,
             chat_id,
             title,
@@ -131,6 +133,7 @@ async def upsert_group(
             member_count or 0,
             photo_big,
             photo_small,
+            chat_type or 'group',
         )
 
 

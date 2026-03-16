@@ -39,6 +39,12 @@ from db.ops.clone_groups import (
 )
 from bot.utils.crypto import hash_token
 from db.ops.groups import upsert_group
+from bot.billing.billing_helpers import (
+    get_bot_plan,
+    is_trial_expired,
+    check_property_limit,
+    enforce_trial_limits,
+)
 
 log = logging.getLogger("group_lifecycle")
 
@@ -77,6 +83,19 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
     # Based on main.py: primary_app.bot_data["db_pool"] = pool
     db_pool = context.bot_data.get("db_pool")
 
+    # Check trial expiration first - if expired, leave immediately
+    if db_pool:
+        try:
+            if await is_trial_expired(db_pool, bot_id):
+                log.info(f"[LIFECYCLE] Trial expired, leaving | bot={bot_id} chat={chat.id}")
+                try:
+                    await context.bot.leave_chat(chat.id)
+                except Exception:
+                    pass
+                return
+        except Exception as e:
+            log.warning(f"[LIFECYCLE] Trial check failed: {e}")
+
     # ── BOT REMOVED ──────────────────────────────────────────────────────
     if _is_bot_remove(event, bot_id):
         log.info(f"[LIFECYCLE] Removed | bot={bot_id} chat={chat.id} by={actor.id}")
@@ -110,6 +129,9 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         log.warning(f"[LIFECYCLE] No DB pool | bot={bot_id} chat={chat.id}")
         return
 
+    # Get chat type from the event
+    chat_type = chat.type if hasattr(chat, 'type') else 'group'  # 'group', 'supergroup', or 'channel'
+
     async with db_pool.acquire() as db:
         # Primary bot: unlimited groups, open policy, owner is OWNER_ID
         is_primary_bot = context.bot_data.get("is_primary", False)
@@ -132,6 +154,14 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         policy = config["group_access_policy"]  # open|approval|blocked
         notify_owner = config["bot_add_notifications"]
         is_owner = actor.id == owner_id
+
+        # Check property limits (for clone bots only)
+        if not is_primary_bot:
+            token_hash = hash_token(context.bot.token)
+            can_add, error_msg = await check_property_limit(db, bot_id, token_hash)
+            if not can_add:
+                await _leave_with_limit_message(context, chat, error_msg)
+                return
 
         # ── 1. OWNER ADDING TO THEIR OWN GROUP ───────────────────────────────
         if is_owner:
@@ -166,6 +196,8 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                     photo_small = chat_obj.photo.small_file_id
             except Exception as e:
                 log.warning(f"[LIFECYCLE] Could not get chat photo | chat={chat.id} error={e}")
+
+            # Update groups table with chat_type
             await upsert_group(
                 chat.id,
                 chat.title,
@@ -174,7 +206,15 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 photo_big=photo_big,
                 photo_small=photo_small,
             )
-            log.info(f"[LIFECYCLE] Owner group registered | bot={bot_id} chat={chat.id}")
+
+            # Update chat_type in groups table
+            await db.execute(
+                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2",
+                chat_type,
+                chat.id
+            )
+
+            log.info(f"[LIFECYCLE] Owner group registered | bot={bot_id} chat={chat.id} type={chat_type}")
 
             # Send setup DM to owner
             await _send_owner_setup_dm(context, owner_id, chat, bot_id)
@@ -221,6 +261,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                     photo_small = chat_obj.photo.small_file_id
             except Exception as e:
                 log.warning(f"[LIFECYCLE] Could not get chat photo | chat={chat.id} error={e}")
+
             await upsert_group(
                 chat.id,
                 chat.title,
@@ -229,6 +270,14 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 photo_big=photo_big,
                 photo_small=photo_small,
             )
+
+            # Update chat_type in groups table
+            await db.execute(
+                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2",
+                chat_type,
+                chat.id
+            )
+
             # Onboard the stranger
             await _send_stranger_onboard_dm(context, actor, chat, policy="open")
             # Notify owner if enabled
@@ -247,6 +296,14 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 is_owner_group=False,
                 access_status="pending",
             )
+
+            # Update chat_type in groups table
+            await db.execute(
+                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2",
+                chat_type,
+                chat.id
+            )
+
             # Tell stranger to wait
             await _send_stranger_onboard_dm(context, actor, chat, policy="approval")
             # Always notify owner for approval (regardless of notification setting)
@@ -288,6 +345,33 @@ async def _leave_with_message(context, chat, reason: str, actor_id: int, is_owne
     try:
         await context.bot.leave_chat(chat.id)
         log.info(f"[LIFECYCLE] Left | chat={chat.id} reason={reason}")
+    except Exception as e:
+        log.warning(f"[LIFECYCLE] Could not leave chat | chat={chat.id} error={e}")
+
+
+async def _leave_with_limit_message(context, chat, error_msg: str):
+    """
+    Send a message about property limit then leave.
+    Used when a clone bot exceeds its plan's property limit.
+    """
+    bot_name = settings.BOT_DISPLAY_NAME
+    main_bot = settings.MAIN_BOT_USERNAME
+
+    text = (
+        f"👋 Hi! {error_msg}\n\n"
+        f"To increase your limit, upgrade your plan in the Mini App or "
+        f"create your own bot at @{main_bot}.\n\n"
+        f"⚡ Powered by {bot_name}"
+    )
+
+    try:
+        await context.bot.send_message(chat_id=chat.id, text=text, parse_mode=ParseMode.HTML)
+    except Exception as e:
+        log.warning(f"[LIFECYCLE] Could not send limit message | chat={chat.id} error={e}")
+
+    try:
+        await context.bot.leave_chat(chat.id)
+        log.info(f"[LIFECYCLE] Left due to limit | chat={chat.id}")
     except Exception as e:
         log.warning(f"[LIFECYCLE] Could not leave chat | chat={chat.id} error={e}")
 

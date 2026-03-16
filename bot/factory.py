@@ -571,6 +571,45 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(h)
     logger.info("[FACTORY] Engagement handlers registered")
 
+    # ── v21 New Handlers ────────────────────────────────────────────────────
+    # TrustNet (Federation) handlers
+    from bot.handlers.federation import federation_handlers
+    for handler in federation_handlers:
+        app.add_handler(handler)
+    logger.info("[FACTORY] TrustNet handlers registered")
+    
+    # Community Vote handlers
+    from bot.handlers.community_vote import community_vote_handlers, auto_detect_scam
+    for handler in community_vote_handlers:
+        app.add_handler(handler)
+    # Auto-detect scam messages (runs on every message)
+    app.add_handler(MessageHandler(GROUP & filters.TEXT, auto_detect_scam), group=5)
+    logger.info("[FACTORY] Community Vote handlers registered")
+    
+    # Night Mode handlers
+    from bot.handlers.night_mode import night_mode_handlers
+    for handler in night_mode_handlers:
+        app.add_handler(handler)
+    logger.info("[FACTORY] Night Mode handlers registered")
+    
+    # Sangmata (Name History) handlers
+    from bot.handlers.sangmata import sangmata_handlers
+    for handler in sangmata_handlers:
+        app.add_handler(handler)
+    logger.info("[FACTORY] Sangmata handlers registered")
+    
+    # Language setting handlers
+    from bot.handlers.lang_setting import lang_setting_handlers
+    for handler in lang_setting_handlers:
+        app.add_handler(handler)
+    logger.info("[FACTORY] Language setting handlers registered")
+    
+    # Enhanced Inline Query handler (replaces existing inline_mode)
+    from bot.handlers.inline_query import inline_query_handlers
+    for handler in inline_query_handlers:
+        app.add_handler(handler)
+    logger.info("[FACTORY] Enhanced inline query handlers registered")
+
     # ── Sync command handler (Bug E fix) ────────────────────────────────────
     async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Sync group with bot — fixes groups added before webhooks were configured."""

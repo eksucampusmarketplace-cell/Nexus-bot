@@ -235,6 +235,14 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
+    # Start night mode scheduler (v21)
+    try:
+        from bot.handlers.night_mode import start_night_mode_scheduler
+        await start_night_mode_scheduler(primary_app)
+        logger.info("[STARTUP] ✅ Night mode scheduler started")
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ Night mode scheduler failed to start: {e}")
+
     logger.info("=" * 60)
     logger.info("[STARTUP] ✅ All services started")
     logger.info("=" * 60)
@@ -403,5 +411,14 @@ try:
 
     from api.routes import pins as pins_api
     app.include_router(pins_api.router)  # prefix="/api/groups/{chat_id}/pins"
+    
+    # v21 New API routes
+    from api.routes import federation as federation_api
+    from api.routes import users as users_api
+    
+    app.include_router(federation_api.router, prefix="/api/federation", tags=["federation"])
+    app.include_router(users_api.router, prefix="/api/users", tags=["users"])
+    
+    logger.info("[STARTUP] ✅ All v21 API routes registered")
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

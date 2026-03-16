@@ -39,6 +39,37 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
             log.debug(f"Failed to upsert user on join: {e}")
         # Note: sometimes old_status is restricted if they were muted/restricted by bot before and left/rejoined
 
+        # ── Federation Ban Check (v21) ─────────────────────────────────────────
+        try:
+            from db.ops.federation import check_federation_ban_on_join
+            
+            fed_ban = await check_federation_ban_on_join(db, chat.id, user.id)
+            if fed_ban:
+                # User is federation banned - ban them
+                await context.bot.ban_chat_member(chat.id, user.id)
+                
+                silent = fed_ban.get("silent", False)
+                if not silent:
+                    fed_name = fed_ban.get("federation_name", "Unknown")
+                    reason = fed_ban.get("reason", "No reason provided")
+                    
+                    await context.bot.send_message(
+                        chat_id=chat.id,
+                        text=(
+                            f"🚫 <b>Federation Ban Enforced</b>\n\n"
+                            f"User {user.mention_html()} was banned.\n"
+                            f"Network: {fed_name}\n"
+                            f"Reason: {reason}",
+                        ),
+                        parse_mode="HTML"
+                    )
+                
+                log.info(f"[FED] Ban enforced on join | chat={chat.id} user={user.id} fed={fed_ban.get('federation_id')}")
+                return  # Don't proceed with other join handling
+        except Exception as e:
+            log.debug(f"Federation ban check failed: {e}")
+        # ──────────────────────────────────────────────────────────────────────
+
         get_settings = context.bot_data.get("get_settings")
         if not get_settings:
             from db.ops.automod import get_group_settings

@@ -60,15 +60,46 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         max_warns = settings["max_warns"]
         warn_action = settings["warn_action"]
 
-    mention = await mention_user(target)
-    await update.message.reply_text(
-        f"⚠️ Warning | {mention}\n"
-        f"📋 Reason: {reason}\n"
-        f"🔢 Warnings: {count}/{max_warns}\n"
-        f"👮 By: {await mention_user(invoker)}",
-        parse_mode="Markdown",
-    )
+    # Use personality engine for warning message (v21)
+    try:
+        from bot.personality.engine import get_personality
+        
+        personality = await get_personality(db.pool, context.bot.id, chat_id)
+        warn_message = personality.format_action(
+            "warn",
+            user=await mention_user(target),
+            reason=reason,
+            count=count,
+            limit=max_warns
+        )
+    except Exception as e:
+        log.debug(f"Personality engine failed: {e}")
+        # Fallback to default
+        mention = await mention_user(target)
+        warn_message = (
+            f"⚠️ Warning | {mention}\n"
+            f"📋 Reason: {reason}\n"
+            f"🔢 Warnings: {count}/{max_warns}\n"
+            f"👮 By: {await mention_user(invoker)}"
+        )
+    
+    await update.message.reply_text(warn_message, parse_mode="Markdown")
 
+    # Update federation reputation (v21)
+    try:
+        import db.ops.federation as fed_ops
+        
+        # Get federations for this group
+        feds = await fed_ops.get_group_federations(db.pool, chat_id)
+        for fed in feds:
+            # Decrease trust score by 10 points for warning
+            await fed_ops.update_reputation(
+                db.pool, target.id, fed["id"], -10, 
+                f"Warned in group: {reason}"
+            )
+    except Exception as e:
+        log.debug(f"Federation reputation update failed: {e}")
+    
     await log_action(
         chat_id, "warn", target.id, target.full_name, invoker.id, invoker.full_name, reason
     )

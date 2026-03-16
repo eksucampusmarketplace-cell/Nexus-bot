@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 # Global cache for warnings time column detection
 _WARNINGS_TIME_COL = None
 
+# In-memory fallback deduplication cache (Bug #8 fix)
+# Used when database write fails - ensures dedup still works
+_dedup_cache: dict[tuple, datetime] = {}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # ERROR CATALOG - 16 error types with title, why, fix steps, and send_to
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -378,7 +382,17 @@ async def _should_send_notification(pool, bot_id: int, error_type: str, owner_id
     Check if we should send this notification based on:
     1. Owner preferences (muted types)
     2. Deduplication (same error+bot in last 24h)
+
+    Bug #6 fix: Includes bot_id in dedup check to prevent cross-bot suppression.
+    For system-level errors (bot_id is None), dedups by owner_id + error_type only.
     """
+    # Check in-memory cache first (Bug #8 - fallback when DB fails)
+    cache_key = (owner_id, error_type, bot_id)
+    if cache_key in _dedup_cache:
+        sent_at = _dedup_cache[cache_key]
+        if datetime.now(timezone.utc) - sent_at < timedelta(hours=24):
+            return False
+
     try:
         async with pool.acquire() as conn:
             # Check owner preferences
@@ -392,15 +406,32 @@ async def _should_send_notification(pool, bot_id: int, error_type: str, owner_id
             if pref and not pref["notify_dm"]:
                 return False
 
-            # Check deduplication - same bot+error in last 24h
+            # Check deduplication - Bug #6 fix: include bot_id
             yesterday = datetime.now(timezone.utc) - timedelta(hours=24)
-            recent = await conn.fetchrow(
-                """SELECT 1 FROM error_notifications
-                   WHERE owner_id = $1 AND error_type = $2 AND sent_at > $3""",
-                owner_id,
-                error_type,
-                yesterday,
-            )
+
+            # For system-level errors (bot_id is None), use owner_id + error_type only
+            # For bot-specific errors, use owner_id + error_type + bot_id
+            if bot_id is None or bot_id == 0:
+                # System-level error: dedup by owner + error_type only
+                recent = await conn.fetchrow(
+                    """SELECT 1 FROM error_notifications
+                       WHERE owner_id = $1 AND error_type = $2
+                       AND bot_id IS NULL AND sent_at > $3""",
+                    owner_id,
+                    error_type,
+                    yesterday,
+                )
+            else:
+                # Bot-specific error: dedup by owner + error_type + bot_id
+                recent = await conn.fetchrow(
+                    """SELECT 1 FROM error_notifications
+                       WHERE owner_id = $1 AND error_type = $2
+                       AND bot_id = $3 AND sent_at > $4""",
+                    owner_id,
+                    error_type,
+                    bot_id,
+                    yesterday,
+                )
             if recent:
                 return False
 
@@ -473,9 +504,21 @@ async def notify_owner(
             f"[NOTIFIER] Sent {error_type} to owner {owner_id} (clone_owner={for_clone_owner})"
         )
 
+        # Bug #8 fix: Update in-memory cache immediately after successful send
+        # This ensures deduplication works even if DB write fails
+        cache_key = (owner_id, error_type, bot_id)
+        _dedup_cache[cache_key] = datetime.now(timezone.utc)
+
         # Record notification
         if pool:
-            await _record_notification(pool, owner_id, error_type, text, bot_id)
+            try:
+                await _record_notification(pool, owner_id, error_type, text, bot_id)
+            except Exception as e:
+                # Bug #8 fix: Log ERROR (not WARNING) when dedup is broken due to DB failure
+                logger.error(
+                    f"[NOTIFIER] CRITICAL: Notification sent but DB write failed. "
+                    f"Deduplication may not work for {error_type} until restart. Error: {e}"
+                )
 
         return True
     except Exception as e:

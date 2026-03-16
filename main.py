@@ -263,6 +263,7 @@ async def lifespan(app: FastAPI):
                 # Send DM notification to clone owner (not just log)
                 try:
                     from bot.utils.error_notifier import notify_privacy_mode_on
+
                     asyncio.create_task(
                         notify_privacy_mode_on(bot_app.bot, me.id, me.username, pool)
                     )
@@ -283,13 +284,14 @@ async def lifespan(app: FastAPI):
     # ── Phase 3: ML Classifier Startup ──────────────────────────────────────
     try:
         from bot.ml.spam_classifier import classifier
+
         loaded = await classifier.load()
         if loaded:
-            logger.info('[STARTUP] ✅ Spam classifier loaded')
+            logger.info("[STARTUP] ✅ Spam classifier loaded")
         else:
-            logger.info('[STARTUP] ℹ️  No spam model yet — run python -m bot.ml.train when ready')
+            logger.info("[STARTUP] ℹ️  No spam model yet — run python -m bot.ml.train when ready")
     except Exception as e:
-        logger.debug(f'[STARTUP] Classifier load skipped: {e}')
+        logger.debug(f"[STARTUP] Classifier load skipped: {e}")
     # ───────────────────────────────────────────────────────────────────────
 
     # ── Phase 4: Analytics Background Jobs ────────────────────────────────
@@ -300,6 +302,7 @@ async def lifespan(app: FastAPI):
         while True:
             try:
                 from bot.analytics.aggregator import aggregate_hourly
+
                 await aggregate_hourly(pool)
                 analytics_failure_counts["hourly"] = 0  # Reset on success
             except Exception as e:
@@ -309,13 +312,17 @@ async def lifespan(app: FastAPI):
                 if analytics_failure_counts["hourly"] >= 3:
                     try:
                         from bot.utils.error_notifier import notify_owner
+
                         asyncio.create_task(
                             notify_owner(
                                 primary_app.bot,
                                 settings.OWNER_ID,
                                 "ANALYTICS_ERROR",
-                                context={"failures": analytics_failure_counts["hourly"], "error": str(e)},
-                                pool=pool
+                                context={
+                                    "failures": analytics_failure_counts["hourly"],
+                                    "error": str(e),
+                                },
+                                pool=pool,
                             )
                         )
                     except Exception:
@@ -326,6 +333,7 @@ async def lifespan(app: FastAPI):
         while True:
             try:
                 from bot.analytics.aggregator import aggregate_daily
+
                 await aggregate_daily(pool)
                 analytics_failure_counts["daily"] = 0  # Reset on success
             except Exception as e:
@@ -427,6 +435,7 @@ try:
         channel_gate,
         channels,
         engagement,
+        events,
         events_new,
         games,
         groups,
@@ -461,6 +470,8 @@ try:
 
     # Routes with full paths defined in the router (no prefix needed)
     app.include_router(automod.router, tags=["automod"])
+    # Bug #2 fix: Register events.py router for SSE query-param endpoint
+    app.include_router(events.router, tags=["sse"])
     app.include_router(events_new.router, tags=["events_new"])
     app.include_router(scheduler.router, tags=["scheduler"])
     app.include_router(log_channel.router, tags=["log_channel"])

@@ -7,10 +7,12 @@ Owner notification preferences and history.
 
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Request, HTTPException
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
-from config import settings
+
 from api.auth import get_current_user
+from config import settings
 
 log = logging.getLogger("admin_api")
 router = APIRouter()
@@ -44,14 +46,16 @@ async def admin_stats(request: Request, user: dict = Depends(get_current_user)):
     users = await pool.fetchval("SELECT COUNT(DISTINCT user_id) FROM users")
     return {"bots": bots or 0, "groups": groups or 0, "users": users or 0}
 
+
 @router.post("/api/admin/ml/retrain")
 async def retrain_ml_model(request: Request, user: dict = Depends(get_current_user)):
     """Only accessible by OWNER_ID. Calls classifier.train() in a background task."""
     if user.get("id") != settings.OWNER_ID:
         raise HTTPException(status_code=403)
 
-    from bot.ml.spam_classifier import classifier
     import asyncio
+
+    from bot.ml.spam_classifier import classifier
 
     async def _retrain():
         result = await classifier.train()
@@ -69,19 +73,27 @@ async def retrain_ml_model(request: Request, user: dict = Depends(get_current_us
 
 # List of all 16 error types from ERROR_CATALOG
 ALL_ERROR_TYPES = [
-    "PRIVACY_MODE_ON", "WEBHOOK_FAILED", "WEBHOOK_MISSING_UPDATES",
-    "BOT_NOT_ADMIN", "BOT_CANT_DELETE", "BOT_CANT_RESTRICT", "BOT_KICKED",
-    "GROUPS_NOT_APPEARING", "FED_BAN_PROPAGATION_FAILED", "CAPTCHA_WEBAPP_URL_MISSING",
-    "INVALID_TOKEN", "MISSING_ENV_VAR", "SUPABASE_CONNECTION_FAILED",
-    "ML_TRAINING_COMPLETE", "ML_TRAINING_FAILED", "ANALYTICS_ERROR"
+    "PRIVACY_MODE_ON",
+    "WEBHOOK_FAILED",
+    "WEBHOOK_MISSING_UPDATES",
+    "BOT_NOT_ADMIN",
+    "BOT_CANT_DELETE",
+    "BOT_CANT_RESTRICT",
+    "BOT_KICKED",
+    "GROUPS_NOT_APPEARING",
+    "FED_BAN_PROPAGATION_FAILED",
+    "CAPTCHA_WEBAPP_URL_MISSING",
+    "INVALID_TOKEN",
+    "MISSING_ENV_VAR",
+    "SUPABASE_CONNECTION_FAILED",
+    "ML_TRAINING_COMPLETE",
+    "ML_TRAINING_FAILED",
+    "ANALYTICS_ERROR",
 ]
 
 
 @router.get("/api/owner/notifications")
-async def get_notification_preferences(
-    request: Request,
-    user: dict = Depends(get_current_user)
-):
+async def get_notification_preferences(request: Request, user: dict = Depends(get_current_user)):
     """
     Get owner's notification preferences.
     Returns list of error types and whether each is muted.
@@ -96,21 +108,24 @@ async def get_notification_preferences(
         async with pool.acquire() as conn:
             # Get all preferences for this owner
             prefs = await conn.fetch(
-                "SELECT error_type, notify_dm FROM owner_error_prefs WHERE owner_id = $1",
-                owner_id
+                "SELECT error_type, notify_dm FROM owner_error_prefs WHERE owner_id = $1", owner_id
             )
 
             # Create lookup dict
-            pref_dict = {p['error_type']: p['notify_dm'] for p in prefs}
+            pref_dict = {p["error_type"]: p["notify_dm"] for p in prefs}
 
             # Build response for all error types
             result = []
             for error_type in ALL_ERROR_TYPES:
-                result.append({
-                    "error_type": error_type,
-                    "muted": not pref_dict.get(error_type, True),  # Default to not muted (notify_dm=True)
-                    "category": _get_error_category(error_type)
-                })
+                result.append(
+                    {
+                        "error_type": error_type,
+                        "muted": not pref_dict.get(
+                            error_type, True
+                        ),  # Default to not muted (notify_dm=True)
+                        "category": _get_error_category(error_type),
+                    }
+                )
 
             return {"preferences": result}
 
@@ -124,7 +139,7 @@ async def update_notification_preference(
     error_type: str,
     pref: NotificationPreference,
     request: Request,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
 ):
     """
     Update owner's preference for a specific error type.
@@ -147,7 +162,9 @@ async def update_notification_preference(
                    VALUES ($1, $2, $3)
                    ON CONFLICT (owner_id, error_type)
                    DO UPDATE SET notify_dm = EXCLUDED.notify_dm""",
-                owner_id, error_type, not pref.muted
+                owner_id,
+                error_type,
+                not pref.muted,
             )
 
         return {"success": True, "error_type": error_type, "muted": pref.muted}
@@ -159,13 +176,13 @@ async def update_notification_preference(
 
 @router.get("/api/owner/notifications/history")
 async def get_notification_history(
-    request: Request,
-    user: dict = Depends(get_current_user),
-    limit: int = 50
+    request: Request, user: dict = Depends(get_current_user), limit: int = 50
 ):
     """
     Get last N notifications sent to the owner.
     Includes error_type, sent_at, bot_id, and bot_name if available.
+
+    Bug #3 fix: Fixed SQL alias and added error handling.
     """
     owner_id = user.get("id")
     pool = request.app.state.db
@@ -175,44 +192,54 @@ async def get_notification_history(
 
     try:
         async with pool.acquire() as conn:
-            # Get notifications with bot info
+            # Bug #3 fix: Explicitly qualify all column references to avoid ambiguity
+            # Use b.bot_id for bot lookup, en.bot_id for error_notifications
             rows = await conn.fetch(
-                """SELECT en.error_type, en.sent_at, en.bot_id, b.username as bot_name
+                """SELECT en.error_type, en.sent_at, en.bot_id, en.owner_id, b.username as bot_name
                    FROM error_notifications en
-                   LEFT JOIN bots b ON b.bot_id = en.bot_id OR b.id = en.bot_id
+                   LEFT JOIN bots b ON b.bot_id = en.bot_id
                    WHERE en.owner_id = $1
                    ORDER BY en.sent_at DESC
                    LIMIT $2""",
-                owner_id, min(limit, 100)  # Max 100
+                owner_id,
+                min(limit, 100),  # Max 100
             )
 
             result = []
             for row in rows:
-                result.append({
-                    "error_type": row['error_type'],
-                    "sent_at": row['sent_at'].isoformat() if row['sent_at'] else None,
-                    "bot_id": row['bot_id'],
-                    "bot_name": row['bot_name'] or ("Primary" if row['bot_id'] else None)
-                })
+                result.append(
+                    {
+                        "error_type": row["error_type"],
+                        "sent_at": row["sent_at"].isoformat() if row["sent_at"] else None,
+                        "bot_id": row["bot_id"],
+                        "bot_name": row["bot_name"] or ("Primary" if row["bot_id"] else None),
+                    }
+                )
 
             return {"notifications": result}
 
     except Exception as e:
+        # Bug #3 fix: Return empty list instead of 500 on DB errors
         log.error(f"Failed to get notification history: {e}")
-        raise HTTPException(status_code=500, detail="Failed to fetch history")
+        return {"notifications": []}
 
 
 def _get_error_category(error_type: str) -> str:
     """Categorize error types for the UI."""
     clone_errors = [
-        "PRIVACY_MODE_ON", "WEBHOOK_FAILED", "WEBHOOK_MISSING_UPDATES",
-        "BOT_NOT_ADMIN", "BOT_CANT_DELETE", "BOT_CANT_RESTRICT", "BOT_KICKED",
-        "GROUPS_NOT_APPEARING", "FED_BAN_PROPAGATION_FAILED", "CAPTCHA_WEBAPP_URL_MISSING",
-        "INVALID_TOKEN"
+        "PRIVACY_MODE_ON",
+        "WEBHOOK_FAILED",
+        "WEBHOOK_MISSING_UPDATES",
+        "BOT_NOT_ADMIN",
+        "BOT_CANT_DELETE",
+        "BOT_CANT_RESTRICT",
+        "BOT_KICKED",
+        "GROUPS_NOT_APPEARING",
+        "FED_BAN_PROPAGATION_FAILED",
+        "CAPTCHA_WEBAPP_URL_MISSING",
+        "INVALID_TOKEN",
     ]
-    system_errors = [
-        "MISSING_ENV_VAR", "SUPABASE_CONNECTION_FAILED", "ANALYTICS_ERROR"
-    ]
+    system_errors = ["MISSING_ENV_VAR", "SUPABASE_CONNECTION_FAILED", "ANALYTICS_ERROR"]
     ml_errors = ["ML_TRAINING_COMPLETE", "ML_TRAINING_FAILED"]
 
     if error_type in clone_errors:

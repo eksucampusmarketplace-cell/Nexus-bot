@@ -524,9 +524,21 @@ try:
     from api.routes import i18n as i18n_api
     from api.routes import users as users_api
 
-    app.include_router(federation_api.router, prefix="/api/federation", tags=["federation"])
+    # Register federation with legacy_router for /api/federation/my endpoint
+    app.include_router(federation_api.legacy_router, tags=["federation"])
     app.include_router(users_api.router, prefix="/api/users", tags=["users"])
-    app.include_router(i18n_api.router, tags=["i18n"])
+    app.include_router(i18n_api.router, prefix="/api", tags=["i18n"])
+
+    # Register new API routes (captcha, night_mode, name_history, community_vote)
+    from api.routes import captcha as captcha_api
+    from api.routes import community_vote as community_vote_api
+    from api.routes import name_history as name_history_api
+    from api.routes import night_mode as night_mode_api
+
+    app.include_router(captcha_api.router, tags=["captcha"])
+    app.include_router(night_mode_api.router, tags=["night_mode"])
+    app.include_router(name_history_api.router, tags=["name_history"])
+    app.include_router(community_vote_api.router, tags=["community_vote"])
 
     logger.info("[STARTUP] ✅ All v21 API routes registered")
 except ImportError as e:

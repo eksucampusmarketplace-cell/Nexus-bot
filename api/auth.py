@@ -65,7 +65,8 @@ def _extract_init_data(request: Request) -> str | None:
 
 async def get_current_user(request: Request):
     if settings.SKIP_AUTH:
-        return {"id": settings.OWNER_ID or 12345, "first_name": "DevUser"}
+        user = {"id": settings.OWNER_ID or 12345, "first_name": "DevUser", "role": "owner"}
+        return user
 
     init_data = _extract_init_data(request)
     if not init_data:
@@ -81,6 +82,15 @@ async def get_current_user(request: Request):
         data = validate_init_data(init_data, settings.PRIMARY_BOT_TOKEN)
         user = data["user"]
         user["validated_bot_token"] = settings.PRIMARY_BOT_TOKEN
+        
+        # Inject role based on bot ownership
+        user_id = user.get('id')
+        if user_id == settings.OWNER_ID:
+            user['role'] = 'owner'
+        else:
+            user['role'] = 'admin'
+        
+        return user
     except Exception as e:
         # If primary bot token fails, try all registered clone bots
         from bot.registry import get_all
@@ -96,7 +106,28 @@ async def get_current_user(request: Request):
                 data = validate_init_data(init_data, bot_token)
                 user = data["user"]
                 user["validated_bot_token"] = bot_token
-                break
+                
+                # Determine role: check if this user owns this bot
+                user_id = user.get('id')
+                try:
+                    from db.client import db as _db
+                    from bot.utils.crypto import hash_token
+                    if _db and _db.pool:
+                        token_hash = hash_token(bot_token)
+                        async with _db.pool.acquire() as conn:
+                            bot_row = await conn.fetchrow(
+                                'SELECT owner_user_id FROM bots WHERE token_hash=$1',
+                                token_hash
+                            )
+                            if bot_row and bot_row['owner_user_id'] == user_id:
+                                user['role'] = 'owner'
+                            else:
+                                user['role'] = 'admin'
+                except Exception as role_err:
+                    logger.debug(f'[auth] Role lookup failed: {role_err}')
+                    user['role'] = 'admin'
+                
+                return user
             except Exception:
                 continue
         else:

@@ -36,3 +36,21 @@ async def admin_stats(request: Request, user: dict = Depends(get_current_user)):
     groups = await pool.fetchval("SELECT COUNT(*) FROM groups")
     users = await pool.fetchval("SELECT COUNT(DISTINCT user_id) FROM users")
     return {"bots": bots or 0, "groups": groups or 0, "users": users or 0}
+
+@router.post("/api/admin/ml/retrain")
+async def retrain_ml_model(request: Request, user: dict = Depends(get_current_user)):
+    """Only accessible by OWNER_ID. Calls classifier.train() in a background task."""
+    if user.get("id") != settings.OWNER_ID:
+        raise HTTPException(status_code=403)
+        
+    from bot.ml.spam_classifier import classifier
+    import asyncio
+    
+    async def _retrain():
+        result = await classifier.train()
+        # In a real scenario, we would notify the owner here.
+        # For now, just log it.
+        log.info(f"ML Retraining complete: {result}")
+        
+    asyncio.create_task(_retrain())
+    return {"status": "training_started"}

@@ -52,6 +52,11 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id, "ban", target.id, target.full_name, invoker.id, invoker.full_name, reason
         )
 
+        # Phase 1: Record signal for ML pipeline
+        from bot.ml.signal_collector import record_mod_action
+        import asyncio
+        asyncio.create_task(record_mod_action(target.id, chat_id, 'ban', reason))
+
         # Notify log channel
         await notify_log_channel(context.bot, chat_id, "ban", target, invoker, reason)
 
@@ -283,6 +288,10 @@ async def sban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.ban_chat_member(chat_id, target.id)
         await update.message.delete()
         # Still log and publish event
+        from bot.ml.signal_collector import record_mod_action
+        import asyncio
+        asyncio.create_task(record_mod_action(target.id, chat_id, 'ban', reason))
+        
         await log_action(
             chat_id, "sban", target.id, target.full_name, invoker.id, invoker.full_name, reason
         )

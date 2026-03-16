@@ -133,6 +133,79 @@ async def group_analytics(chat_id: int, days: int = Query(default=30, ge=7, le=9
     return {"activity": activity, "growth": growth, "modules": modules, "peak_hours": peak_hours}
 
 
+@router.get("/{chat_id}/analytics/spam")
+async def spam_analytics(chat_id: int, user: dict = Depends(get_current_user)):
+    """Returns: daily spam detection counts, top scam types, classifier accuracy."""
+    async with db.pool.acquire() as conn:
+        # Daily spam counts (last 30 days)
+        daily_spam = await conn.fetch(
+            """SELECT day, spam_detected 
+               FROM bot_stats_daily 
+               WHERE chat_id = $1 AND day >= CURRENT_DATE - INTERVAL '30 days'
+               ORDER BY day ASC""",
+            chat_id
+        )
+        
+        # Top scam types
+        top_scams = await conn.fetch(
+            """SELECT metadata->>'scam_type' as scam_type, COUNT(*) as count
+               FROM spam_signals
+               WHERE chat_id = $1 AND label = 'spam'
+               GROUP BY scam_type
+               ORDER BY count DESC LIMIT 5""",
+            chat_id
+        )
+        
+        # Classifier stats (signals from ml_classifier)
+        classifier_signals = await conn.fetch(
+            """SELECT label, COUNT(*) as count
+               FROM spam_signals
+               WHERE chat_id = $1 AND signal_type = 'ml_classifier'
+               GROUP BY label""",
+            chat_id
+        )
+        
+        return {
+            "daily_spam": [dict(r) for r in daily_spam],
+            "top_scams": [dict(r) for r in top_scams],
+            "classifier_signals": [dict(r) for r in classifier_signals]
+        }
+
+@router.get("/{chat_id}/analytics/members")
+async def member_analytics(chat_id: int, user: dict = Depends(get_current_user)):
+    """Returns: join/leave over time, risk score distribution of new joiners."""
+    async with db.pool.acquire() as conn:
+        # Join/Leave over time (last 30 days)
+        growth = await conn.fetch(
+            """SELECT day, members_joined, members_left 
+               FROM bot_stats_daily 
+               WHERE chat_id = $1 AND day >= CURRENT_DATE - INTERVAL '30 days'
+               ORDER BY day ASC""",
+            chat_id
+        )
+        
+        # Risk score distribution
+        risk_dist = await conn.fetch(
+            """SELECT 
+                CASE 
+                    WHEN risk_score > 90 THEN 'critical'
+                    WHEN risk_score > 70 THEN 'high'
+                    WHEN risk_score > 40 THEN 'medium'
+                    ELSE 'low'
+                END as risk_level,
+                COUNT(*) as count
+               FROM user_risk_scores urs
+               JOIN users u ON u.user_id = urs.user_id
+               WHERE u.chat_id = $1
+               GROUP BY risk_level""",
+            chat_id
+        )
+        
+        return {
+            "growth": [dict(r) for r in growth],
+            "risk_distribution": [dict(r) for r in risk_dist]
+        }
+
 @router.get("/{chat_id}/analytics/heatmap")
 async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)):
     async with db.pool.acquire() as conn:

@@ -271,6 +271,42 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[STARTUP] ⚠️ Night mode scheduler failed to start: {e}")
 
+    # ── Phase 3: ML Classifier Startup ──────────────────────────────────────
+    try:
+        from bot.ml.spam_classifier import classifier
+        loaded = await classifier.load()
+        if loaded:
+            logger.info('[STARTUP] ✅ Spam classifier loaded')
+        else:
+            logger.info('[STARTUP] ℹ️  No spam model yet — run python -m bot.ml.train when ready')
+    except Exception as e:
+        logger.debug(f'[STARTUP] Classifier load skipped: {e}')
+    # ───────────────────────────────────────────────────────────────────────
+
+    # ── Phase 4: Analytics Background Jobs ────────────────────────────────
+    async def _hourly_analytics_job():
+        while True:
+            try:
+                from bot.analytics.aggregator import aggregate_hourly
+                await aggregate_hourly(pool)
+            except Exception as e:
+                logger.error(f"[ANALYTICS] Hourly job error: {e}")
+            await asyncio.sleep(3600)
+
+    async def _daily_analytics_job():
+        while True:
+            try:
+                from bot.analytics.aggregator import aggregate_daily
+                await aggregate_daily(pool)
+            except Exception as e:
+                logger.error(f"[ANALYTICS] Daily job error: {e}")
+            await asyncio.sleep(86400)
+
+    asyncio.create_task(_hourly_analytics_job())
+    asyncio.create_task(_daily_analytics_job())
+    logger.info("[STARTUP] ✅ Analytics background jobs started")
+    # ───────────────────────────────────────────────────────────────────────
+
     logger.info("=" * 60)
     logger.info("[STARTUP] ✅ All services started")
     logger.info("=" * 60)

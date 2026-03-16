@@ -92,6 +92,38 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
             log.debug(f"Federation ban check failed: {e}")
         # ──────────────────────────────────────────────────────────────────────
 
+        # ── Phase 2: Rule-Based Risk Scorer ───────────────────────────────────
+        try:
+            from bot.ml.risk_scorer import UserRiskScorer
+            from bot.ml.signal_collector import record_spam_signal
+            
+            scorer = UserRiskScorer()
+            result = await scorer.get_or_score(user, chat.id)
+            score = result['score']
+            action = result['action']
+
+            if action == 'ban':
+                await context.bot.ban_chat_member(chat.id, user.id)
+                await context.bot.send_message(
+                    chat.id,
+                    f'🤖 <b>Auto-removed:</b> risk score {score}/100 (likely spam bot).',
+                    parse_mode="HTML"
+                )
+                asyncio.create_task(record_spam_signal(user.id, chat.id, '', 'risk_score', 'spam', 0.9))
+                return
+
+            elif action == 'challenge':
+                # Force captcha regardless of group captcha setting
+                context.bot_data['force_captcha_user_ids'] = \
+                    context.bot_data.get('force_captcha_user_ids', set()) | {user.id}
+
+            elif action == 'flag':
+                # Log for admin review but don't act
+                asyncio.create_task(record_spam_signal(user.id, chat.id, '', 'risk_score', 'uncertain', 0.6))
+        except Exception as e:
+            log.debug(f"Risk scorer failed: {e}")
+        # ──────────────────────────────────────────────────────────────────────
+
         get_settings = context.bot_data.get("get_settings")
         if not get_settings:
             from db.ops.automod import get_group_settings

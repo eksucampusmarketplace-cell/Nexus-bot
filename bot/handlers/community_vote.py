@@ -16,6 +16,7 @@ from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
 from bot.utils.permissions import is_admin
 from bot.logging.log_channel import log_event
+from bot.ml.signal_collector import record_vote_outcome, VoteSession, record_pattern_match
 
 log = logging.getLogger("community_vote")
 
@@ -247,6 +248,19 @@ async def _process_vote_timeout(context, chat_id: int, message_id: int, timeout_
                    WHERE id = $6""",
                 result, action_taken, upvotes, downvotes, abstentions, vote["id"]
             )
+            
+            # Record outcome for ML pipeline
+            session = VoteSession(
+                target_user_id=vote["target_user_id"],
+                chat_id=chat_id,
+                scam_type=vote["scam_type"],
+                result=result,
+                upvotes=upvotes,
+                downvotes=downvotes,
+                target_message_id=message_id,
+                message_text=vote.get("trigger_text")
+            )
+            asyncio.create_task(record_vote_outcome(session))
         
         # Take action if passed
         if result == "passed" and action_taken:
@@ -508,7 +522,7 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         async with db.acquire() as conn:
             # Get vote
             vote = await conn.fetchrow(
-                """SELECT id, target_user_id FROM community_vote_log 
+                """SELECT id, target_user_id, scam_type, trigger_text FROM community_vote_log 
                    WHERE chat_id = $1 AND message_id = $2 AND result IS NULL""",
                 chat_id, message_id
             )
@@ -561,6 +575,19 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
             
             await _execute_vote_action(context, chat_id, vote["target_user_id"], vote_data["action"], vote["id"])
             
+            # Record outcome for ML pipeline
+            session = VoteSession(
+                target_user_id=vote["target_user_id"],
+                chat_id=chat_id,
+                scam_type=vote["scam_type"],
+                result='passed',
+                upvotes=upvotes,
+                downvotes=downvotes,
+                target_message_id=message_id,
+                message_text=vote.get("trigger_text")
+            )
+            asyncio.create_task(record_vote_outcome(session))
+            
             await query.edit_message_text(
                 f"✅ <b>Vote Passed</b>\n\n"
                 f"Action: {vote_data['action']}\n"
@@ -575,6 +602,19 @@ async def handle_vote_callback(update: Update, context: ContextTypes.DEFAULT_TYP
                    WHERE id = $4""",
                 upvotes, downvotes, abstentions, vote["id"]
             )
+            
+            # Record outcome for ML pipeline
+            session = VoteSession(
+                target_user_id=vote["target_user_id"],
+                chat_id=chat_id,
+                scam_type=vote["scam_type"],
+                result='failed',
+                upvotes=upvotes,
+                downvotes=downvotes,
+                target_message_id=message_id,
+                message_text=vote.get("trigger_text")
+            )
+            asyncio.create_task(record_vote_outcome(session))
             
             await query.edit_message_text(
                 f"❌ <b>Vote Failed</b>\n\n"
@@ -607,6 +647,9 @@ async def auto_detect_scam(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     scam_type, scam_description = result
+    
+    # Record signal for ML pipeline
+    asyncio.create_task(record_pattern_match(user.id, chat.id, text, scam_type))
     
     # Check if auto-vote is enabled
     db = context.bot_data.get("db_pool") or context.bot_data.get("db")

@@ -81,7 +81,6 @@ async def get_current_user(request: Request):
         data = validate_init_data(init_data, settings.PRIMARY_BOT_TOKEN)
         user = data["user"]
         user["validated_bot_token"] = settings.PRIMARY_BOT_TOKEN
-        return user
     except Exception as e:
         # If primary bot token fails, try all registered clone bots
         from bot.registry import get_all
@@ -97,14 +96,23 @@ async def get_current_user(request: Request):
                 data = validate_init_data(init_data, bot_token)
                 user = data["user"]
                 user["validated_bot_token"] = bot_token
-                return user
+                break
             except Exception:
                 continue
+        else:
+            logger.error(f"Auth validation failed: {e}")
+            raise HTTPException(
+                status_code=401, detail={"error": "Invalid or expired initData", "code": "AUTH_FAILED"}
+            )
 
-        logger.error(f"Auth validation failed: {e}")
-        raise HTTPException(
-            status_code=401, detail={"error": "Invalid or expired initData", "code": "AUTH_FAILED"}
-        )
+    # FIX D: Inject role into user object
+    from config import settings as _cfg
+    if user.get("id") and _cfg.OWNER_ID and user["id"] == _cfg.OWNER_ID:
+        user["role"] = "owner"
+    else:
+        user["role"] = "admin"
+
+    return user
 
 
 async def require_auth(request: Request):

@@ -3,7 +3,7 @@
  *
  * AutoMod configuration page.
  * Allows users to configure anti-flood, anti-spam, anti-link,
- * captcha verification, and other automod settings.
+ * and other automod settings.
  *
  * Dependencies:
  *   - lib/components.js (Card, Toggle, Badge, EmptyState, showToast)
@@ -18,8 +18,11 @@ import { apiFetch } from '../../lib/api.js?v=1.6.0';
 
 const store = useStore;
 
+// Render guard token
+let _automodRenderToken = 0;
+
 /**
- * Default automod sections configuration
+ * AutoMod sections configuration
  */
 const AUTOMOD_SECTIONS = [
   {
@@ -95,7 +98,7 @@ const AUTOMOD_SECTIONS = [
       { key: 'lock_sticker', label: 'Block stickers', type: 'toggle' },
       { key: 'lock_gif', label: 'Block GIFs', type: 'toggle' },
       { key: 'lock_voice', label: 'Block voice messages', type: 'toggle' },
-      { key: 'lock_file', label: 'Block files', type: 'toggle' },
+      { key: 'lock_document', label: 'Block files', type: 'toggle' },
     ],
   },
   {
@@ -114,9 +117,12 @@ const AUTOMOD_SECTIONS = [
 
 /**
  * Render the AutoMod configuration page
- * @param {HTMLElement} container - Container element to render into
  */
 export async function renderAutomodPage(container) {
+  // Increment render guard token
+  const myToken = ++_automodRenderToken;
+  const isCurrent = () => myToken === _automodRenderToken;
+
   const state = store.getState();
   const chatId = state.activeChatId;
 
@@ -152,21 +158,20 @@ export async function renderAutomodPage(container) {
     </div>
   `;
 
-  let settings = store.getState().settings || {};
+  let settings = {};
 
   try {
-    // Use /settings endpoint to get fully merged settings (DB columns + JSONB)
+    console.debug('[AutoMod] Loading settings from /api/groups/' + finalChatId + '/settings');
     const res = await apiFetch(`/api/groups/${finalChatId}/settings`);
+    console.debug('[AutoMod] Settings loaded:', res);
     settings = res.settings || res || {};
     store.getState().setSettings(settings);
+
+    if (!isCurrent()) return;
   } catch (error) {
     console.error('[AutoMod] Failed to load settings:', error);
-    // Fallback: try the group endpoint
-    try {
-      const group = await apiFetch(`/api/groups/${finalChatId}`);
-      settings = group.settings || {};
-      store.getState().setSettings(settings);
-    } catch (_) {}
+    showToast('Failed to load settings: ' + (error.message || 'unknown error'), 'error');
+    if (!isCurrent()) return;
   }
 
   // Clear loading state
@@ -182,7 +187,9 @@ export async function renderAutomodPage(container) {
 
   // Render templates section DOM
   const templatesContainer = templatesCard;
-  templatesContainer.appendChild(_renderTemplatesSection());
+  templatesContainer.appendChild(_renderTemplatesSection(finalChatId, settings));
+
+  if (!isCurrent()) return;
 
   // AutoMod sections
   AUTOMOD_SECTIONS.forEach(section => {
@@ -193,16 +200,14 @@ export async function renderAutomodPage(container) {
     container.appendChild(sectionCard);
 
     // Render section DOM
-    sectionCard.appendChild(_renderSection(section, settings));
+    sectionCard.appendChild(_renderSection(section, settings, finalChatId));
   });
 }
 
 /**
  * Render templates section
  */
-function _renderTemplatesSection() {
-  const chatId = store.getState().activeChatId;
-
+function _renderTemplatesSection(chatId, currentSettings) {
   const container = document.createElement('div');
   container.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
 
@@ -227,12 +232,15 @@ function _renderTemplatesSection() {
       btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
 
       try {
+        console.debug('[AutoMod] Applying template:', template.id);
+
         // Use the bulk endpoint and send only the template settings
         await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
           method: 'PUT',
           validate: false,
-          body: JSON.stringify({ settings: template.settings || {} }),
+          body: { settings: template.settings || {} },
         });
+        console.debug('[AutoMod] Template applied successfully');
 
         btn.innerHTML = '<span style="color: var(--success);">✅ Applied! Refreshing...</span>';
 
@@ -242,50 +250,32 @@ function _renderTemplatesSection() {
           const newSettings = res.settings || res || {};
           store.getState().setSettings(newSettings);
 
-          // Re-render each section card to reflect new values
-          // Find all section cards (the container has all cards)
-          const allCards = container.querySelectorAll('.card');
-          const sectionCards = Array.from(allCards).slice(1); // skip templates card (first)
-          AUTOMOD_SECTIONS.forEach((section, i) => {
-            if (sectionCards[i]) {
-              // Clear existing content (keep title/subtitle)
-              const existingContent = sectionCards[i].querySelector('[style*="flex-direction: column"]');
-              if (existingContent) {
-                existingContent.innerHTML = '';
-                existingContent.appendChild(_renderSection(section, newSettings));
-              }
-            }
-          });
+          // Re-render the entire page
+          const automodContainer = document.querySelector('#automod-page') || document.querySelector('[data-page="automod"]');
+          if (automodContainer) {
+            await renderAutomodPage(automodContainer);
+          }
         } catch (refreshErr) {
           console.warn('[AutoMod] Could not refresh after template:', refreshErr);
+          showToast('Template applied but refresh failed', 'warning');
         }
-
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.innerHTML = `
-            <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
-              ${template.name}
-            </div>
-            <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
-              ${template.description}
-            </div>
-          `;
-        }, 2500);
       } catch (e) {
-        console.error('Failed to apply template:', e);
+        console.error('[AutoMod] Failed to apply template:', e);
+        showToast('Failed to apply template: ' + (e.message || 'unknown error'), 'error');
         btn.innerHTML = '<span style="color: var(--danger);">❌ Failed</span>';
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.innerHTML = `
-            <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
-              ${template.name}
-            </div>
-            <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
-              ${template.description}
-            </div>
-          `;
-        }, 2000);
       }
+
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.innerHTML = `
+          <div style="font-weight: var(--fw-semibold); font-size: var(--text-sm); color: var(--text-primary)">
+            ${template.name}
+          </div>
+          <div style="font-size: var(--text-xs); color: var(--text-muted); margin-top: 4px">
+            ${template.description}
+          </div>
+        `;
+      }, 2500);
     };
 
     btn.innerHTML = `
@@ -306,21 +296,20 @@ function _renderTemplatesSection() {
 /**
  * Render a single automod section
  */
-function _renderSection(section, settings) {
-  const state = store.getState();
-  const chatId = state.activeChatId || state.groups?.[0]?.chat_id;
-
+function _renderSection(section, settings, chatId) {
   const container = document.createElement('div');
   container.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
 
   const _saveSetting = async (key, val) => {
     try {
+      console.debug(`[AutoMod] Saving ${key} =`, val);
       // Send ONLY the changed key via the bulk endpoint
       await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
         method: 'PUT',
-        validate: false,  // skip inputSanitizer for settings payloads
-        body: JSON.stringify({ settings: { [key]: val } }),
+        validate: false,
+        body: { settings: { [key]: val } },
       });
+      console.debug(`[AutoMod] Saved ${key} successfully`);
       store.getState().updateSetting(key, val);
       showToast('Saved', 'success');
     } catch (e) {
@@ -340,15 +329,38 @@ function _renderSection(section, settings) {
       label.textContent = setting.label;
       label.style.cssText = 'font-size: var(--text-sm); color: var(--text-primary);';
 
+      // For lock toggles, add status label
+      const isLockSetting = setting.key.startsWith('lock_');
+      let statusLabel = null;
+
       const toggle = Toggle({
         checked: value,
         onChange: async (isChecked) => {
           await _saveSetting(setting.key, isChecked);
+          if (statusLabel) {
+            statusLabel.textContent = isChecked ? '🔴 LOCKED' : '🟢 OPEN';
+            statusLabel.style.color = isChecked ? 'var(--danger)' : 'var(--success)';
+          }
         }
       });
 
       row.appendChild(label);
-      row.appendChild(toggle);
+
+      if (isLockSetting) {
+        const statusWrapper = document.createElement('div');
+        statusWrapper.style.cssText = 'display: flex; align-items: center; gap: var(--sp-2);';
+
+        statusLabel = document.createElement('span');
+        statusLabel.textContent = value ? '🔴 LOCKED' : '🟢 OPEN';
+        statusLabel.style.cssText = 'font-size: 10px; font-weight: 600; color: ' + (value ? 'var(--danger)' : 'var(--success)');
+
+        statusWrapper.appendChild(toggle);
+        statusWrapper.appendChild(statusLabel);
+        row.appendChild(statusWrapper);
+      } else {
+        row.appendChild(toggle);
+      }
+
       container.appendChild(row);
     } else if (setting.type === 'number') {
       const row = document.createElement('div');
@@ -374,7 +386,11 @@ function _renderSection(section, settings) {
         border: 1px solid var(--border);
       `;
       input.addEventListener('change', async () => {
-        await _saveSetting(setting.key, parseInt(input.value, 10));
+        const numVal = parseInt(input.value, 10);
+        if (isNaN(numVal)) return;
+        // Clamp to min/max
+        const clampedVal = Math.max(setting.min, Math.min(setting.max, numVal));
+        await _saveSetting(setting.key, clampedVal);
       });
 
       row.appendChild(label);

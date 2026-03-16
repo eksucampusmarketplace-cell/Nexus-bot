@@ -670,4 +670,30 @@ async def get_group_settings(pool, chat_id: int) -> dict:
     res["_modules"] = modules_json
     res["modules"] = modules_json
 
+    # FIX A: Build the "locks" sub-dict from flat lock_* columns
+    # The automod engine reads settings.get("locks", {}) and iterates its keys
+    LOCK_KEY_MAP = {
+        "lock_photo": "photo",
+        "lock_video": "video",
+        "lock_sticker": "sticker",
+        "lock_gif": "gif",
+        "lock_voice": "voice",
+        "lock_audio": "audio",
+        "lock_document": "document",
+        "lock_link": "link",
+        "lock_forward": "forward",
+        "lock_poll": "poll",
+        "lock_contact": "contact",
+        "lock_username": "username",
+        "lock_bot": "bot",
+        "lock_website": "website",
+        "lock_channel": "forward_channel",
+        "lock_hashtag": "hashtag",
+        "lock_unofficial_tg": "unofficial_tg",
+    }
+    res["locks"] = {
+        short: bool(res.get(flat))
+        for flat, short in LOCK_KEY_MAP.items()
+    }
+
     return res

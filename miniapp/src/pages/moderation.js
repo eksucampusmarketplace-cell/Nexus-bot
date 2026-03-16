@@ -724,6 +724,21 @@ function _connectSSE(chatId) {
     const token = encodeURIComponent(window.Telegram?.WebApp?.initData || '');
     _sseSource = new EventSource(`/api/events/moderation/${chatId}?token=${token}`);
 
+    // Bug C fix: Use connected/heartbeat events as onopen fallback
+    _sseSource.addEventListener('connected', () => {
+      if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 1.5s infinite'; }
+      if (label) label.textContent = 'Live';
+    });
+
+    _sseSource.addEventListener('heartbeat', () => {
+      // Keep-alive received, ensure dot is green
+      if (dot && dot.style.background !== 'var(--success)') {
+        dot.style.background = 'var(--success)';
+        dot.style.animation = 'pulse 1.5s infinite';
+      }
+      if (label && label.textContent !== 'Live') label.textContent = 'Live';
+    });
+
     _sseSource.onopen = () => {
       if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 1.5s infinite'; }
       if (label) label.textContent = 'Live';

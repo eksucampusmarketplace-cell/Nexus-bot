@@ -41,6 +41,7 @@ def _extract_init_data(request: Request) -> str | None:
       - Authorization: tma <initData>   (new standard)
       - X-Telegram-Init-Data: <initData>  (legacy header)
       - x-init-data: <initData>           (legacy header variant)
+      - Query param ?token=               (for EventSource/SSE which cannot send headers)
     """
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("tma "):
@@ -51,6 +52,11 @@ def _extract_init_data(request: Request) -> str | None:
         return init_data.strip()
 
     init_data = request.headers.get("x-init-data")
+    if init_data:
+        return init_data.strip()
+
+    # Query param fallback for EventSource (browsers can't set custom headers on SSE)
+    init_data = request.query_params.get("token")
     if init_data:
         return init_data.strip()
 

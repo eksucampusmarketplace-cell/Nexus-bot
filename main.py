@@ -152,6 +152,17 @@ async def lifespan(app: FastAPI):
         app.state.bot = primary_app.bot
         app.state.lazy_manager = None
 
+        # Register webhook for primary bot (Bug D fix)
+        try:
+            webhook_url = f"{settings.RENDER_EXTERNAL_URL}/webhook/{primary_token}"
+            await primary_app.bot.set_webhook(
+                url=webhook_url,
+                allowed_updates=["message", "callback_query", "chat_member", "my_chat_member", "inline_query"]
+            )
+            logger.info(f"[STARTUP] ✅ Primary bot webhook set → {webhook_url}")
+        except Exception as e:
+            logger.warning(f"[STARTUP] ⚠️ Failed to set primary bot webhook: {e}")
+
     except Exception as e:
         logger.critical(f"[STARTUP] ❌ Failed to start primary bot: {e}")
         raise
@@ -188,19 +199,39 @@ async def lifespan(app: FastAPI):
 
                 await registry_register(me.id, clone_app)
                 logger.info(f"[STARTUP] ✅ Started clone bot @{me.username} (ID: {me.id})")
+
+                # Sync clone bot groups that have NULL bot_token_hash (Bug E fix)
+                try:
+                    from bot.utils.crypto import hash_token
+
+                    token_hash = hash_token(clone_token)
+                    async with pool.acquire() as sync_conn:
+                        synced_count = await sync_conn.fetchval(
+                            """UPDATE groups SET bot_token_hash = $1
+                               WHERE chat_id IN (SELECT chat_id FROM clone_bot_groups WHERE bot_id = $2)
+                               AND (bot_token_hash IS NULL OR bot_token_hash != $1)
+                               RETURNING COUNT(*)""",
+                            token_hash, me.id
+                        ) or 0
+                    if synced_count > 0:
+                        logger.info(f"[STARTUP] ✅ Synced {synced_count} groups for clone @{me.username}")
+                except Exception as sync_err:
+                    logger.debug(f"[STARTUP] Clone group sync skipped for @{me.username}: {sync_err}")
+
             except Exception as ce:
                 logger.error(f"[STARTUP] ⚠️ Failed to start clone {clone_row['bot_id']}: {ce}")
                 continue
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Failed to load clones: {e}")
 
-    # Fix 14: Check privacy mode for all bots (including clones)
+    # Fix 14 + Bug F: Check privacy mode for ALL bots (primary + clones)
     for bot_id, bot_app in registry_get_all().items():
         try:
             me = await bot_app.bot.get_me()
             if getattr(me, "can_read_all_group_messages", None) is False:
-                logger.warning(f"[STARTUP] ⚠️ PRIVACY MODE ON for @{me.username}")
+                logger.warning(f"[STARTUP] ⚠️ CLONE @{me.username} has PRIVACY MODE ON")
                 logger.warning("[STARTUP] Fix: @BotFather → /mybots → Bot Settings → Group Privacy → Turn OFF")
+                logger.warning("[STARTUP] Without this: automod, filters, and blacklist will NOT work for this clone")
         except Exception:
             pass
 

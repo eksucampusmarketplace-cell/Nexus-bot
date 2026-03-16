@@ -91,11 +91,18 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     token_hash = hash_token(bot_app.bot.token)
 
     async with db.pool.acquire() as conn:
+        # Bug E fix: Union fallback query - handle groups via bot_token_hash OR clone_bot_groups
         all_groups = await conn.fetch(
             """
-            SELECT chat_id, title, member_count, settings, photo_big, photo_small 
-            FROM groups 
-            WHERE bot_token_hash = $1
+            SELECT g.chat_id, g.title, g.member_count, g.settings, g.photo_big, g.photo_small 
+            FROM groups g
+            WHERE g.bot_token_hash = $1
+            UNION
+            SELECT g.chat_id, g.title, g.member_count, g.settings, g.photo_big, g.photo_small
+            FROM groups g
+            JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
+            JOIN bots b ON b.id = cbg.bot_id
+            WHERE b.token_hash = $1
             ORDER BY title
         """,
             token_hash,

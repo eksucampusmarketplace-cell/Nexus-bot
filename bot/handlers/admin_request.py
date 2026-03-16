@@ -112,6 +112,11 @@ async def handle_admin_mention(update: Update, context: ContextTypes.DEFAULT_TYP
             if entity.type == MessageEntityType.BOT_COMMAND:
                 return
 
+    # Check if message contains an admin mention
+    msg_text = message.text or message.caption or ""
+    if not contains_admin_mention(msg_text):
+        return
+
     # Check if feature is enabled for this group
     try:
         enabled = await db_admin_req.get_group_setting(db, chat.id, "admin_requests_enabled")

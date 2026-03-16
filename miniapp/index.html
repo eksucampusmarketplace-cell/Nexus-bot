@@ -462,6 +462,9 @@
     import { renderNotesPage } from './src/pages/notes.js?v=1.6.0';
     import { renderChannelGatePage } from './src/pages/channel_gate.js?v=1.6.0';
 
+    // Render guards for async page renders
+    let _settingsRenderToken = 0;
+
     // Initialize theme
     initI18n().then(() => console.log('[i18n] Initialized:', window.i18n?.lang));
     ThemeEngine.init();
@@ -1671,9 +1674,10 @@
               checked: enabled,
               onChange: async (v) => {
                 try {
-                  await apiFetch(`/api/groups/${chatId}/settings`, { 
+                  await apiFetch(`/api/groups/${chatId}/settings/bulk`, { 
                     method: 'PUT', 
-                    body: JSON.stringify({ ...settings, [m.settingKey]: v }) 
+                    validate: false,
+                    body: JSON.stringify({ settings: { [m.settingKey]: v } }) 
                   });
                   state.updateSetting(m.settingKey, v);
                   showToast(`${m.name} ${v ? 'enabled' : 'disabled'}`, 'success');
@@ -1699,6 +1703,10 @@
     }
 
     async function renderSettings(container) {
+      // Render guard: cancel any previous in-flight render
+      const myToken = ++_settingsRenderToken;
+      const isCurrent = () => myToken === _settingsRenderToken;
+
       const state = getState();
       const chatId = state.activeChatId;
       const userContext = state.userContext;
@@ -1706,9 +1714,15 @@
       container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-4);';
 
       if (chatId) {
-        let group = null;
-        try { group = await apiFetch(`/api/groups/${chatId}`); } catch (e) {}
-        const groupSettings = group?.settings || state.settings || {};
+        let groupSettings = {};
+        try {
+          const res = await apiFetch(`/api/groups/${chatId}/settings`);
+          groupSettings = res?.settings || res || {};
+          state.setSettings(groupSettings);
+        } catch (e) {
+          console.error('[Settings] Failed to load:', e);
+          groupSettings = state.settings || {};
+        }
 
         // ── 1. GROUP IDENTITY ─────────────────────────────────────────────
         const LANGS = [
@@ -1747,7 +1761,7 @@
         container.appendChild(identityCard);
         identityCard.querySelector('#lang-select').onchange = async (e) => {
           try {
-            await apiFetch(`/api/groups/${chatId}/settings`, { method: 'PUT', body: JSON.stringify({ ...groupSettings, language: e.target.value }) });
+            await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: JSON.stringify({ settings: { language: e.target.value } }) });
             state.updateSetting('language', e.target.value);
             showToast('Language saved', 'success');
           } catch (err) { showToast('Failed to save', 'error'); }
@@ -1760,7 +1774,7 @@
         };
         tzInput.onblur = async () => {
           try {
-            await apiFetch(`/api/groups/${chatId}/settings`, { method: 'PUT', body: JSON.stringify({ ...groupSettings, timezone: tzInput.value }) });
+            await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: JSON.stringify({ settings: { timezone: tzInput.value } }) });
             state.updateSetting('timezone', tzInput.value);
             showToast('Timezone saved', 'success');
           } catch (err) { showToast('Failed to save', 'error'); }
@@ -1808,13 +1822,13 @@
                 <div id="toggle-password-gate"></div>
               </div>
               <div id="password-input-row" style="display:${groupSettings.password_gate_enabled ? 'flex' : 'none'};gap:var(--sp-2);">
-                <input id="group-password-input" class="input" placeholder="Set password..." value="${groupSettings.group_password || ''}">
-                <button class="btn btn-secondary" style="white-space:nowrap;" id="save-password-btn">Save</button>
+                <input id="group-password-input" class="input" placeholder="Set password..." style="min-width:0;flex:1;" value="${groupSettings.group_password || ''}">
+                <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-password-btn">Save</button>
               </div>
               <div>
                 <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Slow Mode</div>
                 <div style="display:flex;flex-wrap:wrap;gap:var(--sp-1);" id="slowmode-pills">
-                  ${slowModeOptions.map(o => `<button data-val="${o.v}" class="btn ${currentSlowMode === o.v ? 'btn-primary' : 'btn-secondary'}" style="padding:var(--sp-1) var(--sp-3);font-size:var(--text-xs);">${o.l}</button>`).join('')}
+                  ${slowModeOptions.map(o => `<button data-val="${o.v}" class="btn ${currentSlowMode === o.v ? 'btn-primary' : 'btn-secondary'}" style="padding:var(--sp-1) var(--sp-3);font-size:var(--text-xs);min-width:48px;flex:0 0 auto;">${o.l}</button>`).join('')}
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
@@ -1832,8 +1846,8 @@
                 <div id="toggle-channel-gate"></div>
               </div>
               <div id="channel-gate-input-row" style="display:${groupSettings.channel_gate_enabled ? 'flex' : 'none'};gap:var(--sp-2);">
-                <input id="channel-username-input" class="input" placeholder="@channelname" value="${groupSettings.channel_username || ''}">
-                <button class="btn btn-secondary" style="white-space:nowrap;" id="save-channel-btn">Save</button>
+                <input id="channel-username-input" class="input" placeholder="@channelname" style="min-width:0;flex:1;" value="${groupSettings.channel_username || ''}">
+                <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-channel-btn">Save</button>
               </div>
             </div>
           `
@@ -1867,6 +1881,7 @@
             const seconds = parseInt(btn.dataset.val);
             try {
               await apiFetch(`/api/groups/${chatId}/actions/slowmode`, { method: 'POST', body: JSON.stringify({ seconds }) });
+              if (!isCurrent()) return;
               await _updateGroupSetting('slow_mode_delay', seconds);
               secCard.querySelectorAll('#slowmode-pills button').forEach(b => {
                 b.className = `btn ${parseInt(b.dataset.val) === seconds ? 'btn-primary' : 'btn-secondary'}`;
@@ -1900,14 +1915,14 @@
               <div>
                 <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Channel ID</label>
                 <div style="display:flex;gap:var(--sp-2);">
-                  <input type="text" id="input-log-channel" class="input" placeholder="-100..." value="${groupSettings.log_channel_id || ''}">
-                  <button class="btn btn-secondary" style="white-space:nowrap;" id="save-log-channel-btn">Save</button>
+                  <input type="text" id="input-log-channel" class="input" style="min-width:0;flex:1;" placeholder="-100..." value="${groupSettings.log_channel_id || ''}">
+                  <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-log-channel-btn">Save</button>
                   <button class="btn btn-secondary" style="white-space:nowrap;" id="test-log-channel-btn">Test</button>
                 </div>
               </div>
               <div>
                 <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">What to log</div>
-                <div style="display:flex;flex-wrap:wrap;gap:var(--sp-2);" id="log-events-list">
+                <div style="display:flex;flex-wrap:wrap;gap:var(--sp-3);row-gap:var(--sp-3);" id="log-events-list">
                   ${LOG_EVENTS.map(ev => `
                     <label style="display:flex;align-items:center;gap:var(--sp-1);font-size:var(--text-sm);cursor:pointer;">
                       <input type="checkbox" data-ev="${ev}" ${currentLogEvents.includes(ev) ? 'checked' : ''}> ${ev.charAt(0).toUpperCase() + ev.slice(1)}
@@ -2107,11 +2122,19 @@
     async function _updateGroupSetting(key, val) {
       const state = getState();
       const chatId = state.activeChatId;
+      if (!chatId) { showToast('No group selected', 'error'); return; }
       try {
-        await apiFetch(`/api/groups/${chatId}/settings`, { method: 'PUT', body: JSON.stringify({ ...state.settings, [key]: val }) });
+        await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
+          method: 'PUT',
+          validate: false,
+          body: JSON.stringify({ settings: { [key]: val } }),
+        });
         state.updateSetting(key, val);
-        showToast('Setting saved', 'success');
-      } catch (e) { showToast('Failed', 'error'); }
+        showToast('Saved', 'success');
+      } catch (e) {
+        console.error(`[Settings] Failed to save ${key}:`, e);
+        showToast('Failed to save: ' + (e.message || 'unknown'), 'error');
+      }
     }
 
     async function renderCustomMessagesSection(container, apiUrl) {

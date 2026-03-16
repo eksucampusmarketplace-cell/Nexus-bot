@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -9,6 +10,7 @@ from db.ops.groups import get_group, get_user_managed_groups, update_group_setti
 from db.ops.logs import get_recent_logs
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("")

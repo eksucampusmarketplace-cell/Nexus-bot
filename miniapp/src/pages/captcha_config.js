@@ -91,7 +91,7 @@ export async function renderCaptchaConfigPage(container) {
   container.appendChild(section);
 
   // Load current settings
-  loadCaptchaSettings(section);
+  loadCaptchaSettings(section, chatId);
 
   // Toggle functionality
   const toggle = section.querySelector('#captcha-toggle');
@@ -123,7 +123,7 @@ export async function renderCaptchaConfigPage(container) {
   };
 }
 
-async function loadCaptchaSettings(section) {
+async function loadCaptchaSettings(section, chatId) {
   try {
     const settings = await apiFetch(`/api/groups/${chatId}/captcha`);
     if (settings) {

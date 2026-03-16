@@ -231,8 +231,6 @@ function _renderTemplatesSection() {
       transition: all var(--dur-fast);
     `;
 
-    const templateSettings = RULE_TEMPLATES.reduce((acc, t) => ({ ...acc, [t.id]: t.settings }), {});
-
     btn.onclick = async () => {
       btn.disabled = true;
       btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
@@ -240,7 +238,7 @@ function _renderTemplatesSection() {
       try {
         const response = await apiFetch(`/api/groups/${chatId}/settings`, {
           method: 'PUT',
-          body: JSON.stringify(templateSettings[template.id] || {}),
+          body: JSON.stringify(template.settings || {}),
         });
         if (response === null || response === undefined) throw new Error('No response');
 

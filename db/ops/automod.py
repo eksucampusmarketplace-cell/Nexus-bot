@@ -341,6 +341,37 @@ async def update_group_setting(pool, chat_id: int, key: str, value):
         "log_include_preview",
         "log_include_userid",
         "inline_mode_enabled",
+        # Media locks
+        "lock_photo",
+        "lock_video",
+        "lock_sticker",
+        "lock_gif",
+        "lock_voice",
+        "lock_audio",
+        "lock_document",
+        # Communication locks
+        "lock_link",
+        "lock_forward",
+        "lock_poll",
+        "lock_contact",
+        # Additional content locks
+        "lock_username",
+        "lock_bot",
+        "lock_bot_inviter",
+        "lock_website",
+        "lock_channel",
+        # Content filters
+        "lock_porn",
+        "lock_hashtag",
+        "lock_unofficial_tg",
+        "lock_userbots",
+        # Anti-flood
+        "antiflood",
+        "antiflood_limit",
+        "antiflood_window",
+        "antiflood_action",
+        # Anti-spam
+        "antispam",
     }
 
     async with pool.acquire() as conn:
@@ -420,6 +451,37 @@ async def bulk_update_group_settings(pool, chat_id: int, settings: dict):
         "log_include_preview",
         "log_include_userid",
         "inline_mode_enabled",
+        # Media locks
+        "lock_photo",
+        "lock_video",
+        "lock_sticker",
+        "lock_gif",
+        "lock_voice",
+        "lock_audio",
+        "lock_document",
+        # Communication locks
+        "lock_link",
+        "lock_forward",
+        "lock_poll",
+        "lock_contact",
+        # Additional content locks
+        "lock_username",
+        "lock_bot",
+        "lock_bot_inviter",
+        "lock_website",
+        "lock_channel",
+        # Content filters
+        "lock_porn",
+        "lock_hashtag",
+        "lock_unofficial_tg",
+        "lock_userbots",
+        # Anti-flood
+        "antiflood",
+        "antiflood_limit",
+        "antiflood_window",
+        "antiflood_action",
+        # Anti-spam
+        "antispam",
     }
 
     column_updates = {}

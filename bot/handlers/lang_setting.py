@@ -17,6 +17,7 @@ from bot.utils.localization import (
     get_user_language
 )
 from bot.utils.permissions import is_admin
+from bot.utils.lang_detect import set_user_lang_manual
 
 log = logging.getLogger("lang_setting")
 
@@ -147,9 +148,10 @@ async def handle_lang_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     db = context.bot_data.get("db_pool") or context.bot_data.get("db")
     
     if action == "setlang":
-        # Set user language
+        # Set user language manually - this sets auto_detected=FALSE
+        # so it will NEVER be overridden by auto-detection
         if db:
-            success = await set_user_language(db, user.id, lang_code)
+            success = await set_user_lang_manual(db, user.id, lang_code)
             if not success:
                 await query.edit_message_text("❌ Failed to set language.")
                 return
@@ -157,10 +159,11 @@ async def handle_lang_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text(
             f"✅ <b>Language Updated</b>\n\n"
             f"Your language is now set to: <b>{SUPPORTED_LANGUAGES[lang_code]}</b>\n\n"
-            f"This will be used for all bot messages to you.",
+            f"This will be used for all bot messages to you.\n"
+            f"<i>Your preference is saved and won't change automatically.</i>",
             parse_mode="HTML"
         )
-        log.info(f"[LANG] User {user.id} set language to {lang_code}")
+        log.info(f"[LANG] User {user.id} set manual language to {lang_code} (auto_detected=FALSE)")
         
     elif action == "setgrouplang":
         # Set group language

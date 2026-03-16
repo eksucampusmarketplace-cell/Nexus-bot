@@ -532,14 +532,29 @@ async function _renderLocksTab(container, chatId) {
     grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);';
 
     types.filter(t => t.group === groupId).forEach(lock => {
+      const isActive = !!locks[lock.id];
       const row = document.createElement('div');
       row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);';
-      row.innerHTML = `<span style="font-size:var(--text-sm);">${lock.label}</span>`;
+      row.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <span style="font-size:var(--text-sm);">${lock.label}</span>
+          <span class="lock-status-${lock.id}" style="
+            font-size:10px;font-weight:600;
+            color:${isActive ? 'var(--danger)' : 'var(--text-muted)'};
+          ">${isActive ? '🔴 LOCKED' : '🟢 OPEN'}</span>
+        </div>
+      `;
 
       const toggle = Toggle({
-        checked: !!locks[lock.id],
+        checked: isActive,
         onChange: (checked) => {
           pendingLocks[lock.id] = checked;
+          // Update status label immediately (no wait for save)
+          const statusEl = row.querySelector('.lock-status-' + lock.id);
+          if (statusEl) {
+            statusEl.textContent = checked ? '🔴 LOCKED' : '🟢 OPEN';
+            statusEl.style.color = checked ? 'var(--danger)' : 'var(--text-muted)';
+          }
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(saveLocks, 300);
         }

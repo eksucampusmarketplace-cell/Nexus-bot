@@ -306,23 +306,55 @@ async def get_user_warnings(
 @router.post("/warnings")
 async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
-    async with db.pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO warnings (chat_id, user_id, reason, issued_by) VALUES ($1,$2,$3,$4)",
-            chat_id,
-            req.user_id,
-            req.reason or "",
-            user.get("id", 0),
-        )
-        await conn.execute(
-            "INSERT INTO mod_logs (chat_id, target_id, action, reason, admin_id) VALUES ($1,$2,'warn',$3,$4)",
-            chat_id,
-            req.user_id,
-            req.reason or "",
-            user.get("id", 0),
-        )
+    admin_name = user.get("first_name", "Admin")
+    reason = req.reason or "Warned via Mini App"
+
+    # 1. Write to DB with proper error handling
+    try:
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO warnings (chat_id, user_id, reason, issued_by) VALUES ($1,$2,$3,$4)",
+                chat_id, req.user_id, reason, user.get("id", 0)
+            )
+            await conn.execute(
+                "INSERT INTO mod_logs (chat_id, target_id, action, reason, admin_id) "
+                "VALUES ($1,$2,'warn',$3,$4)",
+                chat_id, req.user_id, reason, user.get("id", 0)
+            )
+            warn_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM warnings WHERE chat_id=$1 AND user_id=$2 AND is_active=TRUE",
+                chat_id, req.user_id
+            )
+    except Exception as e:
+        logger.error(f"[warn_user] DB error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {e}")
+
+    # 2. Send Telegram message to the group
+    from bot.registry import get_all
+    target_name = f"User {req.user_id}"
+    bots = get_all()
+    for bid, app in bots.items():
+        try:
+            member = await app.bot.get_chat_member(chat_id, req.user_id)
+            target_name = member.user.mention_html()
+            warn_text = (
+                f"⚠️ <b>Warning Issued</b>\n"
+                f"User: {target_name}\n"
+                f"Reason: {reason}\n"
+                f"Warnings: {warn_count}\n"
+                f"By: {admin_name}"
+            )
+            await app.bot.send_message(
+                chat_id=chat_id,
+                text=warn_text,
+                parse_mode="HTML"
+            )
+            break
+        except Exception as tg_err:
+            logger.warning(f"[warn_user] Telegram send failed: {tg_err}")
+
     await publish_event(chat_id, "warn_change", {"user_id": req.user_id, "action": "warn"})
-    return {"ok": True}
+    return {"ok": True, "warn_count": warn_count}
 
 
 @router.delete("/warnings/{warning_id}")
@@ -632,6 +664,15 @@ async def add_blacklist_word(chat_id: int, body: dict, user: dict = Depends(get_
     import json
 
     async with db.pool.acquire() as conn:
+        # 1. Write to the blacklist TABLE (this is what message_guard reads)
+        await conn.execute(
+            """INSERT INTO blacklist (chat_id, word, action, added_by, added_at)
+               VALUES ($1, $2, $3, $4, NOW())
+               ON CONFLICT (chat_id, word) DO NOTHING""",
+            chat_id, word, "delete", user.get("id", 0)
+        )
+
+        # 2. ALSO write to settings JSON (for Mini App display)
         row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id=$1", chat_id)
         settings = row["settings"] if row else {}
         if isinstance(settings, str):
@@ -655,6 +696,13 @@ async def remove_blacklist_word(chat_id: int, word: str, user: dict = Depends(ge
     import json
 
     async with db.pool.acquire() as conn:
+        # 1. Delete from blacklist TABLE
+        await conn.execute(
+            "DELETE FROM blacklist WHERE chat_id=$1 AND word=$2",
+            chat_id, word.lower()
+        )
+
+        # 2. Also remove from settings JSON
         row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id=$1", chat_id)
         settings = row["settings"] if row else {}
         if isinstance(settings, str):
@@ -663,7 +711,7 @@ async def remove_blacklist_word(chat_id: int, word: str, user: dict = Depends(ge
             except Exception:
                 settings = {}
         words = settings.get("blacklist_words", [])
-        settings["blacklist_words"] = [w for w in words if w != word]
+        settings["blacklist_words"] = [w for w in words if w != word.lower()]
         await conn.execute(
             "UPDATE groups SET settings=$1 WHERE chat_id=$2", json.dumps(settings), chat_id
         )

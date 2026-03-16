@@ -32,6 +32,11 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if rank >= RANK_ADMIN:
         return
 
+    # Guard: ensure db.pool is available
+    if not db or not db.pool:
+        log.warning("[MSG_GUARD] db.pool is None — skipping checks for chat %s", chat_id)
+        return
+
     # ── Passive Language Detection (v21) ───────────────────────────────────
     # Run in background - non-blocking
     message_text = update.effective_message.text or update.effective_message.caption or ""
@@ -120,41 +125,50 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.debug(f"Flood check failed: {e}")
 
-    # 3. Lock checks (support both old and new column names)
+    # 3. Lock checks (using new canonical column names)
     locks = await db.fetchrow("SELECT * FROM locks WHERE chat_id = $1", chat_id)
     if locks:
         delete = False
 
-        # Check old column names first, then new ones for compatibility
-        media_locked = locks.get("media") or locks.get("photo") or locks.get("video")
-        stickers_locked = locks.get("stickers") or locks.get("sticker")
-        gifs_locked = locks.get("gifs") or locks.get("gif")
-        links_locked = locks.get("links") or locks.get("link")
-        forwards_locked = locks.get("forwards") or locks.get("forward")
-        polls_locked = locks.get("polls") or locks.get("poll")
-        voice_locked = locks.get("voice")
-        video_notes_locked = locks.get("video_notes")
-        contacts_locked = locks.get("contacts") or locks.get("contact")
+        # Use new canonical names (matches what PUT /api/groups/{id}/locks saves)
+        photo_locked   = bool(locks.get("photo"))
+        video_locked   = bool(locks.get("video"))
+        sticker_locked = bool(locks.get("sticker"))
+        gif_locked     = bool(locks.get("gif"))
+        voice_locked   = bool(locks.get("voice"))
+        audio_locked   = bool(locks.get("audio"))
+        document_locked = bool(locks.get("document"))
+        link_locked    = bool(locks.get("link"))
+        forward_locked = bool(locks.get("forward"))
+        poll_locked    = bool(locks.get("poll"))
+        contact_locked = bool(locks.get("contact"))
+        video_notes_locked = bool(locks.get("video_note"))
 
-        if media_locked and (message.photo or message.video or message.audio or message.document):
+        if photo_locked and message.photo:
             delete = True
-        elif stickers_locked and message.sticker:
+        elif video_locked and message.video:
             delete = True
-        elif gifs_locked and message.animation:
+        elif audio_locked and message.audio:
             delete = True
-        elif links_locked and (
-            message.entities and any(e.type in ["url", "text_link"] for e in message.entities)
-        ):
+        elif document_locked and message.document:
             delete = True
-        elif forwards_locked and message.forward_from_chat:
+        elif sticker_locked and message.sticker:
             delete = True
-        elif polls_locked and message.poll:
+        elif gif_locked and message.animation:
             delete = True
         elif voice_locked and message.voice:
             delete = True
-        elif video_notes_locked and message.video_note:
+        elif link_locked and (
+            message.entities and any(e.type in ["url", "text_link"] for e in message.entities)
+        ):
             delete = True
-        elif contacts_locked and message.contact:
+        elif forward_locked and message.forward_from_chat:
+            delete = True
+        elif poll_locked and message.poll:
+            delete = True
+        elif contact_locked and message.contact:
+            delete = True
+        elif video_notes_locked and message.video_note:
             delete = True
 
         if delete:
@@ -189,7 +203,7 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         await message.reply_text(f"🚫 Blacklisted word detected. You are banned.")
                         return
     except Exception as e:
-        log.debug(f"Blacklist check error: {e}")
+        log.error(f"[MSG_GUARD] Blacklist check FAILED for chat {chat_id}: {e}", exc_info=True)
 
     # 5. Filter auto-reply check (word-boundary matching to avoid false positives)
     try:
@@ -219,7 +233,7 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                 await _send_filter_reply(message, reply)
                             break
     except Exception as e:
-        log.debug(f"Filter check error: {e}")
+        log.error(f"[MSG_GUARD] Filter check FAILED for chat {chat_id}: {e}", exc_info=True)
 
     # ── XP Award ─────────────────────────────────────────────────────────
     # Award XP for sending a message (non-blocking, create_task)

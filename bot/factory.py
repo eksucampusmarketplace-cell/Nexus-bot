@@ -571,6 +571,57 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(h)
     logger.info("[FACTORY] Engagement handlers registered")
 
+    # ── Sync command handler (Bug E fix) ────────────────────────────────────
+    async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Sync group with bot — fixes groups added before webhooks were configured."""
+        chat = update.effective_chat
+        user = update.effective_user
+        
+        if not chat or chat.type not in ["group", "supergroup"]:
+            await update.message.reply_text("❌ This command only works in groups.")
+            return
+        
+        # Check if user is admin
+        try:
+            member = await context.bot.get_chat_member(chat.id, user.id)
+            if member.status not in ["creator", "administrator"]:
+                await update.message.reply_text("❌ Only admins can use this command.")
+                return
+        except Exception:
+            await update.message.reply_text("❌ Could not verify admin status.")
+            return
+        
+        # Get bot info
+        try:
+            me = await context.bot.get_me()
+            from bot.utils.crypto import hash_token
+            token_hash = hash_token(context.bot.token)
+            
+            # Upsert group with bot_token_hash
+            pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+            async with pool.acquire() as conn:
+                await conn.execute(
+                    """INSERT INTO groups (chat_id, title, bot_token_hash, added_at)
+                       VALUES ($1, $2, $3, NOW())
+                       ON CONFLICT (chat_id) DO UPDATE 
+                       SET bot_token_hash = EXCLUDED.bot_token_hash,
+                           title = EXCLUDED.title""",
+                    chat.id, chat.title or "Unknown", token_hash
+                )
+            
+            await update.message.reply_text(
+                f"✅ Group synced successfully!\n\n"
+                f"Bot: @{me.username}\n"
+                f"Group: {chat.title}\n"
+                f"The group should now appear in your miniapp."
+            )
+        except Exception as e:
+            logger.error(f"[SYNC] Failed to sync group: {e}")
+            await update.message.reply_text(f"❌ Sync failed: {str(e)[:100]}")
+
+    app.add_handler(CommandHandler("sync", cmd_sync, filters=GROUP))
+    logger.info("[FACTORY] Sync command handler registered")
+
     # ── CAPTCHA Callback Handlers ──────────────────────────────────────────
     # CRITICAL: Register captcha callback handlers so button clicks work
     from bot.handlers.captcha_callback import handle_captcha_callback

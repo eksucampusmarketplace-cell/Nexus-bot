@@ -128,21 +128,33 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.debug(f"Blacklist check error: {e}")
 
-    # 5. Filter auto-reply check
+    # 5. Filter auto-reply check (word-boundary matching to avoid false positives)
     try:
         if text:
             async with db.pool.acquire() as conn:
-                # Try reply_content first, then fall back to response
-                filter_row = await conn.fetchrow(
-                    """SELECT keyword, reply_content, response FROM filters 
-                       WHERE chat_id = $1 AND $2 ILIKE '%' || keyword || '%' 
-                       LIMIT 1""",
-                    chat_id, text
+                # Get all filters for this group
+                filter_rows = await conn.fetch(
+                    "SELECT keyword, reply_content, response FROM filters WHERE chat_id = $1",
+                    chat_id
                 )
-                if filter_row:
-                    reply = filter_row.get("reply_content") or filter_row.get("response") or ""
-                    if reply:
-                        await _send_filter_reply(message, reply)
+                for filter_row in filter_rows:
+                    keyword = filter_row["keyword"]
+                    # Use word-boundary regex for alpha keywords; substring match for non-alpha
+                    if keyword.isalpha():
+                        import re
+                        pattern = r'(?<![a-zA-Z0-9_])' + re.escape(keyword) + r'(?![a-zA-Z0-9_])'
+                        if re.search(pattern, text, re.IGNORECASE):
+                            reply = filter_row.get("reply_content") or filter_row.get("response") or ""
+                            if reply:
+                                await _send_filter_reply(message, reply)
+                            break
+                    else:
+                        # Non-alpha keywords use substring match (original behavior)
+                        if keyword.lower() in text.lower():
+                            reply = filter_row.get("reply_content") or filter_row.get("response") or ""
+                            if reply:
+                                await _send_filter_reply(message, reply)
+                            break
     except Exception as e:
         log.debug(f"Filter check error: {e}")
 

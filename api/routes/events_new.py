@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 
 from api.auth import get_current_user
@@ -12,13 +12,18 @@ log = logging.getLogger("sse")
 router = APIRouter(prefix="/api/events")
 
 
-@router.get("/{chat_id}")
 @router.get("/moderation/{chat_id}")
-async def moderation_events(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
+async def moderation_events(
+    chat_id: int, request: Request, user: dict = Depends(get_current_user), token: str = Query("")
+):
     """
     SSE endpoint for moderation events.
-    Supports both /api/events/{chat_id} and /api/events/moderation/{chat_id} paths.
+    Supports path /api/events/moderation/{chat_id} with optional token query param.
     Falls back to in-memory EventBus if Redis is unavailable.
+
+    Bug #7 fix: Removed duplicate @router.get("/{chat_id}") decorator that was
+    shadowing the query-param SSE endpoint in events.py.
+    Bug #10 fix: Added optional token query param for compatibility.
     """
     redis = getattr(request.app.state, "redis", None)
 
@@ -57,23 +62,23 @@ async def moderation_events(chat_id: int, request: Request, user: dict = Depends
         else:
             # Fallback to in-memory EventBus
             yield f'data: {json.dumps({"type": "connected", "chat_id": chat_id, "mode": "memory"})}\n\n'
-            
+
             # Create a queue for this connection
             queue = asyncio.Queue()
-            
+
             async def handler(payload):
                 await queue.put(payload)
-            
+
             EventBus.subscribe(chat_id, handler)
-            
+
             try:
                 while True:
                     if await request.is_disconnected():
                         break
-                    
+
                     try:
                         payload = await asyncio.wait_for(queue.get(), timeout=30.0)
-                        yield f'data: {json.dumps(payload)}\n\n'
+                        yield f"data: {json.dumps(payload)}\n\n"
                     except asyncio.TimeoutError:
                         yield f'data: {json.dumps({"type": "heartbeat"})}\n\n'
             except Exception as e:

@@ -117,25 +117,13 @@ ALTER TABLE groups
     ADD COLUMN IF NOT EXISTS persona_emoji BOOLEAN DEFAULT TRUE;
 
 -- Owner error notification preferences
-CREATE TABLE IF NOT EXISTS owner_error_prefs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id BIGINT NOT NULL,
-    error_type TEXT NOT NULL,
-    notify_dm BOOLEAN DEFAULT TRUE,
-    notify_channel BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(owner_id, error_type)
-);
+-- MOVED to add_error_notifications.sql (Bug #9 fix)
+-- CREATE TABLE IF NOT EXISTS owner_error_prefs (...)
 
 -- Error notifications log
-CREATE TABLE IF NOT EXISTS error_notifications (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id BIGINT NOT NULL,
-    error_type TEXT NOT NULL,
-    message TEXT NOT NULL,
-    sent_at TIMESTAMPTZ DEFAULT NOW(),
-    acknowledged BOOLEAN DEFAULT FALSE
-);
+-- MOVED to add_error_notifications.sql (Bug #9 fix)
+-- CREATE TABLE IF NOT EXISTS error_notifications (...)
 
 -- Index for error notifications
-CREATE INDEX IF NOT EXISTS idx_error_notifications_owner ON error_notifications(owner_id);
+-- MOVED to add_error_notifications.sql (Bug #9 fix)
+-- CREATE INDEX IF NOT EXISTS idx_error_notifications_owner ON error_notifications(owner_id);

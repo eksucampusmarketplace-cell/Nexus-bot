@@ -24,10 +24,11 @@ Logs prefix: [SSE]
 import asyncio
 import json
 import logging
-from datetime import timezone, datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
+
 from config import settings
 
 log = logging.getLogger("sse")
@@ -87,9 +88,12 @@ def push_event(owner_id: int, data: dict):
         asyncio.create_task(EventBus.publish(chat_id, data.get("type", "notification"), data))
 
 
-@router.get("/api/events")
+@router.get("")
 async def sse_events(request: Request, chat_id: int, token: str = ""):
-    """SSE stream for a specific chat_id."""
+    """
+    SSE stream for a specific chat_id.
+    Registered at /api/events (query param version).
+    """
     # Validate token
     from api.auth import validate_init_data
 

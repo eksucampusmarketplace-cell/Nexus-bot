@@ -5,6 +5,7 @@ Unified new member join handler.
 """
 
 import logging
+import asyncio
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -37,6 +38,27 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
             await upsert_user(user.id, chat.id, user.username, user.first_name)
         except Exception as e:
             log.debug(f"Failed to upsert user on join: {e}")
+        
+        # ── Language Auto-Detection (v21) ─────────────────────────────────────
+        # Run language detection in background - don't block join handling
+        if db:
+            try:
+                from bot.utils.lang_detect import auto_detect_and_store
+                
+                asyncio.create_task(
+                    auto_detect_and_store(
+                        db=db,
+                        user_id=user.id,
+                        chat_id=chat.id,
+                        telegram_code=user.language_code,
+                        first_name=user.first_name,
+                        last_name=user.last_name
+                    )
+                )
+            except Exception as e:
+                log.debug(f"Language detection failed: {e}")
+        # ─────────────────────────────────────────────────────────────────────
+        
         # Note: sometimes old_status is restricted if they were muted/restricted by bot before and left/rejoined
 
         # ── Federation Ban Check (v21) ─────────────────────────────────────────

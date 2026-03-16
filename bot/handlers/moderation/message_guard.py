@@ -1,5 +1,6 @@
 import logging
 import re
+import asyncio
 from datetime import datetime, timedelta
 
 from telegram import ChatPermissions, Update
@@ -15,9 +16,10 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Runs on every group message.
     1. Is sender an admin? -> skip all checks
-    2. Lock checks (media, stickers, links etc)
-    3. Blacklist check
-    4. Filter auto-reply check
+    2. Language auto-detection (passive, non-blocking)
+    3. Lock checks (media, stickers, links etc)
+    4. Blacklist check
+    5. Filter auto-reply check
     """
     if not update.effective_chat or update.effective_chat.type not in ["group", "supergroup"]:
         return
@@ -29,6 +31,31 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rank = await get_user_rank(context.bot, update.effective_chat.id, update.effective_user.id)
     if rank >= RANK_ADMIN:
         return
+
+    # ── Passive Language Detection (v21) ───────────────────────────────────
+    # Run in background - non-blocking
+    message_text = update.effective_message.text or update.effective_message.caption or ""
+    if message_text and db:
+        try:
+            from bot.utils.lang_detect import auto_detect_and_store
+            
+            pool = context.bot_data.get("db") or db.pool
+            if pool:
+                asyncio.create_task(
+                    auto_detect_and_store(
+                        db=pool,
+                        user_id=update.effective_user.id,
+                        chat_id=update.effective_chat.id,
+                        telegram_code=update.effective_user.language_code,
+                        first_name=update.effective_user.first_name,
+                        last_name=update.effective_user.last_name,
+                        message_text=message_text
+                    )
+                )
+        except Exception:
+            # Never block message processing for language detection
+            pass
+    # ───────────────────────────────────────────────────────────────────────
 
     chat_id = update.effective_chat.id
     message = update.effective_message

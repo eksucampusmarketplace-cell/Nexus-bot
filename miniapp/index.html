@@ -447,6 +447,7 @@
     import { Card, Toggle, Badge, Avatar, StatCard, EmptyState, SearchInput, MemberRow, showToast } from './lib/components.js?v=1.6.0';
     import { useStore } from './store/index.js?v=1.6.0';
     import { apiFetch } from './lib/api.js?v=1.6.0';
+    import { initI18n, t, isRTL } from './lib/i18n.js?v=1.6.0';
     import { renderAutomodPage } from './src/pages/automod.js?v=1.6.0';
     import { renderCommandsPage } from './src/pages/commands.js?v=1.6.0';
     import { renderEngagementPage } from './src/pages/engagement.js?v=1.6.0';
@@ -461,6 +462,7 @@
     import { renderChannelGatePage } from './src/pages/channel_gate.js?v=1.6.0';
 
     // Initialize theme
+    initI18n().then(() => console.log('[i18n] Initialized:', window.i18n?.lang));
     ThemeEngine.init();
 
     // Store helpers

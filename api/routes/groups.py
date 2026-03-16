@@ -163,7 +163,7 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
 
 
 @router.put("/{chat_id}/settings/bulk")
-async def bulk_update_settings(chat_id: int, request: Request):
+async def bulk_update_settings(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Bulk update multiple settings at once (for templates)."""
     body = await request.json()
     settings = body.get("settings", {})

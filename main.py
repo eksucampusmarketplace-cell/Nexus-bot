@@ -471,7 +471,7 @@ try:
     # Routes with full paths defined in the router (no prefix needed)
     app.include_router(automod.router, tags=["automod"])
     # Bug #2 fix: Register events.py router for SSE query-param endpoint
-    app.include_router(events.router, tags=["sse"])
+    app.include_router(events.router, prefix="/api/events", tags=["sse"])
     app.include_router(events_new.router, tags=["events_new"])
     app.include_router(scheduler.router, tags=["scheduler"])
     app.include_router(log_channel.router, tags=["log_channel"])

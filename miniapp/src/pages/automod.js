@@ -251,9 +251,11 @@ function _renderTemplatesSection(chatId, currentSettings) {
           store.getState().setSettings(newSettings);
 
           // Re-render the entire page
-          const automodContainer = document.querySelector('#automod-page') || document.querySelector('[data-page="automod"]');
+          const automodContainer = document.getElementById('page-automod');
           if (automodContainer) {
             await renderAutomodPage(automodContainer);
+          } else {
+            showToast('Template applied! Reload page to see changes.', 'success');
           }
         } catch (refreshErr) {
           console.warn('[AutoMod] Could not refresh after template:', refreshErr);

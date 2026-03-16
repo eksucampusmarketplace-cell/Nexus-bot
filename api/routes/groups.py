@@ -131,6 +131,34 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
         except Exception as e:
             logger.warning(f"Failed to sync locks to locks table: {e}")
 
+    # NEW: Sync any flat lock_* keys to the locks table
+    LOCK_KEY_MAP = {
+        'lock_photo': 'photo',     'lock_video': 'video',
+        'lock_sticker': 'sticker', 'lock_gif': 'gif',
+        'lock_voice': 'voice',     'lock_audio': 'audio',
+        'lock_document': 'document', 'lock_link': 'link',
+        'lock_forward': 'forward', 'lock_poll': 'poll',
+        'lock_contact': 'contact',
+    }
+    lock_updates = {
+        LOCK_KEY_MAP[k]: v
+        for k, v in incoming.items()
+        if k in LOCK_KEY_MAP and isinstance(v, bool)
+    }
+    if lock_updates:
+        try:
+            cols = ', '.join(lock_updates.keys())
+            placeholders = ', '.join([f'${i+2}' for i in range(len(lock_updates))])
+            updates = ', '.join([f'{k}=EXCLUDED.{k}' for k in lock_updates.keys()])
+            async with db.pool.acquire() as conn:
+                await conn.execute(
+                    f'INSERT INTO locks (chat_id, {cols}) VALUES ($1, {placeholders})'
+                    f' ON CONFLICT (chat_id) DO UPDATE SET {updates}',
+                    chat_id, *lock_updates.values()
+                )
+        except Exception as e:
+            logger.warning(f'Lock sync failed: {e}')
+
     return {"status": "ok"}
 
 
@@ -143,6 +171,34 @@ async def bulk_update_settings(chat_id: int, request: Request):
     from db.ops.automod import bulk_update_group_settings
 
     await bulk_update_group_settings(db.pool, chat_id, settings)
+
+    # Sync any flat lock_* keys to the locks table
+    LOCK_KEY_MAP = {
+        'lock_photo': 'photo',     'lock_video': 'video',
+        'lock_sticker': 'sticker', 'lock_gif': 'gif',
+        'lock_voice': 'voice',     'lock_audio': 'audio',
+        'lock_document': 'document', 'lock_link': 'link',
+        'lock_forward': 'forward', 'lock_poll': 'poll',
+        'lock_contact': 'contact',
+    }
+    lock_updates = {
+        LOCK_KEY_MAP[k]: v
+        for k, v in settings.items()
+        if k in LOCK_KEY_MAP and isinstance(v, bool)
+    }
+    if lock_updates:
+        try:
+            cols = ', '.join(lock_updates.keys())
+            placeholders = ', '.join([f'${i+2}' for i in range(len(lock_updates))])
+            updates = ', '.join([f'{k}=EXCLUDED.{k}' for k in lock_updates.keys()])
+            async with db.pool.acquire() as conn:
+                await conn.execute(
+                    f'INSERT INTO locks (chat_id, {cols}) VALUES ($1, {placeholders})'
+                    f' ON CONFLICT (chat_id) DO UPDATE SET {updates}',
+                    chat_id, *lock_updates.values()
+                )
+        except Exception as e:
+            logger.warning(f'Lock sync failed: {e}')
 
     # Publish SSE event
     from api.routes.events import EventBus

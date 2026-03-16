@@ -67,22 +67,6 @@ const AUTOMOD_SECTIONS = [
     ],
   },
   {
-    id: 'captcha',
-    title: 'Captcha Verification',
-    description: 'Require new members to verify',
-    icon: '🔐',
-    settings: [
-      { key: 'captcha_enabled', label: 'Enable Captcha', type: 'toggle' },
-      { key: 'captcha_timeout_mins', label: 'Timeout (minutes)', type: 'number', min: 1, max: 10, default: 2 },
-      { key: 'captcha_mode', label: 'Captcha Type', type: 'select', options: [
-        { value: 'button', label: 'Click Button' },
-        { value: 'math', label: 'Math Problem' },
-        { value: 'text', label: 'Text Input' },
-      ], default: 'button' },
-      { key: 'captcha_kick_on_timeout', label: 'Kick on timeout', type: 'toggle', default: true },
-    ],
-  },
-  {
     id: 'advanced_content',
     title: 'Advanced Content',
     description: 'Strict message length and content rules',
@@ -171,11 +155,18 @@ export async function renderAutomodPage(container) {
   let settings = store.getState().settings || {};
 
   try {
-    const group = await apiFetch(`/api/groups/${finalChatId}`);
-    settings = group.settings || {};
+    // Use /settings endpoint to get fully merged settings (DB columns + JSONB)
+    const res = await apiFetch(`/api/groups/${finalChatId}/settings`);
+    settings = res.settings || res || {};
     store.getState().setSettings(settings);
   } catch (error) {
     console.error('[AutoMod] Failed to load settings:', error);
+    // Fallback: try the group endpoint
+    try {
+      const group = await apiFetch(`/api/groups/${finalChatId}`);
+      settings = group.settings || {};
+      store.getState().setSettings(settings);
+    } catch (_) {}
   }
 
   // Clear loading state
@@ -236,13 +227,39 @@ function _renderTemplatesSection() {
       btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
 
       try {
-        const response = await apiFetch(`/api/groups/${chatId}/settings`, {
+        // Use the bulk endpoint and send only the template settings
+        await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
           method: 'PUT',
-          body: JSON.stringify(template.settings || {}),
+          validate: false,
+          body: JSON.stringify({ settings: template.settings || {} }),
         });
-        if (response === null || response === undefined) throw new Error('No response');
 
-        btn.innerHTML = '<span style="color: var(--success);">✅ Applied!</span>';
+        btn.innerHTML = '<span style="color: var(--success);">✅ Applied! Refreshing...</span>';
+
+        // Re-fetch settings and re-render all sections
+        try {
+          const res = await apiFetch(`/api/groups/${chatId}/settings`);
+          const newSettings = res.settings || res || {};
+          store.getState().setSettings(newSettings);
+
+          // Re-render each section card to reflect new values
+          // Find all section cards (the container has all cards)
+          const allCards = container.querySelectorAll('.card');
+          const sectionCards = Array.from(allCards).slice(1); // skip templates card (first)
+          AUTOMOD_SECTIONS.forEach((section, i) => {
+            if (sectionCards[i]) {
+              // Clear existing content (keep title/subtitle)
+              const existingContent = sectionCards[i].querySelector('[style*="flex-direction: column"]');
+              if (existingContent) {
+                existingContent.innerHTML = '';
+                existingContent.appendChild(_renderSection(section, newSettings));
+              }
+            }
+          });
+        } catch (refreshErr) {
+          console.warn('[AutoMod] Could not refresh after template:', refreshErr);
+        }
+
         setTimeout(() => {
           btn.disabled = false;
           btn.innerHTML = `
@@ -253,7 +270,7 @@ function _renderTemplatesSection() {
               ${template.description}
             </div>
           `;
-        }, 2000);
+        }, 2500);
       } catch (e) {
         console.error('Failed to apply template:', e);
         btn.innerHTML = '<span style="color: var(--danger);">❌ Failed</span>';
@@ -298,17 +315,17 @@ function _renderSection(section, settings) {
 
   const _saveSetting = async (key, val) => {
     try {
-      const currentSettings = store.getState().settings || {};
-      const updatedSettings = { ...currentSettings, [key]: val };
-      await apiFetch(`/api/groups/${chatId}/settings`, {
+      // Send ONLY the changed key via the bulk endpoint
+      await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
         method: 'PUT',
-        body: JSON.stringify(updatedSettings),
+        validate: false,  // skip inputSanitizer for settings payloads
+        body: JSON.stringify({ settings: { [key]: val } }),
       });
       store.getState().updateSetting(key, val);
-      showToast('Setting saved', 'success');
+      showToast('Saved', 'success');
     } catch (e) {
-      console.error('Failed to save setting:', e);
-      showToast('Failed to save setting', 'error');
+      console.error(`[AutoMod] Failed to save ${key}:`, e);
+      showToast('Failed to save: ' + (e.message || 'unknown error'), 'error');
     }
   };
 

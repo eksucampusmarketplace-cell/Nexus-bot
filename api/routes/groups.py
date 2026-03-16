@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from api.auth import get_current_user
-from db.client import db
-from db.ops.groups import get_user_managed_groups, get_group, update_group_settings
-from db.ops.logs import get_recent_logs
-from bot.utils.crypto import hash_token
 import json
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from api.auth import get_current_user
+from bot.utils.crypto import hash_token
+from db.client import db
+from db.ops.groups import get_group, get_user_managed_groups, update_group_settings
+from db.ops.logs import get_recent_logs
 
 router = APIRouter()
 
@@ -45,6 +47,7 @@ async def group_details(chat_id: int, user: dict = Depends(get_current_user)):
 @router.get("/{chat_id}/settings")
 async def get_settings(chat_id: int, user=Depends(get_current_user)):
     from db.ops.automod import get_group_settings
+
     s = await get_group_settings(db.pool, chat_id)
     return {"status": "ok", "settings": s}
 
@@ -67,26 +70,41 @@ def _normalize_settings(incoming: dict, existing: dict):
     if "automod" not in existing:
         existing["automod"] = {}
     if "antiflood" in incoming:
-        if "antiflood" not in existing["automod"]: existing["automod"]["antiflood"] = {}
+        if "antiflood" not in existing["automod"]:
+            existing["automod"]["antiflood"] = {}
         existing["automod"]["antiflood"]["enabled"] = incoming["antiflood"]
         if "flood_threshold" in incoming:
             existing["automod"]["antiflood"]["flood_threshold"] = incoming["flood_threshold"]
         if "flood_window_sec" in incoming:
             existing["automod"]["antiflood"]["flood_window_sec"] = incoming["flood_window_sec"]
     if "antilink" in incoming:
-        if "antilink" not in existing["automod"]: existing["automod"]["antilink"] = {}
+        if "antilink" not in existing["automod"]:
+            existing["automod"]["antilink"] = {}
         existing["automod"]["antilink"]["enabled"] = incoming["antilink"]
     incoming["automod"] = existing["automod"]
 
 
 @router.put("/{chat_id}/settings")
 async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get_current_user)):
-    from db.ops.automod import get_group_settings, bulk_update_group_settings
+    from db.ops.automod import bulk_update_group_settings, get_group_settings
+
     existing = await get_group_settings(db.pool, chat_id)
     incoming = settings.copy()
     _normalize_settings(incoming, existing)
 
     await bulk_update_group_settings(db.pool, chat_id, incoming)
+
+    # Sync locks to the locks table if any were updated
+    if "locks" in incoming:
+        from api.routes.moderation import update_locks
+
+        # Create a mock user since update_locks needs one
+        mock_user = {"id": user.get("id"), "first_name": "System"}
+        try:
+            await update_locks(chat_id, incoming["locks"], user=mock_user)
+        except Exception as e:
+            logger.warning(f"Failed to sync locks to locks table: {e}")
+
     return {"status": "ok"}
 
 
@@ -115,11 +133,7 @@ async def group_logs(chat_id: int, limit: int = 50, user: dict = Depends(get_cur
 
 
 @router.post("/{chat_id}/copy-settings")
-async def copy_settings_to_groups(
-    chat_id: int,
-    body: dict,
-    user: dict = Depends(get_current_user)
-):
+async def copy_settings_to_groups(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
     """Copy settings from source group to target groups."""
     target_chat_ids = body.get("target_chat_ids", [])
     modules = body.get("modules", [])
@@ -140,7 +154,14 @@ async def copy_settings_to_groups(
                 continue
             target_settings = target.get("settings") or {}
             if not modules or "automod" in modules:
-                automod_keys = ["antiflood", "antispam", "lock_link", "captcha_enabled", "warn_max", "warn_action"]
+                automod_keys = [
+                    "antiflood",
+                    "antispam",
+                    "lock_link",
+                    "captcha_enabled",
+                    "warn_max",
+                    "warn_action",
+                ]
                 for k in automod_keys:
                     if k in source_settings:
                         target_settings[k] = source_settings[k]
@@ -164,6 +185,7 @@ async def copy_settings_to_groups(
 async def set_slowmode(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
     seconds = max(0, min(3600, int(body.get("seconds", 0))))
     from bot.registry import get_all
+
     for bid, app_instance in get_all().items():
         try:
             await app_instance.bot.set_chat_slow_mode_delay(chat_id, seconds)
@@ -182,6 +204,7 @@ async def reset_settings(chat_id: int, user: dict = Depends(get_current_user)):
 @router.post("/{chat_id}/actions/leave")
 async def leave_group(chat_id: int, user: dict = Depends(get_current_user)):
     from bot.registry import get_all
+
     for bid, app_instance in get_all().items():
         try:
             await app_instance.bot.leave_chat(chat_id)

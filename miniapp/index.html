@@ -1522,11 +1522,29 @@
         list.className = 'member-list';
         list.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
         
-        members.forEach(m => list.appendChild(MemberRow({ 
-          member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
-          selectable: true,
-          onSelect: (m) => state.toggleMemberSelection(m.id)
-        })));
+        const _hMAction = async (mid, action, cid) => {
+          try {
+            if (action === 'warn') await apiFetch(`/api/groups/${cid}/warnings`, { method: 'POST', body: { user_id: mid, reason: 'Manual warning' } });
+            else if (action === 'mute') await apiFetch(`/api/groups/${cid}/mutes`, { method: 'POST', body: { user_id: mid, duration: '1h' } });
+            else if (action === 'kick') await apiFetch(`/api/groups/${cid}/actions/kick`, { method: 'POST', body: { user_id: mid } });
+            else if (action === 'ban') await apiFetch(`/api/groups/${cid}/bans`, { method: 'POST', body: { user_id: mid, reason: 'Manual ban' } });
+            showToast('Action success', 'success');
+          } catch (e) { showToast(e.message, 'error'); }
+        };
+        members.forEach(m => {
+          const mID = m.user_id || m.id;
+          list.appendChild(MemberRow({ 
+            member: { id: mID, name: m.first_name || 'User', avatar: (m.first_name?.[0] || '?').toUpperCase(), warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+            selectable: true,
+            onSelect: (m) => state.toggleMemberSelection(m.id),
+            actions: [
+              { icon: '⚠️', label: 'Warn', onClick: () => _hMAction(mID, 'warn', chatId), variant: 'warning' },
+              { icon: '🔇', label: 'Mute', onClick: () => _hMAction(mID, 'mute', chatId), variant: 'warning' },
+              { icon: '👢', label: 'Kick', onClick: () => _hMAction(mID, 'kick', chatId), variant: 'danger' },
+              { icon: '🚫', label: 'Ban', onClick: () => _hMAction(mID, 'ban', chatId), variant: 'danger' }
+            ]
+          }));
+        });
         
         container.appendChild(list);
       } catch (e) {

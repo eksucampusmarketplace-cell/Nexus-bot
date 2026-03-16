@@ -1,7 +1,7 @@
 import logging
-from typing import List, Optional
-from functools import lru_cache
 import time
+from functools import lru_cache
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -21,15 +21,16 @@ ADMIN_CACHE_TTL = 60  # 60 seconds
 
 async def verify_admin(chat_id: int, user: dict):
     from config import settings as _cfg
+
     user_id = user.get("id")
     if user_id and user_id == _cfg.OWNER_ID:
         return
     if not user_id:
         raise HTTPException(403, "Not authenticated")
-    
+
     cache_key = f"{chat_id}:{user_id}"
     now = time.time()
-    
+
     # Check cache
     if cache_key in _admin_cache:
         cached_time, is_admin = _admin_cache[cache_key]
@@ -37,7 +38,7 @@ async def verify_admin(chat_id: int, user: dict):
             if not is_admin:
                 raise HTTPException(403, "You are not an admin of this group")
             return
-    
+
     from bot.registry import get_all
 
     bots = get_all()
@@ -51,7 +52,7 @@ async def verify_admin(chat_id: int, user: dict):
                 return
         except Exception:
             continue
-    
+
     _admin_cache[cache_key] = (now, False)
     raise HTTPException(403, "You are not an admin of this group")
 
@@ -143,15 +144,33 @@ async def unban_user(chat_id: int, target_user_id: int, user: dict = Depends(get
 async def get_locks(chat_id: int, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
     locks = await mod_db.get_locks(chat_id)
+    # Filter only valid lock keys to avoid returning internal DB columns like chat_id
+    if isinstance(locks, dict):
+        filtered_locks = {k: v for k, v in locks.items() if k in VALID_LOCK_KEYS}
+    else:
+        # If locks is an asyncpg Record
+        filtered_locks = {k: v for k, v in dict(locks).items() if k in VALID_LOCK_KEYS}
+
     return {
         "ok": True,
-        "data": dict(locks) if locks and not isinstance(locks, dict) else (locks or {}),
+        "data": filtered_locks,
     }
 
 
 VALID_LOCK_KEYS = {
-    "photo", "video", "sticker", "gif", "voice", "audio", "document",
-    "link", "forward", "poll", "contact", "video_note", "all"
+    "photo",
+    "video",
+    "sticker",
+    "gif",
+    "voice",
+    "audio",
+    "document",
+    "link",
+    "forward",
+    "poll",
+    "contact",
+    "video_note",
+    "all",
 }
 
 
@@ -161,12 +180,8 @@ async def update_locks(chat_id: int, locks: dict, user: dict = Depends(get_curre
     if not locks:
         return {"ok": True}
 
-    # Validate lock types
-    for lock_type in locks.keys():
-        if lock_type not in VALID_LOCK_KEYS:
-            raise HTTPException(400, detail=f"Invalid lock type: {lock_type}")
-
-    valid_locks = {k: v for k, v in locks.items() if isinstance(v, bool)}
+    # Only process valid lock keys
+    valid_locks = {k: v for k, v in locks.items() if k in VALID_LOCK_KEYS and isinstance(v, bool)}
     if not valid_locks:
         return {"ok": True}
 
@@ -180,22 +195,29 @@ async def update_locks(chat_id: int, locks: dict, user: dict = Depends(get_curre
     """
     async with db.pool.acquire() as conn:
         await conn.execute(query, chat_id, *values)
-        
+
         # Also sync to settings JSON for engine to read settings['locks']
-        settings_row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
+        settings_row = await conn.fetchrow(
+            "SELECT settings FROM groups WHERE chat_id = $1", chat_id
+        )
         import json
+
         settings_json = settings_row["settings"] if settings_row else {}
         if isinstance(settings_json, str):
             try:
                 settings_json = json.loads(settings_json)
             except Exception:
                 settings_json = {}
-        
+
         # Sync lock settings to nested 'locks' object
         locks_dict = settings_json.setdefault("locks", {})
         locks_dict.update(valid_locks)
-        
-        await conn.execute("UPDATE groups SET settings = $1::jsonb WHERE chat_id = $2", json.dumps(settings_json), chat_id)
+
+        await conn.execute(
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id = $2",
+            json.dumps(settings_json),
+            chat_id,
+        )
 
     for k, v in valid_locks.items():
         await publish_event(chat_id, "lock_change", {"lock_type": k, "enabled": v})
@@ -554,7 +576,8 @@ async def get_filters(chat_id: int, user: dict = Depends(get_current_user)):
             """SELECT id, chat_id, keyword, 
                       COALESCE(reply_content, response) as reply_content,
                       added_by, added_at, created_at 
-               FROM filters WHERE chat_id=$1 ORDER BY created_at DESC NULLS LAST""", chat_id
+               FROM filters WHERE chat_id=$1 ORDER BY created_at DESC NULLS LAST""",
+            chat_id,
         )
     return [dict(r) for r in rows]
 
@@ -568,7 +591,7 @@ async def add_filter(chat_id: int, body: dict, user: dict = Depends(get_current_
     reply_content = body.get("reply_content", body.get("reply", ""))
     async with db.pool.acquire() as conn:
         await conn.execute(
-            "INSERT INTO filters (chat_id, keyword, reply_content) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
+            "INSERT INTO filters (chat_id, keyword, reply_content, response) VALUES ($1,$2,$3,$3) ON CONFLICT (chat_id, keyword) DO UPDATE SET reply_content = EXCLUDED.reply_content, response = EXCLUDED.response",
             chat_id,
             keyword,
             reply_content,

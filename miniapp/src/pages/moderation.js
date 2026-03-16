@@ -85,32 +85,27 @@ function switchTab(tab, container, chatId) {
 }
 
 async function _renderMembersTab(container, chatId) {
-  container.innerHTML = '';
-  const msg = document.createElement('div');
-  msg.style.cssText = 'text-align:center;padding:var(--sp-8);';
-  msg.innerHTML = `
-    <div style='font-size:2.5rem;margin-bottom:var(--sp-4);'>👥</div>
-    <div style='font-weight:700;font-size:var(--text-lg);margin-bottom:var(--sp-2);'>Member Management</div>
-    <div style='color:var(--text-muted);font-size:var(--text-sm);margin-bottom:var(--sp-6);line-height:1.5;'>
-      Use the dedicated Members page for full member management,<br>
-      including search, advanced filters, and profile details.
-    </div>
-    <button id="go-to-members" class="btn btn-primary" style="padding:var(--sp-3) var(--sp-6);">
-      Go to Members Page →
-    </button>
-  `;
-  container.appendChild(msg);
-
-  msg.querySelector('#go-to-members').onclick = () => {
-    // Assuming window.navigateToPage is available or we use the store
-    if (window.navigateToPage) {
-      window.navigateToPage('members');
-    } else {
-      // Fallback if navigateToPage is not global
-      const navBtn = document.querySelector('[data-page="members"]');
-      if (navBtn) navBtn.click();
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading members...</div>`;
+  
+  try {
+    const members = await apiFetch(`/api/groups/${chatId}/members`);
+    container.innerHTML = '';
+    
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+    
+    if (!members || members.length === 0) {
+      container.appendChild(EmptyState({ icon: '👥', title: 'No members', description: 'No members found in this group.' }));
+      return;
     }
-  };
+
+    members.forEach(m => {
+      container.appendChild(_buildMemberCard(m, chatId));
+    });
+  } catch (e) {
+    container.innerHTML = '';
+    container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: e.message }));
+  }
 }
 
 function _buildMemberCard(m, chatId) {

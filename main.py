@@ -415,9 +415,11 @@ try:
     # v21 New API routes
     from api.routes import federation as federation_api
     from api.routes import users as users_api
+    from api.routes import i18n as i18n_api
     
     app.include_router(federation_api.router, prefix="/api/federation", tags=["federation"])
     app.include_router(users_api.router, prefix="/api/users", tags=["users"])
+    app.include_router(i18n_api.router, tags=["i18n"])
     
     logger.info("[STARTUP] ✅ All v21 API routes registered")
 except ImportError as e:

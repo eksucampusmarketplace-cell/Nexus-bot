@@ -6,7 +6,7 @@ Handles XP awards from games and leaderboard data.
 """
 
 from fastapi import APIRouter, Depends, HTTPException
-from api.auth import get_current_user
+from api.auth import get_current_user, require_auth
 from db.client import db
 from bot.handlers.xp import award_game_xp, get_leaderboard, get_user_rank
 

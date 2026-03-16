@@ -670,8 +670,14 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.captcha import captcha_callback_handler
     app.add_handler(CallbackQueryHandler(
         captcha_callback_handler, pattern=r"^captcha_verify_\d+$"))
-        
+
     logger.info("[FACTORY] CAPTCHA callback handlers registered")
+
+    # ── Message tracking for analytics ────────────────────────────────────────
+    from bot.handlers.message_tracking import track_message
+
+    app.add_handler(MessageHandler(filters.ALL, track_message), group=-999)
+    logger.info("[FACTORY] Message tracking handler registered")
 
     logger.info(f"[FACTORY] Application built successfully | is_primary={is_primary}")
     return app

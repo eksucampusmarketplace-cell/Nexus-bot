@@ -43,6 +43,30 @@ async def group_details(chat_id: int, user: dict = Depends(get_current_user)):
     group = await get_group(chat_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
+
+    # Try to fetch live member count from Telegram
+    try:
+        from bot.registry import get_all
+
+        bot_instances = get_all()
+        for bid, app_instance in bot_instances.items():
+            try:
+                live_count = await app_instance.bot.get_chat_member_count(chat_id)
+                if live_count:
+                    group["member_count"] = live_count
+                    # Persist it so future DB reads are correct too
+                    async with db.pool.acquire() as conn:
+                        await conn.execute(
+                            "UPDATE groups SET member_count=$1 WHERE chat_id=$2",
+                            live_count,
+                            chat_id,
+                        )
+                    break
+            except Exception:
+                continue
+    except Exception as e:
+        logger.warning(f"[groups] Could not refresh member count: {e}")
+
     return group
 
 

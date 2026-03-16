@@ -29,7 +29,7 @@ async def get_captcha_settings(chat_id: int, user: dict = Depends(require_auth))
     try:
         async with db.pool.acquire() as conn:
             row = await conn.fetchrow(
-                """SELECT captcha_enabled, captcha_type, captcha_timeout
+                """SELECT captcha_enabled, captcha_mode, captcha_timeout_mins
                    FROM groups WHERE chat_id = $1""",
                 chat_id,
             )
@@ -39,8 +39,8 @@ async def get_captcha_settings(chat_id: int, user: dict = Depends(require_auth))
 
         return {
             "enabled": row["captcha_enabled"] if row else False,
-            "type": row["captcha_type"] if row else "button",
-            "timeout": row["captcha_timeout"] if row else 300,
+            "type": row["captcha_mode"] if row else "button",
+            "timeout": (row["captcha_timeout_mins"] or 5) * 60,
         }
     except HTTPException:
         raise
@@ -58,11 +58,11 @@ async def save_captcha_settings(
         async with db.pool.acquire() as conn:
             await conn.execute(
                 """UPDATE groups 
-                   SET captcha_enabled = $1, captcha_type = $2, captcha_timeout = $3
+                   SET captcha_enabled = $1, captcha_mode = $2, captcha_timeout_mins = $3
                    WHERE chat_id = $4""",
                 settings.enabled,
                 settings.type,
-                settings.timeout,
+                max(1, settings.timeout // 60),
                 chat_id,
             )
 

@@ -133,7 +133,8 @@ async def upsert_bot(
                 is_primary = EXCLUDED.is_primary,
                 status = EXCLUDED.status,
                 owner_user_id = COALESCE(EXCLUDED.owner_user_id, bots.owner_user_id),
-                group_access_policy = CASE WHEN bots.is_primary THEN 'open'
+                group_limit = EXCLUDED.group_limit,
+                group_access_policy = CASE WHEN EXCLUDED.is_primary THEN 'open'
                                            ELSE EXCLUDED.group_access_policy END,
                 updated_at = NOW()
             RETURNING *

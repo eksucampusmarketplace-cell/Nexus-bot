@@ -1,13 +1,17 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+
 from api.auth import get_current_user
 from db.client import db
-from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/api/groups")
 
 
 @router.get("/{chat_id}/analytics")
-async def group_analytics(chat_id: int, days: int = Query(default=30, ge=7, le=90), user: dict = Depends(get_current_user)):
+async def group_analytics(
+    chat_id: int, days: int = Query(default=30, ge=7, le=90), user: dict = Depends(get_current_user)
+):
     async with db.pool.acquire() as conn:
         group_row = await conn.fetchrow(
             "SELECT member_count FROM groups WHERE chat_id = $1", chat_id
@@ -19,15 +23,28 @@ async def group_analytics(chat_id: int, days: int = Query(default=30, ge=7, le=9
 
         activity_rows = await conn.fetch(
             """
-            SELECT DATE(join_date) as date, SUM(message_count) as messages
-            FROM users
-            WHERE chat_id = $1 AND join_date >= $2
-            GROUP BY DATE(join_date)
-            ORDER BY date
+            SELECT day as date, message_count as messages
+            FROM bot_stats_daily
+            WHERE chat_id = $1 AND day >= $2
+            ORDER BY day
         """,
             chat_id,
-            start_date,
+            start_date.date(),
         )
+
+        if not activity_rows:
+            # Fallback to hourly if daily not yet aggregated
+            activity_rows = await conn.fetch(
+                """
+                SELECT DATE(hour) as date, SUM(message_count) as messages
+                FROM bot_stats_hourly
+                WHERE chat_id = $1 AND hour >= $2
+                GROUP BY DATE(hour)
+                ORDER BY date
+                """,
+                chat_id,
+                start_date,
+            )
 
         activity_map = {str(row["date"]): row["messages"] or 0 for row in activity_rows}
 
@@ -143,9 +160,9 @@ async def spam_analytics(chat_id: int, user: dict = Depends(get_current_user)):
                FROM bot_stats_daily 
                WHERE chat_id = $1 AND day >= CURRENT_DATE - INTERVAL '30 days'
                ORDER BY day ASC""",
-            chat_id
+            chat_id,
         )
-        
+
         # Top scam types
         top_scams = await conn.fetch(
             """SELECT metadata->>'scam_type' as scam_type, COUNT(*) as count
@@ -153,23 +170,24 @@ async def spam_analytics(chat_id: int, user: dict = Depends(get_current_user)):
                WHERE chat_id = $1 AND label = 'spam'
                GROUP BY scam_type
                ORDER BY count DESC LIMIT 5""",
-            chat_id
+            chat_id,
         )
-        
+
         # Classifier stats (signals from ml_classifier)
         classifier_signals = await conn.fetch(
             """SELECT label, COUNT(*) as count
                FROM spam_signals
                WHERE chat_id = $1 AND signal_type = 'ml_classifier'
                GROUP BY label""",
-            chat_id
+            chat_id,
         )
-        
+
         return {
             "daily_spam": [dict(r) for r in daily_spam],
             "top_scams": [dict(r) for r in top_scams],
-            "classifier_signals": [dict(r) for r in classifier_signals]
+            "classifier_signals": [dict(r) for r in classifier_signals],
         }
+
 
 @router.get("/{chat_id}/analytics/members")
 async def member_analytics(chat_id: int, user: dict = Depends(get_current_user)):
@@ -181,9 +199,9 @@ async def member_analytics(chat_id: int, user: dict = Depends(get_current_user))
                FROM bot_stats_daily 
                WHERE chat_id = $1 AND day >= CURRENT_DATE - INTERVAL '30 days'
                ORDER BY day ASC""",
-            chat_id
+            chat_id,
         )
-        
+
         # Risk score distribution
         risk_dist = await conn.fetch(
             """SELECT 
@@ -198,13 +216,14 @@ async def member_analytics(chat_id: int, user: dict = Depends(get_current_user))
                JOIN users u ON u.user_id = urs.user_id
                WHERE u.chat_id = $1
                GROUP BY risk_level""",
-            chat_id
+            chat_id,
         )
-        
+
         return {
             "growth": [dict(r) for r in growth],
-            "risk_distribution": [dict(r) for r in risk_dist]
+            "risk_distribution": [dict(r) for r in risk_dist],
         }
+
 
 @router.get("/{chat_id}/analytics/heatmap")
 async def sentiment_heatmap(chat_id: int, user: dict = Depends(get_current_user)):

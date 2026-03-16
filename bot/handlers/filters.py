@@ -37,9 +37,11 @@ async def filter_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         async with db.pool.acquire() as conn:
             await conn.execute(
-                "INSERT INTO filters (chat_id, keyword, reply_content) VALUES ($1, $2, $3) "
-                "ON CONFLICT (chat_id, keyword) DO UPDATE SET reply_content = EXCLUDED.reply_content",
-                chat_id, keyword, reply_content,
+                "INSERT INTO filters (chat_id, keyword, reply_content, response) VALUES ($1, $2, $3, $3) "
+                "ON CONFLICT (chat_id, keyword) DO UPDATE SET reply_content = EXCLUDED.reply_content, response = EXCLUDED.response",
+                chat_id,
+                keyword,
+                reply_content,
             )
         await update.message.reply_text(f"✅ Filter added: *{keyword}*", parse_mode="Markdown")
         log.info(f"[FILTERS] Added filter '{keyword}' in chat {chat_id}")
@@ -68,7 +70,11 @@ async def filters_list_command(update: Update, context: ContextTypes.DEFAULT_TYP
 
         text = f"📋 *Filters in this group ({len(rows)}):*\n\n"
         for row in rows:
-            preview = row["reply_content"][:50] + "..." if len(row["reply_content"]) > 50 else row["reply_content"]
+            preview = (
+                row["reply_content"][:50] + "..."
+                if len(row["reply_content"]) > 50
+                else row["reply_content"]
+            )
             text += f"• `{row['keyword']}` → {preview}\n"
 
         await update.message.reply_text(text, parse_mode="Markdown")
@@ -94,12 +100,17 @@ async def stop_filter_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         async with db.pool.acquire() as conn:
             result = await conn.execute(
                 "DELETE FROM filters WHERE chat_id = $1 AND keyword = $2",
-                chat_id, keyword,
+                chat_id,
+                keyword,
             )
         if "DELETE 0" in result:
-            await update.message.reply_text(f"❌ No filter found for: *{keyword}*", parse_mode="Markdown")
+            await update.message.reply_text(
+                f"❌ No filter found for: *{keyword}*", parse_mode="Markdown"
+            )
         else:
-            await update.message.reply_text(f"✅ Filter removed: *{keyword}*", parse_mode="Markdown")
+            await update.message.reply_text(
+                f"✅ Filter removed: *{keyword}*", parse_mode="Markdown"
+            )
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to remove filter: {e}")
 

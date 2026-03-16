@@ -83,6 +83,21 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         if db_pool:
             async with db_pool.acquire() as db:
                 await mark_group_left(db, bot_id, chat.id)
+
+        # Notify clone owner that bot was kicked
+        try:
+            from bot.utils.error_notifier import notify_clone_owner
+            asyncio.create_task(
+                notify_clone_owner(
+                    context.bot,
+                    bot_id,
+                    "BOT_KICKED",
+                    context={"chat_id": chat.id, "chat_title": chat.title, "actor_id": actor.id},
+                    pool=db_pool
+                )
+            )
+        except Exception as notify_err:
+            log.debug(f"[LIFECYCLE] BOT_KICKED notification skipped: {notify_err}")
         return
 
     # ── BOT ADDED ────────────────────────────────────────────────────────

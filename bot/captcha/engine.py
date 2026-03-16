@@ -42,6 +42,28 @@ async def send_captcha(
 
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=timeout)
 
+    # Check for WebApp mode without RENDER_EXTERNAL_URL
+    if mode in ("webapp", "miniapp"):
+        from config import settings as bot_settings
+        if not bot_settings.RENDER_EXTERNAL_URL:
+            log.warning(f"[CAPTCHA] WebApp mode requested but RENDER_EXTERNAL_URL not set")
+            # Notify clone owner
+            try:
+                from bot.utils.error_notifier import notify_clone_owner
+                asyncio.create_task(
+                    notify_clone_owner(
+                        bot,
+                        bot.id,
+                        "CAPTCHA_WEBAPP_URL_MISSING",
+                        context={"url": "NOT SET", "chat_id": chat_id},
+                        pool=db
+                    )
+                )
+            except Exception as notify_err:
+                log.debug(f"[CAPTCHA] CAPTCHA_WEBAPP_URL_MISSING notification skipped: {notify_err}")
+            # Fallback to button mode
+            mode = "button"
+
     if mode == "button":
         text, markup, answer = _build_button_captcha(cid)
     elif mode == "math":

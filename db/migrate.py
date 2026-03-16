@@ -144,16 +144,21 @@ async def run_migrations(pool):
 
             log.info(f"[MIGRATE] Applying: {filename}")
             try:
-                with open(filepath, "r") as f:
-                    sql = f.read()
+                # v22 FIX: Use atomic transaction for each migration
+                # If any statement fails, the entire migration rolls back and can be re-run
+                async with conn.transaction():
+                    with open(filepath, "r") as f:
+                        sql = f.read()
 
-                # Use proper SQL splitting that handles JSON/arrays
-                statements = split_sql_statements(sql)
-                for stmt in statements:
-                    if stmt.strip():
-                        await conn.execute(stmt)
+                    # Use proper SQL splitting that handles JSON/arrays
+                    statements = split_sql_statements(sql)
+                    for stmt in statements:
+                        if stmt.strip():
+                            await conn.execute(stmt)
 
-                await conn.execute("INSERT INTO migrations_log (filename) VALUES ($1)", filename)
+                    # Only record migration if ALL statements succeeded
+                    await conn.execute("INSERT INTO migrations_log (filename) VALUES ($1)", filename)
+
                 log.info(f"[MIGRATE] Applied: {filename}")
 
             except Exception as e:

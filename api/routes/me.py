@@ -10,12 +10,14 @@ Logic:
 4. Return structured role data
 """
 
-from fastapi import APIRouter, Depends, HTTPException
-from api.auth import get_current_user
-from db.client import db
-from config import settings
-import logging
 import json
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from api.auth import get_current_user
+from config import settings
+from db.client import db
 
 logger = logging.getLogger(__name__)
 
@@ -94,14 +96,16 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         # Bug E fix: Union fallback query - handle groups via bot_token_hash OR clone_bot_groups
         all_groups = await conn.fetch(
             """
-            SELECT g.chat_id, g.title, g.member_count, g.settings, g.photo_big, g.photo_small 
+            SELECT g.chat_id, g.title, g.member_count, g.settings,
+                   g.photo_big, g.photo_small
             FROM groups g
             WHERE g.bot_token_hash = $1
             UNION
-            SELECT g.chat_id, g.title, g.member_count, g.settings, g.photo_big, g.photo_small
+            SELECT g.chat_id, g.title, g.member_count, g.settings,
+                   g.photo_big, g.photo_small
             FROM groups g
             JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
-            JOIN bots b ON b.id = cbg.bot_id
+            JOIN bots b ON b.bot_id = cbg.bot_id
             WHERE b.token_hash = $1
             ORDER BY title
         """,
@@ -110,7 +114,8 @@ async def get_user_context(user: dict = Depends(get_current_user)):
 
         if not all_groups:
             logger.warning(
-                f"[ME] No groups found for bot token_hash={token_hash[:8]}... — check hash consistency"
+                f"[ME] No groups found for bot token_hash="
+                f"{token_hash[:8]}... — check hash consistency"
             )
             all_groups = []
 
@@ -240,7 +245,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
 
 async def get_member_boost_stats(group_id: int, user_id: int) -> dict:
     """Get boost stats for a specific member in a group."""
-    from db.ops.booster import get_boost_record, get_boost_config
+    from db.ops.booster import get_boost_config, get_boost_record
 
     config = await get_boost_config(group_id)
     record = await get_boost_record(group_id, user_id)
@@ -264,7 +269,7 @@ async def get_member_boost_stats(group_id: int, user_id: int) -> dict:
 
 async def get_member_channel_status(group_id: int, user_id: int) -> dict:
     """Get channel verification status for a member."""
-    from db.ops.booster import get_channel_record, get_channel_gate_config
+    from db.ops.booster import get_channel_gate_config, get_channel_record
 
     config = await get_channel_gate_config(group_id)
     record = await get_channel_record(group_id, user_id)
@@ -318,28 +323,33 @@ async def get_usage(user: dict = Depends(get_current_user)):
 
     async with db.pool.acquire() as conn:
         # Get total bots count (including primary)
-        bots_count = await conn.fetchval(
-            "SELECT COUNT(*) FROM bots WHERE owner_user_id=$1", user_id
-        ) or 0
-        
+        bots_count = (
+            await conn.fetchval("SELECT COUNT(*) FROM bots WHERE owner_user_id=$1", user_id) or 0
+        )
+
         # Get non-primary bots count (clones) - for the limit bar
-        clone_count = await conn.fetchval(
-            "SELECT COUNT(*) FROM bots WHERE owner_user_id=$1 AND is_primary=FALSE", user_id
-        ) or 0
-        
+        clone_count = (
+            await conn.fetchval(
+                "SELECT COUNT(*) FROM bots WHERE owner_user_id=$1 AND is_primary=FALSE", user_id
+            )
+            or 0
+        )
+
         # Get groups count with correct JOIN on token_hash
-        groups_count = await conn.fetchval(
-            """SELECT COUNT(DISTINCT g.chat_id)
+        groups_count = (
+            await conn.fetchval(
+                """SELECT COUNT(DISTINCT g.chat_id)
                FROM groups g
                INNER JOIN bots b ON b.token_hash = g.bot_token_hash
                WHERE b.owner_user_id = $1""",
-            user_id
-        ) or 0
-        
+                user_id,
+            )
+            or 0
+        )
+
         # Get plan limits from primary bot
         primary_bot = await conn.fetchrow(
-            "SELECT group_limit FROM bots WHERE owner_user_id=$1 AND is_primary=TRUE",
-            user_id
+            "SELECT group_limit FROM bots WHERE owner_user_id=$1 AND is_primary=TRUE", user_id
         )
 
     # Determine limits based on plan
@@ -348,7 +358,7 @@ async def get_usage(user: dict = Depends(get_current_user)):
         gl = primary_bot.get("group_limit") or 0
         # 0 = unlimited (primary bot on any plan)
         group_limit = gl if gl > 0 else 0
-    
+
     # Clone bot limit: 3 for free, could be higher for paid plans
     # For now, hardcode to 3 (Free plan) - in production would come from user plan
     bot_limit = 3

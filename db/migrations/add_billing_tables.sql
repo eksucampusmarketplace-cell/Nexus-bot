@@ -19,8 +19,7 @@ CREATE TABLE IF NOT EXISTS billing_subscriptions (
 
 -- Index for looking up owner's active subscription
 CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_owner
-  ON billing_subscriptions(owner_id, plan_expires_at)
-  WHERE plan_expires_at > NOW();
+  ON billing_subscriptions(owner_id, plan_expires_at);
 
 -- Index for looking up by charge ID (webhook verification)
 CREATE INDEX IF NOT EXISTS idx_billing_subscriptions_charge
@@ -54,8 +53,7 @@ CREATE TABLE IF NOT EXISTS stars_purchases (
 
 -- Index for active feature entitlements
 CREATE INDEX IF NOT EXISTS idx_stars_purchases_active
-  ON stars_purchases(owner_id, item_type, expires_at)
-  WHERE expires_at > NOW();
+  ON stars_purchases(owner_id, item_type, expires_at);
 
 -- Promo codes table
 CREATE TABLE IF NOT EXISTS promo_codes (

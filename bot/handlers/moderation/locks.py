@@ -1,6 +1,6 @@
 import logging
 
-from telegram import ChatPermissions, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank, publish_event
@@ -10,8 +10,18 @@ log = logging.getLogger("[MOD_LOCKS]")
 
 # Valid lock types with miniapp-compatible column names (canonical names only)
 VALID_LOCKS = [
-    "photo", "video", "sticker", "gif", "voice", "audio", "document", 
-    "link", "forward", "poll", "contact", "video_note"
+    "photo",
+    "video",
+    "sticker",
+    "gif",
+    "voice",
+    "audio",
+    "document",
+    "link",
+    "forward",
+    "poll",
+    "contact",
+    "video_note",
 ]
 
 # Map legacy names to new column names
@@ -23,7 +33,7 @@ LOCK_COLUMN_MAP = {
     "forwards": "forward",
     "polls": "poll",
     "contacts": "contact",
-    "video_notes": "video_note"
+    "video_notes": "video_note",
 }
 
 
@@ -33,13 +43,11 @@ async def lock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text(
-            f"❌ Specify what to lock: {', '.join(VALID_LOCKS[:6])}..."
-        )
+        await update.message.reply_text(f"❌ Specify what to lock: {', '.join(VALID_LOCKS[:6])}...")
         return
 
     lock_type = context.args[0].lower()
-    
+
     # Normalize user input before DB write
     lock_type = LOCK_COLUMN_MAP.get(lock_type, lock_type)
 
@@ -49,9 +57,16 @@ async def lock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if lock_type == "all":
         updates = {
-            "photo": True, "video": True, "sticker": True, "gif": True,
-            "link": True, "forward": True, "poll": True,
-            "voice": True, "video_note": True, "contact": True
+            "photo": True,
+            "video": True,
+            "sticker": True,
+            "gif": True,
+            "link": True,
+            "forward": True,
+            "poll": True,
+            "voice": True,
+            "video_note": True,
+            "contact": True,
         }
     else:
         updates = {lock_type: True}
@@ -65,10 +80,12 @@ async def lock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await conn.execute(
             f"""
             INSERT INTO locks (chat_id, {columns}) VALUES ($1, {placeholders})
-            ON CONFLICT (chat_id) DO UPDATE SET {", ".join([f"{k}=EXCLUDED.{k}" for k in updates.keys()])}
+            ON CONFLICT (chat_id) DO UPDATE SET {
+                ", ".join([f"{k}=EXCLUDED.{k}" for k in updates.keys()])
+            }
             """,
             chat_id,
-            *values
+            *values,
         )
 
     await update.message.reply_text(f"🔒 Locked: {lock_type}")
@@ -83,15 +100,22 @@ async def unlock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         return
     lock_type = context.args[0].lower()
-    
+
     # Normalize user input before DB write
     lock_type = LOCK_COLUMN_MAP.get(lock_type, lock_type)
 
     if lock_type == "all":
         updates = {
-            "photo": False, "video": False, "sticker": False, "gif": False,
-            "link": False, "forward": False, "poll": False,
-            "voice": False, "video_note": False, "contact": False
+            "photo": False,
+            "video": False,
+            "sticker": False,
+            "gif": False,
+            "link": False,
+            "forward": False,
+            "poll": False,
+            "voice": False,
+            "video_note": False,
+            "contact": False,
         }
     elif lock_type in VALID_LOCKS:
         updates = {lock_type: False}
@@ -103,11 +127,14 @@ async def unlock_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         values = list(updates.values())
         await conn.execute(
             f"""
-            INSERT INTO locks (chat_id, {", ".join(updates.keys())}) VALUES ($1, {placeholders})
-            ON CONFLICT (chat_id) DO UPDATE SET {", ".join([f"{k}=EXCLUDED.{k}" for k in updates.keys()])}
+            INSERT INTO locks (chat_id, {", ".join(updates.keys())})
+            VALUES ($1, {placeholders})
+            ON CONFLICT (chat_id) DO UPDATE SET {
+                ", ".join([f"{k}=EXCLUDED.{k}" for k in updates.keys()])
+            }
             """,
             chat_id,
-            *values
+            *values,
         )
 
     await update.message.reply_text(f"🔓 Unlocked: {lock_type}")
@@ -129,3 +156,41 @@ async def locks_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         text += f"{status} — {key}\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def open_group_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if await get_user_rank(context.bot, chat_id, update.effective_user.id) < RANK_ADMIN:
+        return
+    from telegram import ChatPermissions
+
+    perms = ChatPermissions(
+        can_send_messages=True,
+        can_send_media_messages=True,
+        can_send_polls=True,
+        can_send_other_messages=True,
+        can_add_web_page_previews=True,
+        can_invite_users=True,
+    )
+    await context.bot.set_chat_permissions(chat_id, perms)
+    await update.message.reply_text("🔓 Group opened — all members can send messages.")
+    await publish_event(chat_id, "group_opened", {})
+
+
+async def close_group_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    if await get_user_rank(context.bot, chat_id, update.effective_user.id) < RANK_ADMIN:
+        return
+    from telegram import ChatPermissions
+
+    perms = ChatPermissions(
+        can_send_messages=False,
+        can_send_media_messages=False,
+        can_send_polls=False,
+        can_send_other_messages=False,
+        can_add_web_page_previews=False,
+        can_invite_users=False,
+    )
+    await context.bot.set_chat_permissions(chat_id, perms)
+    await update.message.reply_text("🔒 Group closed — members cannot send messages.")
+    await publish_event(chat_id, "group_closed", {})

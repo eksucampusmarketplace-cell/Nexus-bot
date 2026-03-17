@@ -4,8 +4,6 @@ from datetime import date
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from db.client import db
-
 logger = logging.getLogger(__name__)
 
 
@@ -24,12 +22,13 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         async with pool.acquire() as conn:
             await conn.execute(
-                """INSERT INTO bot_stats_daily (chat_id, day, message_count)
-                   VALUES ($1, $2, 1)
+                """INSERT INTO bot_stats_daily (chat_id, day, message_count, date, bot_id)
+                   VALUES ($1, $2, 1, $2, $3)
                    ON CONFLICT (chat_id, day) DO UPDATE
                    SET message_count = bot_stats_daily.message_count + 1""",
                 chat_id,
                 today,
+                context.bot.id,
             )
     except Exception as e:
         logger.debug(f"[track_message] {e}")

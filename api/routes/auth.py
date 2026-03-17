@@ -18,7 +18,9 @@ import base64
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from api.auth import get_current_user
 
 try:
     from pyrogram import Client
@@ -56,7 +58,7 @@ router = APIRouter()
 
 
 @router.post("/api/auth/validate-session")
-async def validate_session(request: Request):
+async def validate_session(request: Request, user: dict = Depends(get_current_user)):
     """
     Validate a browser-generated MTProto session and store it.
 
@@ -88,7 +90,7 @@ async def validate_session(request: Request):
             detail="Music module is not available.",
         )
 
-    owner_id = request.state.user_id
+    owner_id = user["id"]
     db = request.app.state.db
     body = await request.json()
     raw = body.get("session_string", "").strip()
@@ -108,8 +110,8 @@ async def validate_session(request: Request):
     try:
         client = Client(
             name=f"validate_{owner_id}",
-            api_id=settings.PYROGRAM_API_ID,
-            api_hash=settings.PYROGRAM_API_HASH,
+            api_id=settings.TG_API_ID,
+            api_hash=settings.TG_API_HASH,
             session_string=pyrogram_session,
             in_memory=True,
         )
@@ -187,7 +189,7 @@ async def _to_pyrogram_session(raw: str) -> str | None:
 async def _reload_music_worker(bot_id: int, session_string: str, db):
     """Reload the MusicWorker for a clone bot after new session added."""
     if not PYROGRAM_AVAILABLE or not MUSIC_WORKER_AVAILABLE:
-        log.warning(f"[AUTH] Cannot reload MusicWorker - dependencies not available")
+        log.warning("[AUTH] Cannot reload MusicWorker - dependencies not available")
         return
 
     try:
@@ -197,8 +199,8 @@ async def _reload_music_worker(bot_id: int, session_string: str, db):
 
         pyro = Client(
             name=f"music_{bot_id}",
-            api_id=settings.PYROGRAM_API_ID,
-            api_hash=settings.PYROGRAM_API_HASH,
+            api_id=settings.TG_API_ID,
+            api_hash=settings.TG_API_HASH,
             session_string=session_string,
             in_memory=True,
         )

@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from api.auth import get_current_user
-from db.client import db
 import json
 import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from api.auth import get_current_user
+from db.client import db
 
 logger = logging.getLogger(__name__)
 
@@ -48,25 +50,23 @@ async def _fetch_admins_from_telegram(chat_id: int) -> list:
 async def get_user_risk_score(chat_id: int, user_id: int, user: dict = Depends(get_current_user)):
     """Returns the risk score breakdown for a user."""
     async with db.pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT * FROM user_risk_scores WHERE user_id = $1",
-            user_id
-        )
-        
+        row = await conn.fetchrow("SELECT * FROM user_risk_scores WHERE user_id = $1", user_id)
+
         if not row:
             raise HTTPException(status_code=404, detail="Risk score not found for this user")
-            
-        breakdown = row['score_breakdown']
+
+        breakdown = row["score_breakdown"]
         if isinstance(breakdown, str):
             breakdown = json.loads(breakdown)
-            
+
         return {
             "user_id": user_id,
-            "risk_score": row['risk_score'],
+            "risk_score": row["risk_score"],
             "breakdown": breakdown,
-            "last_scored": row['last_scored'],
-            "updated_at": row['updated_at']
+            "last_scored": row["last_scored"],
+            "updated_at": row["updated_at"],
         }
+
 
 @router.get("/members")
 async def list_members(chat_id: int, user: dict = Depends(get_current_user)):
@@ -102,8 +102,8 @@ async def list_members(chat_id: int, user: dict = Depends(get_current_user)):
     # 2. Get members from member_boost_records (tracked via invite system)
     async with db.pool.acquire() as conn:
         boost_rows = await conn.fetch(
-            "SELECT user_id, username, first_name, invited_count, is_unlocked, is_restricted, created_at "
-            "FROM member_boost_records WHERE group_id = $1",
+            "SELECT user_id, username, first_name, invited_count, is_unlocked, "
+            "is_restricted, created_at FROM member_boost_records WHERE group_id = $1",
             chat_id,
         )
         for r in boost_rows:
@@ -265,8 +265,10 @@ async def get_approved(chat_id: int):
 
 
 @router.post("/members/{user_id}/approve")
-async def approve_member(chat_id: int, user_id: int, request: Request):
-    approver = request.state.user_id
+async def approve_member(
+    chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)
+):
+    approver = user["id"]
     async with db.pool.acquire() as conn:
         await conn.execute(
             """INSERT INTO approved_members (chat_id, user_id, approved_by)
@@ -289,7 +291,9 @@ async def unapprove_member(chat_id: int, user_id: int):
 
 
 @router.post("/members/{user_id}/mute")
-async def mute_member(chat_id: int, user_id: int, request: Request):
+async def mute_member(
+    chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)
+):
     """Mute a member (restrict from sending messages)."""
     body = await request.json()
     duration = body.get("duration", 3600)  # Default 1 hour
@@ -318,7 +322,7 @@ async def mute_member(chat_id: int, user_id: int, request: Request):
             await conn.execute(
                 """INSERT INTO users (chat_id, user_id, is_muted, updated_at)
                    VALUES ($1, $2, TRUE, NOW())
-                   ON CONFLICT (chat_id, user_id) 
+                   ON CONFLICT (chat_id, user_id)
                    DO UPDATE SET is_muted = TRUE, updated_at = NOW()""",
                 chat_id,
                 user_id,
@@ -326,12 +330,12 @@ async def mute_member(chat_id: int, user_id: int, request: Request):
 
             # Log the action
             await conn.execute(
-                """INSERT INTO actions_log 
+                """INSERT INTO actions_log
                    (chat_id, action, target_user_id, by_user_id, reason, timestamp)
                    VALUES ($1, 'mute', $2, $3, $4, NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user["id"],
                 f"Muted for {duration}s via Mini App",
             )
 
@@ -342,7 +346,9 @@ async def mute_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/kick")
-async def kick_member(chat_id: int, user_id: int, request: Request):
+async def kick_member(
+    chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)
+):
     """Kick a member from the group."""
     try:
         # Get bot app for this group
@@ -363,12 +369,12 @@ async def kick_member(chat_id: int, user_id: int, request: Request):
         # Log the action
         async with db.pool.acquire() as conn:
             await conn.execute(
-                """INSERT INTO actions_log 
+                """INSERT INTO actions_log
                    (chat_id, action, target_user_id, by_user_id, reason, timestamp)
                    VALUES ($1, 'kick', $2, $3, 'Kicked via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user["id"],
             )
 
         return {"ok": True}
@@ -378,7 +384,9 @@ async def kick_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/ban")
-async def ban_member(chat_id: int, user_id: int, request: Request):
+async def ban_member(
+    chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)
+):
     """Ban a member from the group."""
     try:
         # Get bot app for this group
@@ -400,7 +408,7 @@ async def ban_member(chat_id: int, user_id: int, request: Request):
             await conn.execute(
                 """INSERT INTO users (chat_id, user_id, is_banned, updated_at)
                    VALUES ($1, $2, TRUE, NOW())
-                   ON CONFLICT (chat_id, user_id) 
+                   ON CONFLICT (chat_id, user_id)
                    DO UPDATE SET is_banned = TRUE, updated_at = NOW()""",
                 chat_id,
                 user_id,
@@ -408,12 +416,12 @@ async def ban_member(chat_id: int, user_id: int, request: Request):
 
             # Log the action
             await conn.execute(
-                """INSERT INTO actions_log 
+                """INSERT INTO actions_log
                    (chat_id, action, target_user_id, by_user_id, reason, timestamp)
                    VALUES ($1, 'ban', $2, $3, 'Banned via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user["id"],
             )
 
         return {"ok": True}
@@ -423,7 +431,9 @@ async def ban_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/unban")
-async def unban_member(chat_id: int, user_id: int, request: Request):
+async def unban_member(
+    chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)
+):
     """Unban a member from the group."""
     try:
         # Get bot app for this group
@@ -451,12 +461,12 @@ async def unban_member(chat_id: int, user_id: int, request: Request):
 
             # Log the action
             await conn.execute(
-                """INSERT INTO actions_log 
+                """INSERT INTO actions_log
                    (chat_id, action, target_user_id, by_user_id, reason, timestamp)
                    VALUES ($1, 'unban', $2, $3, 'Unbanned via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user["id"],
             )
 
         return {"ok": True}
@@ -466,7 +476,9 @@ async def unban_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/unmute")
-async def unmute_member(chat_id: int, user_id: int, request: Request):
+async def unmute_member(
+    chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)
+):
     """Unmute a member (restore permissions)."""
     try:
         # Get bot app for this group
@@ -488,7 +500,6 @@ async def unmute_member(chat_id: int, user_id: int, request: Request):
             user_id,
             ChatPermissions(
                 can_send_messages=True,
-                can_send_media_messages=True,
                 can_send_polls=True,
                 can_send_other_messages=True,
                 can_add_web_page_previews=True,
@@ -509,12 +520,12 @@ async def unmute_member(chat_id: int, user_id: int, request: Request):
 
             # Log the action
             await conn.execute(
-                """INSERT INTO actions_log 
+                """INSERT INTO actions_log
                    (chat_id, action, target_user_id, by_user_id, reason, timestamp)
                    VALUES ($1, 'unmute', $2, $3, 'Unmuted via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user["id"],
             )
 
         return {"ok": True}
@@ -524,7 +535,9 @@ async def unmute_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/warn")
-async def warn_member(chat_id: int, user_id: int, request: Request):
+async def warn_member(
+    chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)
+):
     """Add a warning to a member."""
     body = await request.json()
     reason = body.get("reason", "Warned via Mini App")
@@ -544,13 +557,13 @@ async def warn_member(chat_id: int, user_id: int, request: Request):
                     warns = row["warns"]
 
             # Add new warning
-            warns.append({"reason": reason, "timestamp": "now()", "by": request.state.user_id})
+            warns.append({"reason": reason, "timestamp": "now()", "by": user["id"]})
 
             # Update user record
             await conn.execute(
                 """INSERT INTO users (chat_id, user_id, warns, updated_at)
                    VALUES ($1, $2, $3, NOW())
-                   ON CONFLICT (chat_id, user_id) 
+                   ON CONFLICT (chat_id, user_id)
                    DO UPDATE SET warns = $3, updated_at = NOW()""",
                 chat_id,
                 user_id,
@@ -559,13 +572,13 @@ async def warn_member(chat_id: int, user_id: int, request: Request):
 
             # Log the action
             await conn.execute(
-                """INSERT INTO actions_log 
+                """INSERT INTO actions_log
                    (chat_id, action, target_user_id, by_user_id, reason, timestamp)
                    VALUES ($1, 'warn', $2, $3, $4, NOW())""",
                 chat_id,
                 user_id,
                 reason,
-                request.state.user_id,
+                user["id"],
             )
 
         return {"ok": True, "warn_count": len(warns)}
@@ -575,7 +588,7 @@ async def warn_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/bulk")
-async def bulk_action(chat_id: int, request: Request):
+async def bulk_action(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     user_ids = body.get("user_ids", [])
     action = body.get("action")
@@ -613,7 +626,7 @@ async def bulk_action(chat_id: int, request: Request):
                            ON CONFLICT (chat_id, user_id) DO NOTHING""",
                         chat_id,
                         uid,
-                        request.state.user_id,
+                        user["id"],
                     )
                 elif action == "unapprove":
                     await conn.execute(
@@ -635,14 +648,14 @@ async def bulk_action(chat_id: int, request: Request):
                         {
                             "reason": "Warned via bulk action",
                             "timestamp": "now()",
-                            "by": request.state.user_id,
+                            "by": user["id"],
                         }
                     )
 
                     await conn.execute(
                         """INSERT INTO users (chat_id, user_id, warns, updated_at)
                            VALUES ($1, $2, $3, NOW())
-                           ON CONFLICT (chat_id, user_id) 
+                           ON CONFLICT (chat_id, user_id)
                            DO UPDATE SET warns = $3, updated_at = NOW()""",
                         chat_id,
                         uid,
@@ -651,12 +664,12 @@ async def bulk_action(chat_id: int, request: Request):
 
                     # Log the action
                     await conn.execute(
-                        """INSERT INTO actions_log 
+                        """INSERT INTO actions_log
                            (chat_id, action, target_user_id, by_user_id, reason, timestamp)
                            VALUES ($1, 'warn', $2, $3, 'Bulk warn action', NOW())""",
                         chat_id,
                         uid,
-                        request.state.user_id,
+                        user["id"],
                     )
                 elif bot_app:
                     if action == "ban":
@@ -665,7 +678,7 @@ async def bulk_action(chat_id: int, request: Request):
                         await conn.execute(
                             """INSERT INTO users (chat_id, user_id, is_banned, updated_at)
                                VALUES ($1, $2, TRUE, NOW())
-                               ON CONFLICT (chat_id, user_id) 
+                               ON CONFLICT (chat_id, user_id)
                                DO UPDATE SET is_banned = TRUE, updated_at = NOW()""",
                             chat_id,
                             uid,
@@ -680,7 +693,7 @@ async def bulk_action(chat_id: int, request: Request):
                         await conn.execute(
                             """INSERT INTO users (chat_id, user_id, is_muted, updated_at)
                                VALUES ($1, $2, TRUE, NOW())
-                               ON CONFLICT (chat_id, user_id) 
+                               ON CONFLICT (chat_id, user_id)
                                DO UPDATE SET is_muted = TRUE, updated_at = NOW()""",
                             chat_id,
                             uid,
@@ -693,7 +706,6 @@ async def bulk_action(chat_id: int, request: Request):
                             uid,
                             ChatPermissions(
                                 can_send_messages=True,
-                                can_send_media_messages=True,
                                 can_send_polls=True,
                                 can_send_other_messages=True,
                                 can_add_web_page_previews=True,
@@ -756,7 +768,7 @@ async def update_antiraid_settings(chat_id: int, request: Request):
 
 
 @router.post("/antiraid/toggle")
-async def toggle_antiraid(chat_id: int, request: Request):
+async def toggle_antiraid(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     enable = body.get("enable", False)
 
@@ -778,7 +790,5 @@ async def toggle_antiraid(chat_id: int, request: Request):
     settings = await get_group_settings(db.pool, chat_id)
     from bot.antiraid.engine import manual_toggle_raid
 
-    result = await manual_toggle_raid(
-        bot_app.bot, chat_id, enable, settings, db.pool, request.state.user_id
-    )
+    result = await manual_toggle_raid(bot_app.bot, chat_id, enable, settings, db.pool, user["id"])
     return {"ok": True, "result": result}

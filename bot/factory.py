@@ -14,12 +14,14 @@ CRITICAL:
 
 import logging
 
+from telegram import Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
     CallbackQueryHandler,
     ChatMemberHandler,
     CommandHandler,
+    ContextTypes,
     MessageHandler,
     filters,
 )
@@ -200,6 +202,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.moderation import (
         ban_command,
         clearrules_command,
+        close_group_command,
         del_command,
         demote_command,
     )
@@ -210,6 +213,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         lock_command,
         locks_list_command,
         mute_command,
+        open_group_command,
         promote_command,
         purge_command,
     )
@@ -252,6 +256,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("lock", lock_command, filters=GROUP))
     app.add_handler(CommandHandler("unlock", unlock_command, filters=GROUP))
     app.add_handler(CommandHandler("locks", locks_list_command, filters=GROUP))
+    app.add_handler(CommandHandler("open", open_group_command, filters=GROUP))
+    app.add_handler(CommandHandler("close", close_group_command, filters=GROUP))
     app.add_handler(CommandHandler("rules", nexus_rules_command, filters=GROUP))
     app.add_handler(CommandHandler("setrules", setrules_command, filters=GROUP))
     app.add_handler(CommandHandler("clearrules", clearrules_command, filters=GROUP))
@@ -574,38 +580,44 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── v21 New Handlers ────────────────────────────────────────────────────
     # TrustNet (Federation) handlers
     from bot.handlers.federation import federation_handlers
+
     for handler in federation_handlers:
         app.add_handler(handler)
     logger.info("[FACTORY] TrustNet handlers registered")
-    
+
     # Community Vote handlers
-    from bot.handlers.community_vote import community_vote_handlers, auto_detect_scam
+    from bot.handlers.community_vote import auto_detect_scam, community_vote_handlers
+
     for handler in community_vote_handlers:
         app.add_handler(handler)
     # Auto-detect scam messages (runs on every message)
     app.add_handler(MessageHandler(GROUP & filters.TEXT, auto_detect_scam), group=5)
     logger.info("[FACTORY] Community Vote handlers registered")
-    
+
     # Night Mode handlers
     from bot.handlers.night_mode import night_mode_handlers
+
     for handler in night_mode_handlers:
         app.add_handler(handler)
     logger.info("[FACTORY] Night Mode handlers registered")
-    
+
     # Sangmata (Name History) handlers
     from bot.handlers.sangmata import sangmata_handlers
+
     for handler in sangmata_handlers:
         app.add_handler(handler)
     logger.info("[FACTORY] Sangmata handlers registered")
-    
+
     # Language setting handlers
     from bot.handlers.lang_setting import lang_setting_handlers
+
     for handler in lang_setting_handlers:
         app.add_handler(handler)
     logger.info("[FACTORY] Language setting handlers registered")
-    
+
     # Enhanced Inline Query handler (replaces existing inline_mode)
     from bot.handlers.inline_query import inline_query_handlers
+
     for handler in inline_query_handlers:
         app.add_handler(handler)
     logger.info("[FACTORY] Enhanced inline query handlers registered")
@@ -615,11 +627,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         """Sync group with bot — fixes groups added before webhooks were configured."""
         chat = update.effective_chat
         user = update.effective_user
-        
+
         if not chat or chat.type not in ["group", "supergroup"]:
             await update.message.reply_text("❌ This command only works in groups.")
             return
-        
+
         # Check if user is admin
         try:
             member = await context.bot.get_chat_member(chat.id, user.id)
@@ -629,25 +641,28 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         except Exception:
             await update.message.reply_text("❌ Could not verify admin status.")
             return
-        
+
         # Get bot info
         try:
             me = await context.bot.get_me()
             from bot.utils.crypto import hash_token
+
             token_hash = hash_token(context.bot.token)
-            
+
             # Upsert group with bot_token_hash
             pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
             async with pool.acquire() as conn:
                 await conn.execute(
                     """INSERT INTO groups (chat_id, title, bot_token_hash, added_at)
                        VALUES ($1, $2, $3, NOW())
-                       ON CONFLICT (chat_id) DO UPDATE 
+                       ON CONFLICT (chat_id) DO UPDATE
                        SET bot_token_hash = EXCLUDED.bot_token_hash,
                            title = EXCLUDED.title""",
-                    chat.id, chat.title or "Unknown", token_hash
+                    chat.id,
+                    chat.title or "Unknown",
+                    token_hash,
                 )
-            
+
             await update.message.reply_text(
                 f"✅ Group synced successfully!\n\n"
                 f"Bot: @{me.username}\n"
@@ -664,12 +679,13 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── CAPTCHA Callback Handlers ──────────────────────────────────────────
     # CRITICAL: Register captcha callback handlers so button clicks work
     from bot.handlers.captcha_callback import handle_captcha_callback
+
     app.add_handler(CallbackQueryHandler(handle_captcha_callback, pattern=r"^captcha:"))
-    
+
     # Fix 8: Support old challenge callback pattern
     from bot.handlers.captcha import captcha_callback_handler
-    app.add_handler(CallbackQueryHandler(
-        captcha_callback_handler, pattern=r"^captcha_verify_\d+$"))
+
+    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r"^captcha_verify_\d+$"))
 
     logger.info("[FACTORY] CAPTCHA callback handlers registered")
 

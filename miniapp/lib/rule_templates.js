@@ -95,6 +95,6 @@ export async function applyTemplate(chatId, templateId) {
   const { apiFetch } = await import('./api.js');
   return apiFetch(`/api/groups/${chatId}/settings/bulk`, {
     method: 'PUT',
-    body: JSON.stringify({ settings: template.settings }),
+    body: { settings: template.settings },
   });
 }

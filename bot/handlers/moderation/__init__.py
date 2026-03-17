@@ -1,7 +1,13 @@
 from .ban import ban_command, sban_command, tban_command, unban_command
 from .info import id_command, info_command
 from .kick import kick_command
-from .locks import lock_command, locks_list_command, unlock_command
+from .locks import (
+    close_group_command,
+    lock_command,
+    locks_list_command,
+    open_group_command,
+    unlock_command,
+)
 from .mute import mute_command, tmute_command, unmute_command
 from .promote import admins_command, demote_command, promote_command
 from .purge import del_command, purge_command
@@ -28,6 +34,8 @@ __all__ = [
     "lock_command",
     "unlock_command",
     "locks_list_command",
+    "open_group_command",
+    "close_group_command",
     "rules_command",
     "setrules_command",
     "clearrules_command",

@@ -235,25 +235,39 @@ export async function renderBotsPage(container) {
     if (usage) {
       const usageCard = document.createElement('div');
       usageCard.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);margin-top:var(--sp-4);';
-      const botsPercent = usage.plan_limit_bots > 0 ? Math.min(100, (usage.bots_count / usage.plan_limit_bots) * 100) : 0;
-      const groupsPercent = usage.plan_limit_groups > 0 ? Math.min(100, (usage.groups_count / usage.plan_limit_groups) * 100) : 0;
+      
+      // Clone bots: use clone_count (non-primary only) vs plan_limit_bots
+      const cloneCount = usage.clone_count ?? (usage.bots_count - 1);
+      const botsPercent = usage.plan_limit_bots > 0
+        ? Math.min(100, (cloneCount / usage.plan_limit_bots) * 100) : 0;
+      const botsIsOverLimit = cloneCount > usage.plan_limit_bots;
+      
+      // Groups: handle unlimited (0) - show ∞, hide progress bar
+      const groupsTotal = usage.plan_limit_groups;
+      const groupsDisplay = groupsTotal === 0 ? '∞' : String(groupsTotal);
+      const groupsPercent = groupsTotal > 0
+        ? Math.min(100, (usage.groups_count / groupsTotal) * 100) : 0;
+      const groupsIsOverLimit = groupsTotal > 0 && usage.groups_count > groupsTotal;
+      
       usageCard.innerHTML = `
         <div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);margin-bottom:var(--sp-3);">📊 Plan Usage — ${usage.plan_name}</div>
         <div style="margin-bottom:var(--sp-3);">
           <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:4px;">
-            <span>Bots</span><span>${usage.bots_count} / ${usage.plan_limit_bots}</span>
+            <span>Clone Bots</span><span>${cloneCount} / ${usage.plan_limit_bots}</span>
           </div>
           <div style="height:6px;background:var(--bg-input);border-radius:var(--r-full);overflow:hidden;">
-            <div style="width:${botsPercent}%;height:100%;background:${botsPercent >= 80 ? 'var(--warning)' : 'var(--accent)'};border-radius:var(--r-full);transition:width .3s;"></div>
+            <div style="width:${botsPercent}%;height:100%;background:${botsIsOverLimit ? 'var(--danger)' : (botsPercent >= 80 ? 'var(--warning)' : 'var(--accent)')};border-radius:var(--r-full);transition:width .3s;"></div>
           </div>
         </div>
         <div>
           <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:4px;">
-            <span>Groups</span><span>${usage.groups_count} / ${usage.plan_limit_groups}</span>
+            <span>Groups${groupsTotal === 0 ? ' <span style="color:var(--text-muted);font-size:0.9em;">(Primary bot: unlimited)</span>' : ''}</span><span>${usage.groups_count} / ${groupsDisplay}</span>
           </div>
+          ${groupsTotal > 0 ? `
           <div style="height:6px;background:var(--bg-input);border-radius:var(--r-full);overflow:hidden;">
-            <div style="width:${groupsPercent}%;height:100%;background:${groupsPercent >= 80 ? 'var(--warning)' : 'var(--accent)'};border-radius:var(--r-full);transition:width .3s;"></div>
+            <div style="width:${groupsPercent}%;height:100%;background:${groupsIsOverLimit ? 'var(--danger)' : (groupsPercent >= 80 ? 'var(--warning)' : 'var(--accent)')};border-radius:var(--r-full);transition:width .3s;"></div>
           </div>
+          ` : ''}
         </div>
       `;
       container.appendChild(usageCard);

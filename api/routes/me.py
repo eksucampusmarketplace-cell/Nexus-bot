@@ -317,29 +317,45 @@ async def get_usage(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=401, detail="Invalid user data")
 
     async with db.pool.acquire() as conn:
-        bot_row = await conn.fetchrow(
-            "SELECT id, group_limit, groups_count FROM bots WHERE owner_user_id=$1 AND is_primary=FALSE",
-            user_id
-        )
+        # Get total bots count (including primary)
         bots_count = await conn.fetchval(
             "SELECT COUNT(*) FROM bots WHERE owner_user_id=$1", user_id
         ) or 0
+        
+        # Get non-primary bots count (clones) - for the limit bar
+        clone_count = await conn.fetchval(
+            "SELECT COUNT(*) FROM bots WHERE owner_user_id=$1 AND is_primary=FALSE", user_id
+        ) or 0
+        
+        # Get groups count with correct JOIN on token_hash
         groups_count = await conn.fetchval(
-            """SELECT COUNT(DISTINCT g.chat_id) FROM groups g
-               JOIN bots b ON b.id::text = split_part(g.bot_token_hash, '_', 1)
-                           OR g.bot_token_hash IN (SELECT token_hash FROM bots WHERE owner_user_id=$1)
-               WHERE b.owner_user_id=$1""",
+            """SELECT COUNT(DISTINCT g.chat_id)
+               FROM groups g
+               INNER JOIN bots b ON b.token_hash = g.bot_token_hash
+               WHERE b.owner_user_id = $1""",
             user_id
         ) or 0
+        
+        # Get plan limits from primary bot
+        primary_bot = await conn.fetchrow(
+            "SELECT group_limit FROM bots WHERE owner_user_id=$1 AND is_primary=TRUE",
+            user_id
+        )
 
-    group_limit = 10
+    # Determine limits based on plan
+    group_limit = 10  # default for free
+    if primary_bot:
+        gl = primary_bot.get("group_limit") or 0
+        # 0 = unlimited (primary bot on any plan)
+        group_limit = gl if gl > 0 else 0
+    
+    # Clone bot limit: 3 for free, could be higher for paid plans
+    # For now, hardcode to 3 (Free plan) - in production would come from user plan
     bot_limit = 3
-    if bot_row:
-        gl = bot_row.get("group_limit") or 0
-        group_limit = gl if gl > 0 else 10
 
     return {
         "bots_count": int(bots_count),
+        "clone_count": int(clone_count),
         "groups_count": int(groups_count),
         "plan_limit_bots": bot_limit,
         "plan_limit_groups": group_limit,

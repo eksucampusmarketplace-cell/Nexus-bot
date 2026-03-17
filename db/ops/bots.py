@@ -58,12 +58,18 @@ async def get_bots_by_owner(pool: asyncpg.Pool, owner_user_id: int) -> list[dict
     """
     Return all bots owned by a user, ordered by is_primary DESC, added_at DESC.
     Primary bot always appears first in the list.
+    Groups count is computed live via subquery (not stale column).
     Logs: [DB][bots][SELECT] owner={owner_user_id} → {count} rows
     """
     start = time.monotonic()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT * FROM bots WHERE owner_user_id = $1 ORDER BY is_primary DESC, added_at DESC",
+            """SELECT b.*,
+                      (SELECT COUNT(*) FROM groups g
+                       WHERE g.bot_token_hash = b.token_hash) AS groups_count
+               FROM bots b
+               WHERE b.owner_user_id = $1
+               ORDER BY b.is_primary DESC, b.added_at DESC""",
             owner_user_id,
         )
     duration = (time.monotonic() - start) * 1000

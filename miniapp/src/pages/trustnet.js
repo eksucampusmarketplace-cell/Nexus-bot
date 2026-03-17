@@ -4,9 +4,9 @@
  * TrustNet / Federation management page.
  */
 
-import { t, showToast } from '../lib/i18n.js?v=1.6.0';
-import { apiFetch } from '../lib/api.js?v=1.6.0';
-import { useStore } from '../store/index.js?v=1.6.0';
+import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { useStore } from '../../store/index.js?v=1.6.0';
 
 export async function renderTrustnetPage(container) {
   const chatId = useStore.getState().activeChatId;

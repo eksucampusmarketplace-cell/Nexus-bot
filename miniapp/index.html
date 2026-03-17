@@ -695,10 +695,11 @@
         case 'automod':
           await renderAutomodPage(container);
           break;
-        case 'moderation':
+        case 'moderation': {
           const { renderModerationPage } = await import('./src/pages/moderation.js?v=1.6.0');
           await renderModerationPage(container);
           break;
+        }
         case 'members':
           await renderMembers(container);
           break;
@@ -763,38 +764,46 @@
         case 'owner':
           await renderOwnerPage(container);
           break;
-        case 'trustnet':
+        case 'trustnet': {
           const { renderTrustnetPage } = await import('./src/pages/trustnet.js?v=1.6.0');
           await renderTrustnetPage(container);
           break;
-        case 'captcha':
+        }
+        case 'captcha': {
           const { renderCaptchaPage } = await import('./src/pages/captcha.js?v=1.6.0');
           await renderCaptchaPage(container);
           break;
-        case 'community-vote':
+        }
+        case 'community-vote': {
           const { renderCommunityVotePage } = await import('./src/pages/community_vote.js?v=1.6.0');
           await renderCommunityVotePage(container);
           break;
-        case 'night-mode':
+        }
+        case 'night-mode': {
           const { renderNightModePage } = await import('./src/pages/night_mode.js?v=1.6.0');
           await renderNightModePage(container);
           break;
-        case 'history':
+        }
+        case 'history': {
           const { renderHistoryPage } = await import('./src/pages/history.js?v=1.6.0');
           await renderHistoryPage(container);
           break;
-        case 'language':
+        }
+        case 'language': {
           const { renderLanguagePage } = await import('./src/pages/language.js?v=1.6.0');
           await renderLanguagePage(container);
           break;
-        case 'notifications':
+        }
+        case 'notifications': {
           const { renderNotificationsPage } = await import('./src/pages/notifications.js?v=1.6.0');
           await renderNotificationsPage(container);
           break;
-        case 'persona':
+        }
+        case 'persona': {
           const { renderPersonaPage } = await import('./src/pages/persona.js?v=1.6.0');
           await renderPersonaPage(container);
           break;
+        }
 
       }
     }

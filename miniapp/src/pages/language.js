@@ -5,8 +5,9 @@
  * Integrates with the i18n system.
  */
 
-import { t, showToast, AVAILABLE_LANGUAGES, changeLanguage } from '../lib/i18n.js?v=1.6.0';
-import { apiFetch } from '../lib/api.js?v=1.6.0';
+import { t, showToast, AVAILABLE_LANGUAGES, changeLanguage } from '../../lib/i18n.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { useStore } from '../../store/index.js?v=1.6.0';
 
 export async function renderLanguagePage(container) {
   container.innerHTML = '';

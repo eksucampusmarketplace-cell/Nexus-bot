@@ -950,14 +950,26 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
     await registry_register(bot_id, clone_app)
     logger.info(f"[CLONE][REGISTER] PTB app live | bot_id={bot_id} | @{username}")
 
-    # Step 5: Send success message
+    # Step 5: Start trial for new clone bot
+    from bot.billing.subscriptions import start_trial
+    try:
+        trial_result = await start_trial(db_pool, bot_id)
+        if trial_result.get("ok"):
+            logger.info(f"[CLONE][REGISTER] Trial started | bot_id={bot_id}")
+        else:
+            logger.warning(f"[CLONE][REGISTER] Trial start failed: {trial_result.get('error')}")
+    except Exception as e:
+        logger.warning(f"[CLONE][REGISTER] Trial start error (continuing): {e}")
+
+    # Step 6: Send success message with trial info
     logger.info(f"[CLONE][REGISTER] ✅ Complete | bot_id={bot_id} | @{username}")
     await edit_message.edit_text(
         rf"🚀 *@{username} is live\!*\n\n"
         rf"📛 {pending['display_name']}\n"
         rf"🆔 `{bot_id}`\n"
         r"🔗 Webhook: active\n\n"
-        r"Add it to any group as admin — it will appear in your Mini App dashboard\.",
+        rf"🕐 15\-day trial with Starter features active\.\n"
+        rf"Add it to any group as admin — it will appear in your Mini App dashboard\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [[InlineKeyboardButton("🚀 Open Mini App", web_app={"url": f"{render_url}/miniapp"})]]

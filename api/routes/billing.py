@@ -18,6 +18,18 @@ from bot.billing.stars_economy import (
     get_referral_stats,
     REFERRAL_BONUS_STARS,
 )
+from bot.billing.plans import get_all_plans, get_plans_for_display, get_plan
+from bot.billing.subscriptions import (
+    create_subscription,
+    cancel_subscription,
+    get_trial_days_remaining,
+    get_active_trials,
+)
+from bot.billing.billing_helpers import (
+    get_owner_plan,
+    can_owner_add_clone_bot,
+    check_owner_total_properties,
+)
 
 log = logging.getLogger("billing_api")
 router = APIRouter()
@@ -120,3 +132,136 @@ async def create_promo_endpoint(request: Request, req: CreatePromoRequest):
     except Exception as e:
         log.error(f"[Billing API] create_promo error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── PLAN ENDPOINTS ────────────────────────────────────────────────────────────
+
+
+@router.get("/api/billing/plans")
+async def get_plans_endpoint(request: Request):
+    """Get all available plans for display."""
+    plans = get_plans_for_display()
+    return {"plans": plans}
+
+
+@router.get("/api/billing/owner-info")
+async def get_owner_info_endpoint(request: Request):
+    """Get owner's current plan and usage information."""
+    owner_id = request.state.user_id
+    db_pool = request.app.state.db
+
+    # Get owner's plan
+    plan_key = await get_owner_plan(db_pool, owner_id)
+    plan_config = get_plan(plan_key)
+
+    # Check if can add more clones
+    can_add_clone, clone_error = await can_owner_add_clone_bot(db_pool, owner_id)
+
+    # Check property usage
+    within_limit, prop_count, prop_error = await check_owner_total_properties(db_pool, owner_id)
+
+    # Count current bots
+    from db.ops.bots import get_bots_by_owner
+    bots = await get_bots_by_owner(db_pool, owner_id)
+    clone_count = sum(1 for b in bots if not b.get("is_primary", False))
+
+    # Get active trials
+    trials = await get_active_trials(db_pool, owner_id)
+
+    return {
+        "plan": plan_key,
+        "plan_name": plan_config.get("name", "Free"),
+        "clone_bots_allowed": plan_config.get("clone_bots", 1),
+        "clone_bots_used": clone_count,
+        "can_add_clone": can_add_clone,
+        "clone_error": clone_error if not can_add_clone else None,
+        "total_properties_allowed": plan_config.get("total_properties", 10),
+        "total_properties_used": prop_count,
+        "properties_within_limit": within_limit,
+        "property_error": prop_error if not within_limit else None,
+        "active_trials": trials
+    }
+
+
+# ── SUBSCRIPTION ENDPOINTS ───────────────────────────────────────────────────
+
+
+class SubscribeRequest(BaseModel):
+    plan: str  # 'basic', 'starter', 'pro', 'unlimited'
+
+
+@router.post("/api/billing/subscribe")
+async def subscribe_endpoint(request: Request, req: SubscribeRequest):
+    """
+    Subscribe to a paid plan.
+
+    This endpoint creates a subscription record and returns a payment link.
+    The actual payment is processed via Telegram Stars payment API.
+    """
+    owner_id = request.state.user_id
+    db_pool = request.app.state.db
+    bot = request.app.state.bot
+
+    # Validate plan
+    plan = get_plan(req.plan)
+    if not plan or req.plan in ("free", "trial", "primary", "trial_expired"):
+        raise HTTPException(status_code=400, detail="Invalid plan")
+
+    # Check if already on this plan
+    current_plan = await get_owner_plan(db_pool, owner_id)
+    if current_plan == req.plan:
+        raise HTTPException(status_code=400, detail="You already have this plan")
+
+    # In a real implementation, you would generate a Telegram Stars payment link here
+    # For now, return the plan info
+    return {
+        "ok": True,
+        "plan": req.plan,
+        "plan_name": plan["name"],
+        "price_stars": plan["price_stars"],
+        "price_display": plan["price_display"],
+        "message": "Payment integration coming soon"
+    }
+
+
+@router.post("/api/billing/cancel")
+async def cancel_subscription_endpoint(request: Request):
+    """Cancel auto-renewal of current subscription."""
+    owner_id = request.state.user_id
+    db_pool = request.app.state.db
+
+    result = await cancel_subscription(db_pool, owner_id)
+    return result
+
+
+# ── TRIAL ENDPOINTS ──────────────────────────────────────────────────────────
+
+
+@router.get("/api/billing/trials")
+async def get_trials_endpoint(request: Request):
+    """Get all active trials for the owner."""
+    owner_id = request.state.user_id
+    db_pool = request.app.state.db
+
+    trials = await get_active_trials(db_pool, owner_id)
+    return {"trials": trials}
+
+
+@router.get("/api/billing/trial-days")
+async def get_trial_days_endpoint(request: Request, bot_id: int):
+    """Get remaining days for a trial bot."""
+    owner_id = request.state.user_id
+    db_pool = request.app.state.db
+
+    # Verify ownership
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT owner_user_id FROM bots WHERE bot_id = $1",
+            bot_id
+        )
+
+    if not row or row["owner_user_id"] != owner_id:
+        raise HTTPException(status_code=403, detail="Not your bot")
+
+    days = await get_trial_days_remaining(db_pool, bot_id)
+    return {"bot_id": bot_id, "days_remaining": days}

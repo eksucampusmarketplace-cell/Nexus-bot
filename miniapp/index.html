@@ -1742,14 +1742,14 @@
         // ── 1. GROUP IDENTITY ─────────────────────────────────────────────
         const LANGS = [
           { code: 'en', label: '🇬🇧 English' },
-          { code: 'ar', label: '🇸🇦 العربية' },
+          { code: 'ar', label: '🇸🇦 Arabic' },
           { code: 'de', label: '🇩🇪 Deutsch' },
           { code: 'es', label: '🇪🇸 Español' },
           { code: 'fr', label: '🇫🇷 Français' },
           { code: 'hi', label: '🇮🇳 हिन्दी' },
           { code: 'id', label: '🇮🇩 Indonesia' },
           { code: 'pt', label: '🇧🇷 Português' },
-          { code: 'ru', label: '🇷🇺 Русский' },
+          { code: 'ru', label: '🇷🇺 Russian' },
           { code: 'tr', label: '🇹🇷 Türkçe' },
         ];
         const allTimezones = (typeof Intl !== 'undefined' && Intl.supportedValuesOf) ? Intl.supportedValuesOf('timeZone') : [];
@@ -1782,7 +1782,7 @@
         container.appendChild(identityCard);
         identityCard.querySelector('#lang-select').onchange = async (e) => {
           try {
-            await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: JSON.stringify({ settings: { language: e.target.value } }) });
+            await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: { settings: { language: e.target.value } } });
             state.updateSetting('language', e.target.value);
             showToast('Language saved', 'success');
           } catch (err) { showToast('Failed to save', 'error'); }
@@ -1795,7 +1795,7 @@
         };
         tzInput.onblur = async () => {
           try {
-            await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: JSON.stringify({ settings: { timezone: tzInput.value } }) });
+            await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: { settings: { timezone: tzInput.value } } });
             state.updateSetting('timezone', tzInput.value);
             showToast('Timezone saved', 'success');
           } catch (err) { showToast('Failed to save', 'error'); }

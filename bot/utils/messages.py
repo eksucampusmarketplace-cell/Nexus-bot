@@ -15,6 +15,8 @@ RULES:
   - Customizable fields use {variable} placeholders documented below.
 """
 
+import time
+
 from config import settings
 
 # ── POWERED BY FOOTER ──────────────────────────────────────────────────────
@@ -153,31 +155,41 @@ async def get_message(
 
     custom_body = None
 
-    # 1. Try group-specific override
-    if db and group_id:
-        try:
-            row = await db.fetchrow(
-                "SELECT body FROM group_custom_messages " "WHERE group_id=$1 AND message_key=$2",
-                group_id,
-                key,
-            )
-            if row:
-                custom_body = row["body"]
-        except Exception as e:
-            log.warning(f"[MESSAGES] Group DB lookup failed | key={key} error={e}")
+    if db and (group_id or bot_id):
+        cache_key = (group_id, bot_id, key)
+        cached = get_message._cache.get(cache_key)
+        if cached and (time.monotonic() - cached["ts"]) < 300:
+            custom_body = cached["body"]
+        else:
+            # 1. Try group-specific override
+            if group_id:
+                try:
+                    row = await db.fetchrow(
+                        "SELECT body FROM group_custom_messages"
+                        " WHERE group_id=$1 AND message_key=$2",
+                        group_id,
+                        key,
+                    )
+                    if row:
+                        custom_body = row["body"]
+                except Exception as e:
+                    log.warning(f"[MESSAGES] Group DB lookup failed | key={key} error={e}")
 
-    # 2. Try bot-wide override if no group override found
-    if not custom_body and db and bot_id:
-        try:
-            row = await db.fetchrow(
-                "SELECT body FROM bot_custom_messages " "WHERE bot_id=$1 AND message_key=$2",
-                bot_id,
-                key,
-            )
-            if row:
-                custom_body = row["body"]
-        except Exception as e:
-            log.warning(f"[MESSAGES] Bot DB lookup failed | key={key} error={e}")
+            # 2. Try bot-wide override if no group override found
+            if not custom_body and bot_id:
+                try:
+                    row = await db.fetchrow(
+                        "SELECT body FROM bot_custom_messages"
+                        " WHERE bot_id=$1 AND message_key=$2",
+                        bot_id,
+                        key,
+                    )
+                    if row:
+                        custom_body = row["body"]
+                except Exception as e:
+                    log.warning(f"[MESSAGES] Bot DB lookup failed | key={key} error={e}")
+
+            get_message._cache[cache_key] = {"body": custom_body, "ts": time.monotonic()}
 
     body = custom_body if custom_body else DEFAULTS.get(key, "")
     is_custom = bool(custom_body)
@@ -195,3 +207,6 @@ async def get_message(
         log.warning(f"[MESSAGES] Format failed | key={key} error={e}")
 
     return _append_footer(body)
+
+
+get_message._cache = {}

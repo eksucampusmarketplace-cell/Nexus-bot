@@ -11,7 +11,7 @@ import string
 import uuid
 from datetime import datetime, timezone, timedelta
 
-from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from telegram.error import TelegramError
 
 from db.ops.captcha import (
@@ -28,6 +28,15 @@ log = logging.getLogger("captcha")
 
 EMOJI_OPTIONS = ["🌟", "🎯", "🔥", "💎", "🚀", "🎲", "🌈", "⚡", "🎭", "🦋"]
 
+WEBAPP_MODES = {
+    "webapp",
+    "miniapp",
+    "emoji",
+    "word_scramble",
+    "odd_one_out",
+    "number_sequence",
+}
+
 
 async def send_captcha(
     bot: Bot, chat_id: int, user, settings: dict, db, join_message_id: int | None = None
@@ -42,35 +51,42 @@ async def send_captcha(
 
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=timeout)
 
-    # Check for WebApp mode without RENDER_EXTERNAL_URL
-    if mode in ("webapp", "miniapp"):
-        from config import settings as bot_settings
-        if not bot_settings.RENDER_EXTERNAL_URL:
-            log.warning(f"[CAPTCHA] WebApp mode requested but RENDER_EXTERNAL_URL not set")
+    from config import settings as bot_settings
+
+    if mode in WEBAPP_MODES:
+        if bot_settings.RENDER_EXTERNAL_URL:
+            text, markup, answer = _build_webapp_captcha(
+                cid, mode, bot_settings.RENDER_EXTERNAL_URL, chat_id, user.id
+            )
+        else:
+            # Graceful fallback — log warning and use button mode
+            log.warning(f"[CAPTCHA] WebApp mode {mode} needs RENDER_EXTERNAL_URL")
             # Notify clone owner
             try:
                 from bot.utils.error_notifier import notify_clone_owner
+
                 asyncio.create_task(
                     notify_clone_owner(
                         bot,
                         bot.id,
                         "CAPTCHA_WEBAPP_URL_MISSING",
                         context={"url": "NOT SET", "chat_id": chat_id},
-                        pool=db
+                        pool=db,
                     )
                 )
             except Exception as notify_err:
-                log.debug(f"[CAPTCHA] CAPTCHA_WEBAPP_URL_MISSING notification skipped: {notify_err}")
-            # Fallback to button mode
+                log.debug(
+                    f"[CAPTCHA] CAPTCHA_WEBAPP_URL_MISSING notification skipped: {notify_err}"
+                )
             mode = "button"
-
-    if mode == "button":
-        text, markup, answer = _build_button_captcha(cid)
+            text, markup, answer = _build_button_captcha(cid)
     elif mode == "math":
         text, markup, answer = _build_math_captcha(cid)
     elif mode == "text":
         text, markup, answer = _build_text_captcha(cid)
     else:
+        # Default to button for anything else
+        mode = "button"
         text, markup, answer = _build_button_captcha(cid)
 
     full_text = (
@@ -311,3 +327,18 @@ def _build_text_captcha(cid: str):
     code = "".join(random.choices(string.ascii_uppercase + string.digits, k=6))
     text = f"🔤 Type exactly: <code>{code}</code>"
     return text, None, code
+
+
+def _build_webapp_captcha(cid, mode, base_url, chat_id, user_id):
+    from telegram import WebAppInfo
+
+    url = (
+        f"{base_url.rstrip('/')}/captcha.html"
+        f"?mode={mode}&challenge_id={cid}"
+        f"&chat_id={chat_id}&user_id={user_id}"
+    )
+    markup = InlineKeyboardMarkup(
+        [[InlineKeyboardButton("🌐 Open Verification", web_app=WebAppInfo(url=url))]]
+    )
+    text = "👇 Tap the button below to complete verification."
+    return text, markup, "webapp_verified"

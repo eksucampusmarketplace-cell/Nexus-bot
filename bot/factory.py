@@ -89,7 +89,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # Import alerts utility for error handling
     from bot.handlers.broadcast_track import track_pm_handler
-    from bot.handlers.captcha import captcha_callback_handler, new_member_handler
+    from bot.handlers.captcha import new_member_handler
     from bot.handlers.captcha_callback import handle_captcha_callback
     from bot.handlers.captcha_message import handle_captcha_message
     from bot.handlers.channel import (
@@ -681,11 +681,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.captcha_callback import handle_captcha_callback
 
     app.add_handler(CallbackQueryHandler(handle_captcha_callback, pattern=r"^captcha:"))
-
-    # Fix 8: Support old challenge callback pattern
-    from bot.handlers.captcha import captcha_callback_handler
-
-    app.add_handler(CallbackQueryHandler(captcha_callback_handler, pattern=r"^captcha_verify_\d+$"))
 
     logger.info("[FACTORY] CAPTCHA callback handlers registered")
 

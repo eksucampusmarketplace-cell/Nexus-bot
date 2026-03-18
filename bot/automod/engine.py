@@ -185,27 +185,28 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
             return result
 
         # Check message frequency (flood detection)
-        is_flooding, msg_count = detect_message_frequency(
-            user.id,
-            chat.id,
-            window_sec=settings.get("flood_window_sec", 10),
-            threshold=settings.get("flood_threshold", 8),
-        )
-        if is_flooding:
-            result = AutomodResult(
-                violated=True,
-                rule_key="flood",
-                penalty="mute",
-                reason=f"Rapid message frequency detected ({msg_count} msgs)",
+        if settings.get("antiflood"):
+            is_flooding, msg_count = detect_message_frequency(
+                user.id,
+                chat.id,
+                window_sec=settings.get("antiflood_window", 10),
+                threshold=settings.get("antiflood_limit", 8),
             )
-            await _enforce(
-                msg, user, chat, context, settings, result, settings.get("flood_mute_minutes", 5)
-            )
-            await _push_sse(context, chat, user, result)
-            return result
+            if is_flooding:
+                result = AutomodResult(
+                    violated=True,
+                    rule_key="flood",
+                    penalty=settings.get("antiflood_action", "mute"),
+                    reason=f"Rapid message frequency detected ({msg_count} msgs)",
+                )
+                await _enforce(
+                    msg, user, chat, context, settings, result, settings.get("flood_mute_minutes", 5)
+                )
+                await _push_sse(context, chat, user, result)
+                return result
 
     # ── 6. Unofficial Telegram detection ──────────────────────────────────
-    if settings.get("unofficial_tg_lock") and msg.text:
+    if locks.get("unofficial_tg") and msg.text:
         if detect_unofficial_telegram(msg):
             result = AutomodResult(
                 violated=True,
@@ -482,6 +483,8 @@ def _content_matches_rule(msg, content_type: str, rule_key: str) -> bool:
         "voice": "voice",
         "audio": "audio",
         "file": "document",
+        "document": "document",
+        "contact": "contact",
         "software": "apk",
         "location": "location",
         "phone": "contact",
@@ -509,6 +512,7 @@ def _content_matches_rule(msg, content_type: str, rule_key: str) -> bool:
             m.reply_to_message is not None and m.reply_to_message.forward_from_chat is not None
         ),
         "bot": lambda m: (m.new_chat_members and any(u.is_bot for u in m.new_chat_members)),
+        "userbots": lambda m: (m.via_bot is not None),
         "unofficial_tg": lambda m: False,  # handled separately
         "spoiler": lambda m: _has_spoiler(m),
         "text": lambda m: bool(m.text and not m.text.startswith("/")),

@@ -7,6 +7,7 @@
 
 import { t, showToast, AVAILABLE_LANGUAGES, changeLanguage } from '../../lib/i18n.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
 
 export async function renderLanguagePage(container) {
   container.innerHTML = '';
@@ -48,8 +49,16 @@ export async function renderLanguagePage(container) {
   `;
   container.appendChild(header);
 
-  // Read current language from localStorage — no server call needed just to read
-  const currentLang = localStorage.getItem('nexus_lang') || 'en';
+  // Fetch current language from server
+  let currentLang = 'en';
+  try {
+    const res = await apiFetch('/api/users/me/language');
+    currentLang = res.language_code || 'en';
+  } catch (e) {
+    console.warn('[language] Failed to fetch user language from server:', e);
+    // Fallback to localStorage if server request fails
+    currentLang = localStorage.getItem('nexus_lang') || 'en';
+  }
 
   // Build language grid
   const grid = document.createElement('div');

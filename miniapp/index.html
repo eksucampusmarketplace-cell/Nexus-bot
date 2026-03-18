@@ -465,9 +465,6 @@
     // Render guards for async page renders
     let _settingsRenderToken = 0;
 
-    // Initialize theme
-    initI18n().then(() => console.log('[i18n] Initialized:', window.i18n?.lang));
-    ThemeEngine.init();
 
     // Store helpers
     const store = useStore;
@@ -475,6 +472,15 @@
 
     // Initialize components
     document.addEventListener('DOMContentLoaded', async () => {
+      // 1. ThemeEngine loads (no translations needed)
+      ThemeEngine.init();
+
+      // 2. Translations fetched and cached — await completes
+      await initI18n();
+      console.log('[i18n] Initialized:', window.i18n?.lang);
+
+      // 3. Now translations are in memory — DOM can render
+
       // Setup Telegram WebApp
       const tg = window.Telegram?.WebApp;
       if (tg) {

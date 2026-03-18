@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 
 from bot.utils.localization import STRINGS, SUPPORTED_LANGUAGES
 
-router = APIRouter(prefix="/api/i18n")
+router = APIRouter()
 
 
 @router.get("")

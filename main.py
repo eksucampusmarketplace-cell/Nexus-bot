@@ -556,7 +556,7 @@ try:
     # Register federation with legacy_router for /api/federation/my endpoint
     app.include_router(federation_api.legacy_router, tags=["federation"])
     app.include_router(users_api.router, prefix="/api/users", tags=["users"])
-    app.include_router(i18n_api.router, prefix="/api", tags=["i18n"])
+    app.include_router(i18n_api.router, prefix="/api/i18n", tags=["i18n"])
 
     # Register new API routes (captcha, night_mode, name_history, community_vote)
     from api.routes import captcha as captcha_api

@@ -690,6 +690,7 @@ async def get_group_settings(pool, chat_id: int) -> dict:
         "lock_channel": "forward_channel",
         "lock_hashtag": "hashtag",
         "lock_unofficial_tg": "unofficial_tg",
+        "lock_userbots": "userbots",
     }
     res["locks"] = {
         short: bool(res.get(flat))

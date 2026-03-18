@@ -346,6 +346,29 @@ async def lifespan(app: FastAPI):
     logger.info("[STARTUP] ✅ Analytics background jobs started")
     # ───────────────────────────────────────────────────────────────────────
 
+    # ── Phase 5: Self Keep-Alive Ping ─────────────────────────────────────
+    async def _keep_alive_ping():
+        import aiohttp
+
+        base_url = settings.RENDER_EXTERNAL_URL
+        if not base_url:
+            logger.debug("[KEEP-ALIVE] RENDER_EXTERNAL_URL not set — skipping keep-alive ping")
+            return
+        ping_url = f"{base_url.rstrip('/')}/health"
+        await asyncio.sleep(60)
+        while True:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    await session.get(ping_url, timeout=aiohttp.ClientTimeout(total=10))
+                logger.debug("[KEEP-ALIVE] Pinged health endpoint")
+            except Exception as e:
+                logger.debug(f"[KEEP-ALIVE] Ping failed: {e}")
+            await asyncio.sleep(240)
+
+    asyncio.create_task(_keep_alive_ping())
+    logger.info("[STARTUP] ✅ Keep-alive ping task started")
+    # ───────────────────────────────────────────────────────────────────────
+
     logger.info("=" * 60)
     logger.info("[STARTUP] ✅ All services started")
     logger.info("=" * 60)
@@ -377,6 +400,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Health check endpoint (used by keep-alive ping to prevent Render cold starts)
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 
 # Root redirect

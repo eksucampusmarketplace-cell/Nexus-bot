@@ -12,7 +12,9 @@ Key behaviors:
   - All button URLs come from keyboards.py (never hardcoded here)
 """
 
+import asyncio
 import logging
+
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 from telegram.constants import ParseMode
@@ -110,26 +112,37 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     else:
         # ── GROUP CHAT ────────────────────────────────────────────────
-        # Create group record silently
-        if db_pool:
-            await get_or_create_group(db_pool, chat.id, chat.title)
-
-        # Try to DM the admin
         miniapp_url = None
-        if db_pool:
-            miniapp_url = await get_group_miniapp_url(db_pool, chat.id)
+        dm_msg = None
 
-        dm_msg = await get_message(
-            key="start_group_dm",
-            group_id=chat.id,
-            bot_id=context.bot.id,
-            variables={
-                "first_name": user.first_name,
-                "clone_name": bot_username,
-                "group_name": chat.title or "your group",
-            },
-            db=db_pool,
-        )
+        if db_pool:
+            _, miniapp_url, dm_msg = await asyncio.gather(
+                get_or_create_group(db_pool, chat.id, chat.title),
+                get_group_miniapp_url(db_pool, chat.id),
+                get_message(
+                    key="start_group_dm",
+                    group_id=chat.id,
+                    bot_id=context.bot.id,
+                    variables={
+                        "first_name": user.first_name,
+                        "clone_name": bot_username,
+                        "group_name": chat.title or "your group",
+                    },
+                    db=db_pool,
+                ),
+            )
+        else:
+            dm_msg = await get_message(
+                key="start_group_dm",
+                group_id=chat.id,
+                bot_id=context.bot.id,
+                variables={
+                    "first_name": user.first_name,
+                    "clone_name": bot_username,
+                    "group_name": chat.title or "your group",
+                },
+                db=None,
+            )
 
         try:
             await context.bot.send_message(

@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 class CaptchaSettings(BaseModel):
     enabled: bool = False
-    type: str = "button"  # button, math, word
+    # Accepted modes: button, math, text (classic)
+    # WebApp modes: emoji, word_scramble, odd_one_out, number_sequence, webapp
+    type: str = "button"
     timeout: int = 300  # seconds
 
 

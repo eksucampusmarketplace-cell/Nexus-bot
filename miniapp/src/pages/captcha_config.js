@@ -5,9 +5,10 @@
  * v22: Restored missing file.
  */
 
-import { t, showToast } from '../lib/i18n.js?v=1.6.0';
-import { apiFetch } from '../lib/api.js?v=1.6.0';
-import { useStore } from '../store/index.js?v=1.6.0';
+import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { useStore } from '../../store/index.js?v=1.6.0';
+import { Toggle } from '../../lib/components.js';
 
 export async function renderCaptchaConfigPage(container) {
   const chatId = useStore.getState().activeChatId;
@@ -43,9 +44,7 @@ export async function renderCaptchaConfigPage(container) {
     
     <div class="toggle-row">
       <span>${t('enable_label', 'Enable Captcha')}</span>
-      <div class="toggle" id="captcha-toggle">
-        <div class="toggle-dot"></div>
-      </div>
+      <div id="captcha-toggle-wrapper"></div>
     </div>
 
     <div style="margin-top:var(--sp-4)">
@@ -56,18 +55,19 @@ export async function renderCaptchaConfigPage(container) {
         <optgroup label="Classic (3)">
           <option value="button">🔘 Button Click</option>
           <option value="math">🔢 Math Problem</option>
-          <option value="word">🔤 Word Scramble</option>
+          <option value="text">🔤 Word Scramble</option>
         </optgroup>
-        <optgroup label="WebApp (7)">
+        <optgroup label="WebApp (requires RENDER_EXTERNAL_URL)">
           <option value="emoji">😀 Emoji Match</option>
-          <option value="color">🎨 Color Tap</option>
-          <option value="puzzle">🧩 Slide Puzzle</option>
-          <option value="catch">🎣 Catch the Object</option>
-          <option value="sequence">🔢 Number Sequence</option>
-          <option value="swipe">👆 Swipe Pattern</option>
-          <option value="captcha">🛡️ Image CAPTCHA</option>
+          <option value="word_scramble">🔤 Word Unscramble</option>
+          <option value="odd_one_out">🔍 Odd One Out</option>
+          <option value="number_sequence">🔢 Number Sequence</option>
+          <option value="webapp">🌐 Generic WebApp</option>
         </optgroup>
       </select>
+      <div id="webapp-warning" style="display:none;margin-top:var(--sp-2);padding:var(--sp-2);background:var(--warning-dim);border-radius:var(--r-md);font-size:0.85rem;color:var(--warning);">
+        ⚠️ WebApp modes require RENDER_EXTERNAL_URL to be set in your environment.
+      </div>
     </div>
 
     <div style="margin-top:var(--sp-4)">
@@ -93,17 +93,27 @@ export async function renderCaptchaConfigPage(container) {
   // Load current settings
   loadCaptchaSettings(section, chatId);
 
-  // Toggle functionality
-  const toggle = section.querySelector('#captcha-toggle');
+  // Toggle functionality using Toggle component
   let enabled = false;
-  
-  toggle.onclick = () => {
-    enabled = !enabled;
-    toggle.style.background = enabled ? 'var(--accent)' : 'var(--bg-input)';
-    toggle.querySelector('.toggle-dot').style.transform = enabled ? 'translateX(1.25rem)' : 'translateX(0)';
-  };
+  const toggleWrapper = section.querySelector('#captcha-toggle-wrapper');
+  const toggleEl = Toggle({
+    checked: false,
+    onChange: (val) => { enabled = val; }
+  });
+  toggleWrapper.appendChild(toggleEl);
 
-  // Save functionality
+  // Show/hide WebApp warning based on selection
+  const modeSelect = section.querySelector('#captcha-mode');
+  const webappWarning = section.querySelector('#webapp-warning');
+  const webappModes = ['emoji', 'word_scramble', 'odd_one_out', 'number_sequence', 'webapp'];
+  
+  function updateWarning() {
+    webappWarning.style.display = webappModes.includes(modeSelect.value) ? 'block' : 'none';
+  }
+  updateWarning();
+  modeSelect.addEventListener('change', updateWarning);
+
+  // Save functionality - sends 'type' not 'mode' to match API
   section.querySelector('#save-captcha').onclick = async () => {
     const mode = section.querySelector('#captcha-mode').value;
     const timeout = parseInt(section.querySelector('#captcha-timeout').value);
@@ -113,7 +123,7 @@ export async function renderCaptchaConfigPage(container) {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/captcha`, {
         method: 'POST',
-        body: JSON.stringify({ enabled, mode, timeout, kickFailures })
+        body: { enabled, type: mode, timeout, kickFailures }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {
@@ -127,13 +137,18 @@ async function loadCaptchaSettings(section, chatId) {
   try {
     const settings = await apiFetch(`/api/groups/${chatId}/captcha`);
     if (settings) {
-      const toggle = section.querySelector('#captcha-toggle');
-      if (settings.enabled) {
-        toggle.style.background = 'var(--accent)';
-        toggle.querySelector('.toggle-dot').style.transform = 'translateX(1.25rem)';
+      // Update toggle
+      const toggleWrapper = section.querySelector('#captcha-toggle-wrapper');
+      if (toggleWrapper && settings.enabled) {
+        const toggleInput = toggleWrapper.querySelector('input[type="checkbox"]');
+        if (toggleInput) {
+          toggleInput.checked = true;
+          toggleInput.dispatchEvent(new Event('change'));
+        }
       }
-      if (settings.mode) {
-        section.querySelector('#captcha-mode').value = settings.mode;
+      // API returns 'type', select uses 'mode' as id
+      if (settings.type) {
+        section.querySelector('#captcha-mode').value = settings.type;
       }
       if (settings.timeout) {
         section.querySelector('#captcha-timeout').value = settings.timeout;
@@ -141,6 +156,9 @@ async function loadCaptchaSettings(section, chatId) {
       if (settings.kick_failures) {
         section.querySelector('#kick-failures').value = settings.kick_failures;
       }
+      // Trigger warning update
+      const modeSelect = section.querySelector('#captcha-mode');
+      modeSelect.dispatchEvent(new Event('change'));
     }
   } catch (err) {
     console.debug('Failed to load captcha settings:', err);

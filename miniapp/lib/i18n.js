@@ -221,13 +221,13 @@ async function changeLanguage(newLang) {
     
     // Update server-side preference
     try {
-      await fetch('/api/users/me/lang', {
+      await fetch('/api/users/me/language', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `tma ${window.Telegram?.WebApp?.initData || ''}`
         },
-        body: JSON.stringify({ lang: newLang })
+        body: JSON.stringify({ language_code: newLang })
       });
     } catch (e) {
       console.warn('[i18n] Failed to save server preference:', e);

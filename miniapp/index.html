@@ -1735,11 +1735,16 @@
 
         // ── 1. GROUP IDENTITY ─────────────────────────────────────────────
         const LANGS = [
-          { code: 'en', label: '🇺🇸 English' },
-          { code: 'ru', label: '🇷🇺 Русский' },
-          { code: 'es', label: '🇪🇸 Español' },
-          { code: 'pt-br', label: '🇧🇷 Português' },
+          { code: 'en', label: '🇬🇧 English' },
           { code: 'ar', label: '🇸🇦 العربية' },
+          { code: 'de', label: '🇩🇪 Deutsch' },
+          { code: 'es', label: '🇪🇸 Español' },
+          { code: 'fr', label: '🇫🇷 Français' },
+          { code: 'hi', label: '🇮🇳 हिन्दी' },
+          { code: 'id', label: '🇮🇩 Indonesia' },
+          { code: 'pt', label: '🇧🇷 Português' },
+          { code: 'ru', label: '🇷🇺 Русский' },
+          { code: 'tr', label: '🇹🇷 Türkçe' },
         ];
         const allTimezones = (typeof Intl !== 'undefined' && Intl.supportedValuesOf) ? Intl.supportedValuesOf('timeZone') : [];
         const currentLang = groupSettings.language || 'en';
@@ -1749,14 +1754,15 @@
         };
         const identityCard = Card({
           title: '🌍 Group Identity',
-          subtitle: 'Language and timezone for this group',
+          subtitle: 'Bot message language and timezone for this group',
           children: `
             <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
               <div>
-                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Language</label>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Bot Message Language</label>
                 <select id="lang-select" class="input">
                   ${LANGS.map(l => `<option value="${l.code}" ${currentLang === l.code ? 'selected' : ''}>${l.label}</option>`).join('')}
                 </select>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);line-height:1.5;">Language the bot uses in group messages. To change the mini app display language for yourself, use the Language page in the sidebar.</div>
               </div>
               <div>
                 <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Timezone</label>

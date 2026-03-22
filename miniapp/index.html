@@ -721,9 +721,11 @@
         case 'analytics':
           await renderAnalyticsPage(container);
           break;
-        case 'gamification':
+        case 'gamification': {
+          const { renderGamificationPage } = await import('./src/pages/gamification.js?v=1.6.0');
           await renderGamificationPage(container);
           break;
+        }
         case 'roles': {
           const { renderRolesPage } = await import('./src/pages/roles.js?v=1.6.0');
           await renderRolesPage(container);

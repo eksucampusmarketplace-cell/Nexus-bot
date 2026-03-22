@@ -60,7 +60,7 @@ export async function renderGamificationPage(container) {
         <h2 style="font-size:20px;font-weight:700;margin:0;">🏆 Leaderboard</h2>
         <p style="color:var(--text-muted);font-size:13px;margin:4px 0 0;">Top members by XP</p>
       </div>
-      <a href="games.html?chat_id=${chatId}" class="btn btn-primary" style="text-decoration:none;">🎮 Play Games</a>
+      <a href="games.html?chat_id=${finalChatId}" class="btn btn-primary" style="text-decoration:none;">🎮 Play Games</a>
     `;
     container.appendChild(header);
 

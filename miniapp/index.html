@@ -706,9 +706,11 @@
           await renderModerationPage(container);
           break;
         }
-        case 'members':
+        case 'members': {
+          const { renderMembers } = await import('./src/pages/members.js?v=1.6.0');
           await renderMembers(container);
           break;
+        }
         case 'engagement':
           await renderEngagementPage(container);
           break;
@@ -1318,46 +1320,6 @@
         container.innerHTML = '';
         container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load members', description: e.message || 'Please try again' }));
       }
-    }
-
-    function filterMembers(query, all, container) {
-      const q = query.toLowerCase().trim();
-      if (!q) {
-        // Show all members when query is empty
-        const list = container.querySelector('.member-list');
-        if (!list) return;
-        list.innerHTML = '';
-        all.forEach(m => list.appendChild(MemberRow({ 
-          member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
-          selectable: true,
-          onSelect: (m) => getState().toggleMemberSelection(m.id)
-        })));
-        return;
-      }
-      
-      const filtered = all.filter(m => 
-        (m.first_name || '').toLowerCase().includes(q) || 
-        (m.username || '').toLowerCase().includes(q) ||
-        (m.user_id?.toString() || m.id?.toString() || '').includes(q)
-      );
-      
-      const list = container.querySelector('.member-list');
-      if (!list) return;
-      
-      list.innerHTML = '';
-      if (filtered.length === 0) {
-        const emptyMsg = document.createElement('div');
-        emptyMsg.style.cssText = 'text-align: center; padding: var(--sp-8); color: var(--text-muted);';
-        emptyMsg.textContent = 'No members found matching "' + query + '"';
-        list.appendChild(emptyMsg);
-        return;
-      }
-      
-      filtered.forEach(m => list.appendChild(MemberRow({ 
-        member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
-        selectable: true,
-        onSelect: (m) => getState().toggleMemberSelection(m.id)
-      })));
     }
 
     async function renderModules(container) {

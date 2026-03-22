@@ -461,6 +461,7 @@
     import { renderBoosterPage } from './src/pages/booster.js?v=1.6.0';
     import { renderNotesPage } from './src/pages/notes.js?v=1.6.0';
     import { renderChannelGatePage } from './src/pages/channel_gate.js?v=1.6.0';
+    import { renderOwnerPage } from './src/pages/owner.js?v=1.6.0';
 
     // Render guards for async page renders
     let _settingsRenderToken = 0;
@@ -767,9 +768,11 @@
           await renderSessionPage(container);
           break;
         }
-        case 'owner':
+        case 'owner': {
+          const { renderOwnerPage } = await import('./src/pages/owner.js?v=1.6.0');
           await renderOwnerPage(container);
           break;
+        }
         case 'trustnet': {
           const { renderTrustnetPage } = await import('./src/pages/trustnet.js?v=1.6.0');
           await renderTrustnetPage(container);
@@ -813,26 +816,6 @@
 
       }
     }
-
-    async function renderOwnerPage(container) {
-      container.innerHTML = '';
-      container.style.cssText = 'padding:var(--sp-4);max-width:var(--content-max);margin:0 auto;';
-
-      const header = document.createElement('div');
-      header.style.cssText = 'display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-5);';
-      header.innerHTML = '<div style="font-size:2rem">&#x1F451;</div><div style="font-size:1.2rem;font-weight:700">Owner Panel</div>';
-      container.appendChild(header);
-
-      let statsRes = null;
-      try {
-        statsRes = await apiFetch('/api/admin/stats');
-      } catch (e) {
-        const msg = document.createElement('div');
-        msg.style.cssText = 'text-align:center;padding:var(--sp-8);color:var(--text-muted);';
-        msg.textContent = 'Owner access only.';
-        container.appendChild(msg);
-        return;
-      }
 
       if (statsRes) {
         const row = document.createElement('div');

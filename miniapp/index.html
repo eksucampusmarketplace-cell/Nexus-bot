@@ -692,9 +692,11 @@
       container.innerHTML = '';
 
       switch (pageId) {
-        case 'dashboard':
+        case 'dashboard': {
+          const { renderDashboard } = await import('./src/pages/dashboard.js?v=1.6.0');
           await renderDashboard(container);
           break;
+        }
         case 'bots':
           await renderBotsPage(container);
           break;

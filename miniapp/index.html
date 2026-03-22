@@ -731,9 +731,11 @@
           await renderRolesPage(container);
           break;
         }
-        case 'backup':
+        case 'backup': {
+          const { renderBackupPage } = await import('./src/pages/backup.js?v=1.6.0');
           await renderBackupPage(container);
           break;
+        }
         case 'settings':
           await renderSettings(container);
           break;

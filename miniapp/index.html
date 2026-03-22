@@ -717,9 +717,11 @@
         case 'commands':
           await renderCommandsPage(container);
           break;
-        case 'modules':
+        case 'modules': {
+          const { renderModules } = await import('./src/pages/modules.js?v=1.6.0');
           await renderModules(container);
           break;
+        }
         case 'analytics':
           await renderAnalyticsPage(container);
           break;

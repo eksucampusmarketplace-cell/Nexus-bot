@@ -86,20 +86,30 @@ export async function renderMembers(container) {
     `;
     container.appendChild(header);
 
-    container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => filterMembers(val, members, container) }));
+    // Bug #31 fix: Add search debounce to prevent excessive filtering
+    let _searchTimeout = null;
+    container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => {
+      clearTimeout(_searchTimeout);
+      _searchTimeout = setTimeout(() => filterMembers(val, members, container), 300);
+    }}));
 
     const list = document.createElement('div');
     list.className = 'member-list';
     list.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
 
+    // Bug #31 fix: Add confirmation for destructive actions
     const _hMAction = async (mid, action, cid) => {
+      const destructive = ['kick', 'ban'];
+      if (destructive.includes(action)) {
+        if (!confirm(`Are you sure you want to ${action} this member?`)) return;
+      }
       try {
         if (action === 'warn') await apiFetch(`/api/groups/${cid}/warnings`, { method: 'POST', body: { user_id: mid, reason: 'Manual warning' } });
         else if (action === 'mute') await apiFetch(`/api/groups/${cid}/mutes`, { method: 'POST', body: { user_id: mid, duration: '1h' } });
         else if (action === 'kick') await apiFetch(`/api/groups/${cid}/actions/kick`, { method: 'POST', body: { user_id: mid } });
         else if (action === 'ban') await apiFetch(`/api/groups/${cid}/bans`, { method: 'POST', body: { user_id: mid, reason: 'Manual ban' } });
-        showToast('Action success', 'success');
-      } catch (e) { showToast(e.message, 'error'); }
+        showToast(`${action.charAt(0).toUpperCase() + action.slice(1)} successful`, 'success');
+      } catch (e) { showToast(e.message || `Failed to ${action}`, 'error'); }
     };
 
     members.forEach(m => {

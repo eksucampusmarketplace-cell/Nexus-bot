@@ -1016,10 +1016,15 @@ async def _remove_clone(db_pool, bot_id: int, bot_record: dict):
 
 # ─── ConversationHandler export ───────────────────────────────────────────────
 
+# Bug #7 fix: Split clone_management_callback out of ConversationHandler
+# to avoid conflicts with standalone callback queries
+clone_management_handler = CallbackQueryHandler(
+    clone_management_callback, pattern=r"^clone:(new|reauth|delete|status|groups|access):"
+)
+
 clone_conversation = ConversationHandler(
     entry_points=[
         CommandHandler("clone", clone_command_handler),
-        CallbackQueryHandler(clone_management_callback, pattern=r"^clone:(new|reauth):"),
     ],
     states={
         WAITING_FOR_TOKEN: [

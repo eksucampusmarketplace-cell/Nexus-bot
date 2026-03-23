@@ -343,6 +343,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         from bot.handlers.clone import (
             clone_conversation,
             clone_management_callback,
+            clone_management_handler,
             cloneset_handler,
             myclones_command_handler,
         )
@@ -355,6 +356,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(CommandHandler("cloneset", cloneset_handler, filters=PRIVATE))
         # Owner dashboard command
         app.add_handler(owner_dashboard_handler)
+        # Bug #7 fix: Register standalone clone management handler for all clone: callbacks
+        app.add_handler(clone_management_handler)
         # Management callbacks outside of conversation (remove, confirm_remove, keep)
         app.add_handler(
             CallbackQueryHandler(

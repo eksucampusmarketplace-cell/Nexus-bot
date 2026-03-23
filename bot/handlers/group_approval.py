@@ -77,7 +77,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text=(
                         f"👋 The bot owner has not approved this group. "
                         f"I'll be leaving now.\n\n"
-                        f"Want your own bot? Visit @{settings.MAIN_BOT_USERNAME}\n\n"
+                        f"Want your own bot? Visit @{settings.MAIN_BOT_USERNAME or settings.BOT_DISPLAY_NAME or 'the main bot'}\n\n"
                         f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
                     ),
                     parse_mode=ParseMode.HTML,
@@ -105,7 +105,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text=(
                     f"❌ <b>Request denied.</b>\n\n"
                     f"The bot owner didn't approve your group.\n\n"
-                    f"💡 Create your own free bot at @{settings.MAIN_BOT_USERNAME}\n\n"
+                    f"💡 Create your own free bot at @{settings.MAIN_BOT_USERNAME or settings.BOT_DISPLAY_NAME or 'the main bot'}\n\n"
                     f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
                 ),
                 parse_mode=ParseMode.HTML,

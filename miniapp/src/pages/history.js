@@ -4,10 +4,10 @@
  * Name history (Sangmata) page.
  */
 
-import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
+import { showToast, Toggle } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
-import { Toggle } from '../../lib/components.js?v=1.6.0';
 
 export async function renderHistoryPage(container) {
   const chatId = useStore.getState().activeChatId;

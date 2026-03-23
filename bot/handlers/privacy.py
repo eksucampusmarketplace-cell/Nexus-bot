@@ -62,13 +62,16 @@ View the complete policy with detailed information."""
         keyboard.append(
             [InlineKeyboardButton("📄 View Full Privacy Policy", web_app={"url": privacy_url})]
         )
-    keyboard.append(
-        [
-            InlineKeyboardButton(
-                "📧 Contact Support", url=f"https://t.me/{settings.MAIN_BOT_USERNAME}"
-            )
-        ]
-    )
+    # Bug #23 fix: Guard against empty MAIN_BOT_USERNAME
+    support_username = settings.MAIN_BOT_USERNAME or settings.BOT_DISPLAY_NAME
+    if support_username:
+        keyboard.append(
+            [
+                InlineKeyboardButton(
+                    "📧 Contact Support", url=f"https://t.me/{support_username}"
+                )
+            ]
+        )
 
     await update.message.reply_text(
         privacy_summary, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard)

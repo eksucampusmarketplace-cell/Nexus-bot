@@ -61,7 +61,7 @@ MESSAGE_CATALOG = {
         "variables": {
             "{first_name}": "User's first name",
             "{clone_name}": "This bot's name",
-            "{main_bot}": f"Main support bot (@{settings.MAIN_BOT_USERNAME})",
+            "{main_bot}": f"Main support bot (@{settings.MAIN_BOT_USERNAME or settings.BOT_DISPLAY_NAME or 'support'})",
         },
         "required_vars": [],
     },

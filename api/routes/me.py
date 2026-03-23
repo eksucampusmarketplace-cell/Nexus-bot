@@ -260,9 +260,9 @@ async def get_member_boost_stats(group_id: int, user_id: int) -> dict:
         "enabled": config.get("force_add_enabled", False),
         "required": required,
         "current": current,
-        "is_unlocked": record["is_unlocked"] if record else True,
-        "is_restricted": record["is_restricted"] if record else False,
-        "invite_link": record["invite_link"] if record else None,
+        "is_unlocked": record.get("is_unlocked", True) if record else True,
+        "is_restricted": record.get("is_restricted", False) if record else False,
+        "invite_link": record.get("invite_link") if record else None,
         "progress_style": config.get("force_add_progress_style", "blocks"),
     }
 

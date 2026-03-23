@@ -296,6 +296,13 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 is_owner_group=False,
                 access_status="pending",
             )
+            # Bug #3 fix: Ensure bot_token_hash is set for approval path too
+            token_hash = hash_token(context.bot.token)
+            await upsert_group(
+                chat.id,
+                chat.title,
+                token_hash,
+            )
 
             # Update chat_type in groups table
             await db.execute(
@@ -320,7 +327,8 @@ async def _leave_with_message(context, chat, reason: str, actor_id: int, is_owne
     reason: "limit_reached" | "blocked"
     """
     bot_name = settings.BOT_DISPLAY_NAME
-    main_bot = settings.MAIN_BOT_USERNAME
+    # Bug #23 fix: Guard against empty MAIN_BOT_USERNAME
+    main_bot = settings.MAIN_BOT_USERNAME or settings.BOT_DISPLAY_NAME or "this bot"
 
     if reason == "limit_reached":
         text = (
@@ -355,7 +363,8 @@ async def _leave_with_limit_message(context, chat, error_msg: str):
     Used when a clone bot exceeds its plan's property limit.
     """
     bot_name = settings.BOT_DISPLAY_NAME
-    main_bot = settings.MAIN_BOT_USERNAME
+    # Bug #23 fix: Guard against empty MAIN_BOT_USERNAME
+    main_bot = settings.MAIN_BOT_USERNAME or settings.BOT_DISPLAY_NAME or "this bot"
 
     text = (
         f"👋 Hi! {error_msg}\n\n"
@@ -410,7 +419,8 @@ async def _send_stranger_onboard_dm(context, actor, chat, policy: str):
     policy="open"     → bot is active, redirect them to create their own clone
     policy="approval" → bot is pending, tell them owner must approve
     """
-    main_bot = settings.MAIN_BOT_USERNAME
+    # Bug #23 fix: Guard against empty MAIN_BOT_USERNAME
+    main_bot = settings.MAIN_BOT_USERNAME or settings.BOT_DISPLAY_NAME or "this bot"
     bot_name = settings.BOT_DISPLAY_NAME
 
     if policy == "open":

@@ -36,28 +36,31 @@ def support_keyboard(
         if url:
             buttons.append([InlineKeyboardButton("⚡ Open Mini App", web_app=WebAppInfo(url=url))])
 
-    # Main bot support button
-    buttons.append(
-        [
-            InlineKeyboardButton(
-                "💬 Support Group",
-                url=settings.SUPPORT_GROUP_URL or f"https://t.me/{settings.MAIN_BOT_USERNAME}",
-            )
-        ]
-    )
+    # Main bot support button — Bug #21 fix: guard against empty MAIN_BOT_USERNAME
+    support_url = settings.SUPPORT_GROUP_URL
+    if not support_url and settings.MAIN_BOT_USERNAME:
+        support_url = f"https://t.me/{settings.MAIN_BOT_USERNAME}"
+    if support_url:
+        buttons.append(
+            [InlineKeyboardButton("💬 Support Group", url=support_url)]
+        )
 
-    # Documentation button (if configured, fallback to main bot support link)
+    # Documentation button (if configured)
     if include_docs:
-        docs_url = settings.DOCS_URL or f"https://t.me/{settings.MAIN_BOT_USERNAME}"
-        buttons.append([InlineKeyboardButton("📚 Help & Docs", url=docs_url)])
+        docs_url = settings.DOCS_URL
+        if not docs_url and settings.MAIN_BOT_USERNAME:
+            docs_url = f"https://t.me/{settings.MAIN_BOT_USERNAME}"
+        if docs_url:
+            buttons.append([InlineKeyboardButton("📚 Help & Docs", url=docs_url)])
 
     # Privacy Policy button - show a link to online version if available
     if include_privacy:
-        privacy_url = (
-            settings.PRIVACY_POLICY_URL
-            or "https://github.com/yourusername/nexus/blob/main/PRIVACY_POLICY.md"
-        )
-        buttons.append([InlineKeyboardButton("🔒 Privacy Policy", url=privacy_url)])
+        # Bug #18 fix: Remove hardcoded placeholder URL, use real fallback
+        privacy_url = settings.PRIVACY_POLICY_URL
+        if not privacy_url and hasattr(settings, 'webhook_url') and settings.webhook_url:
+            privacy_url = f"{settings.webhook_url}/miniapp/privacy.html"
+        if privacy_url:
+            buttons.append([InlineKeyboardButton("🔒 Privacy Policy", url=privacy_url)])
 
     return InlineKeyboardMarkup(buttons)
 

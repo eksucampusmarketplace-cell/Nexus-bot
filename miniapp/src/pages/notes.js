@@ -75,7 +75,9 @@ export async function renderNotesPage(container) {
 async function loadNotesList(chatId, listContainer) {
   listContainer.innerHTML = '<div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);">Loading notes...</div>';
   try {
-    const notes = await apiFetch(`/api/groups/${chatId}/notes`);
+    const resp = await apiFetch(`/api/groups/${chatId}/notes`);
+    // Bug #6/#45 fix: API returns {ok, data:[]} but we need the array
+    const notes = Array.isArray(resp) ? resp : (resp?.data || []);
     listContainer.innerHTML = '';
     if (!notes || notes.length === 0) {
       listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">' + t('notes_empty', 'No notes yet') + '</div>';

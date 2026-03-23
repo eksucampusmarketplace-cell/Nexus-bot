@@ -14,7 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 async def _verify_group_access(chat_id: int, user: dict):
-    """Bug #14/#15 fix: Verify the user has access to this group via their bot."""
+    """Bug #14/#15 fix: Verify the user has access to this group via their bot.
+    Also checks clone_bot_groups junction table for clone bot access."""
     bot_token = user.get("validated_bot_token")
     if not bot_token:
         return  # Primary bot owner, allow access
@@ -25,6 +26,16 @@ async def _verify_group_access(chat_id: int, user: dict):
             chat_id,
             token_hash,
         )
+        if not row:
+            # Bug #2 fix: Also check clone_bot_groups path before raising 403
+            row = await conn.fetchrow(
+                """SELECT 1 FROM groups g
+                   JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
+                   JOIN bots b ON b.bot_id = cbg.bot_id
+                   WHERE g.chat_id = $1 AND b.token_hash = $2""",
+                chat_id,
+                token_hash,
+            )
     if not row:
         raise HTTPException(status_code=403, detail="Not authorized for this group")
 
@@ -39,7 +50,17 @@ async def list_groups(user: dict = Depends(get_current_user)):
     token_hash = hash_token(bot_token)
 
     async with db.pool.acquire() as conn:
-        rows = await conn.fetch("SELECT * FROM groups WHERE bot_token_hash = $1", token_hash)
+        # Bug #1 fix: UNION query to include clone_bot_groups
+        rows = await conn.fetch(
+            """SELECT g.* FROM groups g WHERE g.bot_token_hash = $1
+               UNION
+               SELECT g.* FROM groups g
+               JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
+               JOIN bots b ON b.bot_id = cbg.bot_id
+               WHERE b.token_hash = $1
+               ORDER BY title""",
+            token_hash,
+        )
         res = []
         for row in rows:
             d = dict(row)
@@ -229,7 +250,9 @@ async def bulk_update_settings(chat_id: int, request: Request, user: dict = Depe
 @router.get("/{chat_id}/logs")
 async def group_logs(chat_id: int, limit: int = 50, user: dict = Depends(get_current_user)):
     logs = await get_recent_logs(chat_id)
-    return logs[:limit] if isinstance(logs, list) else logs
+    # Bug #71 fix: Always return a plain list
+    logs_list = logs if isinstance(logs, list) else (logs.get('logs', []) if isinstance(logs, dict) else [])
+    return logs_list[:limit]
 
 
 @router.post("/{chat_id}/copy-settings")

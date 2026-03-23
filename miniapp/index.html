@@ -595,6 +595,7 @@
         { id: 'owner', label: 'Owner Panel', icon: '👑', ownerOnly: true },
         { id: 'notifications', label: 'Alerts', icon: '🔔' },
       { id: 'trustnet', label: 'TrustNet', icon: '🌐' },
+        { id: 'federation', label: 'Federation', icon: '🔗' },
         { id: 'captcha', label: 'Captcha', icon: '🤖' },
         { id: 'community-vote', label: 'Community Vote', icon: '⚖️' },
         { id: 'night-mode', label: 'Night Mode', icon: '🌙' },
@@ -825,6 +826,11 @@
         case 'persona': {
           const { renderPersonaPage } = await import('./src/pages/persona.js?v=1.6.0');
           await renderPersonaPage(container);
+          break;
+        }
+        case 'federation': {
+          const { renderFederationPage } = await import('./src/pages/federation.js?v=1.6.0');
+          await renderFederationPage(container);
           break;
         }
 

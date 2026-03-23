@@ -5,12 +5,16 @@
  * v22: Restored missing file.
  */
 
-import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
+import { showToast } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 
 export async function renderFederationPage(container) {
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+
+  // Bug #38 fix: chatId guard not strictly needed for federation (account-level),
+  // but show helpful message if no group context available
 
   const header = document.createElement('div');
   header.innerHTML = `

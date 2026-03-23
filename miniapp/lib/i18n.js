@@ -198,7 +198,6 @@ async function initI18n() {
   
   // Make tr() globally available
   window.tr = t;
-  window.showToast = showToast;
   
   return _i18n;
 }
@@ -248,13 +247,13 @@ async function changeLanguage(newLang) {
 }
 
 // Export functions
+// Bug #49 fix: Removed showToast from exports — it belongs in components.js
 export {
   t,
   loadLang,
   isRTL,
   initI18n,
   changeLanguage,
-  showToast,
   AVAILABLE_LANGUAGES
 };
 
@@ -266,7 +265,6 @@ if (typeof window !== 'undefined') {
     isRTL,
     initI18n,
     changeLanguage,
-    showToast,
     AVAILABLE_LANGUAGES
   };
 }

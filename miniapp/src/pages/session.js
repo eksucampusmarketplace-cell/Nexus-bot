@@ -112,7 +112,7 @@ function _renderPhoneStep(container, library) {
       card.remove();
       _renderOTPStep(container, auth, phone, library);
     } catch (err) {
-      errEl.textContent = 'Failed to initialize MTProto: ' + err.message;
+      errEl.innerHTML = '<b>MTProto not available.</b> The @mtproto/core library could not be loaded in this browser. This feature requires running the bot with the MTProto module installed. Please check your server setup.';
       errEl.style.display = 'block';
       e.target.disabled = false;
       e.target.textContent = 'Send Code';

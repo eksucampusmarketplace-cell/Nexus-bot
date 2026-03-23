@@ -7,6 +7,7 @@
 import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { Toggle } from '../../lib/components.js?v=1.6.0';
 
 export async function renderHistoryPage(container) {
   const chatId = useStore.getState().activeChatId;
@@ -17,10 +18,22 @@ export async function renderHistoryPage(container) {
     container.innerHTML = `
       <div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">
         <div style="font-size:3rem;margin-bottom:var(--sp-3)">📜</div>
-        <div>Select a group first</div>
+        <div>${t('select_group', 'Select a group first')}</div>
       </div>
     `;
     return;
+  }
+
+  // Load current settings
+  let currentEnabled = false;
+  let currentLimit = 10;
+
+  try {
+    const res = await apiFetch(`/api/groups/${chatId}/name-history`);
+    currentEnabled = res.enabled ?? false;
+    currentLimit = res.limit ?? 10;
+  } catch (err) {
+    console.debug('Failed to load history settings:', err);
   }
 
   const header = document.createElement('div');
@@ -29,7 +42,7 @@ export async function renderHistoryPage(container) {
       <div style="font-size:2rem">📜</div>
       <div>
         <div style="font-size:1.2rem;font-weight:700">${t('nav_history', 'Name History')}</div>
-        <div style="font-size:0.85rem;color:var(--text-muted)">Track user name changes</div>
+        <div style="font-size:0.85rem;color:var(--text-muted)">${t('history_subtitle', 'Track user name changes')}</div>
       </div>
     </div>
   `;
@@ -40,18 +53,16 @@ export async function renderHistoryPage(container) {
   section.innerHTML = `
     <div style="font-weight:600;margin-bottom:var(--sp-3)">${t('settings', 'Settings')}</div>
     
-    <div class="toggle-row">
+    <div class="toggle-row" style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
       <span>${t('enable_label', 'Track Name Changes')}</span>
-      <div class="toggle" id="history-toggle">
-        <div class="toggle-dot"></div>
-      </div>
+      <div id="history-toggle-wrapper"></div>
     </div>
 
     <div style="margin-top:var(--sp-4)">
       <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">
         ${t('history_limit', 'History Limit (per user)')}
       </label>
-      <input type="number" class="input" id="history-limit" value="10" min="1" max="50">
+      <input type="number" class="input" id="history-limit" value="${currentLimit}" min="1" max="50">
     </div>
 
     <button class="btn btn-primary" style="margin-top:var(--sp-4);width:100%" id="save-history">
@@ -69,15 +80,13 @@ export async function renderHistoryPage(container) {
   `;
   container.appendChild(section);
 
-  // Toggle functionality
-  const toggle = section.querySelector('#history-toggle');
-  let enabled = false;
-  
-  toggle.onclick = () => {
-    enabled = !enabled;
-    toggle.style.background = enabled ? 'var(--accent)' : 'var(--bg-input)';
-    toggle.querySelector('.toggle-dot').style.transform = enabled ? 'translateX(1.25rem)' : 'translateX(0)';
-  };
+  // Toggle functionality using Toggle component (was using raw div before)
+  let enabled = currentEnabled;
+  const toggleWrapper = section.querySelector('#history-toggle-wrapper');
+  toggleWrapper.appendChild(Toggle({
+    checked: currentEnabled,
+    onChange: (val) => { enabled = val; }
+  }));
 
   // Save functionality
   section.querySelector('#save-history').onclick = async () => {
@@ -96,11 +105,11 @@ export async function renderHistoryPage(container) {
     }
   };
 
-  // Load recent history
-  loadRecentHistory();
+  // Load recent history (chatId passed as parameter, not relying on closure of undefined var)
+  loadRecentHistory(chatId);
 }
 
-async function loadRecentHistory() {
+async function loadRecentHistory(chatId) {
   const list = document.getElementById('history-list');
   if (!list) return;
 
@@ -116,9 +125,9 @@ async function loadRecentHistory() {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2);background:var(--bg-input);border-radius:var(--r-lg);font-size:0.85rem;';
       item.innerHTML = `
-        <span style="font-weight:600">${entry.user_name}</span>
-        <span style="color:var(--text-muted)">→</span>
-        <span>${entry.old_name}</span>
+        <span style="font-weight:600">${escapeText(entry.user_name || 'Unknown')}</span>
+        <span style="color:var(--text-muted)">\u2192</span>
+        <span>${escapeText(entry.old_name || '')}</span>
         <span style="color:var(--text-muted);margin-left:auto">${new Date(entry.changed_at).toLocaleDateString()}</span>
       `;
       list.appendChild(item);
@@ -126,4 +135,10 @@ async function loadRecentHistory() {
   } catch (err) {
     console.error('Failed to load history:', err);
   }
+}
+
+function escapeText(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }

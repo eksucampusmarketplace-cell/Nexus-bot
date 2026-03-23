@@ -1,15 +1,13 @@
 /**
  * miniapp/src/pages/commands.js
  *
- * Commands reference page for the Mini App.
- * Shows all available bot commands organized by category.
- *
- * Dependencies:
- *   - lib/components.js (Card, EmptyState)
- *   - store/index.js (useStore)
+ * Commands reference page with per-command toggling.
+ * Shows all available bot commands organized by category,
+ * with toggles to enable/disable each command for the group.
  */
 
-import { Card, EmptyState } from '../../lib/components.js?v=1.6.0';
+import { Card, EmptyState, Toggle, showToast } from '../../lib/components.js?v=1.6.0';
+import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 
 const store = useStore;
@@ -228,33 +226,26 @@ const COMMAND_CATEGORIES = [
       { cmd: '/info', args: '', desc: 'Show basic group information' },
       { cmd: '/admins', args: '', desc: 'List group admins (alias for /adminlist)' },
       { cmd: '/stats', args: '', desc: 'Show group statistics' },
-      { cmd: '/id', args: '', desc: 'Get your user ID and chat ID' },
       { cmd: '/privacy', args: '', desc: 'View privacy policy in mini app' },
-      { cmd: '/report', args: '[reason]', desc: 'Report a message to admins (reply to message)' },
-      { cmd: '/adminlist', args: '', desc: 'List all group administrators' },
     ]
   }
 ];
 
 /**
- * Render the Commands reference page
+ * Render the Commands reference page with per-command toggling
  * @param {HTMLElement} container - Container element to render into
  */
 export async function renderCommandsPage(container) {
   const state = store.getState();
   const chatId = state.activeChatId;
 
-  // Ensure clean container
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
-  // If no chatId, try to get first available group
   if (!chatId && state.groups && state.groups.length > 0) {
-    const firstGroup = state.groups[0];
-    state.setActiveChatId(firstGroup.chat_id);
+    state.setActiveChatId(state.groups[0].chat_id);
   }
 
-  // Check again after auto-selecting
   const finalChatId = store.getState().activeChatId;
   const settings = store.getState().settings || {};
 
@@ -267,11 +258,17 @@ export async function renderCommandsPage(container) {
     return;
   }
 
-  // Define dynamic booster category based on activation toggle
-  const boosterEnabled = settings.booster_enabled === true;
+  // Load command toggle states from API
+  let commandStates = {};
+  try {
+    const res = await apiFetch(`/api/groups/${finalChatId}/commands/states`);
+    commandStates = res || {};
+  } catch (e) {
+    console.debug('Command states not available, all enabled by default');
+  }
+
   const activeCategories = [...COMMAND_CATEGORIES];
-  
-  if (boosterEnabled) {
+  if (settings.booster_enabled === true) {
     activeCategories.push({
       id: 'booster',
       title: '🚀 Booster',
@@ -310,6 +307,8 @@ export async function renderCommandsPage(container) {
         <br>• <b>AutoMod</b> = Deep configuration with thresholds, actions, regex patterns, word filters, and rule priorities
         <br><br>
         <b>🔧 Deep Configuration:</b> Use the AutoMod, Settings, and Modules pages for advanced options beyond simple commands.
+        <br><br>
+        <b>🔄 Command Toggling:</b> Use the toggle switches to enable or disable individual commands for this group. Disabled commands will not respond.
       </div>
     </div>
   `;
@@ -342,18 +341,18 @@ export async function renderCommandsPage(container) {
   contentContainer.id = 'commands-content';
   container.appendChild(contentContainer);
 
-  // Render all active categories initially
-  renderCategories(contentContainer, activeCategories);
+  // Render all active categories with toggles
+  renderCategories(contentContainer, activeCategories, commandStates, finalChatId);
 
-  // Add search functionality
+  // Search functionality
   const searchInput = searchContainer.querySelector('#cmd-search');
   searchInput.addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase();
     if (query) {
       const filtered = filterCommands(query, activeCategories);
-      renderSearchResults(contentContainer, filtered, query, activeCategories);
+      renderSearchResults(contentContainer, filtered, query, commandStates, finalChatId);
     } else {
-      renderCategories(contentContainer, activeCategories);
+      renderCategories(contentContainer, activeCategories, commandStates, finalChatId);
     }
   });
 }
@@ -379,45 +378,80 @@ function filterCommands(query, categories) {
   return results;
 }
 
-function renderCategories(container, categories) {
+function renderCategories(container, categories, commandStates, chatId) {
   container.innerHTML = '';
-  
   categories.forEach(category => {
-    const categoryHtml = `
-      <div class="command-category" style="margin-bottom: var(--sp-4);">
-        <div style="
-          display: flex;
-          align-items: center;
-          gap: var(--sp-2);
-          margin-bottom: var(--sp-3);
-          padding-bottom: var(--sp-2);
-          border-bottom: 1px solid var(--border);
-        ">
-          <span style="font-size: 24px;">${category.icon}</span>
-          <div>
-            <div style="font-weight: var(--fw-semibold); font-size: var(--text-base); color: var(--text-primary);">
-              ${category.title}
-            </div>
-            <div style="font-size: var(--text-xs); color: var(--text-muted);">
-              ${category.description}
-            </div>
-          </div>
-        </div>
-        <div class="commands-list">
-          ${category.commands.map(cmd => renderCommandRow(cmd)).join('')}
+    const catEl = document.createElement('div');
+    catEl.className = 'command-category';
+    catEl.style.cssText = 'margin-bottom: var(--sp-4);';
+
+    // Category header with bulk toggle
+    const catHeader = document.createElement('div');
+    catHeader.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-3);padding-bottom:var(--sp-2);border-bottom:1px solid var(--border);';
+
+    const catInfo = document.createElement('div');
+    catInfo.style.cssText = 'flex:1;';
+    catInfo.innerHTML = `
+      <div style="display:flex;align-items:center;gap:var(--sp-2);">
+        <span style="font-size:24px;">${category.icon}</span>
+        <div>
+          <div style="font-weight:var(--fw-semibold);font-size:var(--text-base);color:var(--text-primary);">${category.title}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">${category.description}</div>
         </div>
       </div>
     `;
-    
-    const div = document.createElement('div');
-    div.innerHTML = categoryHtml;
-    container.appendChild(div.firstElementChild);
+    catHeader.appendChild(catInfo);
+
+    // Category-level toggle (toggles all commands in category)
+    const allEnabled = category.commands.every(cmd => {
+      const key = cmd.cmd.replace(/^[!\/]/, '');
+      return commandStates[key] !== false;
+    });
+    const catToggleWrap = document.createElement('div');
+    catToggleWrap.style.cssText = 'flex-shrink:0;';
+    catToggleWrap.appendChild(Toggle({
+      checked: allEnabled,
+      onChange: async (val) => {
+        const updates = {};
+        category.commands.forEach(cmd => {
+          const key = cmd.cmd.replace(/^[!\/]/, '');
+          updates[key] = val;
+          commandStates[key] = val;
+        });
+        catEl.querySelectorAll('.cmd-toggle-wrap').forEach(wrap => {
+          const toggle = wrap.querySelector('input[type="checkbox"]');
+          if (toggle) toggle.checked = val;
+        });
+        catEl.querySelectorAll('.command-row').forEach(row => {
+          row.style.opacity = val ? '1' : '0.5';
+        });
+        try {
+          await apiFetch(`/api/groups/${chatId}/commands/states`, {
+            method: 'PUT',
+            body: JSON.stringify(updates)
+          });
+          showToast(`${val ? 'Enabled' : 'Disabled'} all ${category.title.replace(/^[^\s]+\s/, '')} commands`, 'success');
+        } catch (e) {
+          showToast('Failed to update commands', 'error');
+        }
+      }
+    }));
+    catHeader.appendChild(catToggleWrap);
+    catEl.appendChild(catHeader);
+
+    // Command list
+    const cmdList = document.createElement('div');
+    cmdList.className = 'commands-list';
+    category.commands.forEach(cmd => {
+      cmdList.appendChild(renderCommandRow(cmd, commandStates, chatId));
+    });
+    catEl.appendChild(cmdList);
+    container.appendChild(catEl);
   });
 }
 
-function renderSearchResults(container, results, query, categories) {
+function renderSearchResults(container, results, query, commandStates, chatId) {
   container.innerHTML = '';
-  
   if (results.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; padding: var(--sp-8);">
@@ -427,43 +461,55 @@ function renderSearchResults(container, results, query, categories) {
     `;
     return;
   }
-  
   const header = document.createElement('div');
   header.style.cssText = 'margin-bottom: var(--sp-4); color: var(--text-muted); font-size: var(--text-sm);';
   header.textContent = `Found ${results.reduce((acc, cat) => acc + cat.commands.length, 0)} commands`;
   container.appendChild(header);
-  
-  renderCategories(container, results);
+  renderCategories(container, results, commandStates, chatId);
 }
 
-function renderCommandRow(cmd) {
-  return `
-    <div class="command-row" style="
-      display: flex;
-      align-items: flex-start;
-      gap: var(--sp-3);
-      padding: var(--sp-3);
-      background: var(--bg-surface);
-      border-radius: var(--r-lg);
-      margin-bottom: var(--sp-2);
-      border: 1px solid var(--border);
-    ">
-      <div style="flex-shrink: 0;">
-        <code style="
-          background: var(--accent-dim);
-          color: var(--accent);
-          padding: var(--sp-1) var(--sp-2);
-          border-radius: var(--r-md);
-          font-size: var(--text-xs);
-          font-weight: var(--fw-semibold);
-        ">${escapeHtml(cmd.cmd)}</code>
-        ${cmd.args ? `<span style="color: var(--text-muted); font-size: var(--text-xs); margin-left: var(--sp-1);">${escapeHtml(cmd.args)}</span>` : ''}
-      </div>
-      <div style="color: var(--text-secondary); font-size: var(--text-sm);">
-        ${escapeHtml(cmd.desc)}
-      </div>
+function renderCommandRow(cmd, commandStates, chatId) {
+  const key = cmd.cmd.replace(/^[!\/]/, '');
+  const isEnabled = commandStates[key] !== false;
+
+  const row = document.createElement('div');
+  row.className = 'command-row';
+  row.style.cssText = `display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3);background:var(--bg-surface);border-radius:var(--r-lg);margin-bottom:var(--sp-2);border:1px solid var(--border);opacity:${isEnabled ? '1' : '0.5'};transition:opacity 0.2s;`;
+
+  const cmdInfo = document.createElement('div');
+  cmdInfo.style.cssText = 'flex:1;min-width:0;';
+  cmdInfo.innerHTML = `
+    <div style="display:flex;align-items:center;gap:var(--sp-1);flex-wrap:wrap;">
+      <code style="background:var(--accent-dim);color:var(--accent);padding:var(--sp-1) var(--sp-2);border-radius:var(--r-md);font-size:var(--text-xs);font-weight:var(--fw-semibold);">${escapeHtml(cmd.cmd)}</code>
+      ${cmd.args ? `<span style="color:var(--text-muted);font-size:var(--text-xs);">${escapeHtml(cmd.args)}</span>` : ''}
     </div>
+    <div style="color:var(--text-secondary);font-size:var(--text-sm);margin-top:2px;">${escapeHtml(cmd.desc)}</div>
   `;
+  row.appendChild(cmdInfo);
+
+  // Per-command toggle
+  const toggleWrap = document.createElement('div');
+  toggleWrap.className = 'cmd-toggle-wrap';
+  toggleWrap.style.cssText = 'flex-shrink:0;';
+  toggleWrap.appendChild(Toggle({
+    checked: isEnabled,
+    onChange: async (val) => {
+      commandStates[key] = val;
+      row.style.opacity = val ? '1' : '0.5';
+      try {
+        await apiFetch(`/api/groups/${chatId}/commands/states`, {
+          method: 'PUT',
+          body: JSON.stringify({ [key]: val })
+        });
+        showToast(`${cmd.cmd} ${val ? 'enabled' : 'disabled'}`, 'success');
+      } catch (e) {
+        showToast('Failed to toggle ' + cmd.cmd, 'error');
+      }
+    }
+  }));
+  row.appendChild(toggleWrap);
+
+  return row;
 }
 
 function escapeHtml(text) {

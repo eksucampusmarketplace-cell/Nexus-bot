@@ -48,9 +48,10 @@ export async function renderTrustnetPage(container) {
     loading.textContent = t('error', 'Failed to load federations');
   }
 
-  // Create new federation button
+  // Create new federation button (FAB)
   const createBtn = document.createElement('button');
-  createBtn.textContent = '+ Create Federation';
+  createBtn.textContent = '+';
+  createBtn.title = 'Create Federation';
   createBtn.style.cssText = `
     position:fixed;bottom:20px;right:20px;
     width:56px;height:56px;border-radius:50%;
@@ -59,7 +60,62 @@ export async function renderTrustnetPage(container) {
     cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);
     display:flex;align-items:center;justify-content:center;
   `;
+  createBtn.onclick = () => showCreateFederationDialog(chatId, container);
   container.appendChild(createBtn);
+}
+
+function showCreateFederationDialog(chatId, container) {
+  // Remove existing dialog if any
+  const existing = document.getElementById('create-fed-dialog');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'create-fed-dialog';
+  overlay.style.cssText = `
+    position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(0,0,0,0.5);z-index:1000;
+    display:flex;align-items:center;justify-content:center;
+    padding:var(--sp-4);
+  `;
+  overlay.innerHTML = `
+    <div style="background:var(--bg-card);border-radius:var(--r-xl);padding:var(--sp-5);width:100%;max-width:400px;">
+      <div style="font-weight:700;font-size:1.1rem;margin-bottom:var(--sp-4)">Create Federation</div>
+      <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">Federation Name</label>
+      <input type="text" class="input" id="fed-name-input" placeholder="My Federation" style="margin-bottom:var(--sp-4)">
+      <div style="display:flex;gap:var(--sp-3);justify-content:flex-end">
+        <button class="btn btn-secondary" id="fed-cancel">Cancel</button>
+        <button class="btn btn-primary" id="fed-create">Create</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#fed-cancel').onclick = () => overlay.remove();
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#fed-create').onclick = async () => {
+    const name = overlay.querySelector('#fed-name-input').value.trim();
+    if (!name) {
+      showToast('Please enter a federation name');
+      return;
+    }
+    try {
+      showToast('Creating federation...');
+      await apiFetch('/api/federation/create', {
+        method: 'POST',
+        body: { name, chat_id: chatId }
+      });
+      showToast('Federation created!');
+      overlay.remove();
+      // Re-render the page to show the new federation
+      const pageContainer = container;
+      const { renderTrustnetPage } = await import('./trustnet.js');
+      await renderTrustnetPage(pageContainer);
+    } catch (err) {
+      console.error('Failed to create federation:', err);
+      showToast('Failed to create federation');
+    }
+  };
 }
 
 function createFederationList(feds, container) {

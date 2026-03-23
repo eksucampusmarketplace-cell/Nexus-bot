@@ -51,7 +51,7 @@ export async function renderOwnerPage(container) {
       const btn = document.createElement('button');
       btn.textContent = a.label;
       btn.style.cssText = 'padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);cursor:pointer;text-align:left;font-size:0.9rem;';
-      btn.onclick = () => navigateToPage(a.page);
+      btn.onclick = () => window.navigateToPage(a.page);
       actRow.appendChild(btn);
     });
   container.appendChild(actRow);

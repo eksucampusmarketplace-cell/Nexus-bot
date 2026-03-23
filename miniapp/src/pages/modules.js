@@ -88,7 +88,7 @@ export async function renderModules(container) {
         const link = document.createElement('div');
         link.style.cssText = 'margin-top:var(--sp-2);';
         link.innerHTML = `<button class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-3);" data-page="${m.page}">Configure →</button>`;
-        link.querySelector('button').onclick = () => navigateToPage(m.page);
+        link.querySelector('button').onclick = () => window.navigateToPage(m.page);
         card.appendChild(link);
       }
       container.appendChild(card);

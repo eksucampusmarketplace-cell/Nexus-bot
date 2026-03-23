@@ -7,6 +7,7 @@
 import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { Toggle } from '../../lib/components.js';
 
 export async function renderCommunityVotePage(container) {
   const chatId = useStore.getState().activeChatId;
@@ -35,6 +36,25 @@ export async function renderCommunityVotePage(container) {
   `;
   container.appendChild(header);
 
+  // Load current settings from server
+  let currentVoteEnabled = false;
+  let currentScamEnabled = true;
+  let currentThreshold = 5;
+  let currentTimeout = 10;
+  let currentAction = 'ban';
+
+  try {
+    showToast(t('loading', 'Loading...'));
+    const res = await apiFetch(`/api/groups/${chatId}/community-vote`);
+    currentVoteEnabled = res.enabled ?? false;
+    currentScamEnabled = res.autoDetectScams ?? true;
+    currentThreshold = res.threshold ?? 5;
+    currentTimeout = res.timeout ?? 10;
+    currentAction = res.action ?? 'ban';
+  } catch (err) {
+    console.error('Failed to load community vote settings:', err);
+  }
+
   const section = document.createElement('div');
   section.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);';
   section.innerHTML = `
@@ -42,23 +62,21 @@ export async function renderCommunityVotePage(container) {
     
     <div class="toggle-row">
       <span>${t('enable_label', 'Enable Community Vote')}</span>
-      <div class="toggle" id="vote-toggle">
-        <div class="toggle-dot"></div>
-      </div>
+      <div id="vote-toggle-wrapper"></div>
     </div>
 
     <div style="margin-top:var(--sp-4)">
       <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">
         ${t('vote_threshold', 'Vote Threshold')}
       </label>
-      <input type="number" class="input" id="vote-threshold" value="5" min="3" max="20">
+      <input type="number" class="input" id="vote-threshold" value="${currentThreshold}" min="3" max="20">
     </div>
 
     <div style="margin-top:var(--sp-4)">
       <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">
         ${t('timeout_lbl', 'Vote Timeout (minutes)')}
       </label>
-      <input type="number" class="input" id="vote-timeout" value="10" min="5" max="60">
+      <input type="number" class="input" id="vote-timeout" value="${currentTimeout}" min="5" max="60">
     </div>
 
     <div style="margin-top:var(--sp-4)">
@@ -74,9 +92,7 @@ export async function renderCommunityVotePage(container) {
 
     <div class="toggle-row" style="margin-top:var(--sp-4)">
       <span>${t('auto_detect_scams', 'Auto-Detect Scams')}</span>
-      <div class="toggle" id="scam-toggle">
-        <div class="toggle-dot"></div>
-      </div>
+      <div id="scam-toggle-wrapper"></div>
     </div>
 
     <button class="btn btn-primary" style="margin-top:var(--sp-4);width:100%" id="save-vote">
@@ -85,23 +101,24 @@ export async function renderCommunityVotePage(container) {
   `;
   container.appendChild(section);
 
-  // Toggle functionality
-  const voteToggle = section.querySelector('#vote-toggle');
-  const scamToggle = section.querySelector('#scam-toggle');
-  let voteEnabled = false;
-  let scamEnabled = true;
+  // Toggle functionality using Toggle component
+  let voteEnabled = currentVoteEnabled;
+  let scamEnabled = currentScamEnabled;
 
-  voteToggle.onclick = () => {
-    voteEnabled = !voteEnabled;
-    voteToggle.style.background = voteEnabled ? 'var(--accent)' : 'var(--bg-input)';
-    voteToggle.querySelector('.toggle-dot').style.transform = voteEnabled ? 'translateX(1.25rem)' : 'translateX(0)';
-  };
+  const voteToggleWrapper = section.querySelector('#vote-toggle-wrapper');
+  voteToggleWrapper.appendChild(Toggle({
+    checked: currentVoteEnabled,
+    onChange: (val) => { voteEnabled = val; }
+  }));
 
-  scamToggle.onclick = () => {
-    scamEnabled = !scamEnabled;
-    scamToggle.style.background = scamEnabled ? 'var(--accent)' : 'var(--bg-input)';
-    scamToggle.querySelector('.toggle-dot').style.transform = scamEnabled ? 'translateX(1.25rem)' : 'translateX(0)';
-  };
+  const scamToggleWrapper = section.querySelector('#scam-toggle-wrapper');
+  scamToggleWrapper.appendChild(Toggle({
+    checked: currentScamEnabled,
+    onChange: (val) => { scamEnabled = val; }
+  }));
+
+  // Set initial select value
+  section.querySelector('#vote-action').value = currentAction;
 
   // Save functionality
   section.querySelector('#save-vote').onclick = async () => {
@@ -113,7 +130,7 @@ export async function renderCommunityVotePage(container) {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/community-vote`, {
         method: 'POST',
-        body: JSON.stringify({ enabled: voteEnabled, threshold, timeout, action, autoDetectScams: scamEnabled })
+        body: { enabled: voteEnabled, threshold, timeout, action, autoDetectScams: scamEnabled }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {

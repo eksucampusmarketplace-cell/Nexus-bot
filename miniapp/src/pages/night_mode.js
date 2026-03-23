@@ -7,6 +7,7 @@
 import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { Toggle } from '../../lib/components.js';
 
 export async function renderNightModePage(container) {
   const chatId = useStore.getState().activeChatId;
@@ -35,6 +36,27 @@ export async function renderNightModePage(container) {
   `;
   container.appendChild(header);
 
+  // Load current settings from server
+  let currentEnabled = false;
+  let currentStart = '23:00';
+  let currentEnd = '07:00';
+  let currentTimezone = 'UTC';
+  let currentNightMsg = '\u{1F319} Night mode is now active. Group permissions are restricted.';
+  let currentMorningMsg = '\u{2600}\u{FE0F} Good morning! Group permissions have been restored.';
+
+  try {
+    showToast(t('loading', 'Loading...'));
+    const res = await apiFetch(`/api/groups/${chatId}/night-mode`);
+    currentEnabled = res.enabled ?? false;
+    currentStart = res.startTime ?? '23:00';
+    currentEnd = res.endTime ?? '07:00';
+    currentTimezone = res.timezone ?? 'UTC';
+    currentNightMsg = res.nightMessage ?? currentNightMsg;
+    currentMorningMsg = res.morningMessage ?? currentMorningMsg;
+  } catch (err) {
+    console.error('Failed to load night mode settings:', err);
+  }
+
   const section = document.createElement('div');
   section.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);';
   section.innerHTML = `
@@ -42,23 +64,21 @@ export async function renderNightModePage(container) {
     
     <div class="toggle-row">
       <span>${t('enable_label', 'Enable Night Mode')}</span>
-      <div class="toggle" id="night-toggle">
-        <div class="toggle-dot"></div>
-      </div>
+      <div id="night-toggle-wrapper"></div>
     </div>
 
     <div style="margin-top:var(--sp-4)">
       <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">
         ${t('night_start_lbl', 'Start Time')}
       </label>
-      <input type="time" class="input" id="night-start" value="23:00">
+      <input type="time" class="input" id="night-start" value="${currentStart}">
     </div>
 
     <div style="margin-top:var(--sp-4)">
       <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">
         ${t('night_end_lbl', 'End Time')}
       </label>
-      <input type="time" class="input" id="night-end" value="07:00">
+      <input type="time" class="input" id="night-end" value="${currentEnd}">
     </div>
 
     <div style="margin-top:var(--sp-4)">
@@ -81,14 +101,14 @@ export async function renderNightModePage(container) {
       <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">
         ${t('night_message_lbl', 'Night Message')}
       </label>
-      <textarea class="input" id="night-message" rows="3" placeholder="Message shown when night mode activates...">🌙 Night mode is now active. Group permissions are restricted.</textarea>
+      <textarea class="input" id="night-message" rows="3" placeholder="Message shown when night mode activates..."></textarea>
     </div>
 
     <div style="margin-top:var(--sp-4)">
       <label style="display:block;font-size:0.85rem;color:var(--text-muted);margin-bottom:var(--sp-2)">
         ${t('morning_msg_lbl', 'Morning Message')}
       </label>
-      <textarea class="input" id="morning-message" rows="3" placeholder="Message shown when night mode ends...">☀️ Good morning! Group permissions have been restored.</textarea>
+      <textarea class="input" id="morning-message" rows="3" placeholder="Message shown when night mode ends..."></textarea>
     </div>
 
     <button class="btn btn-primary" style="margin-top:var(--sp-4);width:100%" id="save-night">
@@ -97,15 +117,20 @@ export async function renderNightModePage(container) {
   `;
   container.appendChild(section);
 
-  // Toggle functionality
-  const toggle = section.querySelector('#night-toggle');
-  let enabled = false;
-  
-  toggle.onclick = () => {
-    enabled = !enabled;
-    toggle.style.background = enabled ? 'var(--accent)' : 'var(--bg-input)';
-    toggle.querySelector('.toggle-dot').style.transform = enabled ? 'translateX(1.25rem)' : 'translateX(0)';
-  };
+  // Set textarea values programmatically to avoid HTML escaping issues
+  section.querySelector('#night-message').value = currentNightMsg;
+  section.querySelector('#morning-message').value = currentMorningMsg;
+
+  // Set initial select value
+  section.querySelector('#timezone').value = currentTimezone;
+
+  // Toggle functionality using Toggle component
+  let enabled = currentEnabled;
+  const toggleWrapper = section.querySelector('#night-toggle-wrapper');
+  toggleWrapper.appendChild(Toggle({
+    checked: currentEnabled,
+    onChange: (val) => { enabled = val; }
+  }));
 
   // Save functionality
   section.querySelector('#save-night').onclick = async () => {
@@ -119,7 +144,7 @@ export async function renderNightModePage(container) {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/night-mode`, {
         method: 'POST',
-        body: JSON.stringify({ enabled, startTime, endTime, timezone, nightMessage, morningMessage })
+        body: { enabled, startTime, endTime, timezone, nightMessage, morningMessage }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {

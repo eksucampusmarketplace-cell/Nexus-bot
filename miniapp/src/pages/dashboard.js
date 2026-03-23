@@ -72,16 +72,16 @@ export async function renderDashboard(container) {
         🚀 <b>Quick Actions</b>
       </div>
       <div style="display: flex; gap: var(--sp-2); flex-wrap: wrap;">
-        <button onclick="document.querySelector('[data-page=\'commands\']').click()" class="btn btn-primary">
+        <button onclick="window.navigateToPage('commands')" class="btn btn-primary">
           📚 View Commands
         </button>
-        <button onclick="document.querySelector('[data-page=\'automod\']').click()" class="btn btn-secondary">
+        <button onclick="window.navigateToPage('automod')" class="btn btn-secondary">
           🛡️ Configure AutoMod
         </button>
-        <button onclick="document.querySelector('[data-page=\'modules\']').click()" class="btn btn-secondary">
+        <button onclick="window.navigateToPage('modules')" class="btn btn-secondary">
           📦 Manage Modules
         </button>
-        <button onclick="document.querySelector('[data-page=\'analytics\']').click()" class="btn btn-secondary">
+        <button onclick="window.navigateToPage('analytics')" class="btn btn-secondary">
           📊 Analytics
         </button>
         <a href="${gamesUrl}" class="btn btn-secondary" style="text-decoration:none;display:inline-flex;">

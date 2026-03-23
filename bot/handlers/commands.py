@@ -436,7 +436,7 @@ async def unban_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "❓ <b>Usage:</b>\n"
             "• Reply to a message: <code>/unban</code>\n"
-            "• Or: <code>/ban user_id</code>",
+            "• Or: <code>/unban user_id</code>",
             parse_mode="HTML",
         )
         return
@@ -444,6 +444,16 @@ async def unban_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.unban_chat_member(update.effective_chat.id, target.id)
     await update.message.reply_text(
         f"✅ {format_user(target)} has been unbanned.", parse_mode="HTML"
+    )
+    await log_action(
+        update.effective_chat.id,
+        "unban",
+        target.id,
+        target.username or target.first_name,
+        update.effective_user.id,
+        update.effective_user.username or update.effective_user.first_name,
+        "Unbanned",
+        get_token_hash(context.bot.token),
     )
 
 
@@ -614,6 +624,8 @@ async def kick_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reason=reason,
         chat_title=update.effective_chat.title,
     )
+
+    await _refresh_trust_score(context, update.effective_chat.id, target.id)
 
 
 async def purge_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -915,4 +927,6 @@ async def report_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Reply to a message to report it.")
         return
     target = update.message.reply_to_message.from_user
-    await update.message.reply_text(f"✅ Message from {format_user(target)} reported to admins.")
+    await update.message.reply_text(
+        f"✅ Message from {format_user(target)} reported to admins.", parse_mode="HTML"
+    )

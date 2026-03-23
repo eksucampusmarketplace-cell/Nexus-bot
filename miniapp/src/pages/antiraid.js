@@ -8,6 +8,7 @@
 import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
@@ -82,16 +83,16 @@ async function _renderStatusTab(container, chatId) {
 
   container.innerHTML = '';
 
-  const threatLevel = data.threat_level || 0;
-  const threatLabels = ['Safe', 'Low', 'Medium', 'High', 'Critical'];
+  const threatLevel = typeof data.threat_level === 'number' ? data.threat_level : 0;
+  const threatLabels = [t('threat_safe', 'Safe'), t('threat_low', 'Low'), t('threat_medium', 'Medium'), t('threat_high', 'High'), t('threat_critical', 'Critical')];
   const threatColors = ['var(--success)', '#10b981', 'var(--warning)', '#f97316', 'var(--danger)'];
-  const levelIdx = Math.min(Math.floor(threatLevel / 20), 4);
+  const levelIdx = Math.min(Math.max(Math.floor(threatLevel / 20), 0), 4);
 
   const threatCard = document.createElement('div');
   threatCard.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);margin-bottom:var(--sp-4);';
   threatCard.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-3);">
-      <span style="font-size:var(--text-sm);font-weight:var(--fw-semibold);">Threat Level</span>
+      <span style="font-size:var(--text-sm);font-weight:var(--fw-semibold);">${t('antiraid_threat', 'Threat Level')}</span>
       <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);padding:4px 12px;border-radius:var(--r-full);background:${threatColors[levelIdx]};color:white;">${threatLabels[levelIdx]}</span>
     </div>
     <div style="height:12px;background:var(--bg-input);border-radius:var(--r-full);overflow:hidden;margin-bottom:var(--sp-2);">
@@ -99,11 +100,11 @@ async function _renderStatusTab(container, chatId) {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);margin-top:var(--sp-3);">
       <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);">
-        <div style="font-size:var(--text-xs);color:var(--text-muted);">Joins/min</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('antiraid_joins_min', 'Joins/min')}</div>
         <div style="font-size:18px;font-weight:700;">${data.joins_per_min || 0}</div>
       </div>
       <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);">
-        <div style="font-size:var(--text-xs);color:var(--text-muted);">Status</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('antiraid_status', 'Status')}</div>
         <div style="font-size:var(--text-sm);font-weight:700;">${data.lockdown_active ? '🔒 Lockdown' : '✅ Normal'}</div>
       </div>
     </div>

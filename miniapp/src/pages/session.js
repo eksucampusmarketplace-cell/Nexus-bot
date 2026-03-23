@@ -7,6 +7,7 @@
 
 import { Card, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 export async function renderSessionPage(container) {
   container.innerHTML = '';
@@ -16,7 +17,7 @@ export async function renderSessionPage(container) {
   consent.innerHTML = `
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-5);">
       <div style="font-size:32px;text-align:center;margin-bottom:var(--sp-4);">🔑</div>
-      <h2 style="font-size:var(--text-lg);font-weight:var(--fw-bold);margin:0 0 var(--sp-3);text-align:center;">String Session Generator</h2>
+      <h2 style="font-size:var(--text-lg);font-weight:var(--fw-bold);margin:0 0 var(--sp-3);text-align:center;">${t('session_title', 'String Session Generator')}</h2>
       <div style="background:rgba(var(--accent-rgb),0.08);border:1px solid rgba(var(--accent-rgb),0.2);border-radius:var(--r-lg);padding:var(--sp-3);margin-bottom:var(--sp-4);font-size:var(--text-sm);">
         <p style="margin:0 0 var(--sp-2);">✅ Your phone number and OTP go <b>directly to Telegram's servers</b></p>
         <p style="margin:0 0 var(--sp-2);">✅ Nexus <b>never sees</b> your credentials</p>
@@ -73,7 +74,7 @@ function _renderPhoneStep(container, library) {
   const card = document.createElement('div');
   card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-5);';
   card.innerHTML = `
-    <div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);margin-bottom:var(--sp-3);">📱 Phone Number</div>
+    <div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);margin-bottom:var(--sp-3);">📱 ${t('session_phone', 'Phone Number')}</div>
     <input id="phone-input" class="input" type="tel" placeholder="+1234567890" style="margin-bottom:var(--sp-3);">
     <div id="phone-error" style="display:none;color:var(--danger);font-size:var(--text-xs);margin-bottom:var(--sp-2);"></div>
     <button id="send-code-btn" class="btn btn-primary" style="width:100%;justify-content:center;">Send Code</button>
@@ -91,7 +92,7 @@ function _renderPhoneStep(container, library) {
     errEl.style.display = 'none';
 
     if (!phone) {
-      errEl.textContent = 'Enter your phone number';
+      errEl.textContent = t('session_enter_phone', 'Enter your phone number');
       errEl.style.display = 'block';
       e.target.disabled = false;
       e.target.textContent = 'Send Code';
@@ -112,7 +113,7 @@ function _renderPhoneStep(container, library) {
       card.remove();
       _renderOTPStep(container, auth, phone, library);
     } catch (err) {
-      errEl.innerHTML = '<b>MTProto not available.</b> The @mtproto/core library could not be loaded in this browser. This feature requires running the bot with the MTProto module installed. Please check your server setup.';
+      errEl.innerHTML = '<b>' + t('session_mtproto_unavail', 'MTProto not available') + '.</b> ' + t('session_mtproto_detail', 'The MTProto library could not be loaded. This is a browser-side feature that requires @mtproto/core to be bundled with the mini app. Please ensure the module is installed and accessible from the web server.');
       errEl.style.display = 'block';
       e.target.disabled = false;
       e.target.textContent = 'Send Code';
@@ -221,7 +222,7 @@ async function _showSessionResult(container, session, library, auth) {
   const card = document.createElement('div');
   card.style.cssText = 'background:var(--bg-card);border:1px solid var(--success);border-radius:var(--r-xl);padding:var(--sp-5);';
   card.innerHTML = `
-    <div style="color:var(--success);font-weight:var(--fw-bold);margin-bottom:var(--sp-3);">✅ Session Generated!</div>
+    <div style="color:var(--success);font-weight:var(--fw-bold);margin-bottom:var(--sp-3);">✅ ${t('session_generated', 'Session Generated!')}</div>
     <div style="background:var(--bg-input);border-radius:var(--r-lg);padding:var(--sp-3);font-family:monospace;font-size:11px;word-break:break-all;max-height:120px;overflow-y:auto;margin-bottom:var(--sp-3);">
       ${displaySession}
     </div>
@@ -239,7 +240,7 @@ async function _showSessionResult(container, session, library, auth) {
 
   card.querySelector('#copy-session-btn').onclick = () => {
     navigator.clipboard.writeText(displaySession).catch(() => {});
-    showToast('Session copied!', 'success');
+    showToast(t('session_copied', 'Session copied!'), 'success');
     const btn = card.querySelector('#copy-session-btn');
     btn.textContent = '✓ Copied';
     btn.disabled = true;

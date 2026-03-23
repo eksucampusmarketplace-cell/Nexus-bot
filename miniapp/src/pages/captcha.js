@@ -5,10 +5,10 @@
  * Merged from captcha.js + captcha_config.js (duplicate removed).
  */
 
-import { t, showToast } from '../../lib/i18n.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
-import { Toggle } from '../../lib/components.js?v=1.6.0';
+import { Toggle, showToast } from '../../lib/components.js?v=1.6.0';
 
 export async function renderCaptchaPage(container) {
   const chatId = useStore.getState().activeChatId;
@@ -152,15 +152,15 @@ export async function renderCaptchaPage(container) {
     const kickFailures = parseInt(section.querySelector('#kick-failures').value);
     
     try {
-      showToast(t('loading', 'Saving...'));
+      showToast(t('loading', 'Saving...'), 'info');
       await apiFetch(`/api/groups/${chatId}/captcha`, {
         method: 'POST',
         body: JSON.stringify({ enabled, type, timeout, kick_failures: kickFailures })
       });
-      showToast(t('toast_save_success', 'Saved successfully!'));
+      showToast(t('toast_save_success', 'Saved successfully!'), 'success');
     } catch (err) {
       console.error('Failed to save captcha:', err);
-      showToast(t('error', 'Failed to save'));
+      showToast(t('error', 'Failed to save'), 'error');
     }
   };
 }

@@ -8,6 +8,7 @@ import { Card, StatCard, EmptyState } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 import { getActionEmoji, formatAction, formatTime } from '../../lib/helpers.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
@@ -32,8 +33,8 @@ export async function renderDashboard(container) {
   if (!finalChatId && groups.length === 0) {
     container.appendChild(EmptyState({
       icon: '🤖',
-      title: 'No Groups Found',
-      description: 'Add the bot to a group and make it an admin to get started.'
+      title: t('dashboard_no_groups', 'No Groups Found'),
+      description: t('dashboard_no_groups_desc', 'Add the bot to a group and make it an admin to get started.')
     }));
     return;
   }
@@ -51,23 +52,23 @@ export async function renderDashboard(container) {
       padding: var(--sp-5);
     ">
       <div style="font-size: 18px; font-weight: var(--fw-semibold); margin-bottom: var(--sp-3);">
-        🚀 <b>Quick Actions</b>
+        🚀 <b>${t('dashboard_quick_actions', 'Quick Actions')}</b>
       </div>
       <div style="display: flex; gap: var(--sp-2); flex-wrap: wrap;">
         <button onclick="window.navigateToPage('commands')" class="btn btn-primary">
-          📚 View Commands
+          📚 ${t('dashboard_view_commands', 'View Commands')}
         </button>
         <button onclick="window.navigateToPage('automod')" class="btn btn-secondary">
-          🛡️ Configure AutoMod
+          🛡️ ${t('dashboard_configure_automod', 'Configure AutoMod')}
         </button>
         <button onclick="window.navigateToPage('modules')" class="btn btn-secondary">
-          📦 Manage Modules
+          📦 ${t('dashboard_manage_modules', 'Manage Modules')}
         </button>
         <button onclick="window.navigateToPage('analytics')" class="btn btn-secondary">
-          📊 Analytics
+          📊 ${t('nav_analytics', 'Analytics')}
         </button>
         <a href="${gamesUrl}" class="btn btn-secondary" style="text-decoration:none;display:inline-flex;">
-          🎮 Play Games
+          🎮 ${t('dashboard_play_games', 'Play Games')}
         </a>
       </div>
     </div>
@@ -77,9 +78,9 @@ export async function renderDashboard(container) {
   const statsGrid = document.createElement('div');
   statsGrid.className = 'stats-grid';
   const loadingStats = [
-    { label: 'Total Members', value: '...', icon: '👥', color: 'accent' },
-    { label: 'Messages Today', value: '...', icon: '💬', color: 'success' },
-    { label: 'Actions Today', value: '...', icon: '⚡', color: 'warning' },
+    { label: t('dashboard_total_members', 'Total Members'), value: '...', icon: '👥', color: 'accent' },
+    { label: t('dashboard_messages_today', 'Messages Today'), value: '...', icon: '💬', color: 'success' },
+    { label: t('dashboard_actions_today', 'Actions Today'), value: '...', icon: '⚡', color: 'warning' },
   ];
   loadingStats.forEach(s => statsGrid.appendChild(StatCard(s)));
   container.appendChild(statsGrid);
@@ -102,9 +103,9 @@ export async function renderDashboard(container) {
       const activity = analyticsData?.activity || [];
       const todayMessages = activity.length > 0 ? (activity[activity.length - 1]?.messages || 0) : 0;
       const stats = [
-        { label: 'Total Members', value: memberCount.toLocaleString(), icon: '👥', color: 'accent' },
-        { label: 'Messages Today', value: todayMessages.toLocaleString(), icon: '💬', color: 'success' },
-        { label: 'Actions Today', value: (() => {
+        { label: t('dashboard_total_members', 'Total Members'), value: memberCount.toLocaleString(), icon: '👥', color: 'accent' },
+        { label: t('dashboard_messages_today', 'Messages Today'), value: todayMessages.toLocaleString(), icon: '💬', color: 'success' },
+        { label: t('dashboard_actions_today', 'Actions Today'), value: (() => {
           const today = new Date().toDateString();
           const actionsToday = (Array.isArray(logs) ? logs : []).filter(log => {
             const logDate = new Date(log.timestamp || log.created_at);
@@ -122,7 +123,7 @@ export async function renderDashboard(container) {
 
       const recentLogs = logList.slice(0, 10);
       container.appendChild(Card({
-        title: 'Recent Activity',
+        title: t('dashboard_recent_activity', 'Recent Activity'),
         children: recentLogs.length > 0 ? recentLogs.map(log => `
           <div style="padding: 8px 0; border-bottom: 1px solid var(--border);">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -136,18 +137,18 @@ export async function renderDashboard(container) {
               <span style="font-size: 11px; color: var(--text-muted);">${formatTime(log.timestamp)}</span>
             </div>
           </div>
-        `).join('') : EmptyState({ icon: '📭', title: 'No recent activity' })
+        `).join('') : EmptyState({ icon: '📭', title: t('dashboard_no_activity', 'No recent activity') })
       }));
     } catch (error) {
       console.error('[Dashboard] Error:', error);
     }
   } else {
     container.appendChild(Card({
-      title: 'Welcome to Nexus',
+      title: t('dashboard_welcome', 'Welcome to Nexus'),
       children: EmptyState({
         icon: '👆',
-        title: 'Select a group',
-        description: 'Choose one of your managed groups from the dropdown in the top bar to get started.'
+        title: t('dashboard_select_group', 'Select a group'),
+        description: t('dashboard_select_group_desc', 'Choose one of your managed groups from the dropdown in the top bar to get started.')
       })
     }));
   }

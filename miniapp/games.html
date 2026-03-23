@@ -193,28 +193,35 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
       <div class="game-desc">50+ questions with streak bonuses</div>
       <div class="game-xp">Up to 600 XP</div>
     </a>
-    <a class="game-card" id="card-advanced-trivia" onclick="openGame('advanced-trivia')">
+    <a class="game-card" id="card-word-guess">
+      <span class="game-badge badge-xp">+XP</span>
+      <span class="game-icon">🔤</span>
+      <div class="game-name">Word Guess</div>
+      <div class="game-desc">Guess the hidden word letter by letter</div>
+      <div class="game-xp">Up to 400 XP</div>
+    </a>
+    <a class="game-card" id="card-advanced-trivia">
       <span class="game-badge badge-hot">🔥</span>
       <span class="game-icon">🧠</span>
       <div class="game-name">Advanced Trivia</div>
       <div class="game-desc">100+ questions, 6 categories, daily challenges</div>
       <div class="game-xp">Up to 800 XP</div>
     </a>
-    <a class="game-card" id="card-fruit-slash" onclick="openGame('fruit-slash')">
+    <a class="game-card" id="card-fruit-slash">
       <span class="game-badge badge-new">NEW</span>
       <span class="game-icon">🍉</span>
       <div class="game-name">Fruit Slash</div>
       <div class="game-desc">Slice fruit, avoid bombs, combo bonuses</div>
       <div class="game-xp">Combo ×5 XP</div>
     </a>
-    <a class="game-card" id="card-nexus-kitchen" onclick="openGame('nexus-kitchen')">
+    <a class="game-card" id="card-nexus-kitchen">
       <span class="game-badge badge-hot">TREND</span>
       <span class="game-icon">👨‍🍳</span>
       <div class="game-name">Nexus Kitchen</div>
       <div class="game-desc">Cook & serve orders, level up system</div>
       <div class="game-xp">Order rewards</div>
     </a>
-    <a class="game-card" id="card-word-master" onclick="openGame('word-master')">
+    <a class="game-card" id="card-word-master">
       <span class="game-badge badge-xp">+XP</span>
       <span class="game-icon">📝</span>
       <div class="game-name">Word Master</div>
@@ -323,9 +330,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 
   <div class="section-label">Leaderboards</div>
   <div class="lb-tabs">
-    <button class="lb-tab active" onclick="switchTab('global')">🏆 Global</button>
-    <button class="lb-tab" onclick="switchTab('daily')">📅 Today</button>
-    <button class="lb-tab" onclick="switchTab('weekly')">📊 Week</button>
+    <button class="lb-tab active" onclick="switchTab('global', event)">🏆 Global</button>
+    <button class="lb-tab" onclick="switchTab('daily', event)">📅 Today</button>
+    <button class="lb-tab" onclick="switchTab('weekly', event)">📊 Week</button>
   </div>
   <div class="lb-card">
     <div class="lb-header">
@@ -551,6 +558,8 @@ function openGame(game, trackAs = null){
 
 // Setup game cards
     document.getElementById('card-spin').onclick = ()=>openGame('spin-wheel');
+    document.getElementById('card-trivia').onclick = ()=>openGame('trivia', 'trivia');
+    document.getElementById('card-word-guess').onclick = ()=>openGame('word-guess');
     document.getElementById('card-advanced-trivia').onclick = ()=>openGame('advanced-trivia');
     document.getElementById('card-fruit-slash').onclick = ()=>openGame('fruit-slash');
     document.getElementById('card-nexus-kitchen').onclick = ()=>openGame('nexus-kitchen');
@@ -571,10 +580,11 @@ function openGame(game, trackAs = null){
 
 // Leaderboard tabs
 let currentTab = 'global';
-function switchTab(tab) {
+function switchTab(tab, evt) {
   currentTab = tab;
   document.querySelectorAll('.lb-tab').forEach(t => t.classList.remove('active'));
-  event.target.classList.add('active');
+  if (evt && evt.target) evt.target.classList.add('active');
+  else document.querySelectorAll('.lb-tab').forEach(t => { if (t.textContent.toLowerCase().includes(tab)) t.classList.add('active'); });
   
   const titles = {global:'🏆 Global', daily:'📅 Today', weekly:'📊 Week'};
   const periods = {global:'All Time', daily:'Today', weekly:'This Week'};
@@ -589,7 +599,7 @@ function buildLeaderboardData() {
   const scores = {};
   
   // Load from all game leaderboards
-  const games = ['spin','snake','trivia','wordguess','tap','memory','reaction','hol','2048','mines','emoji','colorsort','flappy','aim','brick','blackjack','redlight'];
+  const games = ['spin','snake','trivia','wordguess','tap','memory','reaction','hol','2048','mines','emoji','colorsort','flappy','aim','brick','blackjack','redlight','advanced-trivia','fruit-slash','nexus-kitchen','word-master','word-guess'];
   
   games.forEach(game => {
     const lb = JSON.parse(localStorage.getItem(`nexus_${game}_lb`)||'[]');

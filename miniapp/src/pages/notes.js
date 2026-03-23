@@ -6,6 +6,7 @@
 import { Card, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 export async function renderNotesPage(container) {
   const chatId = useStore.getState().activeChatId;
@@ -13,17 +14,17 @@ export async function renderNotesPage(container) {
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
   if (!chatId) {
-    container.appendChild(EmptyState({ icon: '📝', title: 'Select a group', description: 'Choose a group to manage notes.' }));
+    container.appendChild(EmptyState({ icon: '📝', title: t('select_group', 'Select a group'), description: t('notes_select_group', 'Choose a group to manage notes.') }));
     return;
   }
 
   const header = document.createElement('div');
   header.style.cssText = 'margin-bottom: var(--sp-6);';
-  header.innerHTML = '<h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">📝 Notes</h2><p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Save and retrieve custom notes/triggers</p>';
+  header.innerHTML = '<h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">📝 ' + t('nav_notes', 'Notes') + '</h2><p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">' + t('notes_subtitle', 'Save and retrieve custom notes/triggers') + '</p>';
   container.appendChild(header);
 
   // Create note form
-  const createCard = Card({ title: 'Create Note', subtitle: 'Add a new note to this group' });
+  const createCard = Card({ title: t('notes_create', 'Create Note'), subtitle: t('notes_create_sub', 'Add a new note to this group') });
   createCard.innerHTML += `
     <div style="display:flex;flex-direction:column;gap:var(--sp-3);padding-top:var(--sp-2);">
       <div>
@@ -44,25 +45,25 @@ export async function renderNotesPage(container) {
   createCard.querySelector('#save-note-btn').onclick = async () => {
     const name = createCard.querySelector('#note-name-input').value.trim();
     const content = createCard.querySelector('#note-content-input').value.trim();
-    if (!name) { showToast('Enter a note name', 'error'); return; }
-    if (!content) { showToast('Enter note content', 'error'); return; }
+    if (!name) { showToast(t('notes_enter_name', 'Enter a note name'), 'error'); return; }
+    if (!content) { showToast(t('notes_enter_content', 'Enter note content'), 'error'); return; }
     try {
       await apiFetch(`/api/groups/${chatId}/notes`, {
         method: 'POST',
         body: JSON.stringify({ name, content })
       });
-      showToast('Note saved!', 'success');
+      showToast(t('notes_saved', 'Note saved!'), 'success');
       createCard.querySelector('#note-name-input').value = '';
       createCard.querySelector('#note-content-input').value = '';
       // Re-render notes list
       await loadNotesList(chatId, listContainer);
     } catch (e) {
-      showToast('Failed to save note: ' + (e.message || 'Error'), 'error');
+      showToast(t('notes_save_failed', 'Failed to save note. Please try again.'), 'error');
     }
   };
 
   // Notes list
-  const listCard = Card({ title: 'Saved Notes', subtitle: 'Notes are retrieved with /note or via inline mode' });
+  const listCard = Card({ title: t('notes_saved_title', 'Saved Notes'), subtitle: t('notes_saved_sub', 'Notes are retrieved with /note or via inline mode') });
   const listContainer = document.createElement('div');
   listContainer.id = 'notes-list-container';
   listCard.appendChild(listContainer);
@@ -77,7 +78,7 @@ async function loadNotesList(chatId, listContainer) {
     const notes = await apiFetch(`/api/groups/${chatId}/notes`);
     listContainer.innerHTML = '';
     if (!notes || notes.length === 0) {
-      listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">No notes yet</div>';
+      listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">' + t('notes_empty', 'No notes yet') + '</div>';
       return;
     }
     const list = document.createElement('div');
@@ -96,10 +97,10 @@ async function loadNotesList(chatId, listContainer) {
         if (!confirm('Delete note "' + n.name + '"?')) return;
         try {
           await apiFetch(`/api/groups/${chatId}/notes/${encodeURIComponent(n.name)}`, { method: 'DELETE' });
-          showToast('Note deleted', 'success');
+          showToast(t('notes_deleted', 'Note deleted'), 'success');
           await loadNotesList(chatId, listContainer);
         } catch (e) {
-          showToast('Failed to delete: ' + (e.message || 'Error'), 'error');
+          showToast(t('notes_delete_failed', 'Failed to delete note. Please try again.'), 'error');
         }
       };
       item.appendChild(nameSpan);
@@ -109,6 +110,6 @@ async function loadNotesList(chatId, listContainer) {
     listContainer.appendChild(list);
   } catch (e) {
     listContainer.innerHTML = '';
-    listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">⚠️ Failed to load notes</div>';
+    listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">⚠️ ' + t('notes_load_failed', 'Could not load notes. The notes API may not be configured for this group.') + '</div>';
   }
 }

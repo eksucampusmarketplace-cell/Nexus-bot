@@ -18,6 +18,7 @@
 import { Card, StatCard, EmptyState, showToast, Spinner } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 
@@ -33,8 +34,8 @@ export async function renderAnalyticsPage(container) {
   if (!chatId) {
     container.appendChild(EmptyState({
       icon: '📊',
-      title: 'Select a group',
-      description: 'Choose a group to view analytics.',
+      title: t('analytics_select_group', 'Select a group'),
+      description: t('analytics_select_group_desc', 'Choose a group to view analytics.'),
     }));
     return;
   }
@@ -43,8 +44,8 @@ export async function renderAnalyticsPage(container) {
   header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
   header.innerHTML = `
     <div>
-      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">📊 Analytics</h2>
-      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Group activity overview</p>
+      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">📊 ${t('nav_analytics', 'Analytics')}</h2>
+      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">${t('analytics_subtitle', 'Group activity overview')}</p>
     </div>
   `;
   container.appendChild(header);
@@ -75,7 +76,7 @@ export async function renderAnalyticsPage(container) {
   container.appendChild(dataContainer);
 
   async function loadAnalytics(days) {
-    dataContainer.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading analytics...</div>`;
+    dataContainer.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">${t('loading', 'Loading...')}</div>`;
 
     let analytics, memberStats, reports;
     try {
@@ -88,8 +89,8 @@ export async function renderAnalyticsPage(container) {
       dataContainer.innerHTML = '';
       dataContainer.appendChild(EmptyState({
         icon: '⚠️',
-        title: 'Failed to load analytics',
-        description: err.message || 'Please try again.',
+        title: t('analytics_load_failed', 'Failed to load analytics'),
+        description: err.message || t('try_again', 'Please try again.'),
       }));
       return;
     }

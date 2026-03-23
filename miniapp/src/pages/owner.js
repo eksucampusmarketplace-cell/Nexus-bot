@@ -7,6 +7,7 @@
 import { Card, StatCard, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
@@ -17,7 +18,7 @@ export async function renderOwnerPage(container) {
 
   const header = document.createElement('div');
   header.style.cssText = 'display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-5);';
-  header.innerHTML = '<div style="font-size:2rem">&#x1F451;</div><div style="font-size:1.2rem;font-weight:700">Owner Panel</div>';
+  header.innerHTML = '<div style="font-size:2rem">&#x1F451;</div><div style="font-size:1.2rem;font-weight:700">' + t('nav_owner', 'Owner Panel') + '</div>';
   container.appendChild(header);
 
   let statsRes = null;
@@ -26,7 +27,7 @@ export async function renderOwnerPage(container) {
   } catch (e) {
     const msg = document.createElement('div');
     msg.style.cssText = 'text-align:center;padding:var(--sp-8);color:var(--text-muted);';
-    msg.textContent = 'Owner access only.';
+    msg.textContent = t('owner_access_only', 'Owner access only.');
     container.appendChild(msg);
     return;
   }
@@ -34,7 +35,7 @@ export async function renderOwnerPage(container) {
   if (statsRes) {
     const row = document.createElement('div');
     row.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-3);margin-bottom:var(--sp-5);';
-    [{label:'Clones',val:statsRes.bots,icon:'🤖'},{label:'Groups',val:statsRes.groups,icon:'👥'},{label:'Users',val:statsRes.users,icon:'👤'}]
+    [{label:t('owner_clones', 'Clones'),val:statsRes.bots,icon:'🤖'},{label:t('owner_groups', 'Groups'),val:statsRes.groups,icon:'👥'},{label:t('owner_users', 'Users'),val:statsRes.users,icon:'👤'}]
       .forEach(s => {
         const c = document.createElement('div');
         c.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-3);text-align:center;';
@@ -46,7 +47,7 @@ export async function renderOwnerPage(container) {
 
   const actRow = document.createElement('div');
   actRow.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-4);';
-  [{label:'📋 View All Clones', page:'bots'},{label:'📢 Broadcast to All', page:'broadcast'}]
+  [{label:'📋 ' + t('owner_view_clones', 'View All Clones'), page:'bots'},{label:'📢 ' + t('owner_broadcast', 'Broadcast to All'), page:'broadcast'}]
     .forEach(a => {
       const btn = document.createElement('button');
       btn.textContent = a.label;
@@ -62,7 +63,7 @@ export async function renderOwnerPage(container) {
     const botsArray = Array.isArray(botsRes) ? botsRes : (botsRes?.bots || []);
     
     if (botsArray.length > 0) {
-      const cloneCard = Card({ title: '🤖 Clone Status', subtitle: 'Real-time status of all bot clones' });
+      const cloneCard = Card({ title: '🤖 ' + t('owner_clone_status', 'Clone Status'), subtitle: t('owner_clone_status_sub', 'Real-time status of all bot clones') });
       const cloneList = document.createElement('div');
       cloneList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
 
@@ -79,7 +80,7 @@ export async function renderOwnerPage(container) {
 
         const statusColor = isOnline ? 'var(--success)' : isDead ? 'var(--danger)' : 'var(--warning)';
         const statusIcon = isOnline ? '🟢' : isDead ? '🔴' : '🟡';
-        const statusText = isOnline ? 'Online' : isDead ? 'Error' : 'Offline';
+        const statusText = isOnline ? t('status_online', 'Online') : isDead ? t('status_error', 'Error') : t('status_offline', 'Offline');
 
         const item = document.createElement('div');
         item.style.cssText = 'display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border-left:3px solid ' + statusColor + ';';
@@ -124,7 +125,7 @@ export async function renderOwnerPage(container) {
   try {
     const groups = getState().groups || [];
     if (groups.length > 0) {
-      const groupCard = Card({ title: '👥 Detected Groups', subtitle: 'Groups where your bots are active' });
+      const groupCard = Card({ title: '👥 ' + t('owner_detected_groups', 'Detected Groups'), subtitle: t('owner_detected_groups_sub', 'Groups where your bots are active') });
       const groupList = document.createElement('div');
       groupList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
 
@@ -156,10 +157,10 @@ export async function renderOwnerPage(container) {
   const econCard = document.createElement('div');
   econCard.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);margin-bottom:var(--sp-4);';
   econCard.innerHTML = `
-    <div style="font-weight:700;margin-bottom:var(--sp-3);">💰 Economy Controls</div>
+    <div style="font-weight:700;margin-bottom:var(--sp-3);">💰 ${t('owner_economy', 'Economy Controls')}</div>
     <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
       <div>
-        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Grant Bonus Stars</div>
+        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('owner_grant_stars', 'Grant Bonus Stars')}</div>
         <div style="display:flex;gap:8px;">
           <input id="grant-uid" placeholder="User ID" type="number" style="flex:1;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
           <input id="grant-amt" placeholder="Stars" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
@@ -167,7 +168,7 @@ export async function renderOwnerPage(container) {
         </div>
       </div>
       <div>
-        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Create Promo Code</div>
+        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('owner_create_promo', 'Create Promo Code')}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
           <input id="promo-code" placeholder="Code (e.g. WELCOME50)" style="flex:1;min-width:8rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
           <input id="promo-amt" placeholder="Stars" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
@@ -182,7 +183,7 @@ export async function renderOwnerPage(container) {
   econCard.querySelector('#grant-btn').addEventListener('click', async () => {
     const uid = parseInt(econCard.querySelector('#grant-uid').value);
     const amt = parseInt(econCard.querySelector('#grant-amt').value);
-    if (!uid || !amt) { showToast('Enter user ID and amount', 'error'); return; }
+    if (!uid || !amt) { showToast(t('owner_enter_uid_amt', 'Enter user ID and amount'), 'error'); return; }
     try {
       await apiFetch('/api/billing/grant-bonus', { method: 'POST', body: JSON.stringify({ user_id: uid, amount: amt, reason: 'Owner grant via miniapp' }) });
       showToast('Granted ' + amt + ' Stars to ' + uid, 'success');
@@ -195,7 +196,7 @@ export async function renderOwnerPage(container) {
     const code = econCard.querySelector('#promo-code').value.trim().toUpperCase();
     const amt = parseInt(econCard.querySelector('#promo-amt').value);
     const uses = parseInt(econCard.querySelector('#promo-uses').value) || 10;
-    if (!code || !amt) { showToast('Enter code and amount', 'error'); return; }
+    if (!code || !amt) { showToast(t('owner_enter_code_amt', 'Enter code and amount'), 'error'); return; }
     try {
       await apiFetch('/api/billing/create-promo', { method: 'POST', body: JSON.stringify({ code, amount: amt, max_uses: uses }) });
       showToast('Promo ' + code + ' created (' + amt + ' Stars, ' + uses + ' uses)', 'success');

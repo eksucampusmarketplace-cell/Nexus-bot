@@ -1,6 +1,7 @@
 import { Card, showToast, StatCard, EmptyState, Badge, ProgressBar } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 export async function renderBroadcastPage(container) {
     const state = useStore.getState();
@@ -10,8 +11,8 @@ export async function renderBroadcastPage(container) {
     container.innerHTML = `
         <div style="padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-4);">
             <div class="page-header">
-                <h1 class="text-2xl font-bold">📢 Broadcast</h1>
-                <p class="text-sm text-muted">Send mass messages to your users and groups.</p>
+                <h1 class="text-2xl font-bold">📢 ${t('nav_broadcast', 'Broadcast')}</h1>
+                <p class="text-sm text-muted">${t('broadcast_subtitle', 'Send mass messages to your users and groups.')}</p>
             </div>
             
             <div id="broadcast-form-container"></div>
@@ -22,8 +23,8 @@ export async function renderBroadcastPage(container) {
     if (!botInfo) {
         document.getElementById('broadcast-form-container').appendChild(EmptyState({
             icon: '🤖',
-            title: 'No Bot Found',
-            description: 'You need a bot to use the broadcast feature.'
+            title: t('broadcast_no_bot', 'No Bot Connected'),
+            description: t('broadcast_no_bot_desc', 'A bot must be connected to use broadcasting. Open the Owner Panel to check your bot status, or add your bot to a group first.')
         }));
         return;
     }
@@ -185,7 +186,7 @@ async function renderBroadcastHistory(container, botId) {
             children: listContainer
         }));
     } catch (e) {
-        container.innerHTML = `<div style="color: var(--danger); text-align: center; padding: 20px;">Failed to load history: ${e.message}</div>`;
+        container.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">${t('broadcast_history_error', 'Could not load broadcast history. Please try again later.')}</div>`;
     }
 }
 

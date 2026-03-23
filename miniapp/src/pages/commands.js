@@ -9,6 +9,7 @@
 import { Card, EmptyState, Toggle, showToast } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 
@@ -252,8 +253,8 @@ export async function renderCommandsPage(container) {
   if (!finalChatId) {
     container.appendChild(EmptyState({
       icon: '👆',
-      title: 'Select a group',
-      description: 'Choose a group to see available commands'
+      title: t('select_group', 'Select a group'),
+      description: t('commands_select_group', 'Choose a group to see available commands')
     }));
     return;
   }
@@ -296,7 +297,7 @@ export async function renderCommandsPage(container) {
       padding: var(--sp-5);
       margin-bottom: var(--sp-4);
     ">
-      <div style="font-size: 24px; margin-bottom: var(--sp-2);">📚 <b>Complete Command Reference</b></div>
+      <div style="font-size: 24px; margin-bottom: var(--sp-2);">📚 <b>${t('commands_title', 'Complete Command Reference')}</b></div>
       <div style="color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.6;">
         All available bot commands with detailed descriptions and usage examples.
         <br><br>
@@ -321,7 +322,7 @@ export async function renderCommandsPage(container) {
     <input
       type="text"
       id="cmd-search"
-      placeholder="🔍 Search commands..."
+      placeholder="🔍 ${t('commands_search', 'Search commands...')}"
       class="input"
       style="
         width: 100%;
@@ -430,9 +431,9 @@ function renderCategories(container, categories, commandStates, chatId) {
             method: 'PUT',
             body: JSON.stringify(updates)
           });
-          showToast(`${val ? 'Enabled' : 'Disabled'} all ${category.title.replace(/^[^\s]+\s/, '')} commands`, 'success');
+          showToast(`${val ? t('enabled', 'Enabled') : t('disabled', 'Disabled')} ${t('all', 'all')} ${category.title.replace(/^[^\s]+\s/, '')} ${t('commands', 'commands')}`, 'success');
         } catch (e) {
-          showToast('Failed to update commands', 'error');
+          showToast(t('commands_update_failed', 'Failed to update commands'), 'error');
         }
       }
     }));
@@ -501,9 +502,9 @@ function renderCommandRow(cmd, commandStates, chatId) {
           method: 'PUT',
           body: JSON.stringify({ [key]: val })
         });
-        showToast(`${cmd.cmd} ${val ? 'enabled' : 'disabled'}`, 'success');
+        showToast(`${cmd.cmd} ${val ? t('enabled', 'enabled') : t('disabled', 'disabled')}`, 'success');
       } catch (e) {
-        showToast('Failed to toggle ' + cmd.cmd, 'error');
+        showToast(t('commands_toggle_failed', 'Failed to toggle command'), 'error');
       }
     }
   }));

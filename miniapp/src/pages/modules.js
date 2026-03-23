@@ -7,6 +7,7 @@
 import { Card, EmptyState, Toggle, showToast } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
@@ -19,7 +20,7 @@ export async function renderModules(container) {
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
   if (!chatId) {
-    container.appendChild(EmptyState({ icon: '👆', title: 'Select a group', description: 'Choose a group to manage modules' }));
+    container.appendChild(EmptyState({ icon: '👆', title: t('select_group', 'Select a group'), description: t('modules_select_group', 'Choose a group to manage modules') }));
     return;
   }
 
@@ -41,8 +42,8 @@ export async function renderModules(container) {
     const header = document.createElement('div');
     header.style.cssText = 'margin-bottom: var(--sp-2);';
     header.innerHTML = `
-      <h2 style="font-size: 20px; font-weight: 700; margin: 0;">📦 Modules</h2>
-      <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0;">Toggle features for this group</p>
+      <h2 style="font-size: 20px; font-weight: 700; margin: 0;">📦 ${t('nav_modules', 'Modules')}</h2>
+      <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0;">${t('modules_subtitle', 'Toggle features for this group')}</p>
     `;
     container.appendChild(header);
 
@@ -95,6 +96,6 @@ export async function renderModules(container) {
     });
   } catch (e) {
     container.innerHTML = '';
-    container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load modules', description: e.message || 'Please try again' }));
+    container.appendChild(EmptyState({ icon: '⚠️', title: t('modules_load_failed', 'Failed to load modules'), description: t('modules_try_again', 'Please try again') }));
   }
 }

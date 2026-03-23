@@ -8,6 +8,7 @@
 import { Card, Toggle, Badge, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
@@ -22,8 +23,8 @@ export async function renderEngagementPage(container) {
   if (!chatId) {
     container.appendChild(EmptyState({
       icon: '⭐',
-      title: 'Select a group',
-      description: 'Choose a group to manage engagement settings.'
+      title: t('engagement_select_group', 'Select a group'),
+      description: t('engagement_select_group_desc', 'Choose a group to manage engagement settings.')
     }));
     return;
   }
@@ -32,7 +33,7 @@ export async function renderEngagementPage(container) {
   container.innerHTML = `
     <div style="text-align: center; padding: var(--sp-8);">
       <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
-      <div style="color: var(--text-muted);">Loading engagement data...</div>
+      <div style="color: var(--text-muted);">${t('loading', 'Loading...')}</div>
     </div>
   `;
 
@@ -49,9 +50,9 @@ export async function renderEngagementPage(container) {
     const header = document.createElement('div');
     header.style.cssText = 'margin-bottom: var(--sp-6);';
     header.innerHTML = `
-      <h2 style="font-size: 24px; font-weight: 700; margin: 0;">⭐ Engagement</h2>
+      <h2 style="font-size: 24px; font-weight: 700; margin: 0;">⭐ ${t('nav_engagement', 'Engagement')}</h2>
       <p style="color: var(--text-muted); margin: var(--sp-2) 0 0;">
-        XP, reputation, badges, and cross-group networks
+        ${t('engagement_subtitle', 'XP, reputation, badges, and cross-group networks')}
       </p>
     `;
     container.appendChild(header);
@@ -140,7 +141,7 @@ export async function renderEngagementPage(container) {
     container.innerHTML = '';
     container.appendChild(EmptyState({
       icon: '⚠️',
-      title: 'Failed to load',
+      title: t('load_failed', 'Failed to load'),
       description: err.message
     }));
   }

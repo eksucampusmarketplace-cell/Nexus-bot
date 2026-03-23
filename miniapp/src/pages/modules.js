@@ -57,7 +57,7 @@ export async function renderModules(container) {
       { id: 'logging',    name: '📋 Mod Logging',         desc: 'Log actions to channel',           settingKey: 'log_enabled',          page: 'logs' },
       { id: 'inline',     name: '⚡ Inline Mode',         desc: '@botname queries',                 settingKey: 'inline_mode_enabled',  page: null },
       { id: 'reports',    name: '🚨 Reports',             desc: '/report command',                  settingKey: 'reports_enabled',      page: 'reports' },
-      { id: 'notes',      name: '📝 Notes',               desc: 'Save and retrieve notes',          settingKey: 'notes_enabled',        page: 'greetings' },
+      { id: 'notes',      name: '📝 Notes',               desc: 'Save and retrieve notes',          settingKey: 'notes_enabled',        page: 'notes' },
       { id: 'broadcast',  name: '📡 Broadcast',           desc: 'Mass message system',              settingKey: 'broadcast_enabled',    page: 'broadcast' },
       { id: 'autodelete', name: '🗑️ Auto-Delete',          desc: 'Delete messages after N seconds', settingKey: 'autodelete_enabled',   page: 'settings' },
     ];

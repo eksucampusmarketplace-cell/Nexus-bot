@@ -7,28 +7,10 @@
 import { Card, StatCard, EmptyState } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { getActionEmoji, formatAction, formatTime } from '../../lib/helpers.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
-
-function getActionEmoji(action) {
-  const emojis = { 'ban': '🚫', 'unban': '✅', 'mute': '🔇', 'unmute': '🔊', 'warn': '⚠️', 'kick': '👢', 'purge': '🧹', 'join': '👋', 'leave': '👋' };
-  return emojis[action] || '📋';
-}
-
-function formatAction(action) {
-  return action?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || action;
-}
-
-function formatTime(timestamp) {
-  const date = new Date(timestamp);
-  const diff = new Date() - date;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  if (mins < 1440) return `${Math.floor(mins/60)}h ago`;
-  return date.toLocaleDateString();
-}
 
 export async function renderDashboard(container) {
   const state = getState();

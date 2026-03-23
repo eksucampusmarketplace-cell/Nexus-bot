@@ -103,7 +103,7 @@ function showCreateFederationDialog(chatId, container) {
       showToast('Creating federation...');
       await apiFetch('/api/federation/create', {
         method: 'POST',
-        body: { name, chat_id: chatId }
+        body: JSON.stringify({ name, chat_id: chatId })
       });
       showToast('Federation created!');
       overlay.remove();

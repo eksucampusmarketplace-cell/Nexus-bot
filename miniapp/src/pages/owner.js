@@ -1,7 +1,7 @@
 /**
  * miniapp/src/pages/owner.js
- * Task 1 of 12 — Owner Panel page
- * Extracted from index.html renderOwnerPage()
+ * 
+ * Owner Panel page with clone status indicators and group detection.
  */
 
 import { Card, StatCard, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
@@ -50,25 +50,107 @@ export async function renderOwnerPage(container) {
     .forEach(a => {
       const btn = document.createElement('button');
       btn.textContent = a.label;
-      btn.style.cssText = 'padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);cursor:pointer;text-align:left;font-size:0.9rem;';
+      btn.style.cssText = 'padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);cursor:pointer;text-align:left;font-size:0.9rem;color:var(--text-primary);';
       btn.onclick = () => window.navigateToPage(a.page);
       actRow.appendChild(btn);
     });
   container.appendChild(actRow);
 
-  // Dead Clones Warning
+  // Clone Status Section
   try {
-    const deadRes = await apiFetch('/api/bots').catch(() => null);
-    const botsArray = Array.isArray(deadRes) ? deadRes : (deadRes?.bots || []);
-    const deadBots = botsArray.filter(b => b.status === 'dead' || b.status === 'error');
-    if (deadBots.length > 0) {
-      const warn = document.createElement('div');
-      warn.style.cssText = 'background:#FEF9E7;border:1px solid #F39C12;border-radius:var(--r-xl);padding:var(--sp-3);margin-bottom:var(--sp-4);';
-      warn.innerHTML = '<div style="font-weight:700;color:#E67E22;">⚠️ ' + deadBots.length + ' Dead Clone(s)</div>' +
-        deadBots.map(b => '<div style="font-size:0.82rem;color:var(--text-muted);">@' + (b.username || b.bot_id) + ' — ' + (b.death_reason || b.error || 'invalid token') + '</div>').join('');
-      container.appendChild(warn);
+    const botsRes = await apiFetch('/api/bots').catch(() => null);
+    const botsArray = Array.isArray(botsRes) ? botsRes : (botsRes?.bots || []);
+    
+    if (botsArray.length > 0) {
+      const cloneCard = Card({ title: '🤖 Clone Status', subtitle: 'Real-time status of all bot clones' });
+      const cloneList = document.createElement('div');
+      cloneList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
+
+      const statusCounts = { online: 0, offline: 0, error: 0 };
+
+      botsArray.forEach(bot => {
+        const status = bot.status || 'unknown';
+        const isOnline = status === 'running' || status === 'online' || status === 'active';
+        const isDead = status === 'dead' || status === 'error' || status === 'stopped';
+        
+        if (isOnline) statusCounts.online++;
+        else if (isDead) statusCounts.error++;
+        else statusCounts.offline++;
+
+        const statusColor = isOnline ? 'var(--success)' : isDead ? 'var(--danger)' : 'var(--warning)';
+        const statusIcon = isOnline ? '🟢' : isDead ? '🔴' : '🟡';
+        const statusText = isOnline ? 'Online' : isDead ? 'Error' : 'Offline';
+
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border-left:3px solid ' + statusColor + ';';
+        item.innerHTML = `
+          <div style="flex:1;">
+            <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">@${escapeHtml(bot.username || bot.bot_id || 'Unknown')}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">${bot.groups_count ? bot.groups_count + ' groups' : 'No groups'}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--sp-1);">
+            <span style="font-size:0.7rem;">${statusIcon}</span>
+            <span style="font-size:var(--text-xs);color:${statusColor};font-weight:var(--fw-semibold);">${statusText}</span>
+          </div>
+        `;
+        
+        if (isDead && (bot.death_reason || bot.error)) {
+          const errorInfo = document.createElement('div');
+          errorInfo.style.cssText = 'font-size:var(--text-xs);color:var(--danger);margin-top:var(--sp-1);padding-left:var(--sp-1);';
+          errorInfo.textContent = bot.death_reason || bot.error || 'Invalid token';
+          item.querySelector('div').appendChild(errorInfo);
+        }
+
+        cloneList.appendChild(item);
+      });
+
+      // Status summary bar
+      const summaryBar = document.createElement('div');
+      summaryBar.style.cssText = 'display:flex;gap:var(--sp-3);padding:var(--sp-2) 0;margin-bottom:var(--sp-2);';
+      summaryBar.innerHTML = `
+        <span style="font-size:var(--text-xs);color:var(--success);font-weight:600;">🟢 ${statusCounts.online} Online</span>
+        <span style="font-size:var(--text-xs);color:var(--warning);font-weight:600;">🟡 ${statusCounts.offline} Offline</span>
+        <span style="font-size:var(--text-xs);color:var(--danger);font-weight:600;">🔴 ${statusCounts.error} Error</span>
+      `;
+      cloneCard.appendChild(summaryBar);
+      cloneCard.appendChild(cloneList);
+      container.appendChild(cloneCard);
     }
-  } catch(e) {}
+  } catch(e) {
+    console.debug('Failed to load clone status:', e);
+  }
+
+  // Group Detection Section
+  try {
+    const groups = getState().groups || [];
+    if (groups.length > 0) {
+      const groupCard = Card({ title: '👥 Detected Groups', subtitle: 'Groups where your bots are active' });
+      const groupList = document.createElement('div');
+      groupList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
+
+      groups.forEach(group => {
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);cursor:pointer;';
+        item.innerHTML = `
+          <div>
+            <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">${escapeHtml(group.title || 'Unnamed Group')}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">${group.member_count ? group.member_count + ' members' : 'ID: ' + group.chat_id}</div>
+          </div>
+          <span style="font-size:var(--text-xs);color:var(--accent);cursor:pointer;">Open →</span>
+        `;
+        item.onclick = () => {
+          getState().setActiveChatId(group.chat_id);
+          window.navigateToPage('dashboard');
+        };
+        groupList.appendChild(item);
+      });
+
+      groupCard.appendChild(groupList);
+      container.appendChild(groupCard);
+    }
+  } catch(e) {
+    console.debug('Failed to load groups:', e);
+  }
 
   // Economy Controls
   const econCard = document.createElement('div');
@@ -121,4 +203,10 @@ export async function renderOwnerPage(container) {
       econCard.querySelector('#promo-amt').value = '';
     } catch(e) { showToast('Failed: ' + e.message, 'error'); }
   });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
 }

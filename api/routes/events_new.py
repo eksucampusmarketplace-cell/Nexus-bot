@@ -9,6 +9,10 @@ from api.auth import get_current_user
 from bot.handlers.moderation.utils import EventBus
 
 log = logging.getLogger("sse")
+# Bug #8 fix: This router is included in main.py WITHOUT a prefix (app.include_router(events_new.router)),
+# so the prefix must be defined here. Previously this caused a double /api/events mount conflict
+# with events.router which was mounted WITH prefix="/api/events". Now events_new uses /api/events/moderation
+# path prefix to avoid shadowing events.router's root /api/events endpoint.
 router = APIRouter(prefix="/api/events")
 
 

@@ -85,7 +85,12 @@ def push_event(owner_id: int, data: dict):
     if chat_id:
         import asyncio
 
-        asyncio.create_task(EventBus.publish(chat_id, data.get("type", "notification"), data))
+        # Bug #88 fix: Handle case where no event loop is running
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(EventBus.publish(chat_id, data.get("type", "notification"), data))
+        except RuntimeError:
+            pass  # No running event loop — skip event push
 
 
 @router.get("")

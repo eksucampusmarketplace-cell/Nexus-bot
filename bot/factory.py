@@ -318,7 +318,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(setup_command)
 
     # Message handler for message_guard (checks locks, filters, etc.)
-    app.add_handler(MessageHandler(GROUP & filters.ALL, message_guard), group=0)
+    # Bug #98 fix: Move message_guard to group=6 to avoid conflict with captcha_message at group=0
+    app.add_handler(MessageHandler(GROUP & filters.ALL, message_guard), group=6)
 
     # ── Full report system (replaces stub report_handler for new commands) ──
     for h in full_report_handlers:
@@ -372,8 +373,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(
         CallbackQueryHandler(admin_request_callback, pattern=r"^admin_req:(responding|close):\d+$")
     )
+    # Bug #98 fix: Move captcha_message to group=7 to avoid conflict with message_guard
     app.add_handler(
-        MessageHandler(GROUP & filters.TEXT & ~filters.COMMAND, handle_captcha_message), group=0
+        MessageHandler(GROUP & filters.TEXT & ~filters.COMMAND, handle_captcha_message), group=7
     )
 
     # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
@@ -545,13 +547,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     )
     logger.info("[FACTORY] Import/Export handlers registered")
 
-    # ── Inline query handler ──────────────────────────────────────────────
-    from telegram.ext import InlineQueryHandler
-
-    from bot.handlers.inline_mode import handle_inline_query
-
-    app.add_handler(InlineQueryHandler(handle_inline_query))
-    logger.info("[FACTORY] Inline query handler registered")
+    # Bug #3 fix: Removed duplicate InlineQueryHandler registration.
+    # Only the enhanced inline_query handler (registered below) is used now.
+    # The old inline_mode.handle_inline_query was redundant.
+    logger.info("[FACTORY] Inline query handler (legacy) skipped — using enhanced handler")
 
     # ── Public command handlers ───────────────────────────────────────────
     from bot.handlers.public import (
@@ -590,8 +589,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     for handler in community_vote_handlers:
         app.add_handler(handler)
-    # Auto-detect scam messages (runs on every message)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, auto_detect_scam), group=5)
+    # Bug #99 fix: auto_detect_scam is already part of community_vote_handlers,
+    # so don't register it again separately to avoid double-firing.
     logger.info("[FACTORY] Community Vote handlers registered")
 
     # Night Mode handlers

@@ -13,6 +13,22 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def _verify_group_access(chat_id: int, user: dict):
+    """Bug #14/#15 fix: Verify the user has access to this group via their bot."""
+    bot_token = user.get("validated_bot_token")
+    if not bot_token:
+        return  # Primary bot owner, allow access
+    token_hash = hash_token(bot_token)
+    async with db.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT 1 FROM groups WHERE chat_id = $1 AND bot_token_hash = $2",
+            chat_id,
+            token_hash,
+        )
+    if not row:
+        raise HTTPException(status_code=403, detail="Not authorized for this group")
+
+
 @router.get("")
 async def list_groups(user: dict = Depends(get_current_user)):
     bot_token = user.get("validated_bot_token")
@@ -40,6 +56,7 @@ async def list_groups(user: dict = Depends(get_current_user)):
 
 @router.get("/{chat_id}")
 async def group_details(chat_id: int, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     group = await get_group(chat_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
@@ -112,6 +129,7 @@ def _normalize_settings(incoming: dict, existing: dict):
 
 @router.put("/{chat_id}/settings")
 async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     from db.ops.automod import bulk_update_group_settings, get_group_settings
 
     existing = await get_group_settings(db.pool, chat_id)

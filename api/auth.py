@@ -22,8 +22,10 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
     if "hash" not in vals:
         raise ValueError("Missing hash")
 
-    received_hash = vals.pop("hash")[0]
-    data_check_string = "\n".join(f"{k}={v[0]}" for k, v in sorted(vals.items()))
+    # Bug #20 fix: Copy vals before mutating to avoid corrupting the input dict
+    received_hash = vals["hash"][0]
+    check_vals = {k: v for k, v in vals.items() if k != "hash"}
+    data_check_string = "\n".join(f"{k}={v[0]}" for k, v in sorted(check_vals.items()))
 
     secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
     calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
@@ -31,8 +33,10 @@ def validate_init_data(init_data: str, bot_token: str) -> dict:
     if not hmac.compare_digest(calculated_hash, received_hash):
         raise ValueError("Invalid hash")
 
-    user_data = json.loads(vals.get("user", ["{}"])[0])
-    return {"user": user_data}
+    user_data = json.loads(check_vals.get("user", ["{}"])[0])
+    # Bug #21 fix: Return chat_id consistently with SKIP_AUTH path
+    chat_id = check_vals.get("chat_instance", [None])[0]
+    return {"user": user_data, "chat_id": chat_id}
 
 
 def _extract_init_data(request: Request) -> str | None:
@@ -136,14 +140,8 @@ async def get_current_user(request: Request):
                 status_code=401, detail={"error": "Invalid or expired initData", "code": "AUTH_FAILED"}
             )
 
-    # FIX D: Inject role into user object
-    from config import settings as _cfg
-    if user.get("id") and _cfg.OWNER_ID and user["id"] == _cfg.OWNER_ID:
-        user["role"] = "owner"
-    else:
-        user["role"] = "admin"
-
-    return user
+    # Bug #4 fix: Removed unreachable dead code block.
+    # Role injection is already handled above in both the primary and clone bot paths.
 
 
 async def require_auth(request: Request):
@@ -170,8 +168,13 @@ async def require_auth(request: Request):
                 user["bot_id"] = bot_id
                 break
         else:
-            # Fallback: use hash prefix as bot_id if no match
-            user["bot_id"] = int(token_hash[:10], 16) % (10**10)
+            # Bug #23/#27 fix: Fallback to primary bot id instead of nonsensical hash-derived number
+            from bot.registry import get_all as _get_all_bots
+            _all_bots = _get_all_bots()
+            if _all_bots:
+                user["bot_id"] = list(_all_bots.keys())[0]
+            else:
+                user["bot_id"] = 0
     else:
         # Try to get bot_id from request state or default to primary bot
         bot_id = getattr(request.state, "bot_id", None)

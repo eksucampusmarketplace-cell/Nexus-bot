@@ -64,4 +64,5 @@ async def delete_note(pool, chat_id: int, name: str) -> bool:
             "DELETE FROM notes WHERE chat_id = $1 AND name = $2",
             chat_id, name.lower(),
         )
-    return "DELETE 1" in result
+    # Bug #92 fix: Use exact equality instead of substring match
+    return result == "DELETE 1"

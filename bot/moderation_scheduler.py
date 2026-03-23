@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from telegram import ChatPermissions
 from telegram.ext import ContextTypes
@@ -15,7 +15,8 @@ async def process_timed_actions(context: ContextTypes.DEFAULT_TYPE):
     if not db.pool:
         return
 
-    now = datetime.utcnow()
+    # Bug #25 fix: Use timezone-aware datetimes to avoid comparison errors with TIMESTAMPTZ columns
+    now = datetime.now(timezone.utc)
 
     # 1. Expired Bans
     expired_bans = await db.fetch(
@@ -62,7 +63,7 @@ async def process_timed_actions(context: ContextTypes.DEFAULT_TYPE):
 
 async def check_lockdowns(context: ContextTypes.DEFAULT_TYPE):
     """Deactivate expired lockdowns."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     expired = await db.fetch(
         "SELECT chat_id FROM lockdown_state WHERE is_active = TRUE AND auto_unlock_at < $1", now
     )

@@ -1,7 +1,7 @@
 import json
 import logging
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 from telegram import Bot, Update, User
@@ -54,12 +54,22 @@ async def resolve_target(
         except BadRequest:
             pass
 
-    # Try as username
+    # Bug #5 fix: Resolve @username via DB lookup or get_chat_member
     if target_str.startswith("@"):
-        pass
-
-    # Fallback: try to find user in DB if we had a username -> id map
-    # For this implementation, we'll mostly rely on reply or ID
+        username = target_str[1:]  # Remove the @ prefix
+        # Try to find user_id from DB first
+        try:
+            row = await db.fetchrow(
+                "SELECT user_id FROM users WHERE LOWER(username) = LOWER($1)",
+                username,
+            )
+            if row:
+                member = await context.bot.get_chat_member(
+                    update.effective_chat.id, row["user_id"]
+                )
+                return member.user, reason
+        except Exception:
+            pass
 
     return None, "User not found or invalid format."
 
@@ -164,7 +174,7 @@ async def notify_log_channel(
         text += f"⏱ Duration: {duration}\n"
     else:
         text += f"⏱ Duration: permanent\n"
-    text += f"🕐 Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+    text += f"🕐 Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
 
     try:
         await bot.send_message(log_channel_id, text)
@@ -207,11 +217,20 @@ def parse_time(time_str: str) -> Optional[timedelta]:
 
 
 async def send_and_auto_delete(message, text: str, delay: int = 30):
-    """Send message then delete it after delay seconds"""
+    """Send message then delete it after delay seconds."""
+    import asyncio
+
     sent_msg = await message.reply_text(text, parse_mode="Markdown")
-    # In a real bot we'd use context.job_queue to delete this after delay
-    # Since I don't have easy access to job_queue here, I'll skip the auto-delete part for now
-    # or implement it if I can get context.
+
+    # Bug #6 fix: Actually schedule auto-deletion
+    async def _delete_later():
+        await asyncio.sleep(delay)
+        try:
+            await sent_msg.delete()
+        except Exception:
+            pass  # Message may already be deleted or bot lacks permission
+
+    asyncio.create_task(_delete_later())
     return sent_msg
 
 
@@ -235,7 +254,7 @@ class EventBus:
         payload = {
             "type": event_type,
             "chat_id": chat_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             **data,
         }
         if chat_id in cls._handlers:
@@ -256,7 +275,7 @@ async def publish_event(chat_id: int, event_type: str, data: dict):
     payload = {
         "type": event_type,
         "chat_id": chat_id,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         **data,
     }
     

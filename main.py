@@ -160,7 +160,11 @@ async def lifespan(app: FastAPI):
 
         # Register webhook for primary bot (Bug D fix)
         try:
-            webhook_url = f"{settings.webhook_url}/webhook/{primary_token}"
+            from bot.utils.crypto import hash_token as _hash_token
+
+            # Bug #12 fix: Use opaque webhook secret instead of raw bot token
+            webhook_secret = _hash_token(primary_token)[:32]
+            webhook_url = f"{settings.webhook_url}/webhook/{webhook_secret}"
             await primary_app.bot.set_webhook(
                 url=webhook_url,
                 allowed_updates=[
@@ -220,12 +224,15 @@ async def lifespan(app: FastAPI):
                     async with pool.acquire() as sync_conn:
                         synced_count = (
                             await sync_conn.fetchval(
-                                """UPDATE groups SET bot_token_hash = $1
-                               WHERE chat_id IN (
-                                   SELECT chat_id FROM clone_bot_groups WHERE bot_id = $2
-                               )
-                               AND (bot_token_hash IS NULL OR bot_token_hash != $1)
-                               RETURNING COUNT(*)""",
+                                """WITH updated AS (
+                                       UPDATE groups SET bot_token_hash = $1
+                                       WHERE chat_id IN (
+                                           SELECT chat_id FROM clone_bot_groups WHERE bot_id = $2
+                                       )
+                                       AND (bot_token_hash IS NULL OR bot_token_hash != $1)
+                                       RETURNING 1
+                                   )
+                                   SELECT COUNT(*) FROM updated""",
                                 token_hash,
                                 me.id,
                             )
@@ -341,9 +348,14 @@ async def lifespan(app: FastAPI):
                 analytics_failure_counts["daily"] += 1
             await asyncio.sleep(86400)
 
+    # Bug #86 fix: Stagger analytics jobs so they don't all run at the same time on startup
+    async def _staggered_daily():
+        await asyncio.sleep(300)  # 5 minute offset from hourly
+        await _daily_analytics_job()
+
     asyncio.create_task(_hourly_analytics_job())
-    asyncio.create_task(_daily_analytics_job())
-    logger.info("[STARTUP] ✅ Analytics background jobs started")
+    asyncio.create_task(_staggered_daily())
+    logger.info("[STARTUP] ✅ Analytics background jobs started (daily staggered by 5min)")
     # ───────────────────────────────────────────────────────────────────────
 
     # ── Phase 5: Self Keep-Alive Ping ─────────────────────────────────────
@@ -393,9 +405,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Add CORS middleware
+# Bug #1 fix: allow_origins=["*"] with allow_credentials=True is forbidden by the CORS spec.
+# Use allow_origin_regex to match any origin explicitly while still allowing credentials.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -415,24 +429,36 @@ async def root():
 
 
 # Bot webhooks
-@app.post("/webhook/{bot_token}")
-async def telegram_webhook(bot_token: str, request: Request):
+# Bug #12/#13 fix: Use opaque webhook secret derived from token hash instead of raw token in URL.
+# The raw bot token is no longer exposed in webhook URLs or server logs.
+@app.post("/webhook/{webhook_secret}")
+async def telegram_webhook(webhook_secret: str, request: Request):
+    from bot.utils.crypto import hash_token
+
     target_app = None
-    for app in registry_get_all().values():
-        if app.bot.token == bot_token:
-            target_app = app
+    # Match by token hash (new secure method)
+    for bot_app in registry_get_all().values():
+        if hash_token(bot_app.bot.token)[:32] == webhook_secret:
+            target_app = bot_app
             break
 
-    # Fallback: try matching by bot_id (for webhooks set with bot_id only)
+    # Fallback: try matching by raw token for backward compatibility
+    if not target_app:
+        for bot_app in registry_get_all().values():
+            if bot_app.bot.token == webhook_secret:
+                target_app = bot_app
+                break
+
+    # Fallback: try matching by bot_id
     if not target_app:
         try:
-            bot_id = int(bot_token)
+            bot_id = int(webhook_secret)
             target_app = registry_get(bot_id)
         except ValueError:
             pass
 
     if not target_app:
-        logger.warning(f"[WEBHOOK] No bot found for token/bot_id: {bot_token[:10]}...")
+        logger.warning(f"[WEBHOOK] No bot found for webhook secret: {webhook_secret[:10]}...")
         return Response(status_code=404)
 
     data = await request.json()
@@ -492,6 +518,11 @@ try:
     )
     from api.routes.antiraid import global_router as antiraid_global_router
 
+    # Bug #36/#37/#38 fix: Import previously unregistered routers
+    from api.routes import bots_messages as bots_messages_api
+    from api.routes import debug as debug_api
+    from api.routes import photos as photos_api
+
     # Core API routers (need prefix since routes don't include it)
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
     app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
@@ -544,6 +575,13 @@ try:
     app.include_router(notes_api.router)  # prefix="/api/groups/{chat_id}/notes"
     app.include_router(session_api.router)  # /api/session/convert
 
+    # Bug #36 fix: Register photos router (was never included)
+    app.include_router(photos_api.router, tags=["photos"])
+    # Bug #37 fix: Register bots_messages router (was never included)
+    app.include_router(bots_messages_api.router, tags=["bot-messages"])
+    # Bug #38 fix: Register debug router (was never included, only available when DEBUG=True)
+    app.include_router(debug_api.router, tags=["debug"])
+
     from api.routes import pins as pins_api
 
     app.include_router(pins_api.router)  # prefix="/api/groups/{chat_id}/pins"
@@ -553,7 +591,8 @@ try:
     from api.routes import i18n as i18n_api
     from api.routes import users as users_api
 
-    # Register federation with legacy_router for /api/federation/my endpoint
+    # Bug #39 fix: Register both federation routers (main + legacy)
+    app.include_router(federation_api.router, prefix="/api/federation", tags=["federation"])
     app.include_router(federation_api.legacy_router, tags=["federation"])
     app.include_router(users_api.router, prefix="/api/users", tags=["users"])
     app.include_router(i18n_api.router, prefix="/api/i18n", tags=["i18n"])

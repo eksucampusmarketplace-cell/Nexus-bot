@@ -1,11 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from api.auth import get_current_user
 from bot.registry import get_all
 
 router = APIRouter()
 
 
 @router.get("/photo/{file_id}")
-async def get_group_photo(file_id: str):
+async def get_group_photo(file_id: str, user: dict = Depends(get_current_user)):
     """
     Get a photo by file_id using the bot's API.
     Returns the direct file URL from Telegram.
@@ -15,7 +17,7 @@ async def get_group_photo(file_id: str):
     if not bots:
         raise HTTPException(status_code=503, detail="Bot service unavailable")
 
-    # Try primary bot first, then any available
+    # Bug #24 fix: Check cached_bot_info for is_primary since bot_data["is_primary"] is the correct key
     bot_instance = None
     for bid, app in bots.items():
         if app.bot_data.get("is_primary"):

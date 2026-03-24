@@ -127,23 +127,26 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if count >= max_warns:
         # Execute warn_action
+        target_mention = await mention_user(target)
         if warn_action == "mute":
+            from telegram import ChatPermissions
+
             await context.bot.restrict_chat_member(
-                chat_id, target.id, permissions={"can_send_messages": False}
+                chat_id, target.id, permissions=ChatPermissions(can_send_messages=False)
             )
             await update.message.reply_text(
-                f"🔇 {mention} reached max warnings and was muted.", parse_mode="Markdown"
+                f"🔇 {target_mention} reached max warnings and was muted.", parse_mode="Markdown"
             )
         elif warn_action == "ban":
             await context.bot.ban_chat_member(chat_id, target.id)
             await update.message.reply_text(
-                f"🚫 {mention} reached max warnings and was banned.", parse_mode="Markdown"
+                f"🚫 {target_mention} reached max warnings and was banned.", parse_mode="Markdown"
             )
         elif warn_action == "kick":
             await context.bot.ban_chat_member(chat_id, target.id)
             await context.bot.unban_chat_member(chat_id, target.id)
             await update.message.reply_text(
-                f"👢 {mention} reached max warnings and was kicked.", parse_mode="Markdown"
+                f"👢 {target_mention} reached max warnings and was kicked.", parse_mode="Markdown"
             )
         # Reset warns if reset_on_kick is true
         await db.execute(

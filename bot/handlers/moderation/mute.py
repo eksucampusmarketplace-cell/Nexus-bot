@@ -108,7 +108,9 @@ async def tmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(ERRORS["invalid_time"])
         return
 
-    unmute_at = datetime.utcnow() + duration
+    from datetime import timezone
+
+    unmute_at = datetime.now(timezone.utc) + duration
 
     try:
         await context.bot.restrict_chat_member(

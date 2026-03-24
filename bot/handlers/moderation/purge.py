@@ -62,8 +62,8 @@ async def purge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await log_action(
         chat_id,
         "purge",
-        None,
-        None,
+        0,
+        "N/A",
         invoker.id,
         invoker.full_name,
         f"Purged {count_deleted} messages",

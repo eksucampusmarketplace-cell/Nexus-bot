@@ -158,12 +158,22 @@ async def notify_log_channel(
     duration: str = None,
 ):
     """If group has a log channel set, send formatted mod action there."""
-    # Check if log channel is set
-    row = await db.fetchrow("SELECT log_channel_id FROM groups WHERE chat_id = $1", chat_id)
-    if not row or not row["log_channel_id"]:
+    # Check if log channel is set in the settings JSONB
+    row = await db.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
+    if not row or not row["settings"]:
         return
 
-    log_channel_id = row["log_channel_id"]
+    group_settings = row["settings"]
+    if isinstance(group_settings, str):
+        try:
+            group_settings = json.loads(group_settings)
+        except Exception:
+            return
+    if not isinstance(group_settings, dict):
+        return
+    log_channel_id = group_settings.get("log_channel")
+    if not log_channel_id:
+        return
     chat = await bot.get_chat(chat_id)
 
     text = f"🔨 {action.upper()} | {chat.title}\n"

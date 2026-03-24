@@ -19,6 +19,7 @@ On ADD — decision tree:
 On REMOVE — mark group as left in DB.
 """
 
+import asyncio
 import logging
 
 from telegram import ChatMemberUpdated, Update

@@ -29,33 +29,34 @@ Log prefix: [ENGAGE]
 
 import logging
 from datetime import date, datetime, timezone
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import (
-    ContextTypes,
-    CommandHandler,
     CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
     MessageHandler,
     filters,
 )
-from telegram.constants import ParseMode
 
-from bot.engagement.xp import XPEngine, calculate_level, xp_for_level, xp_to_next_level
-from bot.engagement.reputation import (
-    give_rep,
-    get_reputation,
-    get_rep_leaderboard,
-    get_daily_remaining,
-)
-from bot.engagement.badges import get_member_badges, get_all_badges
+from bot.engagement.badges import get_all_badges, get_member_badges
 from bot.engagement.network import (
+    broadcast_to_network,
     create_network,
-    join_network,
-    leave_network,
     get_member_networks,
     get_network_leaderboard,
     is_network_owner,
-    broadcast_to_network,
+    join_network,
+    leave_network,
 )
+from bot.engagement.reputation import (
+    get_daily_remaining,
+    get_rep_leaderboard,
+    get_reputation,
+    give_rep,
+)
+from bot.engagement.xp import XPEngine, calculate_level, xp_for_level, xp_to_next_level
 
 log = logging.getLogger("engage")
 
@@ -67,8 +68,15 @@ async def get_xp_engine(context: ContextTypes.DEFAULT_TYPE) -> XPEngine:
     return context.bot_data["xp_engine"]
 
 
-def _get_target_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> tuple[int, str]:
-    """Extract target user from mention, reply, or args."""
+def _get_target_user(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> tuple[int | None, str | None]:
+    """Extract target user from mention, reply, or args.
+
+    Returns (user_id, display_name). Both may be None if no target found.
+    When a @username is provided but can't be resolved to an ID,
+    returns (None, None) so callers can show a helpful error.
+    """
     message = update.effective_message
 
     # Check reply first
@@ -76,13 +84,18 @@ def _get_target_user(update: Update, context: ContextTypes.DEFAULT_TYPE) -> tupl
         user = message.reply_to_message.from_user
         return user.id, user.full_name
 
-    # Check mentions in args
+    # Check mentions in message entities (resolves @username to user_id)
+    if message.entities:
+        for entity in message.entities:
+            if entity.type == "text_mention" and entity.user:
+                return entity.user.id, entity.user.full_name
+
+    # Check args for numeric user IDs
     if context.args:
         arg = context.args[0]
         if arg.startswith("@"):
-            # Try to resolve username - this is simplified
-            # In practice, you'd need to track usernames
-            return None, arg[1:]
+            # Cannot resolve @username to user_id without prior interaction
+            return None, None
         try:
             return int(arg), f"User {arg}"
         except ValueError:

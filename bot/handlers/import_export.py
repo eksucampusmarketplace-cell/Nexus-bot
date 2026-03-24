@@ -24,12 +24,13 @@ import logging
 from datetime import datetime, timezone
 from io import BytesIO
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import TelegramError
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
 
 from bot.handlers.copy_settings import COPYABLE_SETTINGS_KEYS
 from bot.logging.log_channel import log_event
+from bot.utils.permissions import is_admin
 
 log = logging.getLogger("import_export")
 
@@ -46,6 +47,10 @@ async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = context.bot_data.get("db")
     bot = context.bot
     user = update.effective_user
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can export group settings.")
+        return
 
     settings_row = await db.fetchrow("SELECT * FROM groups WHERE chat_id=$1", chat.id)
     settings_dict = {}
@@ -168,6 +173,10 @@ async def cmd_import(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db = context.bot_data.get("db")
     bot = context.bot
     user = update.effective_user
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can import group settings.")
+        return
 
     doc = None
     if msg.document:
@@ -368,6 +377,10 @@ async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     msg = update.effective_message
     chat = update.effective_chat
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can reset group settings.")
+        return
 
     markup = InlineKeyboardMarkup(
         [

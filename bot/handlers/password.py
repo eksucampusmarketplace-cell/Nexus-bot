@@ -23,12 +23,13 @@ Logs prefix: [PASSWORD]
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from telegram import Update, ChatPermissions
-from telegram.ext import ContextTypes
+from telegram import ChatPermissions, Update
 from telegram.error import TelegramError
+from telegram.ext import ContextTypes
 
+from bot.utils.permissions import is_admin
 from db.ops.automod import update_group_setting
 
 log = logging.getLogger("password")
@@ -199,12 +200,21 @@ async def cmd_setpassword(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     db = context.bot_data.get("db")
 
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can set the group password.")
+        return
+
     if not context.args:
         await msg.reply_text("Usage: /setpassword <password>")
         return
 
     password = context.args[0]
-    await update_group_setting(db, chat.id, "group_password", password)
+    try:
+        await update_group_setting(db, chat.id, "group_password", password)
+    except Exception as e:
+        log.error(f"[PASSWORD] Failed to set | chat={chat.id} error={e}")
+        await msg.reply_text("❌ Failed to set password. Please try again.")
+        return
     await msg.reply_text(
         f"🔐 Group password set.\n" f"New members must DM the bot with: <code>{password}</code>",
         parse_mode="HTML",
@@ -218,6 +228,15 @@ async def cmd_clearpassword(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     db = context.bot_data.get("db")
 
-    await update_group_setting(db, chat.id, "group_password", None)
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can clear the group password.")
+        return
+
+    try:
+        await update_group_setting(db, chat.id, "group_password", None)
+    except Exception as e:
+        log.error(f"[PASSWORD] Failed to clear | chat={chat.id} error={e}")
+        await msg.reply_text("❌ Failed to clear password. Please try again.")
+        return
     await msg.reply_text("✅ Group password cleared. Anyone can join freely.")
     log.info(f"[PASSWORD] Cleared | chat={chat.id}")

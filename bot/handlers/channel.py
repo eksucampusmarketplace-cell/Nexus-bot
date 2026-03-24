@@ -1,8 +1,9 @@
-import logging
 import json
-from telegram import Update, Message
-from telegram.ext import ContextTypes
+import logging
+
+from telegram import Message, Update
 from telegram.constants import ParseMode
+from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
 
@@ -104,8 +105,12 @@ async def channel_post_handler(update: Update, context: ContextTypes.DEFAULT_TYP
             media_file_id = reply.document.file_id
             media_type = "document"
 
-    await send_to_channel(context.bot, channel_id, text, media_file_id, media_type)
-    await update.message.reply_text(f"✅ Posted to channel.")
+    try:
+        await send_to_channel(context.bot, channel_id, text, media_file_id, media_type)
+        await update.message.reply_text("✅ Posted to channel.")
+    except Exception as e:
+        logger.error(f"[CHANNEL] Post failed | channel={channel_id} error={e}")
+        await update.message.reply_text(f"❌ Failed to post to channel: {e}")
 
 
 async def schedule_post_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

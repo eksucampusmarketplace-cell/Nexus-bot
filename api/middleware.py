@@ -221,7 +221,8 @@ class InputValidationMiddleware:
 
             return True, ""
 
-        return check_value(body, "body")
+        valid, error = check_value(body, "body")
+        return {"valid": valid, "error": error}
 
     def _sanitize_request_body(self, body: dict) -> dict:
         """
@@ -260,7 +261,8 @@ class SecurityHeadersMiddleware:
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self' 'unsafe-inline' https://telegram.org; "
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://telegram.org https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; "
             "connect-src 'self' https:; frame-ancestors 'self' https://web.telegram.org"
         )

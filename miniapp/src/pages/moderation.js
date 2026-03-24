@@ -14,6 +14,19 @@ const store = useStore;
 const getState = store.getState;
 
 let _sseSource = null;
+let _sseCancelled = false;  // Cancel flag to prevent orphaned reconnects
+
+/**
+ * Close any active SSE connection and cancel pending reconnects.
+ * Call this on page teardown / before navigating away.
+ */
+export function teardownModerationPage() {
+  _sseCancelled = true;
+  if (_sseSource) {
+    _sseSource.close();
+    _sseSource = null;
+  }
+}
 
 export async function renderModerationPage(container) {
   const chatId = getState().activeChatId;
@@ -63,6 +76,9 @@ export async function renderModerationPage(container) {
   container.appendChild(content);
 
   await switchTab('members', container, chatId);
+
+  // Reset cancel flag when (re-)entering the page, then connect SSE
+  _sseCancelled = false;
   _connectSSE(chatId);
 }
 
@@ -791,7 +807,12 @@ function _connectSSE(chatId) {
     _sseSource.onerror = () => {
       if (dot) { dot.style.background = 'var(--danger)'; dot.style.animation = ''; }
       if (label) label.textContent = 'Reconnecting...';
-      setTimeout(() => { if (document.getElementById('sse-dot')) _connectSSE(chatId); }, 5000);
+      setTimeout(() => {
+        // Only reconnect if the page is still active (not cancelled/navigated away)
+        if (!_sseCancelled && document.getElementById('sse-dot')) {
+          _connectSSE(chatId);
+        }
+      }, 5000);
     };
 
     _sseSource.addEventListener('mod_action', (e) => {

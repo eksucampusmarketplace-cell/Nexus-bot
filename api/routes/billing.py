@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from api.auth import get_current_user
-
 from bot.billing.billing_helpers import (
     can_owner_add_clone_bot,
     check_owner_total_properties,
@@ -75,7 +74,9 @@ async def get_referral_stats_endpoint(request: Request, user: dict = Depends(get
 
 
 @router.post("/api/billing/redeem-promo")
-async def redeem_promo_endpoint(request: Request, req: RedeemPromoRequest, user: dict = Depends(get_current_user)):
+async def redeem_promo_endpoint(
+    request: Request, req: RedeemPromoRequest, user: dict = Depends(get_current_user)
+):
     """Redeem a promo code."""
     owner_id = user.get("id")
     db = request.app.state.db
@@ -85,7 +86,9 @@ async def redeem_promo_endpoint(request: Request, req: RedeemPromoRequest, user:
 
 
 @router.post("/api/billing/spend-bonus")
-async def spend_bonus_endpoint(request: Request, req: SpendBonusRequest, user: dict = Depends(get_current_user)):
+async def spend_bonus_endpoint(
+    request: Request, req: SpendBonusRequest, user: dict = Depends(get_current_user)
+):
     """Spend bonus Stars to unlock a feature."""
     owner_id = user.get("id")
     db = request.app.state.db
@@ -108,7 +111,9 @@ class CreatePromoRequest(BaseModel):
 
 
 @router.post("/api/billing/grant-bonus")
-async def grant_bonus_endpoint(request: Request, req: GrantBonusRequest, user: dict = Depends(get_current_user)):
+async def grant_bonus_endpoint(
+    request: Request, req: GrantBonusRequest, user: dict = Depends(get_current_user)
+):
     """Grant bonus Stars to a user. Owner only."""
     caller_id = user.get("id")
     if caller_id != settings.OWNER_ID:
@@ -121,7 +126,9 @@ async def grant_bonus_endpoint(request: Request, req: GrantBonusRequest, user: d
 
 
 @router.post("/api/billing/create-promo")
-async def create_promo_endpoint(request: Request, req: CreatePromoRequest, user: dict = Depends(get_current_user)):
+async def create_promo_endpoint(
+    request: Request, req: CreatePromoRequest, user: dict = Depends(get_current_user)
+):
     """Create a new promo code. Owner only."""
     caller_id = user.get("id")
     if caller_id != settings.OWNER_ID:
@@ -213,7 +220,9 @@ class SubscribeRequest(BaseModel):
 
 
 @router.post("/api/billing/subscribe")
-async def subscribe_endpoint(request: Request, req: SubscribeRequest, user: dict = Depends(get_current_user)):
+async def subscribe_endpoint(
+    request: Request, req: SubscribeRequest, user: dict = Depends(get_current_user)
+):
     """
     Subscribe to a paid plan.
 
@@ -244,16 +253,13 @@ async def subscribe_endpoint(request: Request, req: SubscribeRequest, user: dict
             f"| plan={req.plan} | expected={expected_price} | actual={plan.get('price_stars')}"
         )
 
-    # In a real implementation, you would generate a Telegram Stars payment link here
-    # For now, return the plan info
-    return {
-        "ok": True,
-        "plan": req.plan,
-        "plan_name": plan["name"],
-        "price_stars": expected_price or plan["price_stars"],
-        "price_display": plan["price_display"],
-        "message": "Payment integration coming soon",
-    }
+    # TODO: Implement Telegram Stars payment via bot.create_invoice_link()
+    # Payment integration is pending — return 501 so the miniapp can show
+    # an appropriate message instead of silently succeeding with 200.
+    raise HTTPException(
+        status_code=501,
+        detail="Payment integration not yet implemented. Please subscribe via the bot.",
+    )
 
 
 @router.post("/api/billing/cancel")
@@ -280,7 +286,9 @@ async def get_trials_endpoint(request: Request, user: dict = Depends(get_current
 
 
 @router.get("/api/billing/trial-days")
-async def get_trial_days_endpoint(request: Request, bot_id: int, user: dict = Depends(get_current_user)):
+async def get_trial_days_endpoint(
+    request: Request, bot_id: int, user: dict = Depends(get_current_user)
+):
     """Get remaining days for a trial bot."""
     owner_id = user.get("id")
     db_pool = request.app.state.db

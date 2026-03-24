@@ -10,6 +10,9 @@ from bot.utils.text_engine import substitute_variables
 
 logger = logging.getLogger(__name__)
 
+# Store references to background tasks to prevent garbage collection
+_bg_tasks = set()
+
 
 async def _delete_after(message, seconds: int):
     await asyncio.sleep(seconds)
@@ -19,7 +22,9 @@ async def _delete_after(message, seconds: int):
         pass
 
 
-async def send_welcome_in_group(update, context, user, chat, processed_welcome, media=None, reply_markup=None, delete_after=0):
+async def send_welcome_in_group(
+    update, context, user, chat, processed_welcome, media=None, reply_markup=None, delete_after=0
+):
     sent_message = None
     try:
         if media:
@@ -51,7 +56,9 @@ async def send_welcome_in_group(update, context, user, chat, processed_welcome, 
                 )
         else:
             sent_message = await context.bot.send_message(
-                chat_id=chat.id, text=processed_welcome, parse_mode=ParseMode.HTML,
+                chat_id=chat.id,
+                text=processed_welcome,
+                parse_mode=ParseMode.HTML,
                 reply_markup=reply_markup,
             )
 
@@ -60,7 +67,9 @@ async def send_welcome_in_group(update, context, user, chat, processed_welcome, 
         )
 
         if delete_after and delete_after > 0 and sent_message:
-            asyncio.create_task(_delete_after(sent_message, delete_after))
+            t = asyncio.create_task(_delete_after(sent_message, delete_after))
+            _bg_tasks.add(t)
+            t.add_done_callback(_bg_tasks.discard)
 
     except Exception as e:
         logger.error(f"[WELCOME] Failed to send in group: {e}")
@@ -103,8 +112,13 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         buttons_config = text_config.get("welcome_buttons", [])
         reply_markup = None
         if buttons_config:
-            keyboard = [[InlineKeyboardButton(b["text"], url=b["url"])
-                         for b in buttons_config if b.get("text") and b.get("url")]]
+            keyboard = [
+                [
+                    InlineKeyboardButton(b["text"], url=b["url"])
+                    for b in buttons_config
+                    if b.get("text") and b.get("url")
+                ]
+            ]
             if keyboard and keyboard[0]:
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -116,13 +130,26 @@ async def welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 notice = await update.message.reply_text(
                     f"👋 Welcome {user.mention_html()}! Check your DMs.", parse_mode=ParseMode.HTML
                 )
-                asyncio.create_task(_delete_after(notice, 10))
+                t = asyncio.create_task(_delete_after(notice, 10))
+                _bg_tasks.add(t)
+                t.add_done_callback(_bg_tasks.discard)
                 logger.info(f"[WELCOME] Sent | chat_id={chat.id} | user_id={user.id} | mode=dm")
             except Exception as e:
                 logger.info(f"[WELCOME] DM blocked fallback | user_id={user.id}")
-                await send_welcome_in_group(update, context, user, chat, processed_welcome, media, reply_markup, delete_after)
+                await send_welcome_in_group(
+                    update,
+                    context,
+                    user,
+                    chat,
+                    processed_welcome,
+                    media,
+                    reply_markup,
+                    delete_after,
+                )
         else:
-            await send_welcome_in_group(update, context, user, chat, processed_welcome, media, reply_markup, delete_after)
+            await send_welcome_in_group(
+                update, context, user, chat, processed_welcome, media, reply_markup, delete_after
+            )
 
 
 async def goodbye_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

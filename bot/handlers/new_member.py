@@ -4,8 +4,8 @@ bot/handlers/new_member.py
 Unified new member join handler.
 """
 
-import logging
 import asyncio
+import logging
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -15,6 +15,17 @@ from bot.captcha.engine import send_captcha
 from db.ops.approval import is_member_approved
 
 log = logging.getLogger("new_member")
+
+# Store references to background tasks to prevent garbage collection
+_bg_tasks = set()
+
+
+def _create_bg_task(coro):
+    """Create an asyncio task and store a reference to prevent GC collection."""
+    t = asyncio.create_task(coro)
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+    return t
 
 
 async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -38,43 +49,43 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
             await upsert_user(user.id, chat.id, user.username, user.first_name)
         except Exception as e:
             log.debug(f"Failed to upsert user on join: {e}")
-        
+
         # ── Language Auto-Detection (v21) ─────────────────────────────────────
         # Run language detection in background - don't block join handling
         if db:
             try:
                 from bot.utils.lang_detect import auto_detect_and_store
-                
-                asyncio.create_task(
+
+                _create_bg_task(
                     auto_detect_and_store(
                         db=db,
                         user_id=user.id,
                         chat_id=chat.id,
                         telegram_code=user.language_code,
                         first_name=user.first_name,
-                        last_name=user.last_name
+                        last_name=user.last_name,
                     )
                 )
             except Exception as e:
                 log.debug(f"Language detection failed: {e}")
         # ─────────────────────────────────────────────────────────────────────
-        
+
         # Note: sometimes old_status is restricted if they were muted/restricted by bot before and left/rejoined
 
         # ── Federation Ban Check (v21) ─────────────────────────────────────────
         try:
             from db.ops.federation import check_federation_ban_on_join
-            
+
             fed_ban = await check_federation_ban_on_join(db, chat.id, user.id)
             if fed_ban:
                 # User is federation banned - ban them
                 await context.bot.ban_chat_member(chat.id, user.id)
-                
+
                 silent = fed_ban.get("silent", False)
                 if not silent:
                     fed_name = fed_ban.get("federation_name", "Unknown")
                     reason = fed_ban.get("reason", "No reason provided")
-                    
+
                     await context.bot.send_message(
                         chat_id=chat.id,
                         text=(
@@ -83,10 +94,12 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
                             f"Network: {fed_name}\n"
                             f"Reason: {reason}"
                         ),
-                        parse_mode="HTML"
+                        parse_mode="HTML",
                     )
-                
-                log.info(f"[FED] Ban enforced on join | chat={chat.id} user={user.id} fed={fed_ban.get('federation_id')}")
+
+                log.info(
+                    f"[FED] Ban enforced on join | chat={chat.id} user={user.id} fed={fed_ban.get('federation_id')}"
+                )
                 return  # Don't proceed with other join handling
         except Exception as e:
             log.debug(f"Federation ban check failed: {e}")
@@ -96,30 +109,33 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
         try:
             from bot.ml.risk_scorer import UserRiskScorer
             from bot.ml.signal_collector import record_spam_signal
-            
+
             scorer = UserRiskScorer()
             result = await scorer.get_or_score(user, chat.id)
-            score = result['score']
-            action = result['action']
+            score = result["score"]
+            action = result["action"]
 
-            if action == 'ban':
+            if action == "ban":
                 await context.bot.ban_chat_member(chat.id, user.id)
                 await context.bot.send_message(
                     chat.id,
-                    f'🤖 <b>Auto-removed:</b> risk score {score}/100 (likely spam bot).',
-                    parse_mode="HTML"
+                    f"🤖 <b>Auto-removed:</b> risk score {score}/100 (likely spam bot).",
+                    parse_mode="HTML",
                 )
-                asyncio.create_task(record_spam_signal(user.id, chat.id, '', 'risk_score', 'spam', 0.9))
+                _create_bg_task(record_spam_signal(user.id, chat.id, "", "risk_score", "spam", 0.9))
                 return
 
-            elif action == 'challenge':
+            elif action == "challenge":
                 # Force captcha regardless of group captcha setting
-                context.bot_data['force_captcha_user_ids'] = \
-                    context.bot_data.get('force_captcha_user_ids', set()) | {user.id}
+                context.bot_data["force_captcha_user_ids"] = context.bot_data.get(
+                    "force_captcha_user_ids", set()
+                ) | {user.id}
 
-            elif action == 'flag':
+            elif action == "flag":
                 # Log for admin review but don't act
-                asyncio.create_task(record_spam_signal(user.id, chat.id, '', 'risk_score', 'uncertain', 0.6))
+                _create_bg_task(
+                    record_spam_signal(user.id, chat.id, "", "risk_score", "uncertain", 0.6)
+                )
         except Exception as e:
             log.debug(f"Risk scorer failed: {e}")
         # ──────────────────────────────────────────────────────────────────────

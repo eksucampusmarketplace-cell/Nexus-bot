@@ -9,22 +9,25 @@ import logging
 import random
 import string
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
-from telegram import Bot, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.error import TelegramError
 
+from bot.logging.log_channel import log_event as _log_event
 from db.ops.captcha import (
     create_challenge,
     get_challenge_by_id,
     get_pending_challenge,
-    mark_challenge_passed,
     increment_attempts,
     log_member_event,
+    mark_challenge_passed,
 )
-from bot.logging.log_channel import log_event as _log_event
 
 log = logging.getLogger("captcha")
+
+# Store references to background tasks to prevent garbage collection
+_bg_tasks = set()
 
 EMOJI_OPTIONS = ["🌟", "🎯", "🔥", "💎", "🚀", "🎲", "🌈", "⚡", "🎭", "🦋"]
 
@@ -65,7 +68,7 @@ async def send_captcha(
             try:
                 from bot.utils.error_notifier import notify_clone_owner
 
-                asyncio.create_task(
+                t = asyncio.create_task(
                     notify_clone_owner(
                         bot,
                         bot.id,
@@ -74,6 +77,8 @@ async def send_captcha(
                         pool=db,
                     )
                 )
+                _bg_tasks.add(t)
+                t.add_done_callback(_bg_tasks.discard)
             except Exception as notify_err:
                 log.debug(
                     f"[CAPTCHA] CAPTCHA_WEBAPP_URL_MISSING notification skipped: {notify_err}"
@@ -130,7 +135,9 @@ async def send_captcha(
     log.info(f"[CAPTCHA] Sent | chat={chat_id} user={user.id} " f"mode={mode} cid={cid}")
 
     # Schedule timeout check
-    asyncio.create_task(_timeout_check(bot, chat_id, user.id, cid, timeout * 60, settings, db))
+    t = asyncio.create_task(_timeout_check(bot, chat_id, user.id, cid, timeout * 60, settings, db))
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
 
 
 async def verify_button(

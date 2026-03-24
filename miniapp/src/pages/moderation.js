@@ -173,11 +173,18 @@ function _buildMemberCard(m, chatId) {
 }
 
 async function _handleMemberAction(action, member, chatId, inputArea, card) {
+  const userId = member.user_id ?? member.id ?? null;
   inputArea.style.display = 'block';
   inputArea.innerHTML = '';
 
+  if (!userId && action !== 'info') {
+    showToast('Cannot find user ID for this member', 'error');
+    inputArea.style.display = 'none';
+    return;
+  }
+
   if (action === 'info') {
-    _showUserProfilePanel(member.user_id, chatId, member);
+    _showUserProfilePanel(userId, chatId, member);
     inputArea.style.display = 'none';
     return;
   }
@@ -196,7 +203,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/warnings`, {
           method: 'POST',
           validate: false,
-          body: { user_id: member.user_id, reason: reason || 'Warned via Mini App' }
+          body: { user_id: userId, reason: reason || 'Warned via Mini App' }
         });
         showToast('Warning issued', 'success');
         inputArea.style.display = 'none';
@@ -230,7 +237,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/mutes`, {
           method: 'POST',
           validate: false,
-          body: { user_id: member.user_id, reason: reason || 'Muted via Mini App', duration: selectedDuration }
+          body: { user_id: userId, reason: reason || 'Muted via Mini App', duration: selectedDuration }
         });
         showToast('User muted', 'success');
         inputArea.style.display = 'none';
@@ -249,7 +256,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/actions/kick`, {
           method: 'POST',
           validate: false,
-          body: { user_id: member.user_id }
+          body: { user_id: userId }
         });
         showToast('User kicked', 'success');
         card.remove();
@@ -271,7 +278,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
         await apiFetch(`/api/groups/${chatId}/bans`, {
           method: 'POST',
           validate: false,
-          body: { user_id: member.user_id, reason: reason || 'Banned via Mini App' }
+          body: { user_id: userId, reason: reason || 'Banned via Mini App' }
         });
         showToast('User banned', 'success');
         card.remove();

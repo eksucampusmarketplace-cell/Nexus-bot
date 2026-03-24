@@ -141,6 +141,22 @@ export function Avatar({ name = '', src = '', size = 36, online = false } = {}) 
     const img = document.createElement('img');
     img.src   = src;
     img.style.cssText = `width:100%;height:100%;border-radius:50%;object-fit:cover`;
+    img.onerror = () => {
+      // Replace with initials-based fallback for expired CDN URLs
+      img.style.display = 'none';
+      const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+      const hue = name.split('').reduce((a,c) => a + c.charCodeAt(0), 0) % 360;
+      const fallback = document.createElement('div');
+      fallback.textContent = initials || '?';
+      fallback.style.cssText = `
+        width:100%;height:100%;border-radius:50%;
+        background:hsl(${hue},60%,35%);
+        display:flex;align-items:center;justify-content:center;
+        font-size:${Math.round(size * 0.38)}px;
+        font-weight:var(--fw-bold);color:white;
+      `;
+      img.parentElement?.appendChild(fallback);
+    };
     wrap.appendChild(img);
   } else {
     const initials = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
@@ -205,6 +221,8 @@ function _getToastContainer() {
   return _toastContainer;
 }
 
+const MAX_TOASTS = 3;
+
 export function showToast(message, type = 'default', duration = 3000) {
   const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️', default: '' };
   const colors = {
@@ -230,6 +248,12 @@ export function showToast(message, type = 'default', duration = 3000) {
     <span style="flex:1">${message}</span>
   `;
   const container = _getToastContainer();
+  // Remove oldest toasts if at limit
+  const existing = container.querySelectorAll('.nexus-toast');
+  if (existing.length >= MAX_TOASTS) {
+    existing[0].remove();
+  }
+  toast.classList.add('nexus-toast');
   container.appendChild(toast);
   setTimeout(() => {
     toast.style.animation = `toast-out var(--dur-normal) var(--ease-in) forwards`;

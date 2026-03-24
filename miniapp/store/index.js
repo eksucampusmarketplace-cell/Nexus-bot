@@ -29,7 +29,10 @@ export const useStore = createStore((set, get) => ({
     if (chatId) {
       sessionStorage.setItem('active_group', chatId);
     }
-    set({ activeChatId: chatId });
+    // Find matching group from current groups list
+    const groups = get().groups || [];
+    const activeGroup = groups.find(g => String(g.chat_id) === String(chatId)) || null;
+    set({ activeChatId: chatId, activeGroup });
   },
   setActiveGroup: (group) => set({ activeGroup: group }),
   setGroups: (groups) => set({ groups }),

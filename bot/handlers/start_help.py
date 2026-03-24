@@ -26,6 +26,49 @@ from db.ops.groups import get_group_miniapp_url, get_or_create_group
 
 log = logging.getLogger("start_help")
 
+# ── Help categories for detailed /help callback navigation ────────────────
+HELP_CATEGORIES = {
+    "\U0001f6e1\ufe0f Moderation": [
+        "/warn [@user|reply] [reason] \u2014 Warn a user",
+        "/unwarn [@user|reply] \u2014 Remove a warning",
+        "/warns [@user|reply] \u2014 Show user warnings",
+        "/mute [@user|reply] [duration] [reason] \u2014 Mute a user",
+        "/unmute [@user|reply] \u2014 Unmute a user",
+        "/ban [@user|reply] [reason] \u2014 Ban a user",
+        "/unban [@user|reply] \u2014 Unban a user",
+        "/kick [@user|reply] [reason] \u2014 Kick a user",
+        "/purge [count] \u2014 Delete recent messages",
+    ],
+    "\U0001f46e Admin Tools": [
+        "/promote [@user|reply] \u2014 Promote to admin",
+        "/demote [@user|reply] \u2014 Demote admin",
+        "/admins \u2014 List all admins",
+        "/id \u2014 Show user/chat ID",
+        "/info \u2014 Show user/group info",
+    ],
+    "\U0001f510 Locks & Filters": [
+        "/lock <type> \u2014 Lock a message type",
+        "/unlock <type> \u2014 Unlock a message type",
+        "/filter <keyword> <response> \u2014 Add auto-reply",
+        "/filters \u2014 List all keyword filters",
+        "/blacklist <word> \u2014 Add word to blacklist",
+    ],
+    "\U0001f44b Greetings": [
+        "/setwelcome [text] \u2014 Set welcome message",
+        "/setgoodbye [text] \u2014 Set goodbye message",
+        "/setrules [text] \u2014 Set group rules",
+        "/welcome \u2014 Preview welcome message",
+        "/rules \u2014 Show group rules",
+    ],
+    "\u2699\ufe0f Bot Management": [
+        "/panel \u2014 Open Mini App control panel",
+        "/export \u2014 Export group settings",
+        "/import \u2014 Import group settings",
+        "/reset \u2014 Reset all settings",
+        "/help \u2014 Show this message",
+    ],
+}
+
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -243,6 +286,50 @@ async def handle_start_callback(update: Update, context: ContextTypes.DEFAULT_TY
     elif query.data == "help_main":
         # Show help message
         await handle_help(update, context)
+
+
+async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle help category navigation callbacks (help_0, help_1, etc.)."""
+    query = update.callback_query
+    await query.answer()
+
+    data = query.data
+    if not data.startswith("help_"):
+        return
+
+    suffix = data[5:]  # strip 'help_'
+    if suffix == "back":
+        # Re-show the category list
+        keyboard = []
+        row = []
+        for i, category in enumerate(HELP_CATEGORIES.keys()):
+            row.append(InlineKeyboardButton(category, callback_data=f"help_{i}"))
+            if len(row) == 2:
+                keyboard.append(row)
+                row = []
+        if row:
+            keyboard.append(row)
+        await query.edit_message_text(
+            "\u2753 <b>Help Categories</b>\n\nChoose a category:",
+            parse_mode=ParseMode.HTML,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
+
+    try:
+        idx = int(suffix)
+        categories = list(HELP_CATEGORIES.items())
+        if 0 <= idx < len(categories):
+            name, cmds = categories[idx]
+            text = f"<b>{name}</b>\n\n" + "\n".join(f"\u2022 {c}" for c in cmds)
+            back_btn = InlineKeyboardButton("\u2190 Back", callback_data="help_back")
+            await query.edit_message_text(
+                text,
+                parse_mode=ParseMode.HTML,
+                reply_markup=InlineKeyboardMarkup([[back_btn]]),
+            )
+    except (ValueError, IndexError):
+        pass
 
 
 # ── Handler objects to register in factory.py ────────────────────────────

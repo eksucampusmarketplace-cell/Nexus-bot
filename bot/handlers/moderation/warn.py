@@ -15,6 +15,9 @@ from db.client import db
 
 log = logging.getLogger("[MOD_WARN]")
 
+# Store references to background tasks to prevent garbage collection
+_bg_tasks = set()
+
 
 async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
@@ -63,14 +66,10 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Use personality engine for warning message (v21)
     try:
         from bot.personality.engine import get_personality
-        
+
         personality = await get_personality(db.pool, context.bot.id, chat_id)
         warn_message = personality.format_action(
-            "warn",
-            user=await mention_user(target),
-            reason=reason,
-            count=count,
-            limit=max_warns
+            "warn", user=await mention_user(target), reason=reason, count=count, limit=max_warns
         )
     except Exception as e:
         log.debug(f"Personality engine failed: {e}")
@@ -82,33 +81,36 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🔢 Warnings: {count}/{max_warns}\n"
             f"👮 By: {await mention_user(invoker)}"
         )
-    
+
     await update.message.reply_text(warn_message, parse_mode="Markdown")
 
     # Update federation reputation (v21)
     try:
         import db.ops.federation as fed_ops
-        
+
         # Get federations for this group
         feds = await fed_ops.get_group_federations(db.pool, chat_id)
         for fed in feds:
             # Decrease trust score by 10 points for warning
             await fed_ops.update_reputation(
-                db.pool, target.id, fed["id"], -10, 
-                f"Warned in group: {reason}"
+                db.pool, target.id, fed["id"], -10, f"Warned in group: {reason}"
             )
     except Exception as e:
         log.debug(f"Federation reputation update failed: {e}")
-    
+
     await log_action(
         chat_id, "warn", target.id, target.full_name, invoker.id, invoker.full_name, reason
     )
-    
+
     # Phase 1: Record signal for ML pipeline
-    from bot.ml.signal_collector import record_mod_action
     import asyncio
-    asyncio.create_task(record_mod_action(target.id, chat_id, 'warn', reason))
-    
+
+    from bot.ml.signal_collector import record_mod_action
+
+    t = asyncio.create_task(record_mod_action(target.id, chat_id, "warn", reason))
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+
     await publish_event(
         chat_id,
         "mod_action",
@@ -226,12 +228,23 @@ async def resetwarns_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"✅ All warnings reset for {await mention_user(target)}", parse_mode="Markdown"
     )
     await log_action(
-        chat_id, "resetwarns", target.id, target.full_name, invoker.id, invoker.full_name, "All warns reset"
+        chat_id,
+        "resetwarns",
+        target.id,
+        target.full_name,
+        invoker.id,
+        invoker.full_name,
+        "All warns reset",
     )
     await publish_event(
         chat_id,
         "mod_action",
-        {"action": "resetwarns", "target_id": target.id, "target_name": target.full_name, "admin_id": invoker.id},
+        {
+            "action": "resetwarns",
+            "target_id": target.id,
+            "target_name": target.full_name,
+            "admin_id": invoker.id,
+        },
     )
 
 
@@ -257,7 +270,8 @@ async def warnmode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await conn.execute(
             "INSERT INTO warn_settings (chat_id, warn_action) VALUES ($1, $2) "
             "ON CONFLICT (chat_id) DO UPDATE SET warn_action = EXCLUDED.warn_action",
-            chat_id, mode,
+            chat_id,
+            mode,
         )
     await update.message.reply_text(f"✅ Warn mode set to: *{mode}*", parse_mode="Markdown")
 
@@ -281,6 +295,7 @@ async def warnlimit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await conn.execute(
             "INSERT INTO warn_settings (chat_id, max_warns) VALUES ($1, $2) "
             "ON CONFLICT (chat_id) DO UPDATE SET max_warns = EXCLUDED.max_warns",
-            chat_id, limit,
+            chat_id,
+            limit,
         )
     await update.message.reply_text(f"✅ Warn limit set to: *{limit}*", parse_mode="Markdown")

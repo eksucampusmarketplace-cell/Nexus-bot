@@ -4,12 +4,13 @@ API Security Middleware
 Provides middleware for validating and sanitizing API request inputs.
 """
 
-import logging
-from fastapi import Request, HTTPException, status
-from fastapi.responses import JSONResponse
-from typing import Callable, Optional, Dict, Any
-import time
 import hashlib
+import logging
+import time
+from typing import Any, Callable, Dict, Optional
+
+from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse
 
 log = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class RateLimitMiddleware:
         # Simple in-memory rate limiter
         # In production, use Redis for distributed rate limiting
         self.requests: Dict[str, list] = {}
+        self._last_pruned: float = 0.0
         self.rate_limits = {
             "default": {"requests": 100, "window": 60},  # 100 req/min
             "strict": {"requests": 30, "window": 60},  # 30 req/min
@@ -44,6 +46,15 @@ class RateLimitMiddleware:
         limit_config = self.rate_limits[limit_type]
         current_time = time.time()
         window_start = current_time - limit_config["window"]
+
+        # Periodically prune stale IPs (every 2 minutes)
+        if current_time - self._last_pruned > 120:
+            self._last_pruned = current_time
+            max_window = max(lc["window"] for lc in self.rate_limits.values())
+            cutoff = current_time - 2 * max_window
+            stale = [ip for ip, ts in self.requests.items() if not ts or ts[-1] < cutoff]
+            for ip in stale:
+                del self.requests[ip]
 
         # Clean old requests
         if client_ip in self.requests:
@@ -148,13 +159,10 @@ class InputValidationMiddleware:
                         },
                     )
 
-                # Sanitize body
-                sanitized_body = self._sanitize_request_body(body)
-
-                # Replace request body with sanitized version
-                # Note: This is a workaround - FastAPI doesn't allow direct body replacement
-                # So we'll store it in request state for handlers to use
-                request.state.sanitized_body = sanitized_body
+                # Note: Sanitization is intentionally skipped here.
+                # FastAPI re-parses the raw body via Pydantic models, so storing
+                # a sanitized copy in request.state would be dead code.  The
+                # validation above already rejects dangerous patterns.
 
         except Exception as e:
             # If validation fails, log and continue (let handler deal with it)
@@ -170,10 +178,10 @@ class InputValidationMiddleware:
             dict: {"valid": bool, "error": str}
         """
         from bot.utils.input_sanitizer import (
-            detect_sql_injection,
-            detect_xss,
             detect_command_injection,
             detect_spam,
+            detect_sql_injection,
+            detect_xss,
         )
 
         # Check all string values in body

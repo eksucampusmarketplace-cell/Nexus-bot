@@ -53,6 +53,22 @@ class Settings(BaseSettings):
     REFERRAL_BONUS_STARS: int = 100
     REFERRAL_REFERRED_BONUS: int = 50
 
+    # ── Music Settings ────────────────────────────────────────────────────
+    MUSIC_WORKER_COUNT: int = 1  # Number of userbot accounts for main bot music
+    MUSIC_MAX_QUEUE: int = 50  # Maximum tracks in queue
+    MUSIC_MAX_DURATION: int = 3600  # Max track duration in seconds (1 hour)
+    MUSIC_IDLE_TIMEOUT: int = 180  # Leave VC after X seconds idle (3 minutes)
+    MUSIC_DEFAULT_VOLUME: int = 100  # Default volume (0-200)
+    MUSIC_DOWNLOAD_DIR: str = "/tmp/nexus_music"  # Temp directory for downloaded audio
+    MUSIC_JOB_TTL: int = 3600  # Job TTL in seconds (1 hour)
+    MUSIC_SERVICE_TIMEOUT: int = 10  # Bot waits X seconds for music service ack
+    MUSIC_MAX_RETRIES: int = 3  # yt-dlp retry attempts per URL
+    MUSIC_YTDLP_VERSION: str = "2024.12.6"  # Expected yt-dlp version
+
+    # ── Pyrogram / Memory Management ──────────────────────────────────────
+    PYROGRAM_MAX_ACTIVE: int = 10  # Max Pyrogram clients loaded simultaneously
+    LAZY_UNLOAD_TIMEOUT: int = 1800  # Unload idle clients after X seconds (30 min)
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def validate_required_settings(self):

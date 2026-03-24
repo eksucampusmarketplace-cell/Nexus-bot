@@ -11,6 +11,31 @@ logger = logging.getLogger(__name__)
 
 # Simple in-memory flood tracking
 flood_data = {}  # {chat_id: {user_id: [timestamps]}}
+_flood_last_pruned = None  # Track when we last did a full prune
+
+
+def _prune_flood_data(now=None):
+    """Remove stale chat/user entries from flood_data to prevent unbounded growth."""
+    global _flood_last_pruned
+    if now is None:
+        now = datetime.now()
+    # Only prune every 5 minutes to avoid overhead
+    if _flood_last_pruned and now - _flood_last_pruned < timedelta(minutes=5):
+        return
+    _flood_last_pruned = now
+    max_age = timedelta(minutes=10)  # Remove entries older than 10 minutes
+    empty_chats = []
+    for cid, users in flood_data.items():
+        empty_users = [
+            uid for uid, ts_list in users.items() if not ts_list or now - ts_list[-1] > max_age
+        ]
+        for uid in empty_users:
+            del users[uid]
+        if not users:
+            empty_chats.append(cid)
+    for cid in empty_chats:
+        del flood_data[cid]
+
 
 # Default automod settings (same as in db/ops/groups.py)
 DEFAULT_AUTOMOD = {
@@ -147,6 +172,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     antiflood = get_setting(settings, "automod", "antiflood", modules=modules)
     if antiflood["enabled"]:
         now = datetime.now()
+        _prune_flood_data(now)
         if chat_id not in flood_data:
             flood_data[chat_id] = {}
         if user_id not in flood_data[chat_id]:
@@ -206,6 +232,7 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if antiflood["enabled"]:
         now = datetime.now()
+        _prune_flood_data(now)
         if chat_id not in flood_data:
             flood_data[chat_id] = {}
         if user_id not in flood_data[chat_id]:

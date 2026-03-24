@@ -15,8 +15,20 @@ router = APIRouter(prefix="/api/groups/{chat_id}", tags=["moderation"])
 logger = logging.getLogger(__name__)
 
 # Cache for admin verification: {chat_id:user_id} -> (timestamp, is_admin)
+# Capped at 10 000 entries; oldest entries evicted when full.
 _admin_cache = {}
+_ADMIN_CACHE_MAX = 10_000
 ADMIN_CACHE_TTL = 60  # 60 seconds
+
+
+def _cache_admin(cache_key: str, timestamp: float, is_admin: bool):
+    """Store an admin-cache entry, evicting the oldest when the cache is full."""
+    if len(_admin_cache) >= _ADMIN_CACHE_MAX:
+        # Evict oldest 10% of entries
+        sorted_keys = sorted(_admin_cache, key=lambda k: _admin_cache[k][0])
+        for k in sorted_keys[: _ADMIN_CACHE_MAX // 10]:
+            del _admin_cache[k]
+    _admin_cache[cache_key] = (timestamp, is_admin)
 
 
 async def verify_admin(chat_id: int, user: dict):
@@ -48,10 +60,10 @@ async def verify_admin(chat_id: int, user: dict):
         try:
             member = await app.bot.get_chat_member(chat_id, user_id)
             if member.status in ("administrator", "creator"):
-                _admin_cache[cache_key] = (now, True)
+                _cache_admin(cache_key, now, True)
                 return
         except Exception as e:
-            logger.warning(f'[verify_admin] bot {bot_id} failed chat={chat_id} user={user_id}: {e}')
+            logger.warning(f"[verify_admin] bot {bot_id} failed chat={chat_id} user={user_id}: {e}")
             continue
 
     # DB fallback: check if user owns the bot associated with this group
@@ -62,7 +74,7 @@ async def verify_admin(chat_id: int, user: dict):
             chat_id,
         )
         if row and row["owner_user_id"] == user_id:
-            logger.info(f'[verify_admin] Allowing owner {user_id} via DB fallback')
+            logger.info(f"[verify_admin] Allowing owner {user_id} via DB fallback")
             return  # owner always passes
 
     raise HTTPException(403, "Could not verify admin status — ensure bot is admin in group")
@@ -120,7 +132,7 @@ async def ban_user(chat_id: int, req: BanRequest, user: dict = Depends(get_curre
             await app.bot.send_message(
                 chat_id=chat_id,
                 text=f"🚫 <b>Banned</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}",
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
             tg_success = True
             break
@@ -138,11 +150,17 @@ async def ban_user(chat_id: int, req: BanRequest, user: dict = Depends(get_curre
     except Exception as e:
         logger.error(f"[BAN] DB write failed: {e}")
 
-    await publish_event(chat_id, "mod_action", {
-        "action": "ban", "target_id": req.user_id,
-        "reason": reason, "admin_id": user.get("id", 0),
-        "admin_name": admin_name,
-    })
+    await publish_event(
+        chat_id,
+        "mod_action",
+        {
+            "action": "ban",
+            "target_id": req.user_id,
+            "reason": reason,
+            "admin_id": user.get("id", 0),
+            "admin_name": admin_name,
+        },
+    )
     return {"ok": True}
 
 
@@ -354,16 +372,23 @@ async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_cur
         async with db.pool.acquire() as conn:
             await conn.execute(
                 "INSERT INTO warnings (chat_id, user_id, reason, issued_by) VALUES ($1,$2,$3,$4)",
-                chat_id, req.user_id, reason, user.get("id", 0)
+                chat_id,
+                req.user_id,
+                reason,
+                user.get("id", 0),
             )
             await conn.execute(
                 "INSERT INTO mod_logs (chat_id, target_id, action, reason, admin_id) "
                 "VALUES ($1,$2,'warn',$3,$4)",
-                chat_id, req.user_id, reason, user.get("id", 0)
+                chat_id,
+                req.user_id,
+                reason,
+                user.get("id", 0),
             )
             warn_count = await conn.fetchval(
                 "SELECT COUNT(*) FROM warnings WHERE chat_id=$1 AND user_id=$2 AND is_active=TRUE",
-                chat_id, req.user_id
+                chat_id,
+                req.user_id,
             )
     except Exception as e:
         logger.error(f"[WARN] DB write failed: {e}")
@@ -381,11 +406,7 @@ async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_cur
                 f"Warnings: {warn_count}\n"
                 f"By: {admin_name}"
             )
-            await app.bot.send_message(
-                chat_id=chat_id,
-                text=warn_text,
-                parse_mode="HTML"
-            )
+            await app.bot.send_message(chat_id=chat_id, text=warn_text, parse_mode="HTML")
             tg_success = True
             break
         except Exception as tg_err:
@@ -534,7 +555,7 @@ async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_cur
                     f"Reason: {reason}\n"
                     f"By: {admin_name}"
                 ),
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
             tg_success = True
             break
@@ -640,7 +661,7 @@ async def kick_user(chat_id: int, req: KickRequest, user: dict = Depends(get_cur
             await app.bot.send_message(
                 chat_id=chat_id,
                 text=f"👢 <b>Kicked</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}",
-                parse_mode="HTML"
+                parse_mode="HTML",
             )
             tg_success = True
             break
@@ -658,13 +679,21 @@ async def kick_user(chat_id: int, req: KickRequest, user: dict = Depends(get_cur
             await conn.execute(
                 "INSERT INTO mod_logs (chat_id,target_id,target_name,action,reason,admin_id,admin_name)"
                 " VALUES ($1,$2,$3,'kick',$4,$5,$6)",
-                chat_id, req.user_id, target_name, reason,
-                user.get("id", 0), admin_name
+                chat_id,
+                req.user_id,
+                target_name,
+                reason,
+                user.get("id", 0),
+                admin_name,
             )
     except Exception as e:
         logger.error(f"[KICK] DB write failed: {e}")
 
-    await publish_event(chat_id, "mod_action", {"action": "kick", "target_id": req.user_id, "admin_id": user.get("id", 0)})
+    await publish_event(
+        chat_id,
+        "mod_action",
+        {"action": "kick", "target_id": req.user_id, "admin_id": user.get("id", 0)},
+    )
     return {"ok": True}
 
 
@@ -761,7 +790,10 @@ async def add_blacklist_word(chat_id: int, body: dict, user: dict = Depends(get_
             """INSERT INTO blacklist (chat_id, word, action, added_by, added_at)
                VALUES ($1, $2, $3, $4, NOW())
                ON CONFLICT (chat_id, word) DO NOTHING""",
-            chat_id, word, "delete", user.get("id", 0)
+            chat_id,
+            word,
+            "delete",
+            user.get("id", 0),
         )
 
         # 2. ALSO write to settings JSON (for Mini App display)
@@ -790,8 +822,7 @@ async def remove_blacklist_word(chat_id: int, word: str, user: dict = Depends(ge
     async with db.pool.acquire() as conn:
         # 1. Delete from blacklist TABLE
         await conn.execute(
-            "DELETE FROM blacklist WHERE chat_id=$1 AND word=$2",
-            chat_id, word.lower()
+            "DELETE FROM blacklist WHERE chat_id=$1 AND word=$2", chat_id, word.lower()
         )
 
         # 2. Also remove from settings JSON

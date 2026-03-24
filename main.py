@@ -88,7 +88,9 @@ async def lifespan(app: FastAPI):
             "(bot ID: 8-12 digits, token: 35-50 chars). "
             "Please check your environment variables."
         )
-        raise ValueError("Invalid bot token format. Bot tokens should be in format: BOT_ID:TOKEN")
+        raise ValueError(
+            "Invalid bot token format. Bot tokens should be in format: BOT_ID:TOKEN"
+        )
 
     try:
         primary_app = create_application(primary_token, is_primary=True)
@@ -112,7 +114,9 @@ async def lifespan(app: FastAPI):
             primary_me = primary_app.bot.get_me()
 
         if not primary_me or primary_me.id == 0:
-            raise ValueError("Bot initialization failed: get_me() returned invalid bot object.")
+            raise ValueError(
+                "Bot initialization failed: get_me() returned invalid bot object."
+            )
 
         logger.info(
             f"[STARTUP] ✅ Primary bot @{primary_me.username} (ID: {primary_me.id}) is online"
@@ -134,7 +138,9 @@ async def lifespan(app: FastAPI):
         # Auto-set MAIN_BOT_USERNAME if not configured
         if not settings.MAIN_BOT_USERNAME:
             settings.MAIN_BOT_USERNAME = primary_me.username
-            logger.info(f"[STARTUP] ✅ Auto-detected MAIN_BOT_USERNAME: @{primary_me.username}")
+            logger.info(
+                f"[STARTUP] ✅ Auto-detected MAIN_BOT_USERNAME: @{primary_me.username}"
+            )
 
         # Cache bot info to reduce API calls
         primary_app.bot_data["cached_bot_info"] = {
@@ -214,7 +220,9 @@ async def lifespan(app: FastAPI):
                 }
 
                 await registry_register(me.id, clone_app)
-                logger.info(f"[STARTUP] ✅ Started clone bot @{me.username} (ID: {me.id})")
+                logger.info(
+                    f"[STARTUP] ✅ Started clone bot @{me.username} (ID: {me.id})"
+                )
 
                 # Sync clone bot groups that have NULL bot_token_hash (Bug E fix)
                 try:
@@ -248,7 +256,9 @@ async def lifespan(app: FastAPI):
                     )
 
             except Exception as ce:
-                logger.error(f"[STARTUP] ⚠️ Failed to start clone {clone_row['bot_id']}: {ce}")
+                logger.error(
+                    f"[STARTUP] ⚠️ Failed to start clone {clone_row['bot_id']}: {ce}"
+                )
                 continue
     except Exception as e:
         logger.error(f"[STARTUP] ❌ Failed to load clones: {e}")
@@ -275,7 +285,9 @@ async def lifespan(app: FastAPI):
                         notify_privacy_mode_on(bot_app.bot, me.id, me.username, pool)
                     )
                 except Exception as notify_err:
-                    logger.debug(f"[STARTUP] Privacy mode notification skipped: {notify_err}")
+                    logger.debug(
+                        f"[STARTUP] Privacy mode notification skipped: {notify_err}"
+                    )
         except Exception:
             pass
 
@@ -296,7 +308,9 @@ async def lifespan(app: FastAPI):
         if loaded:
             logger.info("[STARTUP] ✅ Spam classifier loaded")
         else:
-            logger.info("[STARTUP] ℹ️  No spam model yet — run python -m bot.ml.train when ready")
+            logger.info(
+                "[STARTUP] ℹ️  No spam model yet — run python -m bot.ml.train when ready"
+            )
     except Exception as e:
         logger.debug(f"[STARTUP] Classifier load skipped: {e}")
     # ───────────────────────────────────────────────────────────────────────
@@ -355,7 +369,24 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_hourly_analytics_job())
     asyncio.create_task(_staggered_daily())
-    logger.info("[STARTUP] ✅ Analytics background jobs started (daily staggered by 5min)")
+    logger.info(
+        "[STARTUP] ✅ Analytics background jobs started (daily staggered by 5min)"
+    )
+
+    # ── Federation XP sync background job (Feature 7) ─────────────────────
+    async def _federation_xp_sync_job():
+        await asyncio.sleep(600)  # 10 minute offset from other jobs
+        while True:
+            try:
+                from bot.handlers.fed_leaderboard import sync_federation_xp
+
+                await sync_federation_xp(pool)
+            except Exception as e:
+                logger.error(f"[FED_XP] Sync job error: {e}")
+            await asyncio.sleep(3600)  # Run hourly
+
+    asyncio.create_task(_federation_xp_sync_job())
+    logger.info("[STARTUP] ✅ Federation XP sync background job started")
     # ───────────────────────────────────────────────────────────────────────
 
     # ── Phase 5: Self Keep-Alive Ping ─────────────────────────────────────
@@ -364,7 +395,9 @@ async def lifespan(app: FastAPI):
 
         base_url = settings.RENDER_EXTERNAL_URL
         if not base_url:
-            logger.debug("[KEEP-ALIVE] RENDER_EXTERNAL_URL not set — skipping keep-alive ping")
+            logger.debug(
+                "[KEEP-ALIVE] RENDER_EXTERNAL_URL not set — skipping keep-alive ping"
+            )
             return
         ping_url = f"{base_url.rstrip('/')}/health"
         await asyncio.sleep(60)
@@ -458,7 +491,9 @@ async def telegram_webhook(webhook_secret: str, request: Request):
             pass
 
     if not target_app:
-        logger.warning(f"[WEBHOOK] No bot found for webhook secret: {webhook_secret[:10]}...")
+        logger.warning(
+            f"[WEBHOOK] No bot found for webhook secret: {webhook_secret[:10]}..."
+        )
         return Response(status_code=404)
 
     data = await request.json()
@@ -470,30 +505,18 @@ async def telegram_webhook(webhook_secret: str, request: Request):
 # Serve Mini App static files
 miniapp_path = os.path.join(os.path.dirname(__file__), "miniapp")
 if os.path.exists(miniapp_path):
-    app.mount("/miniapp", StaticFiles(directory=miniapp_path, html=True), name="miniapp")
+    app.mount(
+        "/miniapp", StaticFiles(directory=miniapp_path, html=True), name="miniapp"
+    )
 
 # Import and include API routers
 try:
     # Bug #36/#37/#38 fix: Import previously unregistered routers
-    from api.routes import (
-        admin,
-        analytics,
-    )
+    from api.routes import admin, analytics
     from api.routes import antiraid as antiraid_api
-    from api.routes import (
-        auth,
-        automod,
-        backup,
-        billing,
-        boost,
-        bots,
-    )
+    from api.routes import auth, automod, backup, billing, boost, bots
     from api.routes import bots_messages as bots_messages_api
-    from api.routes import (
-        broadcast,
-        channel_gate,
-        channels,
-    )
+    from api.routes import broadcast, channel_gate, channels
     from api.routes import debug as debug_api
     from api.routes import (
         engagement,
@@ -508,22 +531,12 @@ try:
         messages,
     )
     from api.routes import moderation as moderation_api
-    from api.routes import (
-        modules,
-    )
+    from api.routes import modules
     from api.routes import notes as notes_api
     from api.routes import photos as photos_api
-    from api.routes import (
-        reports,
-        roles,
-        scheduler,
-    )
+    from api.routes import reports, roles, scheduler
     from api.routes import session as session_api
-    from api.routes import (
-        stats,
-        text_config,
-        webhooks,
-    )
+    from api.routes import stats, text_config, webhooks
     from api.routes.antiraid import global_router as antiraid_global_router
 
     # Core API routers (need prefix since routes don't include it)
@@ -567,7 +580,9 @@ try:
     app.include_router(text_config.router)  # prefix="/api/groups"
     app.include_router(modules.router)  # prefix="/api/groups"
     app.include_router(games.router)  # prefix="/api/groups"
-    app.include_router(channel_gate.router)  # prefix="/api/groups/{chat_id}/channel-gate"
+    app.include_router(
+        channel_gate.router
+    )  # prefix="/api/groups/{chat_id}/channel-gate"
 
     # Other routes with internal prefixes
     app.include_router(broadcast.router)  # prefix="/api/broadcast"
@@ -599,7 +614,9 @@ try:
     from api.routes import users as users_api
 
     # Bug #39 fix: Register both federation routers (main + legacy)
-    app.include_router(federation_api.router, prefix="/api/federation", tags=["federation"])
+    app.include_router(
+        federation_api.router, prefix="/api/federation", tags=["federation"]
+    )
     app.include_router(federation_api.legacy_router, tags=["federation"])
     app.include_router(users_api.router, prefix="/api/users", tags=["users"])
     app.include_router(i18n_api.router, prefix="/api/i18n", tags=["i18n"])
@@ -616,5 +633,12 @@ try:
     app.include_router(community_vote_api.router, tags=["community_vote"])
 
     logger.info("[STARTUP] ✅ All v21 API routes registered")
+
+    # Eight New Features — Analytics Dashboard route
+    from api.routes import analytics_dashboard as analytics_dashboard_api
+
+    app.include_router(analytics_dashboard_api.router, tags=["analytics_dashboard"])
+    logger.info("[STARTUP] ✅ Analytics Dashboard route registered")
+
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

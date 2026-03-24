@@ -67,15 +67,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     )
     from bot.handlers.admin_tools import admin_tool_handlers
     from bot.handlers.advanced_automod import handle_automod_command
-    from bot.handlers.join_approval import (
-        cmd_antiraid,
-        cmd_approve,
-        cmd_approved,
-        cmd_autoantiraid,
-        cmd_captcha,
-        cmd_captchamode,
-        cmd_unapprove,
-    )
     from bot.handlers.automod import (
         antiflood_handler,
         antilink_handler,
@@ -100,6 +91,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         edit_post_handler,
         schedule_post_handler,
     )
+    from bot.handlers.clone_approval import group_approval_handler
     from bot.handlers.commands import (
         ban_handler,
         id_handler,
@@ -129,8 +121,16 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         welcome_handler,
         welcome_preview_handler,
     )
-    from bot.handlers.clone_approval import group_approval_handler
     from bot.handlers.group_lifecycle import group_lifecycle_handler
+    from bot.handlers.join_approval import (
+        cmd_antiraid,
+        cmd_approve,
+        cmd_approved,
+        cmd_autoantiraid,
+        cmd_captcha,
+        cmd_captchamode,
+        cmd_unapprove,
+    )
     from bot.handlers.new_member import handle_chat_member_update
     from bot.handlers.prefix_handler import prefix_handler
     from bot.handlers.privacy import privacy_handler
@@ -153,12 +153,15 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # This will be set by main.py before calling setup_music_worker
 
     # ── PM Tracking ────────────────────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.ChatType.PRIVATE, track_pm_handler), group=-1)
+    app.add_handler(
+        MessageHandler(filters.ChatType.PRIVATE, track_pm_handler), group=-1
+    )
 
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(
         MessageHandler(
-            filters.TEXT & (filters.Regex(r"^!") | filters.Regex(r"^!!")), prefix_handler
+            filters.TEXT & (filters.Regex(r"^!") | filters.Regex(r"^!!")),
+            prefix_handler,
         ),
         group=0,
     )
@@ -189,13 +192,19 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("setgoodbye", set_goodbye_handler, filters=GROUP))
     app.add_handler(CommandHandler("welcome", welcome_preview_handler, filters=GROUP))
     app.add_handler(CommandHandler("goodbye", goodbye_preview_handler, filters=GROUP))
-    app.add_handler(CommandHandler("resetwelcome", reset_welcome_handler, filters=GROUP))
-    app.add_handler(CommandHandler("resetgoodbye", reset_goodbye_handler, filters=GROUP))
+    app.add_handler(
+        CommandHandler("resetwelcome", reset_welcome_handler, filters=GROUP)
+    )
+    app.add_handler(
+        CommandHandler("resetgoodbye", reset_goodbye_handler, filters=GROUP)
+    )
     app.add_handler(CommandHandler("resetrules", reset_rules_handler, filters=GROUP))
 
     # ── Nexus Channel Management ─────────────────────────────────────────
     app.add_handler(CommandHandler("channelpost", channel_post_handler, filters=GROUP))
-    app.add_handler(CommandHandler("schedulepost", schedule_post_handler, filters=GROUP))
+    app.add_handler(
+        CommandHandler("schedulepost", schedule_post_handler, filters=GROUP)
+    )
     app.add_handler(CommandHandler("approvepost", approve_post_handler, filters=GROUP))
     app.add_handler(CommandHandler("cancelpost", cancel_post_handler, filters=GROUP))
     app.add_handler(CommandHandler("editpost", edit_post_handler, filters=GROUP))
@@ -272,10 +281,18 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("stats", stats_handler, filters=GROUP))
 
     from bot.handlers.moderation.kick import skick_command
-    from bot.handlers.moderation.mute import restrict_command, smute_command, unrestrict_command
+    from bot.handlers.moderation.mute import (
+        restrict_command,
+        smute_command,
+        unrestrict_command,
+    )
     from bot.handlers.moderation.promote import title_command
     from bot.handlers.moderation.purge import delall_command, purgeme_command
-    from bot.handlers.moderation.warn import resetwarns_command, warnlimit_command, warnmode_command
+    from bot.handlers.moderation.warn import (
+        resetwarns_command,
+        warnlimit_command,
+        warnmode_command,
+    )
 
     app.add_handler(CommandHandler("resetwarns", resetwarns_command, filters=GROUP))
     app.add_handler(CommandHandler("warnmode", warnmode_command, filters=GROUP))
@@ -288,7 +305,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("delall", delall_command, filters=GROUP))
     app.add_handler(CommandHandler("purgeme", purgeme_command, filters=GROUP))
 
-    from bot.handlers.blacklist import blacklist_command, blacklistmode_command, unblacklist_command
+    from bot.handlers.blacklist import (
+        blacklist_command,
+        blacklistmode_command,
+        unblacklist_command,
+    )
     from bot.handlers.filters import (
         filter_command,
         filters_list_command,
@@ -302,7 +323,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("stopall", stopall_command, filters=GROUP))
     app.add_handler(CommandHandler("blacklist", blacklist_command, filters=GROUP))
     app.add_handler(CommandHandler("unblacklist", unblacklist_command, filters=GROUP))
-    app.add_handler(CommandHandler("blacklistmode", blacklistmode_command, filters=GROUP))
+    app.add_handler(
+        CommandHandler("blacklistmode", blacklistmode_command, filters=GROUP)
+    )
 
     from bot.handlers.notes import (
         delnote_command,
@@ -333,13 +356,16 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     for h in admin_request_command_handlers:
         app.add_handler(h)
     # Message handler for @admins mentions (run before automod)
-    app.add_handler(MessageHandler(GROUP & filters.TEXT, handle_admin_mention), group=-1)
+    app.add_handler(
+        MessageHandler(GROUP & filters.TEXT, handle_admin_mention), group=-1
+    )
 
     # ── Advanced automod commands ───────────────────────────────────────
     # These are also handled by prefix_handler (!, !!) in group 0
     # But we also register specific commands here as fallback
     app.add_handler(
-        MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_automod_command), group=2
+        MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_automod_command),
+        group=2,
     )
 
     # ── Clone commands — PRIMARY BOT ONLY ─────────────────────────────────
@@ -355,7 +381,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         # ConversationHandler for /clone flow (must be added before other clone handlers)
         app.add_handler(clone_conversation)
         # Non-conversation commands
-        app.add_handler(CommandHandler("myclones", myclones_command_handler, filters=PRIVATE))
+        app.add_handler(
+            CommandHandler("myclones", myclones_command_handler, filters=PRIVATE)
+        )
         app.add_handler(CommandHandler("cloneset", cloneset_handler, filters=PRIVATE))
         # Owner dashboard command
         app.add_handler(owner_dashboard_handler)
@@ -376,11 +404,14 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # ── Admin request callbacks (all bots) ────────────────────────────────
     app.add_handler(
-        CallbackQueryHandler(admin_request_callback, pattern=r"^admin_req:(responding|close):\d+$")
+        CallbackQueryHandler(
+            admin_request_callback, pattern=r"^admin_req:(responding|close):\d+$"
+        )
     )
     # Bug #98 fix: Move captcha_message to group=7 to avoid conflict with message_guard
     app.add_handler(
-        MessageHandler(GROUP & filters.TEXT & ~filters.COMMAND, handle_captcha_message), group=7
+        MessageHandler(GROUP & filters.TEXT & ~filters.COMMAND, handle_captcha_message),
+        group=7,
     )
 
     # ── AutoMod message handlers (groups, priority groups 1-3) ───────────
@@ -392,10 +423,14 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── New member joins/leaves ──────────────────────────────────────────
     # Welcome is handled by handle_chat_member_update (which delegates to greetings.welcome_handler).
     # Do NOT register welcome_handler directly here — it would cause double welcome messages.
-    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
+    app.add_handler(
+        MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler)
+    )
 
     # Advanced member join/leave handler (handles welcome, captcha, anti-raid, etc.)
-    app.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
+    app.add_handler(
+        ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
+    )
 
     # ── Global error handler with alert ─────────────────────────────────────
     # Group lifecycle - on ALL bots
@@ -421,8 +456,12 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         # Try to get bot username for alert
         try:
             me = await context.bot.get_me()
-            chat_id = update.effective_chat.id if update and update.effective_chat else 0
-            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
+            chat_id = (
+                update.effective_chat.id if update and update.effective_chat else 0
+            )
+            await alert_error(
+                context.bot, me.username, chat_id, str(context.error)[:300]
+            )
         except Exception:
             pass
 
@@ -440,7 +479,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
                 suffix = DEFAULTS.get("error_suffix", "").format(
                     main_bot=settings.MAIN_BOT_USERNAME
                 )
-                await update.effective_message.reply_text(f"❌ Something went wrong. {suffix}")
+                await update.effective_message.reply_text(
+                    f"❌ Something went wrong. {suffix}"
+                )
         except Exception:
             pass
 
@@ -521,11 +562,17 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     logger.info("[FACTORY] Auto-delete handler registered")
 
     # ── Password management handlers ──────────────────────────────────────
-    from bot.handlers.password import cmd_clearpassword, cmd_setpassword, handle_password_dm
+    from bot.handlers.password import (
+        cmd_clearpassword,
+        cmd_setpassword,
+        handle_password_dm,
+    )
 
     app.add_handler(CommandHandler("setpassword", cmd_setpassword, filters=GROUP))
     app.add_handler(CommandHandler("clearpassword", cmd_clearpassword, filters=GROUP))
-    app.add_handler(MessageHandler(PRIVATE & filters.TEXT & ~filters.COMMAND, handle_password_dm))
+    app.add_handler(
+        MessageHandler(PRIVATE & filters.TEXT & ~filters.COMMAND, handle_password_dm)
+    )
     logger.info("[FACTORY] Password handlers registered")
 
     # ── Copy settings handler ─────────────────────────────────────────────
@@ -543,7 +590,12 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     logger.info("[FACTORY] Log channel handlers registered")
 
     # ── Import / Export / Reset handlers ─────────────────────────────────
-    from bot.handlers.import_export import cmd_export, cmd_import, cmd_reset, handle_reset_callback
+    from bot.handlers.import_export import (
+        cmd_export,
+        cmd_import,
+        cmd_reset,
+        handle_reset_callback,
+    )
 
     app.add_handler(CommandHandler("export", cmd_export, filters=GROUP))
     app.add_handler(CommandHandler("import", cmd_import, filters=GROUP))
@@ -556,7 +608,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Bug #3 fix: Removed duplicate InlineQueryHandler registration.
     # Only the enhanced inline_query handler (registered below) is used now.
     # The old inline_mode.handle_inline_query was redundant.
-    logger.info("[FACTORY] Inline query handler (legacy) skipped — using enhanced handler")
+    logger.info(
+        "[FACTORY] Inline query handler (legacy) skipped — using enhanced handler"
+    )
 
     # ── Public command handlers ───────────────────────────────────────────
     from bot.handlers.public import (
@@ -688,6 +742,50 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CallbackQueryHandler(handle_captcha_callback, pattern=r"^captcha:"))
 
     logger.info("[FACTORY] CAPTCHA callback handlers registered")
+
+    # ── Eight New Features ────────────────────────────────────────────────
+
+    # Feature 1: Scheduled Messages
+    from bot.handlers.schedule_msg import schedule_handlers
+
+    for h in schedule_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Scheduled Messages handlers registered")
+
+    # Feature 3: Welcome Quiz
+    from bot.handlers.welcome_quiz import quiz_handlers
+
+    for h in quiz_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Welcome Quiz handlers registered")
+
+    # Feature 4: Auto-Role by XP
+    from bot.handlers.auto_role import autorole_handlers
+
+    for h in autorole_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Auto-Role handlers registered")
+
+    # Feature 6: Polls with Stakes
+    from bot.handlers.stake_polls import stake_poll_handlers
+
+    for h in stake_poll_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Stake Polls handlers registered")
+
+    # Feature 7: Federation Leaderboards
+    from bot.handlers.fed_leaderboard import fed_leaderboard_handlers
+
+    for h in fed_leaderboard_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Federation Leaderboard handlers registered")
+
+    # Feature 8: Bot Personality Presets
+    from bot.handlers.personality_cmd import personality_handlers
+
+    for h in personality_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Personality Presets handlers registered")
 
     # ── Message tracking for analytics ────────────────────────────────────────
     from bot.handlers.message_tracking import track_message

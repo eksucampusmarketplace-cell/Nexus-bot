@@ -36,31 +36,31 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-from telegram import Update, Message
+from telegram import Message, Update
 from telegram.ext import ContextTypes
 
-from db.ops.automod import (
-    get_group_settings,
-    get_rule_time_windows,
-    get_rule_penalties,
-    get_silent_times,
-    get_necessary_words,
-    get_regex_patterns,
-    get_rule_priority,
-    record_message_hash,
-    get_recent_hash_count,
-    get_whitelist,
-)
-from bot.automod.penalties import apply_penalty, PenaltyType
+from api.routes.events import push_event
 from bot.automod.detectors import (
     detect_content_type,
+    detect_message_frequency,
+    detect_spam_pattern,
     detect_unofficial_telegram,
     is_in_time_window,
-    detect_spam_pattern,
-    detect_message_frequency,
 )
-from api.routes.events import push_event
+from bot.automod.penalties import PenaltyType, apply_penalty
 from bot.logging.log_channel import log_event
+from db.ops.automod import (
+    get_group_settings,
+    get_necessary_words,
+    get_recent_hash_count,
+    get_regex_patterns,
+    get_rule_penalties,
+    get_rule_priority,
+    get_rule_time_windows,
+    get_silent_times,
+    get_whitelist,
+    record_message_hash,
+)
 
 log = logging.getLogger("automod")
 
@@ -75,7 +75,9 @@ class AutomodResult:
     actioned: bool = False
 
 
-async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> AutomodResult:
+async def check_message(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> AutomodResult:
     """
     Main entry point. Called for every message.
     Returns AutomodResult — caller doesn't need to do anything else.
@@ -113,7 +115,9 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
     # ── 3. Silent time check ──────────────────────────────────────────────
     silent_times = await get_silent_times(db, chat.id)
     for slot in silent_times:
-        if slot["is_active"] and is_in_time_window(now_time, slot["start_time"], slot["end_time"]):
+        if slot["is_active"] and is_in_time_window(
+            now_time, slot["start_time"], slot["end_time"]
+        ):
             await msg.delete()
             return AutomodResult(
                 violated=True,
@@ -156,12 +160,17 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
         # Violation found — get penalty
         penalty_row = penalties.get(rule_key)
         penalty = (
-            penalty_row["penalty"] if penalty_row else settings.get("default_penalty", "delete")
+            penalty_row["penalty"]
+            if penalty_row
+            else settings.get("default_penalty", "delete")
         )
         duration = penalty_row["duration_hours"] if penalty_row else 0
 
         result = AutomodResult(
-            violated=True, rule_key=rule_key, penalty=penalty, reason=_rule_reason(rule_key)
+            violated=True,
+            rule_key=rule_key,
+            penalty=penalty,
+            reason=_rule_reason(rule_key),
         )
         await _enforce(msg, user, chat, context, settings, result, duration)
         await _push_sse(context, chat, user, result)
@@ -200,7 +209,13 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
                     reason=f"Rapid message frequency detected ({msg_count} msgs)",
                 )
                 await _enforce(
-                    msg, user, chat, context, settings, result, settings.get("flood_mute_minutes", 5)
+                    msg,
+                    user,
+                    chat,
+                    context,
+                    settings,
+                    result,
+                    settings.get("flood_mute_minutes", 5),
                 )
                 await _push_sse(context, chat, user, result)
                 return result
@@ -284,10 +299,15 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
         ]
         for limit, actual, op, reason in checks:
             if limit > 0:
-                violated = (op == "<" and actual < limit) or (op == ">" and actual > limit)
+                violated = (op == "<" and actual < limit) or (
+                    op == ">" and actual > limit
+                )
                 if violated:
                     result = AutomodResult(
-                        violated=True, rule_key="text_length", penalty="delete", reason=reason
+                        violated=True,
+                        rule_key="text_length",
+                        penalty="delete",
+                        reason=reason,
                     )
                     await _enforce(msg, user, chat, context, settings, result, 0)
                     return result
@@ -327,10 +347,30 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
             except re.error:
                 pass  # invalid pattern — skip
 
+    # ── 11. AI Auto-Moderation (heuristic toxicity/spam scoring) ──────────
+    if settings.get("ai_automod_enabled") and (msg.text or msg.caption):
+        from bot.automod.ai_moderation import analyze_message
+
+        ai_text = msg.text or msg.caption or ""
+        sensitivity = settings.get("ai_automod_sensitivity", 0.7)
+        ai_result = analyze_message(ai_text, sensitivity=sensitivity)
+        if ai_result.triggered:
+            result = AutomodResult(
+                violated=True,
+                rule_key="ai_automod",
+                penalty=settings.get("default_penalty", "delete"),
+                reason=f"AI moderation: {ai_result.category} (score {ai_result.score})",
+            )
+            await _enforce(msg, user, chat, context, settings, result, 0)
+            await _push_sse(context, chat, user, result)
+            return result
+
     return AutomodResult()
 
 
-async def _enforce(msg, user, chat, context, settings, result: AutomodResult, duration_hours: int):
+async def _enforce(
+    msg, user, chat, context, settings, result: AutomodResult, duration_hours: int
+):
     """Delete message, apply penalty, send admonition."""
     db = context.bot_data.get("db")
     bot = context.bot
@@ -355,7 +395,9 @@ async def _enforce(msg, user, chat, context, settings, result: AutomodResult, du
         await _record_warning(context, chat.id, user.id, settings)
 
     # Log event
-    event_type = result.penalty if result.penalty in ("ban", "mute", "kick") else "delete"
+    event_type = (
+        result.penalty if result.penalty in ("ban", "mute", "kick") else "delete"
+    )
     preview = (msg.text or "")[:200] if result.deleted else ""
     await log_event(
         bot=bot,
@@ -451,7 +493,11 @@ async def _record_warning(context, chat_id, user_id, settings):
 
     if count >= max_warns:
         await apply_penalty(
-            context.bot, chat_id, user_id, PenaltyType.silence, 12  # 12h silence on max warns
+            context.bot,
+            chat_id,
+            user_id,
+            PenaltyType.silence,
+            12,  # 12h silence on max warns
         )
 
 
@@ -464,7 +510,9 @@ async def _push_sse(context, chat, user, result: AutomodResult):
             owner_id,
             {
                 "type": (
-                    "message_delete" if result.penalty == "delete" else "member_" + result.penalty
+                    "message_delete"
+                    if result.penalty == "delete"
+                    else "member_" + result.penalty
                 ),
                 "title": f"AutoMod: {result.rule_key}",
                 "body": f"{user.full_name} — {result.reason}",
@@ -509,9 +557,12 @@ def _content_matches_rule(msg, content_type: str, rule_key: str) -> bool:
         "arabic_farsi": lambda m: _has_arabic_farsi(m),
         "reply": lambda m: (m.reply_to_message is not None),
         "external_reply": lambda m: (
-            m.reply_to_message is not None and m.reply_to_message.forward_from_chat is not None
+            m.reply_to_message is not None
+            and m.reply_to_message.forward_from_chat is not None
         ),
-        "bot": lambda m: (m.new_chat_members and any(u.is_bot for u in m.new_chat_members)),
+        "bot": lambda m: (
+            m.new_chat_members and any(u.is_bot for u in m.new_chat_members)
+        ),
         "userbots": lambda m: (m.via_bot is not None),
         "unofficial_tg": lambda m: False,  # handled separately
         "spoiler": lambda m: _has_spoiler(m),

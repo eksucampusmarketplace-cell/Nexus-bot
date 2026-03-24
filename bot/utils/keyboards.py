@@ -36,28 +36,30 @@ def support_keyboard(
         if url:
             buttons.append([InlineKeyboardButton("⚡ Open Mini App", web_app=WebAppInfo(url=url))])
 
-    # Main bot support button
-    buttons.append(
-        [
-            InlineKeyboardButton(
-                "💬 Support Group",
-                url=settings.SUPPORT_GROUP_URL or f"https://t.me/{settings.MAIN_BOT_USERNAME}",
-            )
-        ]
+    # Main bot support button — only if we have a valid URL
+    support_url = settings.SUPPORT_GROUP_URL or (
+        f"https://t.me/{settings.MAIN_BOT_USERNAME}" if settings.MAIN_BOT_USERNAME else None
     )
-
-    # Documentation button (if configured, fallback to main bot support link)
-    if include_docs:
-        docs_url = settings.DOCS_URL or f"https://t.me/{settings.MAIN_BOT_USERNAME}"
-        buttons.append([InlineKeyboardButton("📚 Help & Docs", url=docs_url)])
-
-    # Privacy Policy button - show a link to online version if available
-    if include_privacy:
-        privacy_url = (
-            settings.PRIVACY_POLICY_URL
-            or "https://github.com/yourusername/nexus/blob/main/PRIVACY_POLICY.md"
+    if support_url:
+        buttons.append(
+            [InlineKeyboardButton("💬 Support Group", url=support_url)]
         )
-        buttons.append([InlineKeyboardButton("🔒 Privacy Policy", url=privacy_url)])
+
+    # Documentation button (if configured)
+    if include_docs:
+        docs_url = settings.DOCS_URL or (
+            f"https://t.me/{settings.MAIN_BOT_USERNAME}" if settings.MAIN_BOT_USERNAME else None
+        )
+        if docs_url:
+            buttons.append([InlineKeyboardButton("📚 Help & Docs", url=docs_url)])
+
+    # Privacy Policy button — fall back to the app's own /privacy page
+    if include_privacy:
+        privacy_url = settings.PRIVACY_POLICY_URL or (
+            f"{settings.webhook_url}/privacy" if settings.RENDER_EXTERNAL_URL else None
+        )
+        if privacy_url:
+            buttons.append([InlineKeyboardButton("🔒 Privacy Policy", url=privacy_url)])
 
     return InlineKeyboardMarkup(buttons)
 

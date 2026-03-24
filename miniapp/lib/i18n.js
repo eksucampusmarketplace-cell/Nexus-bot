@@ -198,7 +198,6 @@ async function initI18n() {
   
   // Make tr() globally available
   window.tr = t;
-  window.showToast = showToast;
   
   return _i18n;
 }
@@ -243,7 +242,9 @@ async function changeLanguage(newLang) {
     window.location.reload();
   } catch (error) {
     console.error('[i18n] Failed to change language:', error);
-    showToast(t('error', 'Failed to change language'));
+    if (typeof window !== 'undefined' && window.showToast) {
+      window.showToast(t('error', 'Failed to change language'), 'error');
+    }
   }
 }
 
@@ -254,7 +255,6 @@ export {
   isRTL,
   initI18n,
   changeLanguage,
-  showToast,
   AVAILABLE_LANGUAGES
 };
 
@@ -266,7 +266,6 @@ if (typeof window !== 'undefined') {
     isRTL,
     initI18n,
     changeLanguage,
-    showToast,
     AVAILABLE_LANGUAGES
   };
 }

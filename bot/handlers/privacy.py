@@ -62,13 +62,13 @@ View the complete policy with detailed information."""
         keyboard.append(
             [InlineKeyboardButton("📄 View Full Privacy Policy", web_app={"url": privacy_url})]
         )
-    keyboard.append(
-        [
-            InlineKeyboardButton(
-                "📧 Contact Support", url=f"https://t.me/{settings.MAIN_BOT_USERNAME}"
-            )
-        ]
+    support_url = settings.SUPPORT_GROUP_URL or (
+        f"https://t.me/{settings.MAIN_BOT_USERNAME}" if settings.MAIN_BOT_USERNAME else None
     )
+    if support_url:
+        keyboard.append(
+            [InlineKeyboardButton("📧 Contact Support", url=support_url)]
+        )
 
     await update.message.reply_text(
         privacy_summary, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard)

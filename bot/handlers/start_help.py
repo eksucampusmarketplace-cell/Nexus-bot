@@ -88,23 +88,25 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Get miniapp URL for this bot if configured
         miniapp_url = settings.mini_app_url
 
-        # Build keyboard with clone option
-        keyboard = [[InlineKeyboardButton("📱 Open Panel", web_app={"url": miniapp_url})]]
+        # Build keyboard — guard against missing miniapp_url
+        keyboard = []
+        if miniapp_url:
+            keyboard.append([InlineKeyboardButton("📱 Open Panel", web_app={"url": miniapp_url})])
 
-        # Add "Create Your Own Bot" button for primary bot
+        # Add "Create Your Own Bot" button for primary bot only
         if is_primary:
             keyboard.append(
                 [InlineKeyboardButton("🤖 Create Your Own Bot", callback_data="start_clone")]
             )
 
-        keyboard.append(
-            [
-                InlineKeyboardButton("❓ Help", callback_data="help_main"),
-                InlineKeyboardButton(
-                    "💬 Support", url=f"https://t.me/{settings.MAIN_BOT_USERNAME}"
-                ),
-            ]
+        # Support button — only if we have a valid URL to link to
+        support_url = settings.SUPPORT_GROUP_URL or (
+            f"https://t.me/{settings.MAIN_BOT_USERNAME}" if settings.MAIN_BOT_USERNAME else None
         )
+        help_row = [InlineKeyboardButton("❓ Help", callback_data="help_main")]
+        if support_url:
+            help_row.append(InlineKeyboardButton("💬 Support", url=support_url))
+        keyboard.append(help_row)
 
         await update.message.reply_text(
             text=msg, parse_mode=ParseMode.HTML, reply_markup=InlineKeyboardMarkup(keyboard)

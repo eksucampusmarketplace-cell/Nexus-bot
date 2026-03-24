@@ -6,8 +6,11 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>Nexus Bot Panel v1.5.0</title>
+  <title>Nexus Bot Panel v1.6.0</title>
+  <meta name="app-version" content="1.6.0">
   <base href="/miniapp/">
+  <!-- API base URL: set to empty string for same-origin, or override for cross-domain -->
+  <script>window.NEXUS_API_BASE = '';</script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <!-- Design System -->
   <link rel="stylesheet" href="styles/tokens.css?v=1.6.0">
@@ -847,25 +850,8 @@
     // (Dead code removed — members rendering is handled by src/pages/members.js)
     // (Dead code removed — modules rendering is handled by src/pages/modules.js)
 
-    // Helper functions used by renderLogs and renderSettings
-    function getActionEmoji(action) {
-      const emojis = { 'ban': '🚫', 'unban': '✅', 'mute': '🔇', 'unmute': '🔊', 'warn': '⚠️', 'kick': '👢', 'purge': '🧹', 'join': '👋', 'leave': '👋' };
-      return emojis[action] || '📋';
-    }
-
-    function formatAction(action) {
-      return action?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || action;
-    }
-
-    function formatTime(timestamp) {
-      const date = new Date(timestamp);
-      const diff = new Date() - date;
-      const mins = Math.floor(diff / 60000);
-      if (mins < 1) return 'Just now';
-      if (mins < 60) return `${mins}m ago`;
-      if (mins < 1440) return `${Math.floor(mins/60)}h ago`;
-      return date.toLocaleDateString();
-    }
+    // Helper functions imported from lib/helpers.js — no inline duplicates
+    const { getActionEmoji, formatAction, formatTime } = await import("./lib/helpers.js?v=1.6.0");
 
     async function renderSettings(container) {
       // Render guard: cancel any previous in-flight render

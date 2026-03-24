@@ -79,3 +79,7 @@ yarn.lock
 # Local development
 ngrok.yml
 *.local
+
+# Backup and temp files
+*.bak
+*.tmp

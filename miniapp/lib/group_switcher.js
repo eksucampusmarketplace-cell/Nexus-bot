@@ -28,14 +28,7 @@ export class GroupSwitcher {
     let data = {};
     try {
       data = await apiFetch('/api/me');
-      // Store full response as userContext (includes is_sudo, bot_info, role)
-      this._store.setState({ 
-        userContext: data,
-        user: data.user,
-        is_sudo: data.is_sudo,
-        role: data.role,
-        bot_info: data.bot_info
-      });
+      // Initial data loaded — full setState is done after groups are computed below
       console.log('[GroupSwitcher] Received user data:', {
         admin_groups: data.admin_groups?.length || 0,
         mod_groups: data.mod_groups?.length || 0,
@@ -74,10 +67,14 @@ export class GroupSwitcher {
     console.log('[GroupSwitcher] Final groups list:', this._groups.length, 'groups',
       this._groups.map(g => `${g.title} (${g.chat_id})`));
 
+    // Single setState call with all fields (prevents overwriting userContext)
     this._store.setState({
-      groups: this._groups,
+      userContext: data,          // Full /api/me response
+      user: data.user,
+      is_sudo: data.is_sudo,
+      role: data.role,
       bot_info: data.bot_info,
-      userContext: data.user
+      groups: this._groups,
     });
 
     // Try to restore saved group or use first available
@@ -190,8 +187,7 @@ export class GroupSwitcher {
 
   _switchTo(group) {
     this._active = group;
-    sessionStorage.setItem('active_group', group.chat_id);
-    this._store.getState().setActiveChatId(group.chat_id);
+    this._store.getState().setActiveChatId(group.chat_id);  // Single write — store handles persistence
     this._render();
     showToast(`Switched to ${group.title}`, 'info', 2000);
   }

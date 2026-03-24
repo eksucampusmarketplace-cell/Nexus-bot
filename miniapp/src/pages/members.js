@@ -11,6 +11,17 @@ import { useStore } from '../../store/index.js?v=1.6.0';
 const store = useStore;
 const getState = store.getState;
 
+let _searchTimer = null;
+let _membersPage = 0;
+const PAGE_SIZE = 50;
+
+const ACTION_LABELS = {
+  warn: 'warn',
+  mute: 'mute for 1 hour',
+  kick: 'kick from group',
+  ban: 'permanently ban',
+};
+
 function filterMembers(query, all, container) {
   const q = query.toLowerCase().trim();
   if (!q) {
@@ -70,7 +81,8 @@ export async function renderMembers(container) {
   `;
 
   try {
-    const members = await apiFetch(`/api/groups/${chatId}/members`);
+    _membersPage = 0;
+    const members = await apiFetch(`/api/groups/${chatId}/members?limit=${PAGE_SIZE}&offset=0`);
     state.setMembers(members);
 
     container.innerHTML = '';
@@ -86,13 +98,27 @@ export async function renderMembers(container) {
     `;
     container.appendChild(header);
 
-    container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => filterMembers(val, members, container) }));
+    container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => {
+      clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(() => filterMembers(val, members, container), 300);
+    }}));
 
     const list = document.createElement('div');
     list.className = 'member-list';
     list.style.cssText = 'display: flex; flex-direction: column; gap: var(--sp-2);';
 
-    const _hMAction = async (mid, action, cid) => {
+    const _hMAction = async (mid, action, cid, member) => {
+      if (!mid) {
+        showToast('Cannot perform action: member ID missing', 'error');
+        return;
+      }
+      // Confirmation for destructive actions
+      if (['kick', 'ban', 'mute'].includes(action)) {
+        const label = ACTION_LABELS[action] || action;
+        const name = member.first_name || member.username || 'this member';
+        const confirmed = confirm(`Are you sure you want to ${label} ${name}?`);
+        if (!confirmed) return;
+      }
       try {
         if (action === 'warn') await apiFetch(`/api/groups/${cid}/warnings`, { method: 'POST', body: { user_id: mid, reason: 'Manual warning' } });
         else if (action === 'mute') await apiFetch(`/api/groups/${cid}/mutes`, { method: 'POST', body: { user_id: mid, duration: '1h' } });
@@ -102,22 +128,46 @@ export async function renderMembers(container) {
       } catch (e) { showToast(e.message, 'error'); }
     };
 
-    members.forEach(m => {
-      const mID = m.user_id || m.id;
-      list.appendChild(MemberRow({
-        member: { id: mID, name: m.first_name || 'User', avatar: (m.first_name?.[0] || '?').toUpperCase(), warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
-        selectable: true,
-        onSelect: (m) => state.toggleMemberSelection(m.id),
-        actions: [
-          { icon: '⚠️', label: 'Warn', onClick: () => _hMAction(mID, 'warn', chatId), variant: 'warning' },
-          { icon: '🔇', label: 'Mute', onClick: () => _hMAction(mID, 'mute', chatId), variant: 'warning' },
-          { icon: '👢', label: 'Kick', onClick: () => _hMAction(mID, 'kick', chatId), variant: 'danger' },
-          { icon: '🚫', label: 'Ban',  onClick: () => _hMAction(mID, 'ban',  chatId), variant: 'danger' }
-        ]
-      }));
-    });
+    const renderMemberRows = (memberList, targetList, append = false) => {
+      if (!append) targetList.innerHTML = '';
+      memberList.forEach(m => {
+        const mID = m.user_id ?? m.id ?? null;
+        targetList.appendChild(MemberRow({
+          member: { id: mID, name: m.first_name || 'User', avatar: (m.first_name?.[0] || '?').toUpperCase(), warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+          selectable: true,
+          onSelect: (m) => state.toggleMemberSelection(m.id),
+          actions: [
+            { icon: '\u26A0\uFE0F', label: 'Warn', onClick: () => _hMAction(mID, 'warn', chatId, m), variant: 'warning' },
+            { icon: '\uD83D\uDD07', label: 'Mute', onClick: () => _hMAction(mID, 'mute', chatId, m), variant: 'warning' },
+            { icon: '\uD83D\uDC62', label: 'Kick', onClick: () => _hMAction(mID, 'kick', chatId, m), variant: 'danger' },
+            { icon: '\uD83D\uDEAB', label: 'Ban',  onClick: () => _hMAction(mID, 'ban',  chatId, m), variant: 'danger' }
+          ]
+        }));
+      });
+    };
 
+    renderMemberRows(members, list);
     container.appendChild(list);
+
+    // Pagination: Load More button
+    if (members.length === PAGE_SIZE) {
+      const loadMoreWrap = document.createElement('div');
+      loadMoreWrap.style.cssText = 'text-align: center; padding: var(--sp-4);';
+      const loadMore = document.createElement('button');
+      loadMore.textContent = 'Load More Members';
+      loadMore.className = 'btn btn-secondary';
+      loadMore.style.cssText = 'padding: var(--sp-2) var(--sp-6); border-radius: var(--r-lg); cursor: pointer;';
+      loadMore.onclick = async () => {
+        _membersPage++;
+        try {
+          const more = await apiFetch(`/api/groups/${chatId}/members?limit=${PAGE_SIZE}&offset=${_membersPage * PAGE_SIZE}`);
+          renderMemberRows(more, list, true);
+          if (more.length < PAGE_SIZE) loadMoreWrap.remove();
+        } catch (e) { showToast(e.message, 'error'); }
+      };
+      loadMoreWrap.appendChild(loadMore);
+      container.appendChild(loadMoreWrap);
+    }
   } catch (e) {
     container.innerHTML = '';
     container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load members', description: e.message || 'Please try again' }));

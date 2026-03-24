@@ -54,8 +54,11 @@ export async function apiFetch(path, options = {}) {
     ...(options.headers || {}),
   };
 
-  // Use absolute URL to bypass <base href> resolution
-  const absoluteUrl = window.location.origin + path;
+  // Use NEXUS_API_BASE if configured, otherwise fall back to origin
+  const base = (typeof window.NEXUS_API_BASE !== 'undefined' && window.NEXUS_API_BASE !== '')
+    ? window.NEXUS_API_BASE
+    : window.location.origin;
+  const absoluteUrl = base + path;
 
   const res = await fetch(absoluteUrl, {
     ...options,

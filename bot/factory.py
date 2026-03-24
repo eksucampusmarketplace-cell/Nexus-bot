@@ -67,7 +67,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     )
     from bot.handlers.admin_tools import admin_tool_handlers
     from bot.handlers.advanced_automod import handle_automod_command
-    from bot.handlers.approval import (
+    from bot.handlers.join_approval import (
         cmd_antiraid,
         cmd_approve,
         cmd_approved,
@@ -129,9 +129,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         welcome_handler,
         welcome_preview_handler,
     )
-    from bot.handlers.group_approval import group_approval_handler
+    from bot.handlers.clone_approval import group_approval_handler
     from bot.handlers.group_lifecycle import group_lifecycle_handler
-    from bot.handlers.help import help_callback_handler
     from bot.handlers.new_member import handle_chat_member_update
     from bot.handlers.prefix_handler import prefix_handler
     from bot.handlers.privacy import privacy_handler
@@ -139,7 +138,12 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.setmessage import setmessage_conversation
 
     # Import new start_help and setmessage handlers (for all bots)
-    from bot.handlers.start_help import help_handler, start_callback_handler, start_handler
+    from bot.handlers.start_help import (
+        help_callback_handler,
+        help_handler,
+        start_callback_handler,
+        start_handler,
+    )
     from bot.utils.aliases import register_aliases
     from config import settings
 
@@ -386,10 +390,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(MessageHandler(GROUP & ~filters.COMMAND, message_handler), group=4)
 
     # ── New member joins/leaves ──────────────────────────────────────────
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_handler))
+    # Welcome is handled by handle_chat_member_update (which delegates to greetings.welcome_handler).
+    # Do NOT register welcome_handler directly here — it would cause double welcome messages.
     app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
 
-    # Advanced member join/leave handler
+    # Advanced member join/leave handler (handles welcome, captcha, anti-raid, etc.)
     app.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
 
     # ── Global error handler with alert ─────────────────────────────────────

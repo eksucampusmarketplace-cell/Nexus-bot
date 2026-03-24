@@ -28,8 +28,8 @@ Log prefix: [XP]
 
 import asyncio
 import logging
-from typing import Optional
 from datetime import datetime, timezone
+from typing import Optional
 
 log = logging.getLogger("xp")
 
@@ -126,7 +126,9 @@ class XPEngine:
         """
         try:
             # Check rate limiting for messages
-            if reason == "message" and await self.is_rate_limited(redis, chat_id, user_id):
+            if reason == "message" and await self.is_rate_limited(
+                redis, chat_id, user_id
+            ):
                 return {"ok": False, "error": "rate_limited"}
 
             # Check for double XP
@@ -207,7 +209,9 @@ class XPEngine:
                     pool, redis, bot, chat_id, user_id, bot_id, new_level, current_level
                 )
 
-            self.log.info(f"[XP] Awarded {amount} XP to user {user_id} in chat {chat_id}")
+            self.log.info(
+                f"[XP] Awarded {amount} XP to user {user_id} in chat {chat_id}"
+            )
 
             return {
                 "ok": True,
@@ -266,7 +270,29 @@ class XPEngine:
                     f'"new_level":{new_level},"previous_level":{previous_level}}}',
                 )
 
-            self.log.info(f"[XP] User {user_id} leveled up to {new_level} in chat {chat_id}")
+            self.log.info(
+                f"[XP] User {user_id} leveled up to {new_level} in chat {chat_id}"
+            )
+
+            # Check auto-role assignments on level up
+            try:
+                from bot.handlers.auto_role import check_auto_roles
+
+                # Get current XP for the user
+                async with pool.acquire() as ar_conn:
+                    xp_row = await ar_conn.fetchrow(
+                        "SELECT xp FROM member_xp WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3",
+                        chat_id,
+                        user_id,
+                        bot_id,
+                    )
+                    current_xp = xp_row["xp"] if xp_row else 0
+
+                await check_auto_roles(
+                    bot, pool, chat_id, user_id, bot_id, current_xp, new_level
+                )
+            except Exception as ar_err:
+                self.log.debug(f"[XP] Auto-role check skipped: {ar_err}")
 
         except Exception as e:
             self.log.error(f"[XP] Error handling level up: {e}")
@@ -380,7 +406,9 @@ class XPEngine:
             self.log.error(f"[XP] Error getting leaderboard: {e}")
             return []
 
-    async def get_member_rank(self, pool, chat_id: int, user_id: int, bot_id: int) -> dict:
+    async def get_member_rank(
+        self, pool, chat_id: int, user_id: int, bot_id: int
+    ) -> dict:
         """
         Get a specific member's rank position.
         Returns {rank, total_members, xp, level, xp_to_next, progress_pct}
@@ -430,7 +458,8 @@ class XPEngine:
                 progress_pct = 0
                 if next_level_xp > prev_level_xp:
                     progress_pct = int(
-                        ((row["xp"] - prev_level_xp) / (next_level_xp - prev_level_xp)) * 100
+                        ((row["xp"] - prev_level_xp) / (next_level_xp - prev_level_xp))
+                        * 100
                     )
 
                 return {
@@ -464,10 +493,14 @@ class XPEngine:
         await redis.setex(key, 60, "1")
         return False
 
-    async def start_double_xp(self, pool, chat_id: int, bot_id: int, hours: int) -> bool:
+    async def start_double_xp(
+        self, pool, chat_id: int, bot_id: int, hours: int
+    ) -> bool:
         """Enable double XP event for a group for N hours."""
         try:
-            until = datetime.now(timezone.utc) + __import__("datetime").timedelta(hours=hours)
+            until = datetime.now(timezone.utc) + __import__("datetime").timedelta(
+                hours=hours
+            )
             async with pool.acquire() as conn:
                 await conn.execute(
                     """
@@ -502,7 +535,9 @@ class XPEngine:
                     return False
 
                 # Check if expired
-                if row["double_xp_until"] and row["double_xp_until"] < datetime.now(timezone.utc):
+                if row["double_xp_until"] and row["double_xp_until"] < datetime.now(
+                    timezone.utc
+                ):
                     # Reset expired double XP
                     await conn.execute(
                         """

@@ -7,6 +7,8 @@ export async function renderBroadcastPage(container) {
     const state = useStore.getState();
     const botInfo = state.userContext?.bot_info;
     const isOwner = state.userContext?.role === 'owner';
+    const isSudo = state.is_sudo || state.userContext?.is_sudo;
+    const chatId = state.activeChatId;
 
     container.innerHTML = `
         <div style="padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-4);">
@@ -31,6 +33,33 @@ export async function renderBroadcastPage(container) {
 
     renderBroadcastForm(document.getElementById('broadcast-form-container'), botInfo, isOwner);
     renderBroadcastHistory(document.getElementById('broadcast-history-container'), botInfo.id);
+
+    // Disable group-specific broadcast section if no group selected
+    if (!chatId) {
+        const targetSelect = document.getElementById('broadcast-target');
+        if (targetSelect) {
+            const groupsOpt = targetSelect.querySelector('option[value="groups"]');
+            const allOpt = targetSelect.querySelector('option[value="all"]');
+            if (groupsOpt) groupsOpt.disabled = true;
+            if (allOpt) allOpt.disabled = true;
+        }
+        const formContainer = document.getElementById('broadcast-form-container');
+        if (formContainer) {
+            const hint = document.createElement('p');
+            hint.textContent = 'Select a group to enable group broadcast';
+            hint.style.cssText = 'color:var(--text-muted);font-size:12px;margin-top:4px;';
+            formContainer.prepend(hint);
+        }
+    }
+
+    // Hide global broadcast (include clones) for non-sudo users
+    if (!isSudo) {
+        const includeClones = document.getElementById('broadcast-include-clones');
+        if (includeClones) {
+            const wrapper = includeClones.closest('div[style*="accent"]');
+            if (wrapper) wrapper.remove();
+        }
+    }
 }
 
 function renderBroadcastForm(container, botInfo, isOwner) {

@@ -13,6 +13,21 @@ export async function renderSessionPage(container) {
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: 480px; margin: 0 auto;';
 
+  // Check if MTProto credentials are configured before showing the form
+  try {
+    const status = await apiFetch('/api/session/status');
+    if (!status?.configured) {
+      container.appendChild(EmptyState({
+        icon: '⚙️',
+        title: t('session_not_configured', 'Session converter not configured'),
+        description: t('session_not_configured_desc', 'TG_API_ID and TG_API_HASH must be set in environment variables.')
+      }));
+      return;
+    }
+  } catch (_) {
+    // Status check failed — show form anyway, let conversion attempt surface error
+  }
+
   const consent = document.createElement('div');
   consent.innerHTML = `
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-5);">

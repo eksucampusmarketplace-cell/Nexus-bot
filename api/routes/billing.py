@@ -5,34 +5,42 @@ Stars economy and billing API routes.
 """
 
 import logging
-from fastapi import APIRouter, Request, HTTPException
+
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from config import settings
+from bot.billing.billing_helpers import (
+    can_owner_add_clone_bot,
+    check_owner_total_properties,
+    get_owner_plan,
+)
+from bot.billing.plans import get_all_plans, get_plan, get_plans_for_display
 from bot.billing.stars_economy import (
+    REFERRAL_BONUS_STARS,
     get_bonus_balance,
+    get_referral_link,
+    get_referral_stats,
     grant_bonus_stars,
     redeem_promo_code,
     spend_bonus_stars,
-    get_referral_link,
-    get_referral_stats,
-    REFERRAL_BONUS_STARS,
 )
-from bot.billing.plans import get_all_plans, get_plans_for_display, get_plan
 from bot.billing.subscriptions import (
-    create_subscription,
     cancel_subscription,
-    get_trial_days_remaining,
+    create_subscription,
     get_active_trials,
+    get_trial_days_remaining,
 )
-from bot.billing.billing_helpers import (
-    get_owner_plan,
-    can_owner_add_clone_bot,
-    check_owner_total_properties,
-)
+from config import settings
 
 log = logging.getLogger("billing_api")
 router = APIRouter()
+
+# Authoritative plan prices (Stars) — never trust client-sent amounts
+PLAN_PRICES = {
+    "starter": 500,
+    "pro": 1500,
+    "unlimited": 3000,
+}
 
 
 class RedeemPromoRequest(BaseModel):
@@ -103,7 +111,9 @@ async def grant_bonus_endpoint(request: Request, req: GrantBonusRequest):
     if caller_id != settings.OWNER_ID:
         raise HTTPException(status_code=403, detail="Owner only")
     db_pool = request.app.state.db
-    new_balance = await grant_bonus_stars(db_pool, req.user_id, req.amount, req.reason, granted_by=caller_id)
+    new_balance = await grant_bonus_stars(
+        db_pool, req.user_id, req.amount, req.reason, granted_by=caller_id
+    )
     return {"ok": True, "user_id": req.user_id, "amount": req.amount, "new_balance": new_balance}
 
 
@@ -126,9 +136,17 @@ async def create_promo_endpoint(request: Request, req: CreatePromoRequest):
                          max_uses = EXCLUDED.max_uses,
                          is_active = TRUE
                    RETURNING id, code""",
-                code, req.amount, req.max_uses,
+                code,
+                req.amount,
+                req.max_uses,
             )
-        return {"ok": True, "id": row["id"], "code": row["code"], "amount": req.amount, "max_uses": req.max_uses}
+        return {
+            "ok": True,
+            "id": row["id"],
+            "code": row["code"],
+            "amount": req.amount,
+            "max_uses": req.max_uses,
+        }
     except Exception as e:
         log.error(f"[Billing API] create_promo error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -162,6 +180,7 @@ async def get_owner_info_endpoint(request: Request):
 
     # Count current bots
     from db.ops.bots import get_bots_by_owner
+
     bots = await get_bots_by_owner(db_pool, owner_id)
     clone_count = sum(1 for b in bots if not b.get("is_primary", False))
 
@@ -179,7 +198,7 @@ async def get_owner_info_endpoint(request: Request):
         "total_properties_used": prop_count,
         "properties_within_limit": within_limit,
         "property_error": prop_error if not within_limit else None,
-        "active_trials": trials
+        "active_trials": trials,
     }
 
 
@@ -212,15 +231,23 @@ async def subscribe_endpoint(request: Request, req: SubscribeRequest):
     if current_plan == req.plan:
         raise HTTPException(status_code=400, detail="You already have this plan")
 
+    # Validate price against server-side authoritative prices
+    expected_price = PLAN_PRICES.get(req.plan)
+    if expected_price is not None and plan.get("price_stars") != expected_price:
+        log.warning(
+            f"[BILLING] Price mismatch detected | user={owner_id} "
+            f"| plan={req.plan} | expected={expected_price} | actual={plan.get('price_stars')}"
+        )
+
     # In a real implementation, you would generate a Telegram Stars payment link here
     # For now, return the plan info
     return {
         "ok": True,
         "plan": req.plan,
         "plan_name": plan["name"],
-        "price_stars": plan["price_stars"],
+        "price_stars": expected_price or plan["price_stars"],
         "price_display": plan["price_display"],
-        "message": "Payment integration coming soon"
+        "message": "Payment integration coming soon",
     }
 
 
@@ -255,10 +282,7 @@ async def get_trial_days_endpoint(request: Request, bot_id: int):
 
     # Verify ownership
     async with db_pool.acquire() as conn:
-        row = await conn.fetchrow(
-            "SELECT owner_user_id FROM bots WHERE bot_id = $1",
-            bot_id
-        )
+        row = await conn.fetchrow("SELECT owner_user_id FROM bots WHERE bot_id = $1", bot_id)
 
     if not row or row["owner_user_id"] != owner_id:
         raise HTTPException(status_code=403, detail="Not your bot")

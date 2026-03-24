@@ -54,10 +54,14 @@ async def verify_admin(chat_id: int, user: dict):
             logger.warning(f'[verify_admin] bot {bot_id} failed chat={chat_id} user={user_id}: {e}')
             continue
 
-    # At the end, also add DB fallback:
+    # DB fallback: check if user owns the bot associated with this group
     async with db.pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT owner_id FROM groups WHERE chat_id=$1", chat_id)
-        if row and row["owner_id"] == user_id:
+        row = await conn.fetchrow(
+            "SELECT owner_user_id FROM bots WHERE token_hash = "
+            "(SELECT bot_token_hash FROM groups WHERE chat_id=$1)",
+            chat_id,
+        )
+        if row and row["owner_user_id"] == user_id:
             logger.info(f'[verify_admin] Allowing owner {user_id} via DB fallback')
             return  # owner always passes
 

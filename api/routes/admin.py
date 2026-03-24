@@ -23,9 +23,9 @@ class NotificationPreference(BaseModel):
 
 
 @router.get("/api/admin/memory")
-async def memory_stats(request: Request):
+async def memory_stats(request: Request, user: dict = Depends(get_current_user)):
     """Superadmin only — process memory stats."""
-    if request.state.user_id != settings.OWNER_ID:
+    if user.get("id") != settings.OWNER_ID:
         raise HTTPException(status_code=403)
     lazy = request.app.state.lazy_manager
     return lazy.get_memory_usage() if lazy else {}

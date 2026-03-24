@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from api.auth import get_current_user
-from db.client import db
 import json
 import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from api.auth import get_current_user
+from db.client import db
 
 logger = logging.getLogger(__name__)
 
@@ -265,8 +267,8 @@ async def get_approved(chat_id: int):
 
 
 @router.post("/members/{user_id}/approve")
-async def approve_member(chat_id: int, user_id: int, request: Request):
-    approver = request.state.user_id
+async def approve_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
+    approver = user.get("id")
     async with db.pool.acquire() as conn:
         await conn.execute(
             """INSERT INTO approved_members (chat_id, user_id, approved_by)
@@ -289,7 +291,7 @@ async def unapprove_member(chat_id: int, user_id: int):
 
 
 @router.post("/members/{user_id}/mute")
-async def mute_member(chat_id: int, user_id: int, request: Request):
+async def mute_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Mute a member (restrict from sending messages)."""
     body = await request.json()
     duration = body.get("duration", 3600)  # Default 1 hour
@@ -331,7 +333,7 @@ async def mute_member(chat_id: int, user_id: int, request: Request):
                    VALUES ($1, 'mute', $2, $3, $4, NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user.get("id"),
                 f"Muted for {duration}s via Mini App",
             )
 
@@ -342,7 +344,7 @@ async def mute_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/kick")
-async def kick_member(chat_id: int, user_id: int, request: Request):
+async def kick_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Kick a member from the group."""
     try:
         # Get bot app for this group
@@ -368,7 +370,7 @@ async def kick_member(chat_id: int, user_id: int, request: Request):
                    VALUES ($1, 'kick', $2, $3, 'Kicked via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user.get("id"),
             )
 
         return {"ok": True}
@@ -378,7 +380,7 @@ async def kick_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/ban")
-async def ban_member(chat_id: int, user_id: int, request: Request):
+async def ban_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Ban a member from the group."""
     try:
         # Get bot app for this group
@@ -413,7 +415,7 @@ async def ban_member(chat_id: int, user_id: int, request: Request):
                    VALUES ($1, 'ban', $2, $3, 'Banned via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user.get("id"),
             )
 
         return {"ok": True}
@@ -423,7 +425,7 @@ async def ban_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/unban")
-async def unban_member(chat_id: int, user_id: int, request: Request):
+async def unban_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Unban a member from the group."""
     try:
         # Get bot app for this group
@@ -456,7 +458,7 @@ async def unban_member(chat_id: int, user_id: int, request: Request):
                    VALUES ($1, 'unban', $2, $3, 'Unbanned via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user.get("id"),
             )
 
         return {"ok": True}
@@ -466,7 +468,7 @@ async def unban_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/unmute")
-async def unmute_member(chat_id: int, user_id: int, request: Request):
+async def unmute_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Unmute a member (restore permissions)."""
     try:
         # Get bot app for this group
@@ -514,7 +516,7 @@ async def unmute_member(chat_id: int, user_id: int, request: Request):
                    VALUES ($1, 'unmute', $2, $3, 'Unmuted via Mini App', NOW())""",
                 chat_id,
                 user_id,
-                request.state.user_id,
+                user.get("id"),
             )
 
         return {"ok": True}
@@ -524,7 +526,7 @@ async def unmute_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/{user_id}/warn")
-async def warn_member(chat_id: int, user_id: int, request: Request):
+async def warn_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Add a warning to a member."""
     body = await request.json()
     reason = body.get("reason", "Warned via Mini App")
@@ -544,7 +546,7 @@ async def warn_member(chat_id: int, user_id: int, request: Request):
                     warns = row["warns"]
 
             # Add new warning
-            warns.append({"reason": reason, "timestamp": "now()", "by": request.state.user_id})
+            warns.append({"reason": reason, "timestamp": "now()", "by": user.get("id")})
 
             # Update user record
             await conn.execute(
@@ -565,7 +567,7 @@ async def warn_member(chat_id: int, user_id: int, request: Request):
                 chat_id,
                 user_id,
                 reason,
-                request.state.user_id,
+                user.get("id"),
             )
 
         return {"ok": True, "warn_count": len(warns)}
@@ -575,7 +577,7 @@ async def warn_member(chat_id: int, user_id: int, request: Request):
 
 
 @router.post("/members/bulk")
-async def bulk_action(chat_id: int, request: Request):
+async def bulk_action(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     user_ids = body.get("user_ids", [])
     action = body.get("action")
@@ -613,7 +615,7 @@ async def bulk_action(chat_id: int, request: Request):
                            ON CONFLICT (chat_id, user_id) DO NOTHING""",
                         chat_id,
                         uid,
-                        request.state.user_id,
+                        user.get("id"),
                     )
                 elif action == "unapprove":
                     await conn.execute(
@@ -635,7 +637,7 @@ async def bulk_action(chat_id: int, request: Request):
                         {
                             "reason": "Warned via bulk action",
                             "timestamp": "now()",
-                            "by": request.state.user_id,
+                            "by": user.get("id"),
                         }
                     )
 
@@ -656,7 +658,7 @@ async def bulk_action(chat_id: int, request: Request):
                            VALUES ($1, 'warn', $2, $3, 'Bulk warn action', NOW())""",
                         chat_id,
                         uid,
-                        request.state.user_id,
+                        user.get("id"),
                     )
                 elif bot_app:
                     if action == "ban":
@@ -756,7 +758,7 @@ async def update_antiraid_settings(chat_id: int, request: Request):
 
 
 @router.post("/antiraid/toggle")
-async def toggle_antiraid(chat_id: int, request: Request):
+async def toggle_antiraid(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
     body = await request.json()
     enable = body.get("enable", False)
 
@@ -779,6 +781,6 @@ async def toggle_antiraid(chat_id: int, request: Request):
     from bot.antiraid.engine import manual_toggle_raid
 
     result = await manual_toggle_raid(
-        bot_app.bot, chat_id, enable, settings, db.pool, request.state.user_id
+        bot_app.bot, chat_id, enable, settings, db.pool, user.get("id")
     )
     return {"ok": True, "result": result}

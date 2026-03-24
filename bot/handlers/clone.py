@@ -26,43 +26,45 @@ AUTH NOTE:
   Clone bots are never used for auth. This is enforced in api/auth.py.
 """
 
-import re
 import asyncio
 import logging
-import httpx
+import re
 from datetime import datetime, timezone
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+
+import httpx
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import (
+    CallbackQueryHandler,
+    CommandHandler,
     ContextTypes,
     ConversationHandler,
-    CommandHandler,
-    CallbackQueryHandler,
     MessageHandler,
     filters,
 )
-from telegram.constants import ParseMode
 
-from bot.registry import register as registry_register, deregister as registry_deregister
 from bot.factory import create_application
+from bot.registry import deregister as registry_deregister
+from bot.registry import register as registry_register
 from bot.utils.crypto import (
+    decrypt_token,
     encrypt_token,
     hash_token,
     mask_token,
     validate_token_format,
-    decrypt_token,
 )
+from config import settings
 from db.ops.bots import (
+    count_recent_clone_attempts,
+    delete_bot,
     get_bot_by_id,
     get_bot_by_token_hash,
     get_bots_by_owner,
     insert_bot,
+    log_clone_attempt,
     update_bot_status,
     update_bot_token,
-    delete_bot,
-    count_recent_clone_attempts,
-    log_clone_attempt,
 )
-from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -115,8 +117,9 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
     # Force redirect to PM for clone creation
     if chat.type != "private":
         reply_text = (
-            r"🤖 *Create Your Own Bot*" + "\n\n" +
-            r"To create your own Nexus bot clone, please continue in a private message with me\."
+            r"🤖 *Create Your Own Bot*"
+            + "\n\n"
+            + r"To create your own Nexus bot clone, please continue in a private message with me\."
         )
         keyboard = InlineKeyboardMarkup(
             [
@@ -150,8 +153,9 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         reply_method = update.message.reply_text
 
     await reply_method(
-        r"🔁 *Create Your Own Bot*" + "\n\n" +
-        "Follow these steps to create your branded Nexus bot:\n\n"
+        r"🔁 *Create Your Own Bot*"
+        + "\n\n"
+        + "Follow these steps to create your branded Nexus bot:\n\n"
         "*Step 1:* Open @BotFather\n"
         "*Step 2:* Send /newbot and follow the instructions\n"
         "*Step 3:* Choose a name and username for your bot\n"
@@ -237,7 +241,9 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         return ConversationHandler.END
 
     # ── Layer 4: Live Telegram validation ──────────────────────────────────
-    await processing.edit_text(r"🔍 Verifying with Telegram\.\.\.", parse_mode=ParseMode.MARKDOWN_V2)
+    await processing.edit_text(
+        r"🔍 Verifying with Telegram\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
+    )
     logger.info(f"[CLONE] Calling getMe | masked={mask_token(token)}")
 
     try:
@@ -618,12 +624,10 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
     # ── new (from myclones add button) ────────────────────────────────────
     if action == "new":
         await query.edit_message_text(
-            "Paste your new bot token from @BotFather:",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel_entry")]]
-            ),
+            "🤖 To add a new clone bot, send /clone in this chat.\n\n"
+            "The conversation will guide you through the token setup.",
         )
-        return WAITING_FOR_TOKEN
+        return
 
     # ── remove (show confirm prompt) ──────────────────────────────────────
     if action == "remove":
@@ -682,7 +686,8 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
                 f"[CLONE] Removed | bot_id={target_bot_id} | username=@{bot_record['username']} | by=user_id={user.id}"
             )
             await query.edit_message_text(
-                rf"✅ @{bot_record['username']} has been removed\.", parse_mode=ParseMode.MARKDOWN_V2
+                rf"✅ @{bot_record['username']} has been removed\.",
+                parse_mode=ParseMode.MARKDOWN_V2,
             )
         except Exception as e:
             logger.error(
@@ -703,12 +708,10 @@ async def clone_management_callback(update: Update, context: ContextTypes.DEFAUL
         target_bot_id = int(parts[2])
         context.user_data["reauth_bot_id"] = target_bot_id
         await query.edit_message_text(
-            "Paste the new token for this bot from @BotFather:",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("❌ Cancel", callback_data="clone:cancel_entry")]]
-            ),
+            "🔑 Send /clone to begin re-authentication for this bot.\n\n"
+            "The bot will detect the re-auth context automatically.",
         )
-        return WAITING_FOR_TOKEN
+        return
 
     # ── cancel_entry (cancel from entry point) ────────────────────────────
     if action == "cancel_entry":
@@ -952,6 +955,7 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
 
     # Step 5: Start trial for new clone bot
     from bot.billing.subscriptions import start_trial
+
     try:
         trial_result = await start_trial(db_pool, bot_id)
         if trial_result.get("ok"):
@@ -1019,7 +1023,7 @@ async def _remove_clone(db_pool, bot_id: int, bot_record: dict):
 clone_conversation = ConversationHandler(
     entry_points=[
         CommandHandler("clone", clone_command_handler),
-        CallbackQueryHandler(clone_management_callback, pattern=r"^clone:(new|reauth):"),
+        # Management callbacks (new/reauth) are handled by separate standalone handler
     ],
     states={
         WAITING_FOR_TOKEN: [

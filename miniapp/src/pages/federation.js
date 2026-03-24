@@ -6,12 +6,23 @@
  */
 
 import { t } from '../../lib/i18n.js?v=1.6.0';
-import { showToast } from '../../lib/components.js?v=1.6.0';
+import { showToast, EmptyState } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { useStore } from '../../store/index.js?v=1.6.0';
 
 export async function renderFederationPage(container) {
+  const chatId = useStore?.getState()?.activeChatId;
   container.innerHTML = '';
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+
+  if (!chatId) {
+    container.appendChild(EmptyState({
+      icon: '🔗',
+      title: 'Select a group',
+      description: 'Choose a group from the dropdown above to manage federation settings.'
+    }));
+    return;
+  }
 
   const header = document.createElement('div');
   header.innerHTML = `

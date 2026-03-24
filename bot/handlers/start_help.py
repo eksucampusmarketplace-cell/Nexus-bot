@@ -15,14 +15,14 @@ Key behaviors:
 import asyncio
 import logging
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
+from telegram.ext import CallbackQueryHandler, CommandHandler, ContextTypes
 
-from config import settings
-from bot.utils.keyboards import support_keyboard, mini_app_keyboard
+from bot.utils.keyboards import mini_app_keyboard, support_keyboard
 from bot.utils.messages import get_message
-from db.ops.groups import get_or_create_group, get_group_miniapp_url
+from config import settings
+from db.ops.groups import get_group_miniapp_url, get_or_create_group
 
 log = logging.getLogger("start_help")
 
@@ -232,10 +232,13 @@ async def handle_start_callback(update: Update, context: ContextTypes.DEFAULT_TY
             )
             return
 
-        # Import and trigger clone flow
-        from bot.handlers.clone import clone_command_handler
-
-        await clone_command_handler(update, context)
+        # Send instruction message — let user trigger /clone properly
+        await query.edit_message_text(
+            "🤖 <b>Create Your Own Bot</b>\n\n"
+            "Send /clone to begin the bot creation wizard.\n\n"
+            "You will need a bot token from @BotFather.",
+            parse_mode=ParseMode.HTML,
+        )
 
     elif query.data == "help_main":
         # Show help message

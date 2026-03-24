@@ -474,6 +474,7 @@ if os.path.exists(miniapp_path):
 
 # Import and include API routers
 try:
+    # Bug #36/#37/#38 fix: Import previously unregistered routers
     from api.routes import (
         admin,
         analytics,
@@ -486,9 +487,15 @@ try:
         billing,
         boost,
         bots,
+    )
+    from api.routes import bots_messages as bots_messages_api
+    from api.routes import (
         broadcast,
         channel_gate,
         channels,
+    )
+    from api.routes import debug as debug_api
+    from api.routes import (
         engagement,
         events,
         events_new,
@@ -505,6 +512,7 @@ try:
         modules,
     )
     from api.routes import notes as notes_api
+    from api.routes import photos as photos_api
     from api.routes import (
         reports,
         roles,
@@ -517,11 +525,6 @@ try:
         webhooks,
     )
     from api.routes.antiraid import global_router as antiraid_global_router
-
-    # Bug #36/#37/#38 fix: Import previously unregistered routers
-    from api.routes import bots_messages as bots_messages_api
-    from api.routes import debug as debug_api
-    from api.routes import photos as photos_api
 
     # Core API routers (need prefix since routes don't include it)
     app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
@@ -579,8 +582,12 @@ try:
     app.include_router(photos_api.router, tags=["photos"])
     # Bug #37 fix: Register bots_messages router (was never included)
     app.include_router(bots_messages_api.router, tags=["bot-messages"])
-    # Bug #38 fix: Register debug router (was never included, only available when DEBUG=True)
-    app.include_router(debug_api.router, tags=["debug"])
+    # Bug #38 fix: Register debug router only when DEBUG=True
+    if settings.DEBUG:
+        app.include_router(debug_api.router, tags=["debug"])
+        logger.info("[STARTUP] Debug routes ENABLED (DEBUG=True)")
+    else:
+        logger.info("[STARTUP] Debug routes disabled (DEBUG=False)")
 
     from api.routes import pins as pins_api
 

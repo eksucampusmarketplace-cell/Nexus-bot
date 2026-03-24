@@ -177,37 +177,43 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
 
     # NEW: Sync any flat lock_* keys to the locks table
     LOCK_KEY_MAP = {
-        'lock_photo': 'photo',     'lock_video': 'video',
-        'lock_sticker': 'sticker', 'lock_gif': 'gif',
-        'lock_voice': 'voice',     'lock_audio': 'audio',
-        'lock_document': 'document', 'lock_link': 'link',
-        'lock_forward': 'forward', 'lock_poll': 'poll',
-        'lock_contact': 'contact',
+        "lock_photo": "photo",
+        "lock_video": "video",
+        "lock_sticker": "sticker",
+        "lock_gif": "gif",
+        "lock_voice": "voice",
+        "lock_audio": "audio",
+        "lock_document": "document",
+        "lock_link": "link",
+        "lock_forward": "forward",
+        "lock_poll": "poll",
+        "lock_contact": "contact",
     }
     lock_updates = {
-        LOCK_KEY_MAP[k]: v
-        for k, v in incoming.items()
-        if k in LOCK_KEY_MAP and isinstance(v, bool)
+        LOCK_KEY_MAP[k]: v for k, v in incoming.items() if k in LOCK_KEY_MAP and isinstance(v, bool)
     }
     if lock_updates:
         try:
-            cols = ', '.join(lock_updates.keys())
-            placeholders = ', '.join([f'${i+2}' for i in range(len(lock_updates))])
-            updates = ', '.join([f'{k}=EXCLUDED.{k}' for k in lock_updates.keys()])
+            cols = ", ".join(lock_updates.keys())
+            placeholders = ", ".join([f"${i+2}" for i in range(len(lock_updates))])
+            updates = ", ".join([f"{k}=EXCLUDED.{k}" for k in lock_updates.keys()])
             async with db.pool.acquire() as conn:
                 await conn.execute(
-                    f'INSERT INTO locks (chat_id, {cols}) VALUES ($1, {placeholders})'
-                    f' ON CONFLICT (chat_id) DO UPDATE SET {updates}',
-                    chat_id, *lock_updates.values()
+                    f"INSERT INTO locks (chat_id, {cols}) VALUES ($1, {placeholders})"
+                    f" ON CONFLICT (chat_id) DO UPDATE SET {updates}",
+                    chat_id,
+                    *lock_updates.values(),
                 )
         except Exception as e:
-            logger.warning(f'Lock sync failed: {e}')
+            logger.warning(f"Lock sync failed: {e}")
 
     return {"status": "ok"}
 
 
 @router.put("/{chat_id}/settings/bulk")
-async def bulk_update_settings(chat_id: int, request: Request, user: dict = Depends(get_current_user)):
+async def bulk_update_settings(
+    chat_id: int, request: Request, user: dict = Depends(get_current_user)
+):
     """Bulk update multiple settings at once (for templates)."""
     body = await request.json()
     settings = body.get("settings", {})
@@ -218,31 +224,35 @@ async def bulk_update_settings(chat_id: int, request: Request, user: dict = Depe
 
     # Sync any flat lock_* keys to the locks table
     LOCK_KEY_MAP = {
-        'lock_photo': 'photo',     'lock_video': 'video',
-        'lock_sticker': 'sticker', 'lock_gif': 'gif',
-        'lock_voice': 'voice',     'lock_audio': 'audio',
-        'lock_document': 'document', 'lock_link': 'link',
-        'lock_forward': 'forward', 'lock_poll': 'poll',
-        'lock_contact': 'contact',
+        "lock_photo": "photo",
+        "lock_video": "video",
+        "lock_sticker": "sticker",
+        "lock_gif": "gif",
+        "lock_voice": "voice",
+        "lock_audio": "audio",
+        "lock_document": "document",
+        "lock_link": "link",
+        "lock_forward": "forward",
+        "lock_poll": "poll",
+        "lock_contact": "contact",
     }
     lock_updates = {
-        LOCK_KEY_MAP[k]: v
-        for k, v in settings.items()
-        if k in LOCK_KEY_MAP and isinstance(v, bool)
+        LOCK_KEY_MAP[k]: v for k, v in settings.items() if k in LOCK_KEY_MAP and isinstance(v, bool)
     }
     if lock_updates:
         try:
-            cols = ', '.join(lock_updates.keys())
-            placeholders = ', '.join([f'${i+2}' for i in range(len(lock_updates))])
-            updates = ', '.join([f'{k}=EXCLUDED.{k}' for k in lock_updates.keys()])
+            cols = ", ".join(lock_updates.keys())
+            placeholders = ", ".join([f"${i+2}" for i in range(len(lock_updates))])
+            updates = ", ".join([f"{k}=EXCLUDED.{k}" for k in lock_updates.keys()])
             async with db.pool.acquire() as conn:
                 await conn.execute(
-                    f'INSERT INTO locks (chat_id, {cols}) VALUES ($1, {placeholders})'
-                    f' ON CONFLICT (chat_id) DO UPDATE SET {updates}',
-                    chat_id, *lock_updates.values()
+                    f"INSERT INTO locks (chat_id, {cols}) VALUES ($1, {placeholders})"
+                    f" ON CONFLICT (chat_id) DO UPDATE SET {updates}",
+                    chat_id,
+                    *lock_updates.values(),
                 )
         except Exception as e:
-            logger.warning(f'Lock sync failed: {e}')
+            logger.warning(f"Lock sync failed: {e}")
 
     # Publish SSE event
     from api.routes.events import EventBus
@@ -255,7 +265,11 @@ async def bulk_update_settings(chat_id: int, request: Request, user: dict = Depe
 @router.get("/{chat_id}/logs")
 async def group_logs(chat_id: int, limit: int = 50, user: dict = Depends(get_current_user)):
     logs = await get_recent_logs(chat_id)
-    return logs[:limit] if isinstance(logs, list) else logs
+    if isinstance(logs, list):
+        return logs[:limit]
+    elif isinstance(logs, dict) and "logs" in logs:
+        return logs["logs"][:limit]
+    return []
 
 
 @router.post("/{chat_id}/copy-settings")

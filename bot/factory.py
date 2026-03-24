@@ -355,10 +355,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(CommandHandler("cloneset", cloneset_handler, filters=PRIVATE))
         # Owner dashboard command
         app.add_handler(owner_dashboard_handler)
-        # Management callbacks outside of conversation (remove, confirm_remove, keep)
+        # Management callbacks outside conversation (remove, confirm_remove, keep, reauth, new)
         app.add_handler(
             CallbackQueryHandler(
-                clone_management_callback, pattern=r"^clone:(remove|confirm_remove|keep)$"
+                clone_management_callback,
+                pattern=r"^clone:(remove|confirm_remove|keep|reauth|new|cancel_entry).*",
             )
         )
         logger.info("[FACTORY] Clone handlers registered (primary bot only)")

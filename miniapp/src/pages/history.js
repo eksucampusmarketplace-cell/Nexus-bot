@@ -30,9 +30,9 @@ export async function renderHistoryPage(container) {
   let currentLimit = 10;
 
   try {
-    const res = await apiFetch(`/api/groups/${chatId}/name-history`);
-    currentEnabled = res.enabled ?? false;
-    currentLimit = res.limit ?? 10;
+    const resp = await apiFetch(`/api/groups/${chatId}/name-history`);
+    currentEnabled = resp?.enabled ?? false;
+    currentLimit = resp?.limit ?? 10;
   } catch (err) {
     console.debug('Failed to load history settings:', err);
   }
@@ -115,8 +115,9 @@ async function loadRecentHistory(chatId) {
   if (!list) return;
 
   try {
-    const history = await apiFetch(`/api/groups/${chatId}/name-history/recent`).catch(() => []);
-    
+    const raw = await apiFetch(`/api/groups/${chatId}/name-history/recent`).catch(() => []);
+    const history = Array.isArray(raw) ? raw : (raw?.entries ?? []);
+
     if (!history || history.length === 0) {
       return;
     }

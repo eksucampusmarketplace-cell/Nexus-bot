@@ -260,9 +260,9 @@ async def get_member_boost_stats(group_id: int, user_id: int) -> dict:
         "enabled": config.get("force_add_enabled", False),
         "required": required,
         "current": current,
-        "is_unlocked": record["is_unlocked"] if record else True,
-        "is_restricted": record["is_restricted"] if record else False,
-        "invite_link": record["invite_link"] if record else None,
+        "is_unlocked": record.get("is_unlocked", True) if record else True,
+        "is_restricted": record.get("is_restricted", False) if record else False,
+        "invite_link": record.get("invite_link") if record else None,
         "progress_style": config.get("force_add_progress_style", "blocks"),
     }
 
@@ -307,10 +307,14 @@ async def get_member_warn_count(group_id: int, user_id: int) -> int:
             "SELECT warns FROM users WHERE user_id = $1 AND chat_id = $2", user_id, group_id
         )
         if row and row["warns"]:
-            import json
-
-            warns = row["warns"] if isinstance(row["warns"], list) else json.loads(row["warns"])
-            return len(warns)
+            raw = row["warns"]
+            if isinstance(raw, list):
+                return len(raw)
+            if isinstance(raw, str):
+                try:
+                    return len(json.loads(raw))
+                except (json.JSONDecodeError, TypeError):
+                    return 0
         return 0
 
 
@@ -363,13 +367,28 @@ async def get_usage(user: dict = Depends(get_current_user)):
     # For now, hardcode to 3 (Free plan) - in production would come from user plan
     bot_limit = 3
 
+    # Query for active subscription to get actual plan_name
+    async with db.pool.acquire() as conn:
+        subscription = await conn.fetchrow(
+            """SELECT tier, status FROM subscriptions
+               WHERE bot_id IN (
+                   SELECT bot_id FROM bots
+                   WHERE owner_user_id=$1 AND is_primary=TRUE
+               )
+               AND status='active'
+               ORDER BY created_at DESC LIMIT 1""",
+            user_id,
+        )
+
+    plan_name = subscription["tier"].title() if subscription else "Free"
+
     return {
         "bots_count": int(bots_count),
         "clone_count": int(clone_count),
         "groups_count": int(groups_count),
         "plan_limit_bots": bot_limit,
         "plan_limit_groups": group_limit,
-        "plan_name": "Free",
+        "plan_name": plan_name,
     }
 
 

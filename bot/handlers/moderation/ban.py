@@ -217,7 +217,9 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
         return
 
-    unban_at = datetime.utcnow() + duration
+    from datetime import timezone
+
+    unban_at = datetime.now(timezone.utc) + duration
 
     try:
         await context.bot.ban_chat_member(chat_id, target.id, until_date=unban_at)

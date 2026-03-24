@@ -705,6 +705,10 @@ async def bulk_action(chat_id: int, req: BulkActionRequest, user: dict = Depends
         try:
             if req.action == "ban":
                 await mod_db.ban_user(chat_id, uid, user.get("id", 0), req.reason or "Bulk action")
+            elif req.action == "mute":
+                await mod_db.mute_user(chat_id, uid, user.get("id", 0), req.reason or "Bulk action")
+            elif req.action == "warn":
+                await mod_db.add_warning(chat_id, uid, user.get("id", 0), req.reason or "Bulk action")
             async with db.pool.acquire() as conn:
                 await conn.execute(
                     "INSERT INTO mod_logs (chat_id, target_id, action, reason, admin_id, admin_name) VALUES ($1,$2,$3,$4,$5,$6)",

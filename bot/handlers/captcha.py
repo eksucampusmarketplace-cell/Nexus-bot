@@ -117,7 +117,9 @@ async def send_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE, membe
     text = f"Welcome {member.first_name}! Please click the button below to verify you're human."
     msg = await context.bot.send_message(chat_id, text, reply_markup=reply_markup)
 
-    expires_at = datetime.now() + timedelta(seconds=120)
+    from datetime import timezone
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=120)
     # Use create_challenge instead of add_captcha_pending
     import uuid
 

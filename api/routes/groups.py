@@ -14,14 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 async def _verify_group_access(chat_id: int, user: dict):
-    """Bug #14/#15 fix: Verify the user has access to this group via their bot."""
+    """Verify the user has access to this group via their bot (direct or clone_bot_groups)."""
     bot_token = user.get("validated_bot_token")
     if not bot_token:
         return  # Primary bot owner, allow access
     token_hash = hash_token(bot_token)
     async with db.pool.acquire() as conn:
+        # Check direct ownership OR clone_bot_groups membership
         row = await conn.fetchrow(
-            "SELECT 1 FROM groups WHERE chat_id = $1 AND bot_token_hash = $2",
+            """
+            SELECT 1 FROM groups g
+            WHERE g.chat_id = $1 AND g.bot_token_hash = $2
+            UNION
+            SELECT 1 FROM groups g
+            JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
+            JOIN bots b ON b.bot_id = cbg.bot_id
+            WHERE g.chat_id = $1 AND b.token_hash = $2
+            LIMIT 1
+            """,
             chat_id,
             token_hash,
         )
@@ -39,7 +49,23 @@ async def list_groups(user: dict = Depends(get_current_user)):
     token_hash = hash_token(bot_token)
 
     async with db.pool.acquire() as conn:
-        rows = await conn.fetch("SELECT * FROM groups WHERE bot_token_hash = $1", token_hash)
+        rows = await conn.fetch(
+            """
+            SELECT g.chat_id, g.title, g.member_count, g.settings,
+                   g.photo_big, g.photo_small, g.bot_token_hash
+            FROM groups g
+            WHERE g.bot_token_hash = $1
+            UNION
+            SELECT g.chat_id, g.title, g.member_count, g.settings,
+                   g.photo_big, g.photo_small, g.bot_token_hash
+            FROM groups g
+            JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
+            JOIN bots b ON b.bot_id = cbg.bot_id
+            WHERE b.token_hash = $1
+            ORDER BY title
+            """,
+            token_hash,
+        )
         res = []
         for row in rows:
             d = dict(row)

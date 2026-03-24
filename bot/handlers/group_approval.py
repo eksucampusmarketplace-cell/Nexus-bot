@@ -17,6 +17,7 @@ from telegram.constants import ParseMode
 from config import settings
 from db.ops.clone_groups import update_access_status, mark_group_left
 from bot.registry import get as registry_get
+from bot.utils.format import get_main_bot_ref
 
 log = logging.getLogger("group_approval")
 
@@ -77,7 +78,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     text=(
                         f"👋 The bot owner has not approved this group. "
                         f"I'll be leaving now.\n\n"
-                        f"Want your own bot? Visit @{settings.MAIN_BOT_USERNAME}\n\n"
+                        f"Want your own bot? Visit {get_main_bot_ref()}\n\n"
                         f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
                     ),
                     parse_mode=ParseMode.HTML,
@@ -105,7 +106,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 text=(
                     f"❌ <b>Request denied.</b>\n\n"
                     f"The bot owner didn't approve your group.\n\n"
-                    f"💡 Create your own free bot at @{settings.MAIN_BOT_USERNAME}\n\n"
+                    f"💡 Create your own free bot at {get_main_bot_ref()}\n\n"
                     f"⚡ Powered by {settings.BOT_DISPLAY_NAME}"
                 ),
                 parse_mode=ParseMode.HTML,

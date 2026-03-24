@@ -44,6 +44,7 @@ from telegram.constants import ParseMode
 from config import settings
 from bot.utils.messages import DEFAULTS, get_message, POWERED_BY_FOOTER
 from bot.utils.keyboards import support_keyboard
+from bot.utils.format import get_main_bot_ref
 from db.ops.groups import require_admin
 
 log = logging.getLogger("setmessage")
@@ -61,7 +62,7 @@ MESSAGE_CATALOG = {
         "variables": {
             "{first_name}": "User's first name",
             "{clone_name}": "This bot's name",
-            "{main_bot}": f"Main support bot (@{settings.MAIN_BOT_USERNAME})",
+            "{main_bot}": f"Main support bot ({get_main_bot_ref()})",
         },
         "required_vars": [],
     },
@@ -70,7 +71,7 @@ MESSAGE_CATALOG = {
         "description": "Shown when any user sends /help.",
         "variables": {
             "{clone_name}": "This bot's name",
-            "{main_bot}": "Main support bot username",
+            "{main_bot}": f"Main support bot ({get_main_bot_ref()})",
             "{bot_name}": f"Brand name ({settings.BOT_DISPLAY_NAME})",
         },
         "required_vars": [],

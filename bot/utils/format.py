@@ -1,6 +1,23 @@
 from telegram import User
 
 
+def get_main_bot_ref() -> str:
+    """Returns a safe reference to the main bot (never empty string).
+
+    Falls back through several options so messages always have
+    a valid reference even when MAIN_BOT_USERNAME is not configured.
+    """
+    from config import settings
+
+    if settings.MAIN_BOT_USERNAME:
+        return f"@{settings.MAIN_BOT_USERNAME}"
+    if settings.SUPPORT_GROUP_URL:
+        return settings.SUPPORT_GROUP_URL
+    if settings.BOT_DISPLAY_NAME:
+        return settings.BOT_DISPLAY_NAME
+    return "the main bot"
+
+
 def format_user(user: User) -> str:
     if user.username:
         return f"@{user.username}"

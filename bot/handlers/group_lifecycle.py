@@ -26,6 +26,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ChatMemberHandler, ContextTypes
 
 from bot.utils.keyboards import support_keyboard
+from bot.utils.format import get_main_bot_ref
 from config import settings
 
 # alert_new_group_add might not exist, I'll check or just skip it if it's not provided
@@ -297,6 +298,20 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 access_status="pending",
             )
 
+            # Immediately sync bot_token_hash for clone bot groups
+            token_hash = hash_token(context.bot.token)
+            if not is_primary_bot:
+                await db.execute(
+                    """UPDATE groups SET bot_token_hash = $1
+                       WHERE chat_id = $2
+                       AND (bot_token_hash IS NULL OR bot_token_hash != $1)""",
+                    token_hash,
+                    chat.id,
+                )
+                log.info(
+                    f"[LIFECYCLE] Set bot_token_hash for clone | chat_id={chat.id}"
+                )
+
             # Update chat_type in groups table
             await db.execute(
                 "UPDATE groups SET chat_type = $1 WHERE chat_id = $2",
@@ -320,20 +335,20 @@ async def _leave_with_message(context, chat, reason: str, actor_id: int, is_owne
     reason: "limit_reached" | "blocked"
     """
     bot_name = settings.BOT_DISPLAY_NAME
-    main_bot = settings.MAIN_BOT_USERNAME
+    main_bot = get_main_bot_ref()
 
     if reason == "limit_reached":
         text = (
             f"👋 Hi! I'm at my group limit and can't stay here.\n\n"
             f"To use a bot like me in this group, create your own at "
-            f"@{main_bot}.\n\n"
+            f"{main_bot}.\n\n"
             f"⚡ Powered by {bot_name}"
         )
     else:  # blocked
         text = (
             f"👋 Hi! This bot is currently set to private and isn't "
             f"accepting new groups.\n\n"
-            f"Want your own bot? Create one free at @{main_bot}.\n\n"
+            f"Want your own bot? Create one free at {main_bot}.\n\n"
             f"⚡ Powered by {bot_name}"
         )
 
@@ -355,12 +370,12 @@ async def _leave_with_limit_message(context, chat, error_msg: str):
     Used when a clone bot exceeds its plan's property limit.
     """
     bot_name = settings.BOT_DISPLAY_NAME
-    main_bot = settings.MAIN_BOT_USERNAME
+    main_bot = get_main_bot_ref()
 
     text = (
         f"👋 Hi! {error_msg}\n\n"
         f"To increase your limit, upgrade your plan in the Mini App or "
-        f"create your own bot at @{main_bot}.\n\n"
+        f"create your own bot at {main_bot}.\n\n"
         f"⚡ Powered by {bot_name}"
     )
 
@@ -410,7 +425,7 @@ async def _send_stranger_onboard_dm(context, actor, chat, policy: str):
     policy="open"     → bot is active, redirect them to create their own clone
     policy="approval" → bot is pending, tell them owner must approve
     """
-    main_bot = settings.MAIN_BOT_USERNAME
+    main_bot = get_main_bot_ref()
     bot_name = settings.BOT_DISPLAY_NAME
 
     if policy == "open":
@@ -420,7 +435,7 @@ async def _send_stranger_onboard_dm(context, actor, chat, policy: str):
             f"⚠️ <b>Note:</b> You're using someone else's bot. "
             f"You won't have full control over it.\n\n"
             f"💡 <b>Want your own bot with full control?</b>\n"
-            f"Create your own free clone at @{main_bot} — "
+            f"Create your own free clone at {main_bot} — "
             f"it takes less than a minute.\n\n"
             f"⚡ Powered by {bot_name}"
         )
@@ -431,7 +446,7 @@ async def _send_stranger_onboard_dm(context, actor, chat, policy: str):
             f"needs to approve new groups first.\n\n"
             f"⏳ <b>Your request is pending.</b> The owner will be notified.\n\n"
             f"💡 <b>Don't want to wait?</b>\n"
-            f"Create your own free clone at @{main_bot} — "
+            f"Create your own free clone at {main_bot} — "
             f"full control, instant setup.\n\n"
             f"⚡ Powered by {bot_name}"
         )

@@ -526,11 +526,11 @@ function _substitutePreviewVars(text) {
     .replace(/\{duration\}/g, '1 hour')
     .replace(/\{timeout\}/g, '60')
     .replace(/\{channel_name\}/g, 'Our Channel')
-    .replace(/\{channel_link\}/g, 'https://t.me/ourchannel')
+    .replace(/\{channel_link\}/g, '[channel link]')
     .replace(/\{required\}/g, '5')
     .replace(/\{current\}/g, '3')
     .replace(/\{remaining\}/g, '2')
-    .replace(/\{link\}/g, 'https://t.me/+invitelink')
+    .replace(/\{link\}/g, '[invite link]')
     .replace(/\{bar\}/g, '██████░░░░ 60%')
     .replace(/\n/g, '<br>');
 }

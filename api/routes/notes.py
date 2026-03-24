@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.auth import get_current_user
+from api.routes.groups import _verify_group_access
 from db.client import db
 import db.ops.notes as notes_db
 
@@ -28,6 +29,7 @@ class NoteRequest(BaseModel):
 
 @router.get("")
 async def list_notes(chat_id: int, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     try:
         notes = await notes_db.get_notes(db.pool, chat_id)
         return {"ok": True, "data": notes}
@@ -38,6 +40,7 @@ async def list_notes(chat_id: int, user: dict = Depends(get_current_user)):
 
 @router.get("/{name}")
 async def get_note(chat_id: int, name: str, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     try:
         note = await notes_db.get_note(db.pool, chat_id, name)
         if not note:
@@ -52,6 +55,7 @@ async def get_note(chat_id: int, name: str, user: dict = Depends(get_current_use
 
 @router.post("")
 async def create_note(chat_id: int, req: NoteRequest, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     if not req.name or not req.name.strip():
         raise HTTPException(status_code=400, detail="name is required")
     try:
@@ -73,6 +77,7 @@ async def create_note(chat_id: int, req: NoteRequest, user: dict = Depends(get_c
 
 @router.delete("/{name}")
 async def delete_note(chat_id: int, name: str, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     try:
         deleted = await notes_db.delete_note(db.pool, chat_id, name)
         if not deleted:

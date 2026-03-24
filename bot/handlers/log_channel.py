@@ -18,11 +18,13 @@ Logs prefix: [LOG_CHANNEL_CMD]
 """
 
 import logging
-from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler
-from telegram.error import TelegramError
 
-from db.ops.log_channel import get_log_channel, get_log_categories
+from telegram import Update
+from telegram.error import TelegramError
+from telegram.ext import CommandHandler, ContextTypes
+
+from bot.utils.permissions import is_admin
+from db.ops.log_channel import get_log_categories, get_log_channel
 
 log = logging.getLogger("log_channel_cmd")
 
@@ -35,6 +37,10 @@ async def cmd_setlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     db = context.bot_data.get("db")
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can set the log channel.")
+        return
 
     channel_id = None
 
@@ -91,6 +97,10 @@ async def cmd_unsetlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     db = context.bot_data.get("db")
 
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can unset the log channel.")
+        return
+
     from db.ops.automod import update_group_setting
 
     await update_group_setting(db, chat.id, "log_channel_id", None)
@@ -103,6 +113,10 @@ async def cmd_logchannel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     db = context.bot_data.get("db")
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can view log channel settings.")
+        return
 
     channel_id = await get_log_channel(db, chat.id)
     if not channel_id:

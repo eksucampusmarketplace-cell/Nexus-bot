@@ -15,12 +15,14 @@ Logs prefix: [PINS]
 """
 
 import logging
-from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler
-from telegram.error import TelegramError
 
-from db.ops.pins import record_pin, get_current_pin, get_last_pin, mark_unpinned
+from telegram import Update
+from telegram.error import TelegramError
+from telegram.ext import CommandHandler, ContextTypes
+
 from bot.logging.log_channel import log_event
+from bot.utils.permissions import is_admin
+from db.ops.pins import get_current_pin, get_last_pin, mark_unpinned, record_pin
 
 log = logging.getLogger("pins")
 
@@ -34,6 +36,11 @@ async def cmd_pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     db = context.bot_data.get("db")
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can pin messages.")
+        return
+
     args = context.args or []
     silent = "silent" in args
 
@@ -69,6 +76,10 @@ async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     db = context.bot_data.get("db")
 
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can unpin messages.")
+        return
+
     try:
         await context.bot.unpin_chat_message(chat_id=chat.id)
         await mark_unpinned(db, chat.id)
@@ -93,6 +104,10 @@ async def cmd_unpinall(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     db = context.bot_data.get("db")
 
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can unpin messages.")
+        return
+
     try:
         await context.bot.unpin_all_chat_messages(chat_id=chat.id)
         await db.execute("UPDATE pinned_messages SET is_current=FALSE WHERE chat_id=$1", chat.id)
@@ -107,6 +122,10 @@ async def cmd_repin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     db = context.bot_data.get("db")
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can re-pin messages.")
+        return
 
     last = await get_last_pin(db, chat.id)
     if not last:
@@ -134,6 +153,10 @@ async def cmd_editpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     db = context.bot_data.get("db")
 
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can edit pinned messages.")
+        return
+
     if not context.args:
         await msg.reply_text("Usage: /editpin <new message text>")
         return
@@ -159,6 +182,10 @@ async def cmd_delpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.effective_message
     chat = update.effective_chat
     db = context.bot_data.get("db")
+
+    if not await is_admin(update, context):
+        await msg.reply_text("❌ Only admins can delete pinned messages.")
+        return
 
     current = await get_current_pin(db, chat.id)
     if not current:

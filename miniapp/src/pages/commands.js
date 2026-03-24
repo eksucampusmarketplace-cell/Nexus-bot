@@ -58,8 +58,6 @@ const COMMAND_CATEGORIES = [
       { cmd: '!antiraid', args: '', desc: 'Toggle anti-raid mode' },
       { cmd: '/slowmode', args: '<seconds>', desc: 'Set slow mode delay (0-300s)' },
       { cmd: '/setflood', args: '<number>', desc: 'Set flood message limit' },
-      { cmd: '/setpassword', args: '<password>', desc: 'Set group password for new members' },
-      { cmd: '/clearpassword', args: '', desc: 'Remove group password' },
       { cmd: '/filter', args: '<keyword> <response>', desc: 'Add keyword auto-reply' },
       { cmd: '/filters', args: '', desc: 'List all keyword filters' },
       { cmd: '/stop', args: '<keyword>', desc: 'Remove a keyword filter' },
@@ -115,6 +113,7 @@ const COMMAND_CATEGORIES = [
       { cmd: '/checkin', args: '', desc: 'Daily check-in for XP' },
       { cmd: '/badges', args: '[@user]', desc: 'Show earned badges' },
       { cmd: '/givexp', args: '@user <amount>', desc: 'Admin: give XP' },
+      { cmd: '/removexp', args: '@user <amount>', desc: 'Admin: remove XP' },
       { cmd: '/doublexp', args: '<hours>', desc: 'Admin: start double XP event' },
       { cmd: '/network', args: '', desc: 'Show network status' },
       { cmd: '/joinnetwork', args: '<code>', desc: 'Join a network' },
@@ -150,13 +149,16 @@ const COMMAND_CATEGORIES = [
     icon: '⚡',
     commands: [
       { cmd: '/announce', args: '<message>', desc: 'Send announcement to group' },
-      { cmd: '/pinmessage', args: '<text>', desc: 'Create and pin custom message' },
-      { cmd: '/admininfo', args: '', desc: 'Show detailed group information' },
-      { cmd: '/exportsettings', args: '', desc: 'Export settings as JSON' },
-      { cmd: '/importsettings', args: '<json>', desc: 'Import settings from JSON' },
-      { cmd: '/backup', args: '', desc: 'Create group backup' },
-      { cmd: '/cleardata', args: '', desc: 'Clear bot data for group' },
-      { cmd: '/admintimeout', args: '<user> <mins>', desc: 'Timeout a user temporarily' },
+      { cmd: '/export', args: '', desc: 'Export group settings as JSON file' },
+      { cmd: '/import', args: '', desc: 'Import settings from JSON (reply to file)' },
+      { cmd: '/reset', args: '', desc: 'Reset all group settings to defaults' },
+      { cmd: '/copysettings', args: '<chat_id>', desc: 'Copy settings from another group' },
+      { cmd: '/setlog', args: '<channel_id>', desc: 'Set log channel for moderation events' },
+      { cmd: '/unsetlog', args: '', desc: 'Remove log channel' },
+      { cmd: '/logchannel', args: '', desc: 'Show current log channel info' },
+      { cmd: '/personality', args: '[tone]', desc: 'Set bot personality tone' },
+      { cmd: '/autodelete', args: '<seconds>', desc: 'Auto-delete bot messages after delay' },
+      { cmd: '/autorole', args: '', desc: 'Configure auto-role for new members' },
     ]
   },
   {
@@ -171,8 +173,6 @@ const COMMAND_CATEGORIES = [
       { cmd: '/repin', args: '', desc: 'Re-pin the last pinned message' },
       { cmd: '/editpin', args: '<text>', desc: 'Edit the pinned message text' },
       { cmd: '/delpin', args: '', desc: 'Delete the pinned message' },
-      { cmd: '/pinmsg', args: '[silent]', desc: 'Alias for /pin' },
-      { cmd: '/unpinmsg', args: '', desc: 'Alias for /unpin' },
     ]
   },
   {
@@ -228,6 +228,60 @@ const COMMAND_CATEGORIES = [
       { cmd: '/admins', args: '', desc: 'List group admins (alias for /adminlist)' },
       { cmd: '/stats', args: '', desc: 'Show group statistics' },
       { cmd: '/privacy', args: '', desc: 'View privacy policy in mini app' },
+    ]
+  },
+  {
+    id: 'scheduling',
+    title: '⏰ Scheduling',
+    description: 'Schedule messages and events',
+    icon: '⏰',
+    commands: [
+      { cmd: '/schedule', args: '<time> <message>', desc: 'Schedule a message for later' },
+    ]
+  },
+  {
+    id: 'verification',
+    title: '🔐 Verification',
+    description: 'Member verification and passwords',
+    icon: '🔐',
+    commands: [
+      { cmd: '/setpassword', args: '<password>', desc: 'Set group password for new members' },
+      { cmd: '/clearpassword', args: '', desc: 'Remove group password' },
+    ]
+  },
+  {
+    id: 'community',
+    title: '🗳️ Community',
+    description: 'Voting and community features',
+    icon: '🗳️',
+    commands: [
+      { cmd: '/vote', args: '<question>', desc: 'Start a community vote' },
+      { cmd: '/votekick', args: '', desc: 'Start a vote to kick a user (reply)' },
+      { cmd: '/votesettings', args: '', desc: 'Configure community vote settings' },
+      { cmd: '/votestats', args: '', desc: 'Show voting statistics' },
+    ]
+  },
+  {
+    id: 'history',
+    title: '📜 Name History',
+    description: 'Track member name changes',
+    icon: '📜',
+    commands: [
+      { cmd: '/history', args: '[@user]', desc: 'Show name change history' },
+      { cmd: '/historyoptout', args: '', desc: 'Opt out of name tracking' },
+      { cmd: '/historyoptin', args: '', desc: 'Opt back in to name tracking' },
+      { cmd: '/historydelete', args: '', desc: 'Delete your name history' },
+    ]
+  },
+  {
+    id: 'language',
+    title: '🌐 Language',
+    description: 'Language settings',
+    icon: '🌐',
+    commands: [
+      { cmd: '/lang', args: '<code>', desc: 'Set your personal language' },
+      { cmd: '/grouplang', args: '<code>', desc: 'Set group language (admin)' },
+      { cmd: '/languages', args: '', desc: 'Show available languages' },
     ]
   }
 ];

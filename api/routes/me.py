@@ -368,19 +368,20 @@ async def get_usage(user: dict = Depends(get_current_user)):
     bot_limit = 3
 
     # Query for active subscription to get actual plan_name
-    async with db.pool.acquire() as conn:
-        subscription = await conn.fetchrow(
-            """SELECT tier, status FROM subscriptions
-               WHERE bot_id IN (
-                   SELECT bot_id FROM bots
-                   WHERE owner_user_id=$1 AND is_primary=TRUE
-               )
-               AND status='active'
-               ORDER BY created_at DESC LIMIT 1""",
-            user_id,
-        )
-
-    plan_name = subscription["tier"].title() if subscription else "Free"
+    plan_name = "Free"
+    try:
+        async with db.pool.acquire() as conn:
+            subscription = await conn.fetchrow(
+                """SELECT plan, plan_expires_at FROM billing_subscriptions
+                   WHERE owner_id = $1
+                     AND plan_expires_at > NOW()
+                   ORDER BY created_at DESC LIMIT 1""",
+                user_id,
+            )
+        if subscription:
+            plan_name = subscription["plan"].title()
+    except Exception as e:
+        logger.warning(f"[ME] Could not fetch subscription info: {e}")
 
     return {
         "bots_count": int(bots_count),

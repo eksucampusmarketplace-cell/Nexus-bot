@@ -15,6 +15,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = update.effective_chat.id
+    bot_id = context.bot.id
     today = date.today()
 
     try:
@@ -24,12 +25,16 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         async with pool.acquire() as conn:
             await conn.execute(
-                """INSERT INTO bot_stats_daily (chat_id, day, message_count)
-                   VALUES ($1, $2, 1)
+                """INSERT INTO bot_stats_daily
+                       (chat_id, day, message_count, bot_id, date,
+                        spam_detected, members_joined, members_left,
+                        bans_issued, warns_issued)
+                   VALUES ($1, $2, 1, $3, $2, 0, 0, 0, 0, 0)
                    ON CONFLICT (chat_id, day) DO UPDATE
                    SET message_count = bot_stats_daily.message_count + 1""",
                 chat_id,
                 today,
+                bot_id,
             )
     except Exception as e:
         logger.debug(f"[track_message] {e}")

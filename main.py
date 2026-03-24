@@ -474,6 +474,13 @@ async def root():
 # Bot webhooks
 # Bug #12/#13 fix: Use opaque webhook secret derived from token hash instead of raw token in URL.
 # The raw bot token is no longer exposed in webhook URLs or server logs.
+
+# Deduplication cache: track recently processed update_ids to prevent double-processing.
+# Uses a bounded dict keyed by (bot_id, update_id) with a max size to prevent memory leaks.
+_recent_update_ids: dict[tuple[int, int], bool] = {}
+_DEDUP_MAX_SIZE = 1000
+
+
 @app.post("/webhook/{webhook_secret}")
 async def telegram_webhook(webhook_secret: str, request: Request):
     from bot.utils.crypto import hash_token
@@ -505,6 +512,22 @@ async def telegram_webhook(webhook_secret: str, request: Request):
         return Response(status_code=404)
 
     data = await request.json()
+
+    # Deduplicate by update_id to prevent double-processing from Telegram retries
+    update_id = data.get("update_id")
+    if update_id is not None:
+        dedup_key = (target_app.bot.id, update_id)
+        if dedup_key in _recent_update_ids:
+            logger.debug(f"[WEBHOOK] Duplicate update_id={update_id} — skipping")
+            return Response(status_code=200)
+        # Evict oldest entries if cache is full
+        if len(_recent_update_ids) >= _DEDUP_MAX_SIZE:
+            # Remove the oldest half of entries
+            keys_to_remove = list(_recent_update_ids.keys())[: _DEDUP_MAX_SIZE // 2]
+            for k in keys_to_remove:
+                _recent_update_ids.pop(k, None)
+        _recent_update_ids[dedup_key] = True
+
     update = Update.de_json(data, target_app.bot)
     await target_app.process_update(update)
     return Response(status_code=200)

@@ -153,9 +153,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # This will be set by main.py before calling setup_music_worker
 
     # ── PM Tracking ────────────────────────────────────────────────────────
-    app.add_handler(
-        MessageHandler(filters.ChatType.PRIVATE, track_pm_handler), group=-1
-    )
+    app.add_handler(MessageHandler(filters.ChatType.PRIVATE, track_pm_handler), group=-1)
 
     # ── Prefix system (highest priority) ─────────────────────────────────
     app.add_handler(
@@ -192,19 +190,13 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("setgoodbye", set_goodbye_handler, filters=GROUP))
     app.add_handler(CommandHandler("welcome", welcome_preview_handler, filters=GROUP))
     app.add_handler(CommandHandler("goodbye", goodbye_preview_handler, filters=GROUP))
-    app.add_handler(
-        CommandHandler("resetwelcome", reset_welcome_handler, filters=GROUP)
-    )
-    app.add_handler(
-        CommandHandler("resetgoodbye", reset_goodbye_handler, filters=GROUP)
-    )
+    app.add_handler(CommandHandler("resetwelcome", reset_welcome_handler, filters=GROUP))
+    app.add_handler(CommandHandler("resetgoodbye", reset_goodbye_handler, filters=GROUP))
     app.add_handler(CommandHandler("resetrules", reset_rules_handler, filters=GROUP))
 
     # ── Nexus Channel Management ─────────────────────────────────────────
     app.add_handler(CommandHandler("channelpost", channel_post_handler, filters=GROUP))
-    app.add_handler(
-        CommandHandler("schedulepost", schedule_post_handler, filters=GROUP)
-    )
+    app.add_handler(CommandHandler("schedulepost", schedule_post_handler, filters=GROUP))
     app.add_handler(CommandHandler("approvepost", approve_post_handler, filters=GROUP))
     app.add_handler(CommandHandler("cancelpost", cancel_post_handler, filters=GROUP))
     app.add_handler(CommandHandler("editpost", edit_post_handler, filters=GROUP))
@@ -323,9 +315,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("stopall", stopall_command, filters=GROUP))
     app.add_handler(CommandHandler("blacklist", blacklist_command, filters=GROUP))
     app.add_handler(CommandHandler("unblacklist", unblacklist_command, filters=GROUP))
-    app.add_handler(
-        CommandHandler("blacklistmode", blacklistmode_command, filters=GROUP)
-    )
+    app.add_handler(CommandHandler("blacklistmode", blacklistmode_command, filters=GROUP))
 
     from bot.handlers.notes import (
         delnote_command,
@@ -356,9 +346,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     for h in admin_request_command_handlers:
         app.add_handler(h)
     # Message handler for @admins mentions (run before automod)
-    app.add_handler(
-        MessageHandler(GROUP & filters.TEXT, handle_admin_mention), group=-1
-    )
+    app.add_handler(MessageHandler(GROUP & filters.TEXT, handle_admin_mention), group=-1)
 
     # ── Advanced automod commands ───────────────────────────────────────
     # These are also handled by prefix_handler (!, !!) in group 0
@@ -381,9 +369,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         # ConversationHandler for /clone flow (must be added before other clone handlers)
         app.add_handler(clone_conversation)
         # Non-conversation commands
-        app.add_handler(
-            CommandHandler("myclones", myclones_command_handler, filters=PRIVATE)
-        )
+        app.add_handler(CommandHandler("myclones", myclones_command_handler, filters=PRIVATE))
         app.add_handler(CommandHandler("cloneset", cloneset_handler, filters=PRIVATE))
         # Owner dashboard command
         app.add_handler(owner_dashboard_handler)
@@ -396,7 +382,21 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         )
         logger.info("[FACTORY] Clone handlers registered (primary bot only)")
     else:
-        logger.info("[FACTORY] Clone handlers SKIPPED (clone bot)")
+        # Register informative handlers for clone-only commands on clone bots
+        from bot.utils.format import get_main_bot_ref
+
+        async def _clone_only_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Inform clone bot users that this command is only available on the main bot."""
+            main_bot = get_main_bot_ref()
+            await update.message.reply_text(
+                f"ℹ️ This command is only available on the main Nexus bot.\n\n"
+                f"Head over to {main_bot} to manage your clones."
+            )
+
+        app.add_handler(CommandHandler("clone", _clone_only_reply, filters=PRIVATE))
+        app.add_handler(CommandHandler("myclones", _clone_only_reply, filters=PRIVATE))
+        app.add_handler(CommandHandler("cloneset", _clone_only_reply, filters=PRIVATE))
+        logger.info("[FACTORY] Clone-only command redirects registered (clone bot)")
 
     # ── Help callbacks (all bots) ─────────────────────────────────────────
     app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r"^help_"))
@@ -404,9 +404,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # ── Admin request callbacks (all bots) ────────────────────────────────
     app.add_handler(
-        CallbackQueryHandler(
-            admin_request_callback, pattern=r"^admin_req:(responding|close):\d+$"
-        )
+        CallbackQueryHandler(admin_request_callback, pattern=r"^admin_req:(responding|close):\d+$")
     )
     # Bug #98 fix: Move captcha_message to group=7 to avoid conflict with message_guard
     app.add_handler(
@@ -423,14 +421,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── New member joins/leaves ──────────────────────────────────────────
     # Welcome is handled by handle_chat_member_update (which delegates to greetings.welcome_handler).
     # Do NOT register welcome_handler directly here — it would cause double welcome messages.
-    app.add_handler(
-        MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler)
-    )
+    app.add_handler(MessageHandler(filters.StatusUpdate.LEFT_CHAT_MEMBER, goodbye_handler))
 
     # Advanced member join/leave handler (handles welcome, captcha, anti-raid, etc.)
-    app.add_handler(
-        ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER)
-    )
+    app.add_handler(ChatMemberHandler(handle_chat_member_update, ChatMemberHandler.CHAT_MEMBER))
 
     # ── Global error handler with alert ─────────────────────────────────────
     # Group lifecycle - on ALL bots
@@ -456,12 +450,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         # Try to get bot username for alert
         try:
             me = await context.bot.get_me()
-            chat_id = (
-                update.effective_chat.id if update and update.effective_chat else 0
-            )
-            await alert_error(
-                context.bot, me.username, chat_id, str(context.error)[:300]
-            )
+            chat_id = update.effective_chat.id if update and update.effective_chat else 0
+            await alert_error(context.bot, me.username, chat_id, str(context.error)[:300])
         except Exception:
             pass
 
@@ -479,9 +469,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
                 suffix = DEFAULTS.get("error_suffix", "").format(
                     main_bot=settings.MAIN_BOT_USERNAME
                 )
-                await update.effective_message.reply_text(
-                    f"❌ Something went wrong. {suffix}"
-                )
+                await update.effective_message.reply_text(f"❌ Something went wrong. {suffix}")
         except Exception:
             pass
 
@@ -570,9 +558,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     app.add_handler(CommandHandler("setpassword", cmd_setpassword, filters=GROUP))
     app.add_handler(CommandHandler("clearpassword", cmd_clearpassword, filters=GROUP))
-    app.add_handler(
-        MessageHandler(PRIVATE & filters.TEXT & ~filters.COMMAND, handle_password_dm)
-    )
+    app.add_handler(MessageHandler(PRIVATE & filters.TEXT & ~filters.COMMAND, handle_password_dm))
     logger.info("[FACTORY] Password handlers registered")
 
     # ── Copy settings handler ─────────────────────────────────────────────
@@ -608,9 +594,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Bug #3 fix: Removed duplicate InlineQueryHandler registration.
     # Only the enhanced inline_query handler (registered below) is used now.
     # The old inline_mode.handle_inline_query was redundant.
-    logger.info(
-        "[FACTORY] Inline query handler (legacy) skipped — using enhanced handler"
-    )
+    logger.info("[FACTORY] Inline query handler (legacy) skipped — using enhanced handler")
 
     # ── Public command handlers ───────────────────────────────────────────
     from bot.handlers.public import (

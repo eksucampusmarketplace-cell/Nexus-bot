@@ -26,8 +26,15 @@ from telegram import ChatMemberUpdated, Update
 from telegram.constants import ParseMode
 from telegram.ext import ChatMemberHandler, ContextTypes
 
-from bot.utils.keyboards import support_keyboard
+from bot.billing.billing_helpers import (
+    check_property_limit,
+    enforce_trial_limits,
+    get_bot_plan,
+    is_trial_expired,
+)
+from bot.utils.crypto import hash_token
 from bot.utils.format import get_main_bot_ref
+from bot.utils.keyboards import support_keyboard
 from config import settings
 
 # alert_new_group_add might not exist, I'll check or just skip it if it's not provided
@@ -39,14 +46,7 @@ from db.ops.clone_groups import (
     mark_group_left,
     register_group,
 )
-from bot.utils.crypto import hash_token
 from db.ops.groups import upsert_group
-from bot.billing.billing_helpers import (
-    get_bot_plan,
-    is_trial_expired,
-    check_property_limit,
-    enforce_trial_limits,
-)
 
 log = logging.getLogger("group_lifecycle")
 
@@ -108,13 +108,14 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         # Notify clone owner that bot was kicked
         try:
             from bot.utils.error_notifier import notify_clone_owner
+
             asyncio.create_task(
                 notify_clone_owner(
                     context.bot,
                     bot_id,
                     "BOT_KICKED",
                     context={"chat_id": chat.id, "chat_title": chat.title, "actor_id": actor.id},
-                    pool=db_pool
+                    pool=db_pool,
                 )
             )
         except Exception as notify_err:
@@ -132,13 +133,16 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     # Get chat type from the event
-    chat_type = chat.type if hasattr(chat, 'type') else 'group'  # 'group', 'supergroup', or 'channel'
+    chat_type = (
+        chat.type if hasattr(chat, "type") else "group"
+    )  # 'group', 'supergroup', or 'channel'
 
     async with db_pool.acquire() as db:
         # Primary bot: unlimited groups, open policy, owner is OWNER_ID
         is_primary_bot = context.bot_data.get("is_primary", False)
         if is_primary_bot:
             from config import settings as _settings
+
             config = {
                 "owner_id": _settings.OWNER_ID,
                 "group_limit": 0,
@@ -211,12 +215,12 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
             # Update chat_type in groups table
             await db.execute(
-                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2",
-                chat_type,
-                chat.id
+                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2", chat_type, chat.id
             )
 
-            log.info(f"[LIFECYCLE] Owner group registered | bot={bot_id} chat={chat.id} type={chat_type}")
+            log.info(
+                f"[LIFECYCLE] Owner group registered | bot={bot_id} chat={chat.id} type={chat_type}"
+            )
 
             # Send setup DM to owner
             await _send_owner_setup_dm(context, owner_id, chat, bot_id)
@@ -275,9 +279,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
 
             # Update chat_type in groups table
             await db.execute(
-                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2",
-                chat_type,
-                chat.id
+                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2", chat_type, chat.id
             )
 
             # Onboard the stranger
@@ -299,25 +301,34 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
                 access_status="pending",
             )
 
-            # Immediately sync bot_token_hash for clone bot groups
+            # Ensure groups table entry exists with correct bot_token_hash
             token_hash = hash_token(context.bot.token)
-            if not is_primary_bot:
-                await db.execute(
-                    """UPDATE groups SET bot_token_hash = $1
-                       WHERE chat_id = $2
-                       AND (bot_token_hash IS NULL OR bot_token_hash != $1)""",
-                    token_hash,
-                    chat.id,
-                )
-                log.info(
-                    f"[LIFECYCLE] Set bot_token_hash for clone | chat_id={chat.id}"
-                )
+            try:
+                member_count = await chat.get_member_count()
+            except Exception:
+                member_count = 0
+            photo_big = None
+            photo_small = None
+            try:
+                chat_obj = await context.bot.get_chat(chat.id)
+                if chat_obj.photo:
+                    photo_big = chat_obj.photo.big_file_id
+                    photo_small = chat_obj.photo.small_file_id
+            except Exception as e:
+                log.warning(f"[LIFECYCLE] Could not get chat photo | chat={chat.id} error={e}")
+
+            await upsert_group(
+                chat.id,
+                chat.title,
+                token_hash,
+                member_count=member_count,
+                photo_big=photo_big,
+                photo_small=photo_small,
+            )
 
             # Update chat_type in groups table
             await db.execute(
-                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2",
-                chat_type,
-                chat.id
+                "UPDATE groups SET chat_type = $1 WHERE chat_id = $2", chat_type, chat.id
             )
 
             # Tell stranger to wait

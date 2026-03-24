@@ -448,6 +448,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register security middleware
+from api.middleware import (  # noqa: E402
+    InputValidationMiddleware,
+    RateLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
+
+_security_headers = SecurityHeadersMiddleware()
+_rate_limiter = RateLimitMiddleware()
+_input_validator = InputValidationMiddleware()
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    return await _security_headers(request, call_next)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    return await _rate_limiter(request, call_next)
+
+
+@app.middleware("http")
+async def input_validation_middleware(request: Request, call_next):
+    return await _input_validator(request, call_next)
+
 
 # Health check endpoint (used by keep-alive ping to prevent Render cold starts)
 @app.get("/health")

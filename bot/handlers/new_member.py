@@ -81,7 +81,7 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
                             f"🚫 <b>Federation Ban Enforced</b>\n\n"
                             f"User {user.mention_html()} was banned.\n"
                             f"Network: {fed_name}\n"
-                            f"Reason: {reason}",
+                            f"Reason: {reason}"
                         ),
                         parse_mode="HTML"
                     )

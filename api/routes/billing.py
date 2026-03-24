@@ -6,8 +6,10 @@ Stars economy and billing API routes.
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+
+from api.auth import get_current_user
 
 from bot.billing.billing_helpers import (
     can_owner_add_clone_bot,
@@ -37,9 +39,10 @@ router = APIRouter()
 
 # Authoritative plan prices (Stars) — never trust client-sent amounts
 PLAN_PRICES = {
-    "starter": 500,
-    "pro": 1500,
-    "unlimited": 3000,
+    "basic": 300,
+    "starter": 700,
+    "pro": 2000,
+    "unlimited": 8000,
 }
 
 
@@ -52,18 +55,18 @@ class SpendBonusRequest(BaseModel):
 
 
 @router.get("/api/billing/bonus-balance")
-async def get_bonus_balance_endpoint(request: Request):
+async def get_bonus_balance_endpoint(request: Request, user: dict = Depends(get_current_user)):
     """Get bonus Stars balance for owner."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db = request.app.state.db
     balance = await get_bonus_balance(db, owner_id)
     return {"balance": balance}
 
 
 @router.get("/api/billing/referral-stats")
-async def get_referral_stats_endpoint(request: Request):
+async def get_referral_stats_endpoint(request: Request, user: dict = Depends(get_current_user)):
     """Get referral stats for owner."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db = request.app.state.db
     me = await request.app.state.bot.get_me()
     stats = await get_referral_stats(db, owner_id)
@@ -72,9 +75,9 @@ async def get_referral_stats_endpoint(request: Request):
 
 
 @router.post("/api/billing/redeem-promo")
-async def redeem_promo_endpoint(request: Request, req: RedeemPromoRequest):
+async def redeem_promo_endpoint(request: Request, req: RedeemPromoRequest, user: dict = Depends(get_current_user)):
     """Redeem a promo code."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db = request.app.state.db
     bot = request.app.state.bot
     result = await redeem_promo_code(db, bot, owner_id, req.code)
@@ -82,9 +85,9 @@ async def redeem_promo_endpoint(request: Request, req: RedeemPromoRequest):
 
 
 @router.post("/api/billing/spend-bonus")
-async def spend_bonus_endpoint(request: Request, req: SpendBonusRequest):
+async def spend_bonus_endpoint(request: Request, req: SpendBonusRequest, user: dict = Depends(get_current_user)):
     """Spend bonus Stars to unlock a feature."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db = request.app.state.db
     result = await spend_bonus_stars(
         db, owner_id, 0, req.item_type
@@ -105,9 +108,9 @@ class CreatePromoRequest(BaseModel):
 
 
 @router.post("/api/billing/grant-bonus")
-async def grant_bonus_endpoint(request: Request, req: GrantBonusRequest):
+async def grant_bonus_endpoint(request: Request, req: GrantBonusRequest, user: dict = Depends(get_current_user)):
     """Grant bonus Stars to a user. Owner only."""
-    caller_id = request.state.user_id
+    caller_id = user.get("id")
     if caller_id != settings.OWNER_ID:
         raise HTTPException(status_code=403, detail="Owner only")
     db_pool = request.app.state.db
@@ -118,9 +121,9 @@ async def grant_bonus_endpoint(request: Request, req: GrantBonusRequest):
 
 
 @router.post("/api/billing/create-promo")
-async def create_promo_endpoint(request: Request, req: CreatePromoRequest):
+async def create_promo_endpoint(request: Request, req: CreatePromoRequest, user: dict = Depends(get_current_user)):
     """Create a new promo code. Owner only."""
-    caller_id = request.state.user_id
+    caller_id = user.get("id")
     if caller_id != settings.OWNER_ID:
         raise HTTPException(status_code=403, detail="Owner only")
     db_pool = request.app.state.db
@@ -163,9 +166,9 @@ async def get_plans_endpoint(request: Request):
 
 
 @router.get("/api/billing/owner-info")
-async def get_owner_info_endpoint(request: Request):
+async def get_owner_info_endpoint(request: Request, user: dict = Depends(get_current_user)):
     """Get owner's current plan and usage information."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db_pool = request.app.state.db
 
     # Get owner's plan
@@ -210,14 +213,14 @@ class SubscribeRequest(BaseModel):
 
 
 @router.post("/api/billing/subscribe")
-async def subscribe_endpoint(request: Request, req: SubscribeRequest):
+async def subscribe_endpoint(request: Request, req: SubscribeRequest, user: dict = Depends(get_current_user)):
     """
     Subscribe to a paid plan.
 
     This endpoint creates a subscription record and returns a payment link.
     The actual payment is processed via Telegram Stars payment API.
     """
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db_pool = request.app.state.db
     bot = request.app.state.bot
 
@@ -233,7 +236,9 @@ async def subscribe_endpoint(request: Request, req: SubscribeRequest):
 
     # Validate price against server-side authoritative prices
     expected_price = PLAN_PRICES.get(req.plan)
-    if expected_price is not None and plan.get("price_stars") != expected_price:
+    if expected_price is None:
+        raise HTTPException(status_code=400, detail=f"Unknown plan: {req.plan}")
+    if plan.get("price_stars") != expected_price:
         log.warning(
             f"[BILLING] Price mismatch detected | user={owner_id} "
             f"| plan={req.plan} | expected={expected_price} | actual={plan.get('price_stars')}"
@@ -252,9 +257,9 @@ async def subscribe_endpoint(request: Request, req: SubscribeRequest):
 
 
 @router.post("/api/billing/cancel")
-async def cancel_subscription_endpoint(request: Request):
+async def cancel_subscription_endpoint(request: Request, user: dict = Depends(get_current_user)):
     """Cancel auto-renewal of current subscription."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db_pool = request.app.state.db
 
     result = await cancel_subscription(db_pool, owner_id)
@@ -265,9 +270,9 @@ async def cancel_subscription_endpoint(request: Request):
 
 
 @router.get("/api/billing/trials")
-async def get_trials_endpoint(request: Request):
+async def get_trials_endpoint(request: Request, user: dict = Depends(get_current_user)):
     """Get all active trials for the owner."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db_pool = request.app.state.db
 
     trials = await get_active_trials(db_pool, owner_id)
@@ -275,9 +280,9 @@ async def get_trials_endpoint(request: Request):
 
 
 @router.get("/api/billing/trial-days")
-async def get_trial_days_endpoint(request: Request, bot_id: int):
+async def get_trial_days_endpoint(request: Request, bot_id: int, user: dict = Depends(get_current_user)):
     """Get remaining days for a trial bot."""
-    owner_id = request.state.user_id
+    owner_id = user.get("id")
     db_pool = request.app.state.db
 
     # Verify ownership

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from telegram import Update, constants
 from telegram.ext import ContextTypes
 
+from bot.utils.crypto import hash_token
 from db.ops.groups import get_group, upsert_group
 from db.ops.users import increment_message_count, upsert_user
 
@@ -137,7 +138,8 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group = await get_group(chat_id)
     if not group:
         # Auto-register group if not exists
-        await upsert_group(chat_id, update.effective_chat.title, "")
+        token_hash = hash_token(context.bot.token)
+        await upsert_group(chat_id, update.effective_chat.title, token_hash)
         return
 
     settings = group.get("settings") or {}

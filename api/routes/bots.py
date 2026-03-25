@@ -157,7 +157,8 @@ async def clone_bot(request: Request, user: dict = Depends(get_current_user)):
 
     # Step 2: Save to DB
     render_url = settings.RENDER_EXTERNAL_URL
-    webhook_url = f"{render_url}/webhook/{cloned_bot_id}"
+    webhook_secret = hash_token(token)[:32]
+    webhook_url = f"{render_url}/webhook/{webhook_secret}"
 
     await insert_bot(
         db.pool,
@@ -191,7 +192,8 @@ async def clone_bot(request: Request, user: dict = Depends(get_current_user)):
                             "message",
                             "callback_query",
                             "chat_member",
-                            "new_chat_members",
+                            "my_chat_member",
+                            "inline_query",
                         ],
                         "drop_pending_updates": True,
                     },

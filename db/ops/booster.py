@@ -726,18 +726,14 @@ async def get_boost_config(group_id: int) -> dict:
 
 async def save_boost_config(group_id: int, config: dict) -> bool:
     """Save boost configuration to group settings."""
-    from db.ops.groups import get_group, upsert_group
+    from db.ops.groups import get_group, update_group_settings
 
     group = await get_group(group_id)
-    settings = group.get("settings", {}) if group else {}
+    if not group:
+        return False
+    settings = group.get("settings", {})
     settings["member_boost"] = config
-
-    await upsert_group(
-        group_id,
-        group.get("title", "Unknown") if group else "Unknown",
-        group.get("bot_token_hash", "") if group else "",
-        settings,
-    )
+    await update_group_settings(group_id, settings)
     return True
 
 
@@ -785,18 +781,14 @@ async def get_channel_gate_config(group_id: int) -> dict:
 
 async def save_channel_gate_config(group_id: int, config: dict) -> bool:
     """Save channel gate configuration to group settings."""
-    from db.ops.groups import get_group, upsert_group
+    from db.ops.groups import get_group, update_group_settings
 
     group = await get_group(group_id)
-    settings = group.get("settings", {}) if group else {}
+    if not group:
+        return False
+    settings = group.get("settings", {})
     settings["channel_gate"] = config
-
-    await upsert_group(
-        group_id,
-        group.get("title", "Unknown") if group else "Unknown",
-        group.get("bot_token_hash", "") if group else "",
-        settings,
-    )
+    await update_group_settings(group_id, settings)
     return True
 
 

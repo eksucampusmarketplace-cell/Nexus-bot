@@ -218,6 +218,32 @@ async def lifespan(app: FastAPI):
                 await registry_register(me.id, clone_app)
                 logger.info(f"[STARTUP] ✅ Started clone bot @{me.username} (ID: {me.id})")
 
+                # Re-register webhook for clone bot so it receives my_chat_member events
+                try:
+                    from bot.utils.crypto import hash_token as _clone_hash
+
+                    clone_webhook_secret = _clone_hash(clone_token)[:32]
+                    clone_webhook_url = (
+                        f"{settings.webhook_url}/webhook/{clone_webhook_secret}"
+                    )
+                    await clone_app.bot.set_webhook(
+                        url=clone_webhook_url,
+                        allowed_updates=[
+                            "message",
+                            "callback_query",
+                            "chat_member",
+                            "my_chat_member",
+                            "inline_query",
+                        ],
+                    )
+                    logger.info(
+                        f"[STARTUP] ✅ Clone webhook set for @{me.username}"
+                    )
+                except Exception as wh_err:
+                    logger.warning(
+                        f"[STARTUP] ⚠️ Failed to set clone webhook for @{me.username}: {wh_err}"
+                    )
+
                 # Sync clone bot groups that have NULL bot_token_hash (Bug E fix)
                 try:
                     from bot.utils.crypto import hash_token

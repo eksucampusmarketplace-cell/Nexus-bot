@@ -119,7 +119,7 @@ async def upsert_group(
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (chat_id) DO UPDATE
             SET title = EXCLUDED.title,
-                bot_token_hash = EXCLUDED.bot_token_hash,
+                bot_token_hash = CASE WHEN EXCLUDED.bot_token_hash IS NOT NULL AND EXCLUDED.bot_token_hash != '' THEN EXCLUDED.bot_token_hash ELSE groups.bot_token_hash END,
                 settings = EXCLUDED.settings,
                 member_count = CASE WHEN EXCLUDED.member_count > 0 THEN EXCLUDED.member_count ELSE groups.member_count END,
                 photo_big = CASE WHEN EXCLUDED.photo_big IS NOT NULL AND EXCLUDED.photo_big != '' THEN EXCLUDED.photo_big ELSE groups.photo_big END,

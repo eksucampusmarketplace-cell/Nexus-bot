@@ -11,6 +11,25 @@ import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 import { t } from '../../lib/i18n.js?v=1.6.0';
 
+/**
+ * Command aliases - shorthand versions of commands
+ */
+const COMMAND_ALIASES = {
+  '/w': '/warn', '/uw': '/unwarn', '/m': '/mute', '/um': '/unmute',
+  '/tm': '/tmute', '/b': '/ban', '/ub': '/unban', '/tb': '/tban',
+  '/k': '/kick', '/p': '/purge', '/d': '/del', '/s': '/lock',
+  '/r': '/rules', '/n': '/note', '/gn': '/note', '/sn': '/notes',
+  '/i': '/info', '/wi': '/info', '/ci': '/groupinfo',
+  '/ws': '/warns', '/wl': '/warnlimit', '/wa': '/warnmode',
+  '/post': '/channelpost', '/sched': '/schedulepost',
+  '/ap': '/approvepost', '/cp': '/cancelpost',
+  '/ep': '/editpost', '/dp': '/deletepost',
+  '/sw': '/setwelcome', '/sg': '/setgoodbye', '/sr': '/setrules',
+  '/rw': '/resetwelcome', '/rg': '/resetgoodbye', '/rr': '/resetrules',
+  '/sc': '/captcha', '/raidmode': '/antiraid',
+  '/clearwarns': '/resetwarns', '/pinner': '/pin', '/unpinner': '/unpin',
+};
+
 const store = useStore;
 
 /**
@@ -533,10 +552,17 @@ function renderCommandRow(cmd, commandStates, chatId) {
 
   const cmdInfo = document.createElement('div');
   cmdInfo.style.cssText = 'flex:1;min-width:0;';
+  const aliases = Object.entries(COMMAND_ALIASES)
+    .filter(([, target]) => target === cmd.cmd)
+    .map(([alias]) => alias);
+  const aliasHtml = aliases.length > 0
+    ? `<span style="color:var(--text-muted);font-size:var(--text-xs);margin-left:var(--sp-1);">(${aliases.map(a => escapeHtml(a)).join(', ')})</span>`
+    : '';
   cmdInfo.innerHTML = `
     <div style="display:flex;align-items:center;gap:var(--sp-1);flex-wrap:wrap;">
       <code style="background:var(--accent-dim);color:var(--accent);padding:var(--sp-1) var(--sp-2);border-radius:var(--r-md);font-size:var(--text-xs);font-weight:var(--fw-semibold);">${escapeHtml(cmd.cmd)}</code>
       ${cmd.args ? `<span style="color:var(--text-muted);font-size:var(--text-xs);">${escapeHtml(cmd.args)}</span>` : ''}
+      ${aliasHtml}
     </div>
     <div style="color:var(--text-secondary);font-size:var(--text-sm);margin-top:2px;">${escapeHtml(cmd.desc)}</div>
   `;

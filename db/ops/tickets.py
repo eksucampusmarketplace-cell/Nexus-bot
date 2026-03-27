@@ -59,7 +59,9 @@ async def create_ticket(
             resolution_deadline,
         )
     ticket = dict(row) if row else {}
-    log.info(f"[TICKETS_DB] Created ticket #{ticket.get('id')} | chat={chat_id} creator={creator_id}")
+    log.info(
+        f"[TICKETS_DB] Created ticket #{ticket.get('id')} | chat={chat_id} creator={creator_id}"
+    )
     return ticket
 
 
@@ -286,7 +288,9 @@ async def get_staff_workload(pool, chat_id: int) -> list[dict]:
     async with pool.acquire() as conn:
         rows = await conn.fetch(
             """SELECT ta.staff_id, ta.staff_name,
-                      COUNT(t.id) FILTER (WHERE t.status IN ('open', 'in_progress', 'escalated')) AS active_tickets,
+                      COUNT(t.id) FILTER (
+                        WHERE t.status IN ('open', 'in_progress', 'escalated')
+                      ) AS active_tickets,
                       COUNT(t.id) FILTER (WHERE t.status = 'closed') AS closed_tickets
                FROM ticket_assignments ta
                JOIN tickets t ON t.id = ta.ticket_id AND t.chat_id = $1
@@ -544,9 +548,7 @@ async def mark_survey_sent(pool, ticket_id: int) -> None:
         )
 
 
-async def submit_satisfaction(
-    pool, ticket_id: int, rating: int, comment: str = ""
-) -> bool:
+async def submit_satisfaction(pool, ticket_id: int, rating: int, comment: str = "") -> bool:
     """Submit a satisfaction rating for a closed ticket."""
     async with pool.acquire() as conn:
         result = await conn.execute(
@@ -574,7 +576,8 @@ async def get_ticket_analytics(pool, chat_id: int) -> dict:
                  COUNT(*) FILTER (WHERE status = 'escalated') AS escalated_count,
                  COUNT(*) FILTER (WHERE status = 'closed') AS closed_count,
                  AVG(EXTRACT(EPOCH FROM (closed_at - created_at)) / 3600)
-                   FILTER (WHERE status = 'closed' AND closed_at IS NOT NULL) AS avg_resolution_hours,
+                   FILTER (WHERE status = 'closed'
+                     AND closed_at IS NOT NULL) AS avg_resolution_hours,
                  AVG(EXTRACT(EPOCH FROM (first_response_at - created_at)) / 60)
                    FILTER (WHERE first_response_at IS NOT NULL) AS avg_first_response_mins,
                  AVG(satisfaction_rating)
@@ -612,7 +615,12 @@ async def get_templates(pool, chat_id: int) -> list[dict]:
 
 
 async def upsert_template(
-    pool, chat_id: int, name: str, content: str, category: str | None = None, created_by: int | None = None
+    pool,
+    chat_id: int,
+    name: str,
+    content: str,
+    category: str | None = None,
+    created_by: int | None = None,
 ) -> dict:
     """Create or update a response template."""
     async with pool.acquire() as conn:

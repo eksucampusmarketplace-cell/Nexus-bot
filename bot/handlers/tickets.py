@@ -79,16 +79,18 @@ async def cmd_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     priority_emoji = {"low": "🟢", "normal": "🔵", "high": "🟠", "urgent": "🔴"}.get(priority, "🔵")
 
     # Create inline keyboard for staff actions
-    keyboard = InlineKeyboardMarkup([
+    keyboard = InlineKeyboardMarkup(
         [
-            InlineKeyboardButton("📥 Claim", callback_data=f"ticket:claim:{ticket_id}"),
-            InlineKeyboardButton("⬆️ Escalate", callback_data=f"ticket:escalate:{ticket_id}"),
-        ],
-        [
-            InlineKeyboardButton("✅ Close", callback_data=f"ticket:close:{ticket_id}"),
-            InlineKeyboardButton("🔄 Priority", callback_data=f"ticket:priority:{ticket_id}"),
-        ],
-    ])
+            [
+                InlineKeyboardButton("📥 Claim", callback_data=f"ticket:claim:{ticket_id}"),
+                InlineKeyboardButton("⬆️ Escalate", callback_data=f"ticket:escalate:{ticket_id}"),
+            ],
+            [
+                InlineKeyboardButton("✅ Close", callback_data=f"ticket:close:{ticket_id}"),
+                InlineKeyboardButton("🔄 Priority", callback_data=f"ticket:priority:{ticket_id}"),
+            ],
+        ]
+    )
 
     sla_info = ""
     if ticket.get("sla_response_deadline"):
@@ -125,14 +127,18 @@ async def cmd_ticket(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat.id, "ticket_created", {
-            "ticket_id": ticket_id,
-            "creator_id": user.id,
-            "creator_name": creator_name,
-            "subject": subject,
-            "priority": priority,
-            "chat_id": chat.id,
-        })
+        await EventBus.publish(
+            chat.id,
+            "ticket_created",
+            {
+                "ticket_id": ticket_id,
+                "creator_id": user.id,
+                "creator_name": creator_name,
+                "subject": subject,
+                "priority": priority,
+                "chat_id": chat.id,
+            },
+        )
     except Exception:
         pass
 
@@ -223,11 +229,15 @@ async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat.id, "ticket_closed", {
-            "ticket_id": ticket["id"],
-            "closed_by": user.id,
-            "chat_id": chat.id,
-        })
+        await EventBus.publish(
+            chat.id,
+            "ticket_closed",
+            {
+                "ticket_id": ticket["id"],
+                "closed_by": user.id,
+                "chat_id": chat.id,
+            },
+        )
     except Exception:
         pass
 
@@ -304,9 +314,7 @@ async def cmd_assign(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target = user  # Default: assign to self
 
     staff_name = target.full_name or target.first_name or str(target.id)
-    await db_tickets.assign_ticket(
-        db, ticket["id"], target.id, staff_name, assigned_by=user.id
-    )
+    await db_tickets.assign_ticket(db, ticket["id"], target.id, staff_name, assigned_by=user.id)
 
     await msg.reply_text(
         f"📥 <b>Ticket #{ticket['id']} assigned</b>\n\n"
@@ -319,18 +327,20 @@ async def cmd_assign(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat.id, "ticket_assigned", {
-            "ticket_id": ticket["id"],
-            "assigned_to": target.id,
-            "assigned_name": staff_name,
-            "chat_id": chat.id,
-        })
+        await EventBus.publish(
+            chat.id,
+            "ticket_assigned",
+            {
+                "ticket_id": ticket["id"],
+                "assigned_to": target.id,
+                "assigned_name": staff_name,
+                "chat_id": chat.id,
+            },
+        )
     except Exception:
         pass
 
-    log.info(
-        f"[TICKET] Assigned #{ticket['id']} to {target.id} | chat={chat.id} by={user.id}"
-    )
+    log.info(f"[TICKET] Assigned #{ticket['id']} to {target.id} | chat={chat.id} by={user.id}")
 
 
 async def cmd_escalate(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -389,11 +399,15 @@ async def cmd_escalate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat.id, "ticket_escalated", {
-            "ticket_id": ticket["id"],
-            "escalation_level": updated["escalation_level"],
-            "chat_id": chat.id,
-        })
+        await EventBus.publish(
+            chat.id,
+            "ticket_escalated",
+            {
+                "ticket_id": ticket["id"],
+                "escalation_level": updated["escalation_level"],
+                "chat_id": chat.id,
+            },
+        )
     except Exception:
         pass
 
@@ -462,7 +476,9 @@ async def handle_ticket_callback(update: Update, context: ContextTypes.DEFAULT_T
 
         updated = await db_tickets.escalate_ticket(db, ticket_id)
         if updated:
-            await query.answer(f"Ticket #{ticket_id} escalated to level {updated['escalation_level']}!")
+            await query.answer(
+                f"Ticket #{ticket_id} escalated to level {updated['escalation_level']}!"
+            )
             await _update_ticket_message(query, updated)
 
     elif action == "close":
@@ -473,8 +489,13 @@ async def handle_ticket_callback(update: Update, context: ContextTypes.DEFAULT_T
 
         await db_tickets.update_ticket_status(db, ticket_id, "closed", closed_by=user.id)
         await db_tickets.add_ticket_message(
-            db, ticket_id, user.id, user.full_name or "",
-            "Ticket closed.", is_staff=is_admin, is_system=True,
+            db,
+            ticket_id,
+            user.id,
+            user.full_name or "",
+            "Ticket closed.",
+            is_staff=is_admin,
+            is_system=True,
         )
         updated = await db_tickets.get_ticket(db, ticket_id)
         await _update_ticket_message(query, updated)
@@ -483,9 +504,15 @@ async def handle_ticket_callback(update: Update, context: ContextTypes.DEFAULT_T
         try:
             from api.routes.events import EventBus
 
-            await EventBus.publish(chat.id, "ticket_closed", {
-                "ticket_id": ticket_id, "closed_by": user.id, "chat_id": chat.id,
-            })
+            await EventBus.publish(
+                chat.id,
+                "ticket_closed",
+                {
+                    "ticket_id": ticket_id,
+                    "closed_by": user.id,
+                    "chat_id": chat.id,
+                },
+            )
         except Exception:
             pass
 
@@ -526,11 +553,13 @@ async def _update_ticket_message(query, ticket: dict):
     priority_emoji = {"low": "🟢", "normal": "🔵", "high": "🟠", "urgent": "🔴"}.get(
         ticket["priority"], "🔵"
     )
-    status_emoji = {
-        "open": "📋", "in_progress": "🔧", "escalated": "⬆️", "closed": "✅"
-    }.get(ticket["status"], "📋")
+    status_emoji = {"open": "📋", "in_progress": "🔧", "escalated": "⬆️", "closed": "✅"}.get(
+        ticket["status"], "📋"
+    )
 
-    assigned_text = f"\n👷 Assigned to: {ticket['assigned_name']}" if ticket.get("assigned_name") else ""
+    assigned_text = (
+        f"\n👷 Assigned to: {ticket['assigned_name']}" if ticket.get("assigned_name") else ""
+    )
     escalation_text = (
         f"\n⬆️ Escalation level: {ticket['escalation_level']}"
         if ticket["escalation_level"] > 0
@@ -550,16 +579,22 @@ async def _update_ticket_message(query, ticket: dict):
         keyboard = None
         text += "\n\n✅ This ticket has been resolved."
     else:
-        keyboard = InlineKeyboardMarkup([
+        keyboard = InlineKeyboardMarkup(
             [
-                InlineKeyboardButton("📥 Claim", callback_data=f"ticket:claim:{ticket['id']}"),
-                InlineKeyboardButton("⬆️ Escalate", callback_data=f"ticket:escalate:{ticket['id']}"),
-            ],
-            [
-                InlineKeyboardButton("✅ Close", callback_data=f"ticket:close:{ticket['id']}"),
-                InlineKeyboardButton("🔄 Priority", callback_data=f"ticket:priority:{ticket['id']}"),
-            ],
-        ])
+                [
+                    InlineKeyboardButton("📥 Claim", callback_data=f"ticket:claim:{ticket['id']}"),
+                    InlineKeyboardButton(
+                        "⬆️ Escalate", callback_data=f"ticket:escalate:{ticket['id']}"
+                    ),
+                ],
+                [
+                    InlineKeyboardButton("✅ Close", callback_data=f"ticket:close:{ticket['id']}"),
+                    InlineKeyboardButton(
+                        "🔄 Priority", callback_data=f"ticket:priority:{ticket['id']}"
+                    ),
+                ],
+            ]
+        )
 
     try:
         await query.edit_message_text(text, parse_mode="HTML", reply_markup=keyboard)

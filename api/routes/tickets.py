@@ -268,13 +268,17 @@ async def add_ticket_message(
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat_id, "ticket_message", {
-            "ticket_id": ticket_id,
-            "sender_id": user_id,
-            "message_text": body.message_text,
-            "is_staff": body.is_staff,
-            "chat_id": chat_id,
-        })
+        await EventBus.publish(
+            chat_id,
+            "ticket_message",
+            {
+                "ticket_id": ticket_id,
+                "sender_id": user_id,
+                "message_text": body.message_text,
+                "is_staff": body.is_staff,
+                "chat_id": chat_id,
+            },
+        )
     except Exception:
         pass
 
@@ -307,12 +311,16 @@ async def assign_ticket(
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat_id, "ticket_assigned", {
-            "ticket_id": ticket_id,
-            "assigned_to": body.staff_id,
-            "assigned_name": body.staff_name,
-            "chat_id": chat_id,
-        })
+        await EventBus.publish(
+            chat_id,
+            "ticket_assigned",
+            {
+                "ticket_id": ticket_id,
+                "assigned_to": body.staff_id,
+                "assigned_name": body.staff_name,
+                "chat_id": chat_id,
+            },
+        )
     except Exception:
         pass
 
@@ -338,19 +346,28 @@ async def close_ticket(
 
     if body.note:
         await db_tickets.add_ticket_message(
-            db.pool, ticket_id, user_id, user.get("first_name", ""),
-            body.note, is_staff=True, is_system=False,
+            db.pool,
+            ticket_id,
+            user_id,
+            user.get("first_name", ""),
+            body.note,
+            is_staff=True,
+            is_system=False,
         )
 
     # Push SSE event
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat_id, "ticket_closed", {
-            "ticket_id": ticket_id,
-            "closed_by": user_id,
-            "chat_id": chat_id,
-        })
+        await EventBus.publish(
+            chat_id,
+            "ticket_closed",
+            {
+                "ticket_id": ticket_id,
+                "closed_by": user_id,
+                "chat_id": chat_id,
+            },
+        )
     except Exception:
         pass
 
@@ -378,11 +395,15 @@ async def escalate_ticket(
     try:
         from api.routes.events import EventBus
 
-        await EventBus.publish(chat_id, "ticket_escalated", {
-            "ticket_id": ticket_id,
-            "escalation_level": updated["escalation_level"],
-            "chat_id": chat_id,
-        })
+        await EventBus.publish(
+            chat_id,
+            "ticket_escalated",
+            {
+                "ticket_id": ticket_id,
+                "escalation_level": updated["escalation_level"],
+                "chat_id": chat_id,
+            },
+        )
     except Exception:
         pass
 

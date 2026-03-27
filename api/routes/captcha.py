@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.auth import get_current_user, require_auth
+from config import settings
 from db.client import db
 
 router = APIRouter(prefix="/api/groups/{chat_id}/captcha", tags=["captcha"])
@@ -43,6 +44,7 @@ async def get_captcha_settings(chat_id: int, user: dict = Depends(require_auth))
             "enabled": row["captcha_enabled"] if row else False,
             "type": row["captcha_mode"] if row else "button",
             "timeout": (row["captcha_timeout_mins"] or 5) * 60,
+            "has_external_url": bool(settings.RENDER_EXTERNAL_URL),
         }
     except HTTPException:
         raise

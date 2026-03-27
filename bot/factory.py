@@ -726,6 +726,13 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(h)
     logger.info("[FACTORY] Personality Presets handlers registered")
 
+    # ── Ticket / Support System handlers ──────────────────────────────────
+    from bot.handlers.tickets import ticket_handlers
+
+    for h in ticket_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Ticket support system handlers registered")
+
     # ── Custom Commands runtime engine ───────────────────────────────────────
     from bot.handlers.custom_commands import custom_command_handler
 

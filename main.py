@@ -415,6 +415,66 @@ async def lifespan(app: FastAPI):
     logger.info("[STARTUP] ✅ Federation XP sync background job started")
     # ───────────────────────────────────────────────────────────────────────
 
+    # ── Ticket Support System background jobs ─────────────────────────────
+    async def _ticket_auto_close_job():
+        await asyncio.sleep(900)  # 15 minute offset from other jobs
+        while True:
+            try:
+                from db.ops.tickets import auto_close_stale_tickets
+
+                closed = await auto_close_stale_tickets(pool)
+                if closed:
+                    logger.info(f"[TICKETS] Auto-closed {closed} stale ticket(s)")
+            except Exception as e:
+                logger.error(f"[TICKETS] Auto-close job error: {e}")
+            await asyncio.sleep(1800)  # Run every 30 minutes
+
+    async def _ticket_survey_job():
+        await asyncio.sleep(1200)  # 20 minute offset
+        while True:
+            try:
+                from db.ops.tickets import (get_unsurveyed_closed_tickets,
+                                            mark_survey_sent)
+
+                tickets = await get_unsurveyed_closed_tickets(pool)
+                for ticket in tickets:
+                    try:
+                        # Send satisfaction survey via DM to ticket creator
+                        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+                        keyboard = InlineKeyboardMarkup([
+                            [
+                                InlineKeyboardButton(
+                                    f"{'⭐' * i} ({i})",
+                                    callback_data=f"ticket:rate:{ticket['id']}:{i}",
+                                )
+                                for i in range(1, 6)
+                            ]
+                        ])
+                        await primary_app.bot.send_message(
+                            chat_id=ticket["creator_id"],
+                            text=(
+                                f"🎫 <b>Ticket #{ticket['id']} — Satisfaction Survey</b>\n\n"
+                                f"Your ticket \"{ticket['subject'][:50]}\" has been resolved.\n"
+                                f"How would you rate the support you received?\n\n"
+                                f"Please tap a rating below:"
+                            ),
+                            parse_mode="HTML",
+                            reply_markup=keyboard,
+                        )
+                        await mark_survey_sent(pool, ticket["id"])
+                    except Exception:
+                        # User may have blocked the bot — skip silently
+                        await mark_survey_sent(pool, ticket["id"])
+            except Exception as e:
+                logger.error(f"[TICKETS] Survey job error: {e}")
+            await asyncio.sleep(3600)  # Run hourly
+
+    asyncio.create_task(_ticket_auto_close_job())
+    asyncio.create_task(_ticket_survey_job())
+    logger.info("[STARTUP] ✅ Ticket background jobs started (auto-close + surveys)")
+    # ───────────────────────────────────────────────────────────────────────
+
     # ── Phase 5: Self Keep-Alive Ping ─────────────────────────────────────
     async def _keep_alive_ping():
         import aiohttp
@@ -701,6 +761,12 @@ try:
     logger.info("[STARTUP] Custom Commands API route registered")
 
     logger.info("[STARTUP] ✅ All v21 API routes registered")
+
+    # Ticket / Support System API routes
+    from api.routes import tickets as tickets_api
+
+    app.include_router(tickets_api.router, tags=["tickets"])
+    logger.info("[STARTUP] ✅ Ticket support system API route registered")
 
     # Eight New Features — Analytics Dashboard route
     from api.routes import analytics_dashboard as analytics_dashboard_api

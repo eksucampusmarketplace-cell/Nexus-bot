@@ -262,6 +262,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     from bot.handlers.notes import (delnote_command, note_command,
                                     notes_list_command, savenote_command)
+    from bot.handlers.public import (cmd_adminlist, cmd_groupinfo,
+                                     cmd_invitelink, cmd_kickme, cmd_time)
 
     app.add_handler(CommandHandler("savenote", savenote_command, filters=GROUP))
     app.add_handler(CommandHandler("note", note_command, filters=GROUP))
@@ -556,9 +558,6 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     )
 
     # ── Public command handlers ───────────────────────────────────────────
-    from bot.handlers.public import (cmd_adminlist, cmd_groupinfo,
-                                     cmd_invitelink, cmd_kickme, cmd_time)
-
     app.add_handler(CommandHandler("time", cmd_time, filters=GROUP))
     app.add_handler(CommandHandler("kickme", cmd_kickme, filters=GROUP))
     app.add_handler(CommandHandler("adminlist", cmd_adminlist, filters=GROUP))

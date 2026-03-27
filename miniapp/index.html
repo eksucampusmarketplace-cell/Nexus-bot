@@ -434,6 +434,8 @@
       <div id="page-channel-gate" class="page"></div>
       <div id="page-notes" class="page"></div>
       <div id="page-owner" class="page"></div>
+      <!-- Ticket Support System -->
+      <div id="page-tickets" class="page"></div>
       <!-- v21 pages -->
       <div id="page-trustnet" class="page"></div>
       <div id="page-captcha" class="page"></div>
@@ -614,6 +616,7 @@
         { id: 'history', label: 'Name History', icon: '📜' },
         { id: 'language', label: 'Language', icon: '🌍' },
         { id: 'persona', label: 'Bot Persona', icon: '🎭' },
+        { id: 'tickets', label: 'Tickets', icon: '🎫' },
       ];
 
       // Build sidebar nav (owner panel only shown if API confirms ownership)
@@ -848,6 +851,11 @@
         case 'federation': {
           const { renderFederationPage } = await import('./src/pages/federation.js?v=1.6.0');
           await renderFederationPage(container);
+          break;
+        }
+        case 'tickets': {
+          const { renderTicketsPage } = await import('./src/pages/tickets.js?v=1.6.0');
+          await renderTicketsPage(container);
           break;
         }
 

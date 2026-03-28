@@ -117,6 +117,25 @@ async def group_details(chat_id: int, user: dict = Depends(get_current_user)):
 async def get_settings(chat_id: int, user=Depends(get_current_user)):
     from db.ops.automod import get_group_settings
 
+    bot_token = user.get("validated_bot_token")
+    if bot_token:
+        token_hash = hash_token(bot_token)
+        async with db.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
+                token_hash,
+                chat_id,
+            )
+        if row and row["settings"]:
+            import json
+            s = row["settings"]
+            if isinstance(s, str):
+                try:
+                    s = json.loads(s)
+                except Exception:
+                    s = {}
+            return {"status": "ok", "settings": s}
+
     s = await get_group_settings(db.pool, chat_id)
     return {"status": "ok", "settings": s}
 
@@ -157,6 +176,35 @@ def _normalize_settings(incoming: dict, existing: dict):
 async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get_current_user)):
     await _verify_group_access(chat_id, user)
     from db.ops.automod import bulk_update_group_settings, get_group_settings
+
+    bot_token = user.get("validated_bot_token")
+    if bot_token:
+        import json as _json
+        token_hash = hash_token(bot_token)
+        async with db.pool.acquire() as conn:
+            existing_row = await conn.fetchrow(
+                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
+                token_hash,
+                chat_id,
+            )
+        existing = {}
+        if existing_row and existing_row["settings"]:
+            s = existing_row["settings"]
+            existing = s if isinstance(s, dict) else (_json.loads(s) if isinstance(s, str) else {})
+        incoming = settings.copy()
+        _normalize_settings(incoming, existing)
+        existing.update(incoming)
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO bot_group_settings (bot_token_hash, chat_id, settings, updated_at)
+                   VALUES ($1, $2, $3::jsonb, NOW())
+                   ON CONFLICT (bot_token_hash, chat_id) DO UPDATE
+                   SET settings = $3::jsonb, updated_at = NOW()""",
+                token_hash,
+                chat_id,
+                _json.dumps(existing),
+            )
+        return {"status": "ok"}
 
     existing = await get_group_settings(db.pool, chat_id)
     incoming = settings.copy()
@@ -220,7 +268,33 @@ async def bulk_update_settings(
 
     from db.ops.automod import bulk_update_group_settings
 
-    await bulk_update_group_settings(db.pool, chat_id, settings)
+    bot_token = user.get("validated_bot_token")
+    if bot_token:
+        import json as _json
+        token_hash = hash_token(bot_token)
+        async with db.pool.acquire() as conn:
+            existing_row = await conn.fetchrow(
+                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
+                token_hash,
+                chat_id,
+            )
+        existing = {}
+        if existing_row and existing_row["settings"]:
+            s = existing_row["settings"]
+            existing = s if isinstance(s, dict) else (_json.loads(s) if isinstance(s, str) else {})
+        existing.update(settings)
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """INSERT INTO bot_group_settings (bot_token_hash, chat_id, settings, updated_at)
+                   VALUES ($1, $2, $3::jsonb, NOW())
+                   ON CONFLICT (bot_token_hash, chat_id) DO UPDATE
+                   SET settings = $3::jsonb, updated_at = NOW()""",
+                token_hash,
+                chat_id,
+                _json.dumps(existing),
+            )
+    else:
+        await bulk_update_group_settings(db.pool, chat_id, settings)
 
     # Sync any flat lock_* keys to the locks table
     LOCK_KEY_MAP = {

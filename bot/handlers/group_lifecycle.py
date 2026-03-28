@@ -159,7 +159,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
         group_limit = config["group_limit"]  # 1–5
         policy = config["group_access_policy"]  # open|approval|blocked
         notify_owner = config["bot_add_notifications"]
-        is_owner = actor.id == owner_id
+        is_owner = actor.id == owner_id or is_primary_bot
 
         # Check property limits (for clone bots only)
         if not is_primary_bot:
@@ -223,7 +223,7 @@ async def handle_my_chat_member(update: Update, context: ContextTypes.DEFAULT_TY
             )
 
             # Send setup DM to owner
-            await _send_owner_setup_dm(context, owner_id, chat, bot_id)
+            await _send_owner_setup_dm(context, actor.id, chat, bot_id, is_primary=is_primary_bot)
             return
 
         # ── 2. STRANGER ADDING THE BOT ───────────────────────────────────────
@@ -403,25 +403,30 @@ async def _leave_with_limit_message(context, chat, error_msg: str):
         log.warning(f"[LIFECYCLE] Could not leave chat | chat={chat.id} error={e}")
 
 
-async def _send_owner_setup_dm(context, owner_id: int, chat, bot_id: int):
-    """DM the owner confirming their bot was added to a new group."""
+async def _send_owner_setup_dm(context, owner_id: int, chat, bot_id: int, is_primary: bool = False):
+    """DM the admin/owner confirming their bot was added to a new group."""
     miniapp_url = settings.MINI_APP_URL
     try:
-        # We need to send this via the primary bot if possible,
-        # or just via the current bot. The prompt says DM to owner via primary bot.
-        # But here 'context.bot' is the clone bot.
-        # To send via primary bot, we need its instance.
-        # For now, let's send via the current bot.
-        # Actually, let's check how other handlers do it.
-        await context.bot.send_message(
-            chat_id=owner_id,
-            text=(
+        if is_primary:
+            text = (
+                f"✅ <b>I've been added to a new group!</b>\n\n"
+                f"Group: <b>{chat.title}</b>\n"
+                f"ID: <code>{chat.id}</code>\n\n"
+                f"Open the Mini App to configure commands, auto-moderation, "
+                f"welcome messages, and more."
+                f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}"
+            )
+        else:
+            text = (
                 f"✅ <b>Your bot was added to a new group!</b>\n\n"
                 f"Group: <b>{chat.title}</b>\n"
                 f"ID: <code>{chat.id}</code>\n\n"
                 f"Open the Mini App to configure it."
                 f"\n\n⚡ Powered by {settings.BOT_DISPLAY_NAME}"
-            ),
+            )
+        await context.bot.send_message(
+            chat_id=owner_id,
+            text=text,
             parse_mode=ParseMode.HTML,
             reply_markup=support_keyboard(
                 include_miniapp=bool(miniapp_url), miniapp_url=miniapp_url

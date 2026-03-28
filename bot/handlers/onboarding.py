@@ -46,7 +46,7 @@ async def start_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
 
     await update.message.reply_text(
-        f"👋 Welcome! I'm {context.bot.bot.username}, your group management bot.\n\n"
+        f"👋 Welcome! I'm @{context.bot.username}, your group management bot.\n\n"
         "Let's get you set up. First, choose your language:",
         reply_markup=InlineKeyboardMarkup(keyboard),
     )

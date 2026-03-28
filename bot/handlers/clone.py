@@ -307,7 +307,9 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             # Now set up webhook for the reauthenticated bot
             try:
                 render_url = settings.RENDER_EXTERNAL_URL
-                webhook_url = f"{render_url}/webhook/{reauth_bot_id}"
+                reauth_token_hash = hash_token(token)
+                reauth_webhook_secret = reauth_token_hash[:32]
+                webhook_url = f"{render_url}/webhook/{reauth_webhook_secret}"
 
                 # Clear webhook first
                 async with httpx.AsyncClient(timeout=10.0) as client:
@@ -329,7 +331,8 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                                         "message",
                                         "callback_query",
                                         "chat_member",
-                                        "new_chat_members",
+                                        "my_chat_member",
+                                        "inline_query",
                                     ],
                                     "drop_pending_updates": True,
                                 },
@@ -855,10 +858,12 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
     If any step fails, raises an exception — caller handles messaging.
     """
     token = pending["token"]
+    token_hash = pending["token_hash"]
     bot_id = pending["bot_id"]
     username = pending["username"]
     render_url = settings.RENDER_EXTERNAL_URL
-    webhook_url = f"{render_url}/webhook/{bot_id}"
+    webhook_secret = token_hash[:32]
+    webhook_url = f"{render_url}/webhook/{webhook_secret}"
 
     logger.info(
         f"[CLONE][REGISTER] Starting | "
@@ -884,7 +889,7 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
             "username": username,
             "display_name": pending["display_name"],
             "token_encrypted": encrypt_token(token),
-            "token_hash": pending["token_hash"],
+            "token_hash": token_hash,
             "owner_user_id": owner_user_id,
             "webhook_url": webhook_url,
             "is_primary": False,
@@ -912,7 +917,8 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
                             "message",
                             "callback_query",
                             "chat_member",
-                            "new_chat_members",
+                            "my_chat_member",
+                            "inline_query",
                         ],
                         "drop_pending_updates": True,
                     },

@@ -367,18 +367,47 @@ async def reauth_bot(bot_id: int, request: Request, user: dict = Depends(get_cur
         bot_id,
     )
 
-    # Re-register webhook
+    # Re-register webhook using token-hash-based secret (not raw bot_id)
     render_url = settings.RENDER_EXTERNAL_URL
-    webhook_url = f"{render_url}/webhook/{bot_id}"
+    new_token_hash = hash_token(new_token)
+    webhook_secret = new_token_hash[:32]
+    webhook_url = f"{render_url}/webhook/{webhook_secret}"
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             await client.post(
-                f"https://api.telegram.org/bot{new_token}/setWebhook", json={"url": webhook_url}
+                f"https://api.telegram.org/bot{new_token}/setWebhook",
+                json={
+                    "url": webhook_url,
+                    "allowed_updates": [
+                        "message",
+                        "callback_query",
+                        "chat_member",
+                        "my_chat_member",
+                        "inline_query",
+                    ],
+                    "drop_pending_updates": True,
+                },
             )
         await update_bot_status(db.pool, bot_id, "active", webhook_active=True)
     except Exception as e:
+        logger.warning(f"[API] setWebhook failed during reauth: {e}")
         await update_bot_status(db.pool, bot_id, "active", webhook_active=False)
+
+    # Spin up or replace the PTB Application for the reauthenticated bot
+    try:
+        await registry_deregister(bot_id)
+    except Exception:
+        pass
+    try:
+        clone_app = create_application(new_token, is_primary=False)
+        clone_app.bot_data["db_pool"] = db.pool
+        await clone_app.initialize()
+        await clone_app.start()
+        await registry_register(bot_id, clone_app)
+        logger.info(f"[API] Reauth: PTB app re-registered for bot_id={bot_id}")
+    except Exception as e:
+        logger.warning(f"[API] Reauth: Failed to spin up PTB app for bot_id={bot_id}: {e}")
 
     return {"status": "reauthenticated", "bot_id": bot_id}
 

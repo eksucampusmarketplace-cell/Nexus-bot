@@ -84,10 +84,9 @@ def validate_token_format(token: str) -> bool:
     """
     Quick regex-free format check before hitting Telegram API.
     Telegram bot tokens are: {bot_id}:{secret}
-    - bot_id: numeric string (currently 8-12 digits)
-    - secret: alphanumeric/hyphen/underscore (usually 35-50 chars)
+    - bot_id: numeric string (8-15 digits, newer bots have longer IDs)
+    - secret: alphanumeric/hyphen/underscore (30+ chars, length varies)
     """
     import re
 
-    # More permissive regex to handle newer/longer Telegram bot tokens
-    return bool(re.match(r"^\d{8,12}:[\w-]{35,50}$", token))
+    return bool(re.match(r"^\d{8,15}:[\w-]{30,}$", token))

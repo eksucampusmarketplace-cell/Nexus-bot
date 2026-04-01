@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
     primary_token = settings.PRIMARY_BOT_TOKEN
 
     # Validate token format before attempting to initialize
-    token_pattern = r"^\d{8,12}:[\w-]{35,50}$"
+    token_pattern = r"^\d{8,15}:[\w-]{30,}$"
     if not re.match(token_pattern, primary_token):
         logger.error(
             "[STARTUP] ❌ Invalid PRIMARY_BOT_TOKEN format. "

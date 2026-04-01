@@ -76,7 +76,13 @@ export async function apiFetch(path, options = {}) {
     let detail = `HTTP ${res.status}`;
     try {
       const body = await res.json();
-      detail = body.detail || JSON.stringify(body);
+      if (body.detail) {
+        detail = typeof body.detail === 'object'
+          ? (body.detail.error || JSON.stringify(body.detail))
+          : body.detail;
+      } else {
+        detail = JSON.stringify(body);
+      }
     } catch (_) {}
     throw new Error(detail);
   }

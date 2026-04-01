@@ -266,11 +266,24 @@ async def _send_welcome(bot, chat_id, user, settings, db):
     try:
         from bot.handlers.greetings import welcome_handler
 
-        # Mocking update and context to reuse existing welcome_handler
+        async def _noop_reply(*args, **kwargs):
+            pass
+
+        class _MockMessage:
+            def __init__(self, user):
+                self.new_chat_members = [user]
+
+            async def reply_text(self, *args, **kwargs):
+                pass
+
+        class _MockChat:
+            def __init__(self, chat_id):
+                self.id = chat_id
+
         class MockUpdate:
             def __init__(self, user, chat_id):
-                self.message = type("obj", (object,), {"new_chat_members": [user]})
-                self.effective_chat = type("obj", (object,), {"id": chat_id})
+                self.message = _MockMessage(user)
+                self.effective_chat = _MockChat(chat_id)
                 self.effective_message = self.message
 
         class MockContext:

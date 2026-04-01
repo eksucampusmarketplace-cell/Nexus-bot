@@ -32,7 +32,7 @@ import re
 from datetime import datetime, timezone
 
 import httpx
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.constants import ParseMode
 from telegram.ext import (
     CallbackQueryHandler,
@@ -153,15 +153,15 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         reply_method = update.message.reply_text
 
     await reply_method(
-        r"🔁 *Create Your Own Bot*"
-        + "\n\n"
-        + "Follow these steps to create your branded Nexus bot:\n\n"
+        "🔁 *Create Your Own Bot*"
+        "\n\n"
+        "Follow these steps to create your branded Nexus bot:\n\n"
         "*Step 1:* Open @BotFather\n"
         "*Step 2:* Send /newbot and follow the instructions\n"
         "*Step 3:* Choose a name and username for your bot\n"
-        "*Step 4:* Copy the token BotFather gives you\n"
-        "*Step 5:* Paste the token here\n\n"
-        r"_Your bot will keep its own name, username, and photo_\.\n\n"
+        r"*Step 4:* Copy the token BotFather gives you" "\n"
+        r"*Step 5:* Paste the token here" "\n\n"
+        r"_Your bot will keep its own name, username, and photo_\." "\n\n"
         r"⚠️ Only paste tokens for bots *you own*\!",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
@@ -396,11 +396,11 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         limit_row.append(InlineKeyboardButton("∞ Unlimited", callback_data="clone:limit:0"))
 
     await processing.edit_text(
-        r"✅ *Token verified\!*\n\n"
-        rf"🤖 @{cloned_username}\n"
-        rf"📛 {cloned_name}\n\n"
-        r"How many groups should this bot work in?\n"
-        r"Default: 1",
+        r"✅ *Token verified\!" + "\n\n"
+        f"🤖 @{cloned_username}\n"
+        f"📛 {cloned_name}\n\n"
+        "How many groups should this bot work in?\n"
+        "Default: 1",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [
@@ -444,8 +444,8 @@ async def on_limit_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         "Who can add this bot to groups?\n\n"
-        r"🔒 *Only me*: Only you can add this bot\.\n"
-        r"✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\.\n"
+        r"🔒 *Only me*: Only you can add this bot\." "\n"
+        r"✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\." "\n"
         r"🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
@@ -586,14 +586,14 @@ async def _show_final_confirmation(query, context):
     cloned_bot_id = pending["bot_id"]
 
     await query.edit_message_text(
-        rf"✅ *Settings saved\!*\n\n"
-        rf"🤖 @{cloned_username}\n"
-        rf"🆔 `{cloned_bot_id}`\n\n"
-        r"*Summary:*\n"
-        rf"👥 Group limit: {pending.get('group_limit', 1)}\n"
-        rf"🛡️ Policy: {pending.get('group_access_policy', 'blocked')}\n"
-        rf"🔔 Notify: {'Yes' if pending.get('bot_add_notifications') else 'No'}\n\n"
-        r"Confirm to register this bot as a Nexus clone?",
+        r"✅ *Settings saved\!*" + "\n\n"
+        f"🤖 @{cloned_username}\n"
+        f"🆔 `{cloned_bot_id}`\n\n"
+        "*Summary:*\n"
+        f"👥 Group limit: {pending.get('group_limit', 1)}\n"
+        f"🛡️ Policy: {pending.get('group_access_policy', 'blocked')}\n"
+        f"🔔 Notify: {'Yes' if pending.get('bot_add_notifications') else 'No'}\n\n"
+        "Confirm to register this bot as a Nexus clone?",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
             [
@@ -736,26 +736,33 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
 
     if not clones:
         await update.message.reply_text(
-            r"You have no clones yet\.\n\nSend /clone to add your first one\.",
+            r"You have no clones yet\." + "\n\nSend /clone to add your first one\\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
         return
 
-    text = rf"🤖 *Your Bots* \({len(clones)}\)\n\n"
+    text = rf"🤖 *Your Bots* \({len(clones)}\)" + "\n\n"
     keyboard = []
+
+    import re as _re
+
+    def _md_escape(s: str) -> str:
+        return _re.sub(r"([_*\[\]()~`>#+=|{}.!\\-])", r"\\\1", str(s))
 
     for bot in clones:
         status_icon = "👑" if bot["is_primary"] else ("🟢" if bot["status"] == "active" else "🔴")
         webhook_icon = "🔗" if bot["webhook_active"] else "⚠️"
         label = r" \(Primary\)" if bot["is_primary"] else ""
+        display_name = _md_escape(bot["display_name"])
+        added_at_str = _md_escape(bot["added_at"].strftime("%b %d %Y"))
 
         text += (
             f"{status_icon} *@{bot['username']}*{label}\n"
-            f"   📛 {bot['display_name']}\n"
+            f"   📛 {display_name}\n"
             f"   🆔 `{bot['bot_id']}`\n"
             f"   {webhook_icon} Webhook: {'active' if bot['webhook_active'] else 'inactive'}\n"
             f"   👥 Groups: {bot['groups_count']}\n"
-            f"   📅 Added: {bot['added_at'].strftime('%b %d %Y')}\n\n"
+            f"   📅 Added: {added_at_str}\n\n"
         )
 
         if not bot["is_primary"]:
@@ -793,9 +800,9 @@ async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not args or len(args) < 2:
         await update.message.reply_text(
-            r"📖 *Usage:*\n"
-            r"`/cloneset limit <1-5>`\n"
-            r"`/cloneset policy open|approval|blocked`\n"
+            r"📖 *Usage:*" + "\n"
+            r"`/cloneset limit <1-5>`" + "\n"
+            r"`/cloneset policy open|approval|blocked`" + "\n"
             r"`/cloneset notify on|off`",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
@@ -974,15 +981,15 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
     # Step 6: Send success message with trial info
     logger.info(f"[CLONE][REGISTER] ✅ Complete | bot_id={bot_id} | @{username}")
     await edit_message.edit_text(
-        rf"🚀 *@{username} is live\!*\n\n"
-        rf"📛 {pending['display_name']}\n"
-        rf"🆔 `{bot_id}`\n"
-        r"🔗 Webhook: active\n\n"
-        rf"🕐 15\-day trial with Starter features active\.\n"
-        rf"Add it to any group as admin — it will appear in your Mini App dashboard\.",
+        rf"🚀 *@{username} is live\!*" + "\n\n"
+        f"📛 {pending['display_name']}\n"
+        f"🆔 `{bot_id}`\n"
+        r"🔗 Webhook: active" + "\n\n"
+        r"🕐 15\-day trial with Starter features active\." + "\n"
+        r"Add it to any group as admin — it will appear in your Mini App dashboard\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🚀 Open Mini App", web_app={"url": f"{render_url}/miniapp"})]]
+            [[InlineKeyboardButton("🚀 Open Mini App", web_app=WebAppInfo(url=f"{render_url}/miniapp"))]]
         ),
     )
 
@@ -1034,7 +1041,7 @@ clone_conversation = ConversationHandler(
     states={
         WAITING_FOR_TOKEN: [
             MessageHandler(
-                filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d{8,12}:[\w\-]{35,50}$"),
+                filters.TEXT & ~filters.COMMAND & filters.Regex(r"^\d{8,15}:[\w\-]{30,}$"),
                 token_input_handler,
             ),
             CallbackQueryHandler(on_cancel, pattern=r"^clone:cancel$"),

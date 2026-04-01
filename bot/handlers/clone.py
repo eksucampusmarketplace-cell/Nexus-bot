@@ -159,9 +159,12 @@ async def clone_command_handler(update: Update, context: ContextTypes.DEFAULT_TY
         "*Step 1:* Open @BotFather\n"
         "*Step 2:* Send /newbot and follow the instructions\n"
         "*Step 3:* Choose a name and username for your bot\n"
-        r"*Step 4:* Copy the token BotFather gives you" "\n"
-        r"*Step 5:* Paste the token here" "\n\n"
-        r"_Your bot will keep its own name, username, and photo_\." "\n\n"
+        r"*Step 4:* Copy the token BotFather gives you"
+        "\n"
+        r"*Step 5:* Paste the token here"
+        "\n\n"
+        r"_Your bot will keep its own name, username, and photo_\."
+        "\n\n"
         r"⚠️ Only paste tokens for bots *you own*\!",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
@@ -208,8 +211,8 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         await log_clone_attempt(db_pool, user.id, False, "invalid_format")
         logger.warning(f"[CLONE] Invalid format | user_id={user.id} | masked={mask_token(token)}")
         await processing.edit_text(
-            r"❌ Invalid token format\.\n\n"
-            r"It should look like: `1234567890:ABCdef\.\.\.`\n\n"
+            r"❌ Invalid token format\." + "\n\n"
+            r"It should look like: `1234567890:ABCdef\.\.\.`" + "\n\n"
             r"Send /clone to try again\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
@@ -229,7 +232,8 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
         if existing["status"] == "dead":
             await processing.edit_text(
-                rf"⚠️ @{existing['username']} is already registered but its token was revoked\.\n\n"
+                rf"⚠️ @{existing['username']} is already registered but its token was revoked\."
+                + "\n\n"
                 r"Send /myclones and use *Re\-authenticate* to fix it\.",
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
@@ -444,8 +448,10 @@ async def on_limit_chosen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(
         "Who can add this bot to groups?\n\n"
-        r"🔒 *Only me*: Only you can add this bot\." "\n"
-        r"✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\." "\n"
+        r"🔒 *Only me*: Only you can add this bot\."
+        "\n"
+        r"✅ *Anyone \(open\)*: Anyone can add it\. They can use it but won't have owner\-level control\."
+        "\n"
         r"🔔 *Approval needed*: Anyone can add it, but you'll get a request to approve or deny each group\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
@@ -989,7 +995,13 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
         r"Add it to any group as admin — it will appear in your Mini App dashboard\.",
         parse_mode=ParseMode.MARKDOWN_V2,
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("🚀 Open Mini App", web_app=WebAppInfo(url=f"{render_url}/miniapp"))]]
+            [
+                [
+                    InlineKeyboardButton(
+                        "🚀 Open Mini App", web_app=WebAppInfo(url=f"{render_url}/miniapp")
+                    )
+                ]
+            ]
         ),
     )
 

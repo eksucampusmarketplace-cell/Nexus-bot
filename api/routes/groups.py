@@ -64,46 +64,25 @@ async def list_groups(user: dict = Depends(get_current_user)):
         return await get_user_managed_groups(user["id"])
 
     token_hash = hash_token(bot_token)
-    
-    # Check if user is the clone owner
-    is_clone_owner = user.get("role") == "owner" and user.get("validated_bot_id") is not None
 
     async with db.pool.acquire() as conn:
-        if is_clone_owner:
-            # Clone owner: show ALL groups where their bot is active
-            # (including groups added by third parties)
-            rows = await conn.fetch(
-                """
-                SELECT g.chat_id, g.title, g.member_count, g.settings,
-                       g.photo_big, g.photo_small, g.bot_token_hash
-                FROM groups g
-                JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
-                JOIN bots b ON b.bot_id = cbg.bot_id
-                WHERE b.token_hash = $1
-                  AND cbg.is_active = TRUE
-                ORDER BY g.title
-                """,
-                token_hash,
-            )
-        else:
-            # Regular user: show all groups linked to their bot token
-            rows = await conn.fetch(
-                """
-                SELECT g.chat_id, g.title, g.member_count, g.settings,
-                       g.photo_big, g.photo_small, g.bot_token_hash
-                FROM groups g
-                WHERE g.bot_token_hash = $1
-                UNION
-                SELECT g.chat_id, g.title, g.member_count, g.settings,
-                       g.photo_big, g.photo_small, g.bot_token_hash
-                FROM groups g
-                JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
-                JOIN bots b ON b.bot_id = cbg.bot_id
-                WHERE b.token_hash = $1
-                ORDER BY title
-                """,
-                token_hash,
-            )
+        rows = await conn.fetch(
+            """
+            SELECT g.chat_id, g.title, g.member_count, g.settings,
+                   g.photo_big, g.photo_small, g.bot_token_hash
+            FROM groups g
+            WHERE g.bot_token_hash = $1
+            UNION
+            SELECT g.chat_id, g.title, g.member_count, g.settings,
+                   g.photo_big, g.photo_small, g.bot_token_hash
+            FROM groups g
+            JOIN clone_bot_groups cbg ON g.chat_id = cbg.chat_id
+            JOIN bots b ON b.bot_id = cbg.bot_id
+            WHERE b.token_hash = $1
+            ORDER BY title
+            """,
+            token_hash,
+        )
         res = []
         for row in rows:
             d = dict(row)

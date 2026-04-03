@@ -8,10 +8,11 @@ All routes require authentication via get_current_user.
 import asyncio
 import logging
 import httpx
+import time
 from fastapi import APIRouter, Depends, HTTPException, Request
 from typing import List
 
-from api.auth import get_current_user
+from api.auth import get_current_user, require_overlord, require_clone_owner_or_overlord
 from bot.registry import (
     register as registry_register,
     deregister as registry_deregister,
@@ -42,6 +43,45 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["bots"])
 
 CLONE_RATE_LIMIT = 5
+
+# Rate limiting for API calls (in-memory, per process)
+_api_call_tracker: dict = {}
+API_RATE_LIMIT_WINDOW = 60  # 1 minute
+API_RATE_LIMIT_MAX = 30  # 30 calls per minute for regular users
+API_RATE_LIMIT_CLONE_OWNER = 60  # 60 calls per minute for clone owners
+API_RATE_LIMIT_OVERLORD = 1000  # Overlord has high limit
+
+
+def check_api_rate_limit(user: dict) -> tuple[bool, str]:
+    """
+    Check API rate limit for a user.
+    Overlords have highest limit, clone owners have higher than regular users.
+    """
+    user_id = user.get("id")
+    now = time.time()
+    
+    # Determine limit based on role
+    if user.get("is_overlord"):
+        limit = API_RATE_LIMIT_OVERLORD
+    elif user.get("is_clone_owner"):
+        limit = API_RATE_LIMIT_CLONE_OWNER
+    else:
+        limit = API_RATE_LIMIT_MAX
+    
+    if user_id not in _api_call_tracker:
+        _api_call_tracker[user_id] = []
+    
+    # Clean old calls
+    _api_call_tracker[user_id] = [
+        t for t in _api_call_tracker[user_id]
+        if now - t < API_RATE_LIMIT_WINDOW
+    ]
+    
+    if len(_api_call_tracker[user_id]) >= limit:
+        return False, f"Rate limit exceeded. Try again in {int(API_RATE_LIMIT_WINDOW)} seconds."
+    
+    _api_call_tracker[user_id].append(now)
+    return True, ""
 
 
 @router.get("")

@@ -109,11 +109,17 @@ async def get_current_user(request: Request):
             user_id = user.get("id")
             if bot_id is None:
                 # Primary bot
-                user["role"] = "owner" if user_id == settings.OWNER_ID else "admin"
-                logger.info(f"[AUTH] Validated via primary bot token | user_id={user_id}")
+                if user_id == settings.OWNER_ID:
+                    user["role"] = "overlord"  # Main bot owner - highest privilege
+                    user["is_overlord"] = True
+                else:
+                    user["role"] = "admin"
+                    user["is_overlord"] = False
+                logger.info(f"[AUTH] Validated via primary bot token | user_id={user_id} | role={user['role']}")
             else:
                 # Clone bot — check if this user owns the clone
                 user["role"] = "admin"
+                user["is_overlord"] = False
                 try:
                     from db.client import db as _db
                     from bot.utils.crypto import hash_token
@@ -126,12 +132,13 @@ async def get_current_user(request: Request):
                                 token_hash,
                             )
                             if bot_row and bot_row["owner_user_id"] == user_id:
-                                user["role"] = "owner"
+                                user["role"] = "owner"  # Clone owner
+                                user["is_clone_owner"] = True
                 except Exception as role_err:
                     logger.debug(f"[AUTH] Role lookup failed: {role_err}")
 
                 logger.info(
-                    f"[AUTH] Validated via clone token bot_id={bot_id} | user_id={user_id}"
+                    f"[AUTH] Validated via clone token bot_id={bot_id} | user_id={user_id} | role={user['role']}"
                 )
 
             return user
@@ -194,3 +201,35 @@ async def require_auth(request: Request):
                 user["bot_id"] = 0
 
     return user
+
+
+async def require_overlord(request: Request):
+    """
+    Require main bot owner (overlord) access.
+    Used for sensitive operations that only the bot owner should access.
+    """
+    user = await get_current_user(request)
+    
+    if not user.get("is_overlord"):
+        raise HTTPException(
+            status_code=403,
+            detail={"error": "This operation requires bot owner privileges", "code": "FORBIDDEN"}
+        )
+    
+    return user
+
+
+async def require_clone_owner_or_overlord(request: Request):
+    """
+    Require either clone owner or overlord access.
+    Used for bot management operations.
+    """
+    user = await get_current_user(request)
+    
+    if user.get("is_overlord") or user.get("is_clone_owner"):
+        return user
+    
+    raise HTTPException(
+        status_code=403,
+        detail={"error": "This operation requires bot ownership", "code": "FORBIDDEN"}
+    )

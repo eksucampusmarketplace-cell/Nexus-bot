@@ -1,6 +1,19 @@
 from telegram import User
 
 
+def escape_markdown_v2(text: str) -> str:
+    """Escapes strings for Telegram's MarkdownV2 parse mode."""
+    if not text:
+        return ""
+    # Standard MarkdownV2 special characters that must be escaped outside code blocks
+    # Backslash must be escaped first, so it's at the beginning of the string.
+    special_chars = r"\_*[]()~`>#+-=|{}.!"
+    res = str(text)
+    for char in special_chars:
+        res = res.replace(char, f"\\{char}")
+    return res
+
+
 def get_main_bot_ref() -> str:
     """Returns a safe reference to the main bot (never empty string).
 

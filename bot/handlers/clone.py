@@ -53,6 +53,7 @@ from bot.utils.crypto import (
     mask_token,
     validate_token_format,
 )
+from bot.utils.format import escape_markdown_v2
 from config import settings
 from db.ops.bots import (
     count_recent_clone_attempts,
@@ -230,16 +231,17 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             f"[CLONE] Duplicate token | user_id={user.id} | existing_bot=@{existing['username']} | status={existing['status']}"
         )
 
+        esc_existing_username = escape_markdown_v2(existing["username"])
         if existing["status"] == "dead":
             await processing.edit_text(
-                rf"⚠️ @{existing['username']} is already registered but its token was revoked\."
+                rf"⚠️ @{esc_existing_username} is already registered but its token was revoked\."
                 + "\n\n"
                 r"Send /myclones and use *Re\-authenticate* to fix it\.",
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
         else:
             await processing.edit_text(
-                rf"⚠️ This token belongs to @{existing['username']} which is already a registered clone\.",
+                rf"⚠️ This token belongs to @{esc_existing_username} which is already a registered clone\.",
                 parse_mode=ParseMode.MARKDOWN_V2,
             )
         return ConversationHandler.END
@@ -277,8 +279,9 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.warning(
             f"[CLONE] Token rejected by Telegram | user_id={user.id} | reason={err_desc}"
         )
+        esc_err = escape_markdown_v2(err_desc)
         await processing.edit_text(
-            rf"❌ Telegram rejected this token:\n_{err_desc}_\n\nSend /clone to try again\.",
+            rf"❌ Telegram rejected this token:\n_{esc_err}_\n\nSend /clone to try again\.",
             parse_mode=ParseMode.MARKDOWN_V2,
         )
         return ConversationHandler.END
@@ -360,8 +363,9 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     await clone_app.start()
                     await registry_register(reauth_bot_id, clone_app)
 
+                    esc_username = escape_markdown_v2(cloned_username)
                     await processing.edit_text(
-                        rf"✅ *@{cloned_username} re\-authenticated\!*\n\n"
+                        rf"✅ *@{esc_username} re\-authenticated\!*\n\n"
                         r"Your bot is now active again\.",
                         parse_mode=ParseMode.MARKDOWN_V2,
                     )
@@ -400,9 +404,9 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         limit_row.append(InlineKeyboardButton("∞ Unlimited", callback_data="clone:limit:0"))
 
     await processing.edit_text(
-        r"✅ *Token verified\!" + "\n\n"
-        f"🤖 @{cloned_username}\n"
-        f"📛 {cloned_name}\n\n"
+        r"✅ *Token verified\!*" + "\n\n"
+        f"🤖 @{escape_markdown_v2(cloned_username)}\n"
+        f"📛 {escape_markdown_v2(cloned_name)}\n\n"
         "How many groups should this bot work in?\n"
         "Default: 1",
         parse_mode=ParseMode.MARKDOWN_V2,
@@ -588,7 +592,7 @@ async def on_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def _show_final_confirmation(query, context):
     pending = context.user_data.get("pending_clone", {})
-    cloned_username = pending["username"]
+    cloned_username = escape_markdown_v2(pending["username"])
     cloned_bot_id = pending["bot_id"]
 
     await query.edit_message_text(
@@ -750,20 +754,16 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
     text = rf"🤖 *Your Bots* \({len(clones)}\)" + "\n\n"
     keyboard = []
 
-    import re as _re
-
-    def _md_escape(s: str) -> str:
-        return _re.sub(r"([_*\[\]()~`>#+=|{}.!\\-])", r"\\\1", str(s))
-
     for bot in clones:
         status_icon = "👑" if bot["is_primary"] else ("🟢" if bot["status"] == "active" else "🔴")
         webhook_icon = "🔗" if bot["webhook_active"] else "⚠️"
         label = r" \(Primary\)" if bot["is_primary"] else ""
-        display_name = _md_escape(bot["display_name"])
-        added_at_str = _md_escape(bot["added_at"].strftime("%b %d %Y"))
+        display_name = escape_markdown_v2(bot["display_name"])
+        username = escape_markdown_v2(bot["username"])
+        added_at_str = escape_markdown_v2(bot["added_at"].strftime("%b %d %Y"))
 
         text += (
-            f"{status_icon} *@{bot['username']}*{label}\n"
+            f"{status_icon} *@{username}*{label}\n"
             f"   📛 {display_name}\n"
             f"   🆔 `{bot['bot_id']}`\n"
             f"   {webhook_icon} Webhook: {'active' if bot['webhook_active'] else 'inactive'}\n"
@@ -986,9 +986,11 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
 
     # Step 6: Send success message with trial info
     logger.info(f"[CLONE][REGISTER] ✅ Complete | bot_id={bot_id} | @{username}")
+    esc_username = escape_markdown_v2(username)
+    esc_display_name = escape_markdown_v2(pending["display_name"])
     await edit_message.edit_text(
-        rf"🚀 *@{username} is live\!*" + "\n\n"
-        f"📛 {pending['display_name']}\n"
+        rf"🚀 *@{esc_username} is live\!*" + "\n\n"
+        f"📛 {esc_display_name}\n"
         f"🆔 `{bot_id}`\n"
         r"🔗 Webhook: active" + "\n\n"
         r"🕐 15\-day trial with Starter features active\." + "\n"

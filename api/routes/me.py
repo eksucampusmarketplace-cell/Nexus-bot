@@ -125,6 +125,25 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     mod_groups = []
     member_groups = []
 
+    # Check if this is a clone owner - they should see all groups where their bot is active
+    is_clone_owner = user.get("role") == "owner" and user.get("validated_bot_id") is not None
+    bot_owner_group_ids = set()
+
+    if is_clone_owner:
+        # Fetch all active groups for this clone bot (owner sees all groups, not just is_owner_group)
+        async with db.pool.acquire() as conn:
+            owner_groups = await conn.fetch(
+                """
+                SELECT cbg.chat_id
+                FROM clone_bot_groups cbg
+                JOIN bots b ON b.bot_id = cbg.bot_id
+                WHERE b.token_hash = $1 AND cbg.is_active = TRUE
+                """,
+                token_hash,
+            )
+            bot_owner_group_ids = {row["chat_id"] for row in owner_groups}
+            logger.info(f"[ME] Clone owner detected | user_id={user_id} | total_bot_groups={len(bot_owner_group_ids)}")
+
     async def _process_group(group_row):
         chat_id = group_row["chat_id"]
         title = group_row["title"]
@@ -138,7 +157,9 @@ async def get_user_context(user: dict = Depends(get_current_user)):
                 group_settings = {}
 
         status = await get_user_telegram_status(bot_app.bot, chat_id, user_id)
-        return chat_id, title, member_count, photo_big, group_settings, status
+        # Clone owners also have access to groups they own via is_owner_group
+        is_owner_via_clone = chat_id in bot_owner_group_ids
+        return chat_id, title, member_count, photo_big, group_settings, status, is_owner_via_clone
 
     results = await asyncio.gather(
         *[_process_group(row) for row in all_groups], return_exceptions=True
@@ -148,9 +169,10 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         if isinstance(result, Exception):
             logger.warning(f"[ME] Error processing group: {result}")
             continue
-        chat_id, title, member_count, photo_big, group_settings, status = result
+        chat_id, title, member_count, photo_big, group_settings, status, is_owner_via_clone = result
 
-        if status in ["owner", "admin"]:
+        # User has admin access if: they are Telegram admin/owner OR they are the clone owner of this group
+        if status in ["owner", "admin"] or is_owner_via_clone:
             boost_settings = group_settings.get("member_boost", {})
             channel_settings = group_settings.get("channel_gate", {})
 
@@ -161,7 +183,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
                     "username": None,
                     "member_count": member_count or 0,
                     "photo_big": photo_big,
-                    "is_owner": status == "owner",
+                    "is_owner": status == "owner" or is_owner_via_clone,
                     "boost_enabled": boost_settings.get("force_add_enabled", False),
                     "channel_gate_enabled": channel_settings.get("force_channel_enabled", False),
                 }

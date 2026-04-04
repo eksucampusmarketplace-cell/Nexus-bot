@@ -144,9 +144,11 @@ async def get_settings(chat_id: int, user=Depends(get_current_user)):
 def _normalize_settings(incoming: dict, existing: dict):
     if "locks" not in existing:
         existing["locks"] = {}
-    for k, v in list(incoming.items()):
+    # Pop lock_* keys from incoming and move them to existing["locks"]
+    # This prevents double-processing (flat keys also being written as JSONB)
+    for k in list(incoming.keys()):
         if k.startswith("lock_"):
-            existing["locks"][k[5:]] = v
+            existing["locks"][k[5:]] = incoming.pop(k)
     incoming["locks"] = existing["locks"]
 
     if "antiflood_limit" in incoming:
@@ -454,7 +456,27 @@ async def set_slowmode(chat_id: int, body: dict, user: dict = Depends(get_curren
 @router.delete("/{chat_id}/settings/reset")
 async def reset_settings(chat_id: int, user: dict = Depends(get_current_user)):
     await _verify_group_access(chat_id, user)
-    await update_group_settings(chat_id, {})
+    
+    bot_token = user.get("validated_bot_token")
+    token_hash = hash_token(bot_token) if bot_token else None
+    
+    async with db.pool.acquire() as conn:
+        # Reset groups table settings
+        await conn.execute("UPDATE groups SET settings='{}'::jsonb WHERE chat_id=$1", chat_id)
+        # Also reset bot_group_settings overrides if this is a clone bot context
+        if token_hash:
+            await conn.execute(
+                "DELETE FROM bot_group_settings WHERE chat_id=$1 AND bot_token_hash=$2",
+                chat_id, token_hash
+            )
+        else:
+            # For main bot, delete all bot_group_settings for this chat_id
+            await conn.execute("DELETE FROM bot_group_settings WHERE chat_id=$1", chat_id)
+    
+    # Publish SSE event so all pages re-fetch settings
+    from api.routes.events import EventBus
+    await EventBus.publish(chat_id, "settings_change", {"settings": {}, "reset": True})
+    
     return {"ok": True}
 
 

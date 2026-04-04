@@ -576,6 +576,22 @@
         sse.on('bot_action', (data) => {
           nc.push({ type: 'bot_action', title: 'Bot action', body: data.action });
         });
+        // Listen for settings_change events (e.g., from reset on another device/page)
+        sse.on('settings_change', async (data) => {
+          if (data.reset) {
+            // Settings were reset - clear store and re-render current page
+            state.setSettings({});
+            const currentPage = getState().activePage;
+            if (currentPage) {
+              // Re-render the current page to get fresh settings
+              try { await renderPage(currentPage); } catch (e) { console.error('[SSE] Re-render failed:', e); }
+            }
+            showToast('Settings were reset', 'success');
+          } else if (data.settings) {
+            // Merge updated settings into store
+            state.setSettings({ ...getState().settings, ...data.settings });
+          }
+        });
         sse.connect(activeChatId);
       }
 
@@ -1378,6 +1394,10 @@
         });
         container.appendChild(logCard);
         logCard.querySelector('#save-log-channel-btn').onclick = () => _updateGroupSetting('log_channel_id', logCard.querySelector('#input-log-channel').value);
+        // Auto-save log channel on blur (when user tabs/clicks away)
+        logCard.querySelector('#input-log-channel').addEventListener('blur', async (e) => {
+          await _updateGroupSetting('log_channel_id', e.target.value);
+        });
         logCard.querySelector('#test-log-channel-btn').onclick = async () => {
           try {
             await apiFetch(`/api/groups/${chatId}/log-channel/test`, { method: 'POST' });
@@ -1459,6 +1479,14 @@
           await _updateGroupSetting('password_enabled', !!val);
           showToast(val ? 'Password set' : 'Password cleared', 'success');
         });
+        // Auto-save join password on blur
+        joinPwRow.querySelector('#join-password-input').addEventListener('blur', async (e) => {
+          const val = e.target.value.trim();
+          if (val) {
+            await _updateGroupSetting('join_password', val);
+            await _updateGroupSetting('password_enabled', true);
+          }
+        });
 
         // ── 7. CUSTOM MESSAGES ────────────────────────────────────────────
         const groupMsgsCard = Card({ title: '📝 Group Custom Messages', subtitle: 'Customize responses for this group', children: '<div id="group-messages-container"></div>' });
@@ -1481,7 +1509,10 @@
             if (!confirm('Are you absolutely sure?')) return;
             try {
               await apiFetch(`/api/groups/${chatId}/settings/reset`, { method: 'DELETE' });
+              // Clear store settings so all pages reflect the reset
+              state.setSettings({});
               showToast('Settings reset', 'success');
+              // Re-render settings page
               await renderSettings(container);
             } catch (err) { showToast('Failed to reset', 'error'); }
           };

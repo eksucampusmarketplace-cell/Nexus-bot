@@ -127,6 +127,7 @@ class InputValidationMiddleware:
             "/api/bots",
             "/api/analytics",
             "/health",
+            "/webhook",  # Telegram webhook payloads are handled by PTB
         }
 
     async def __call__(self, request: Request, call_next: Callable):

@@ -155,7 +155,7 @@ export async function renderCaptchaPage(container) {
       showToast(t('loading', 'Saving...'), 'info');
       await apiFetch(`/api/groups/${chatId}/captcha`, {
         method: 'POST',
-        body: JSON.stringify({ enabled, type, timeout, kick_failures: kickFailures })
+        body: { enabled, type, timeout, kick_failures: kickFailures }
       });
       showToast(t('toast_save_success', 'Saved successfully!'), 'success');
     } catch (err) {

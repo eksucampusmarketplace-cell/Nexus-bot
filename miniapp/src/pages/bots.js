@@ -53,7 +53,7 @@ export async function renderBotsPage(container) {
     btn.textContent = '⏳ Adding...';
     btn.disabled = true;
     try {
-      const result = await apiFetch('/api/bots/clone', { method: 'POST', body: JSON.stringify({ token }) });
+      const result = await apiFetch('/api/bots/clone', { method: 'POST', body: { token } });
       showToast(`Bot @${result.username} added successfully!`, 'success');
       addClonePanel.style.display = 'none';
       addClonePanel.querySelector('#clone-token-input').value = '';
@@ -151,7 +151,7 @@ export async function renderBotsPage(container) {
             confirmBtn.textContent = '⏳ Verifying...';
             confirmBtn.disabled = true;
             try {
-              await apiFetch(`/api/bots/${bot.bot_id || bot.id}/reauth`, { method: 'POST', body: JSON.stringify({ token: newToken }) });
+              await apiFetch(`/api/bots/${bot.bot_id || bot.id}/reauth`, { method: 'POST', body: { token: newToken } });
               showToast('Bot re-authenticated successfully!', 'success');
               await renderBotsPage(container);
             } catch (e) {
@@ -255,7 +255,7 @@ export async function renderBotsPage(container) {
             try {
               await apiFetch(`/api/bots/${botId}/config`, {
                 method: 'PUT',
-                body: JSON.stringify({ group_limit: limit, group_access_policy: policy }),
+                body: { group_limit: limit, group_access_policy: policy },
               });
               showToast('Settings saved', 'success');
             } catch (e) {

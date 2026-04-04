@@ -331,7 +331,7 @@ function renderXPContent(container, chatId, data, settings) {
     try {
       await apiFetch(`/api/groups/${chatId}/xp/settings`, {
         method: 'PUT',
-        body: JSON.stringify(newSettings)
+        body: newSettings
       });
       showToast('Settings saved!', 'success');
     } catch (e) {
@@ -345,7 +345,7 @@ function renderXPContent(container, chatId, data, settings) {
     try {
       await apiFetch(`/api/groups/${chatId}/xp/double`, {
         method: 'POST',
-        body: JSON.stringify({ hours })
+        body: { hours }
       });
       showToast(`Double XP started for ${hours} hours!`, 'success');
       banner.style.display = 'block';

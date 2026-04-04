@@ -104,7 +104,7 @@ export async function renderFederationPage(container) {
       showToast(t('joining', 'Joining...'));
       await apiFetch('/api/federation/join', {
         method: 'POST',
-        body: JSON.stringify({ invite_code: code })
+        body: { invite_code: code }
       });
       showToast(t('joined_success', 'Joined federation!'));
       loadFederationData(myFedSection);

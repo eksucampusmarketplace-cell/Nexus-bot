@@ -119,21 +119,21 @@ function renderBroadcastForm(container, botInfo, isOwner) {
             if (includeClones) {
                 result = await apiFetch('/api/broadcast/global', {
                     method: 'POST',
-                    body: JSON.stringify({
+                    body: {
                         target_type: targetType,
                         content: content,
                         include_clones: true
-                    })
+                    }
                 });
                 showToast(`Global broadcast started: ${result.tasks.length} tasks created`, 'success');
             } else {
                 result = await apiFetch('/api/broadcast', {
                     method: 'POST',
-                    body: JSON.stringify({
+                    body: {
                         bot_id: botInfo.id,
                         target_type: targetType,
                         content: content
-                    })
+                    }
                 });
                 showToast(`Broadcast started for ${result.total_targets} targets`, 'success');
             }

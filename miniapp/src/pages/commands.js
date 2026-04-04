@@ -502,7 +502,7 @@ function renderCategories(container, categories, commandStates, chatId) {
         try {
           await apiFetch(`/api/groups/${chatId}/commands/states`, {
             method: 'PUT',
-            body: JSON.stringify(updates)
+            body: updates
           });
           showToast(`${val ? t('enabled', 'Enabled') : t('disabled', 'Disabled')} ${t('all', 'all')} ${category.title.replace(/^[^\s]+\s/, '')} ${t('commands', 'commands')}`, 'success');
         } catch (e) {
@@ -580,7 +580,7 @@ function renderCommandRow(cmd, commandStates, chatId) {
       try {
         await apiFetch(`/api/groups/${chatId}/commands/states`, {
           method: 'PUT',
-          body: JSON.stringify({ [key]: val })
+          body: { [key]: val }
         });
         showToast(`${cmd.cmd} ${val ? t('enabled', 'enabled') : t('disabled', 'disabled')}`, 'success');
       } catch (e) {

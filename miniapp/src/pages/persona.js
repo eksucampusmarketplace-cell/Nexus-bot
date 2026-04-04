@@ -153,7 +153,7 @@ export async function renderPersonaPage(container) {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/personality`, {
         method: 'POST',
-        body: JSON.stringify({ tone, greetingStyle, welcomeMessage, emojiStyle })
+        body: { tone, greetingStyle, welcomeMessage, emojiStyle }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {

@@ -50,7 +50,7 @@ export async function renderNotesPage(container) {
     try {
       await apiFetch(`/api/groups/${chatId}/notes`, {
         method: 'POST',
-        body: JSON.stringify({ name, content })
+        body: { name, content }
       });
       showToast(t('notes_saved', 'Note saved!'), 'success');
       createCard.querySelector('#note-name-input').value = '';

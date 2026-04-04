@@ -196,7 +196,7 @@ async function _testWebhook(webhook, chatId) {
   try {
     const result = await apiFetch(`/api/groups/${chatId}/webhooks/${webhook.id}/test`, {
       method: 'POST',
-      body: JSON.stringify({ event_type: 'member_join' })
+      body: { event_type: 'member_join' }
     });
     
     if (result.success) {
@@ -304,12 +304,12 @@ function _showWebhookModal(chatId, webhook = null) {
       if (isEdit) {
         await apiFetch(`/api/groups/${chatId}/webhooks/${webhook.id}`, {
           method: 'PUT',
-          body: JSON.stringify(payload)
+          body: payload
         });
       } else {
         await apiFetch(`/api/groups/${chatId}/webhooks`, {
           method: 'POST',
-          body: JSON.stringify(payload)
+          body: payload
         });
       }
       showToast(`Webhook ${isEdit ? 'updated' : 'created'}`, 'success');

@@ -61,17 +61,19 @@ async def save_captcha_settings(
 ):
     """Save captcha settings for a group."""
     try:
-        async with db.pool.acquire() as conn:
-            await conn.execute(
-                """UPDATE groups 
-                   SET captcha_enabled = $1, captcha_mode = $2, captcha_timeout_mins = $3, captcha_max_attempts = $4
-                   WHERE chat_id = $5""",
-                settings.enabled,
-                settings.type,
-                max(1, settings.timeout // 60),
-                settings.kick_failures,
-                chat_id,
-            )
+        from db.ops.automod import bulk_update_group_settings
+
+        await bulk_update_group_settings(
+            db.pool,
+            chat_id,
+            {
+                "captcha_enabled": settings.enabled,
+                "captcha_mode": settings.type,
+                "captcha_timeout_mins": max(1, settings.timeout // 60),
+                "captcha_kick_on_timeout": settings.kick_failures > 0,
+                "captcha_max_attempts": settings.kick_failures,
+            },
+        )
 
         return {
             "ok": True,

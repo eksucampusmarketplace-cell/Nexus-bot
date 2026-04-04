@@ -84,7 +84,7 @@ export async function renderBackupPage(container) {
       const data = JSON.parse(text);
       await apiFetch(`/api/groups/${chatId}/restore`, {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: data
       });
       showToast('Backup restored successfully!', 'success');
     } catch (err) {

@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     PORT: int = 8000
     RENDER_EXTERNAL_URL: Optional[str] = None
-    CLONE_ACCESS: str = "owner_only"  # owner_only | anyone
+    CLONE_ACCESS: str = "anyone"  # owner_only | anyone
     SECRET_KEY: Optional[str] = None  # Fernet key for token encryption
     SUPPORT_GROUP_URL: Optional[str] = None  # Optional support group link for the Mini App
 

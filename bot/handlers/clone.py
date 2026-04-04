@@ -595,12 +595,15 @@ async def _show_final_confirmation(query, context):
     cloned_username = escape_markdown_v2(pending["username"])
     cloned_bot_id = pending["bot_id"]
 
+    group_limit = pending.get("group_limit", 1)
+    limit_display = "Unlimited" if group_limit == 0 else str(group_limit)
+
     await query.edit_message_text(
         r"✅ *Settings saved\!*" + "\n\n"
         f"🤖 @{cloned_username}\n"
         f"🆔 `{cloned_bot_id}`\n\n"
         "*Summary:*\n"
-        f"👥 Group limit: {pending.get('group_limit', 1)}\n"
+        f"👥 Group limit: {limit_display}\n"
         f"🛡️ Policy: {pending.get('group_access_policy', 'blocked')}\n"
         f"🔔 Notify: {'Yes' if pending.get('bot_add_notifications') else 'No'}\n\n"
         "Confirm to register this bot as a Nexus clone?",
@@ -791,7 +794,7 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
     )
 
 
-# ─── /cloneset ────────────────────────────────────────────────────────────────
+# ─── /cloneset ────────────────────────────────────────�����───────────────────────
 
 
 async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -807,7 +810,7 @@ async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not args or len(args) < 2:
         await update.message.reply_text(
             r"📖 *Usage:*" + "\n"
-            r"`/cloneset limit <1-5>`" + "\n"
+            r"`/cloneset limit <0-20>` (0 = Unlimited)" + "\n"
             r"`/cloneset policy open|approval|blocked`" + "\n"
             r"`/cloneset notify on|off`",
             parse_mode=ParseMode.MARKDOWN_V2,
@@ -830,12 +833,19 @@ async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from db.ops.bots import update_bot_access_settings
 
     if subcommand == "limit":
-        if not value.isdigit() or not (1 <= int(value) <= 20):
-            await update.message.reply_text("❌ Limit must be between 1 and 20.")
+        if not value.isdigit() or not (0 <= int(value) <= 20):
+            await update.message.reply_text("❌ Limit must be between 0 and 20 (0 = Unlimited).")
             return
+        
+        # Only owner can set to 0 (Unlimited)
+        if int(value) == 0 and user.id != settings.OWNER_ID:
+            await update.message.reply_text("❌ Only the bot owner can set an unlimited group limit.")
+            return
+
         await update_bot_access_settings(db_pool, bot_id, group_limit=int(value))
+        limit_text = "Unlimited" if int(value) == 0 else value
         await update.message.reply_text(
-            f"✅ Group limit updated to {value} for @{target_bot['username']}."
+            f"✅ Group limit updated to {limit_text} for @{target_bot['username']}."
         )
 
     elif subcommand == "policy":

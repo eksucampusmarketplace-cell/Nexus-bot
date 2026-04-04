@@ -17,10 +17,14 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from db.client import db
-from db.ops.custom_commands import (check_rate_limit, get_actions,
-                                    get_all_enabled_commands_with_triggers,
-                                    get_variables, increment_execution,
-                                    set_variable)
+from db.ops.custom_commands import (
+    check_rate_limit,
+    get_actions,
+    get_all_enabled_commands_with_triggers,
+    get_variables,
+    increment_execution,
+    set_variable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -87,11 +91,7 @@ async def _resolve_variable(
     if var_name == "user.last_name":
         return (user.last_name or "") if user else ""
     if var_name == "user.username":
-        return (
-            f"@{user.username}"
-            if user and user.username
-            else user.full_name if user else ""
-        )
+        return f"@{user.username}" if user and user.username else user.full_name if user else ""
     if var_name == "user.id":
         return str(user.id) if user else "0"
     if var_name == "user.mention":
@@ -206,6 +206,7 @@ async def _evaluate_condition(
         return True
 
     cond_type = condition.get("type", "")
+    msg = update.message
 
     if cond_type == "role_check":
         # Check if user has a specific role
@@ -248,7 +249,57 @@ async def _evaluate_condition(
             return False
 
     if cond_type == "reply_check":
-        return update.message.reply_to_message is not None
+        return bool(msg is not None and msg.reply_to_message)
+
+    if cond_type == "has_photo":
+        return bool(msg is not None and msg.photo)
+
+    if cond_type == "has_video":
+        return bool(msg is not None and msg.video)
+
+    if cond_type == "has_document":
+        return bool(msg is not None and msg.document)
+
+    if cond_type == "has_audio":
+        return bool(msg is not None and msg.audio)
+
+    if cond_type == "has_voice":
+        return bool(msg is not None and msg.voice)
+
+    if cond_type == "has_sticker":
+        return bool(msg is not None and msg.sticker)
+
+    if cond_type == "has_link":
+        if not msg:
+            return False
+        text = msg.text or msg.caption or ""
+        url_pattern = r"https?://|www\.|t\.me/|telegram\."
+        return bool(re.search(url_pattern, text, re.IGNORECASE))
+
+    if cond_type == "is_forwarded":
+        return bool(getattr(msg, "forward_date", False))
+
+    if cond_type == "user_id_match":
+        target_id = condition.get("user_id", 0)
+        if not target_id:
+            return False
+        target = msg.reply_to_message.from_user if msg and msg.reply_to_message else None
+        user = update.effective_user
+        if target:
+            return str(target.id) == str(target_id)
+        if user:
+            return str(user.id) == str(target_id)
+        return False
+
+    if cond_type == "user_name_contains":
+        name_part = condition.get("name", "").lower()
+        target = msg.reply_to_message.from_user if msg and msg.reply_to_message else None
+        user = update.effective_user
+        if target:
+            return name_part in target.full_name.lower()
+        if user:
+            return name_part in user.full_name.lower()
+        return False
 
     return True
 
@@ -297,15 +348,11 @@ async def _execute_action(
 
     elif action_type == "warn":
         target = (
-            update.message.reply_to_message.from_user
-            if update.message.reply_to_message
-            else None
+            update.message.reply_to_message.from_user if update.message.reply_to_message else None
         )
         if target:
             reason = config.get("reason", "Custom command auto-warn")
-            reason = await _substitute_variables(
-                reason, update, context, chat_id, command_id
-            )
+            reason = await _substitute_variables(reason, update, context, chat_id, command_id)
             try:
                 from db.ops.users import add_warn
 
@@ -318,9 +365,7 @@ async def _execute_action(
 
     elif action_type == "mute":
         target = (
-            update.message.reply_to_message.from_user
-            if update.message.reply_to_message
-            else None
+            update.message.reply_to_message.from_user if update.message.reply_to_message else None
         )
         if target:
             try:
@@ -335,17 +380,14 @@ async def _execute_action(
                     until_date=until_date,
                 )
                 await update.message.reply_text(
-                    f"Muted {target.full_name}"
-                    + (f" for {duration}s" if duration > 0 else "")
+                    f"Muted {target.full_name}" + (f" for {duration}s" if duration > 0 else "")
                 )
             except Exception as e:
                 logger.warning(f"[CUSTOM_CMD] mute action failed: {e}")
 
     elif action_type == "unmute":
         target = (
-            update.message.reply_to_message.from_user
-            if update.message.reply_to_message
-            else None
+            update.message.reply_to_message.from_user if update.message.reply_to_message else None
         )
         if target:
             try:
@@ -365,9 +407,7 @@ async def _execute_action(
 
     elif action_type == "kick":
         target = (
-            update.message.reply_to_message.from_user
-            if update.message.reply_to_message
-            else None
+            update.message.reply_to_message.from_user if update.message.reply_to_message else None
         )
         if target:
             try:
@@ -378,9 +418,7 @@ async def _execute_action(
 
     elif action_type == "ban":
         target = (
-            update.message.reply_to_message.from_user
-            if update.message.reply_to_message
-            else None
+            update.message.reply_to_message.from_user if update.message.reply_to_message else None
         )
         if target:
             try:
@@ -388,12 +426,9 @@ async def _execute_action(
                 until_date = None
                 if duration > 0:
                     until_date = datetime.now(timezone.utc).timestamp() + duration
-                await context.bot.ban_chat_member(
-                    chat_id, target.id, until_date=until_date
-                )
+                await context.bot.ban_chat_member(chat_id, target.id, until_date=until_date)
                 await update.message.reply_text(
-                    f"Banned {target.full_name}"
-                    + (f" for {duration}s" if duration > 0 else "")
+                    f"Banned {target.full_name}" + (f" for {duration}s" if duration > 0 else "")
                 )
             except Exception as e:
                 logger.warning(f"[CUSTOM_CMD] ban action failed: {e}")
@@ -412,9 +447,7 @@ async def _execute_action(
 
     elif action_type == "promote":
         target = (
-            update.message.reply_to_message.from_user
-            if update.message.reply_to_message
-            else None
+            update.message.reply_to_message.from_user if update.message.reply_to_message else None
         )
         if target:
             try:
@@ -433,9 +466,7 @@ async def _execute_action(
 
     elif action_type == "demote":
         target = (
-            update.message.reply_to_message.from_user
-            if update.message.reply_to_message
-            else None
+            update.message.reply_to_message.from_user if update.message.reply_to_message else None
         )
         if target:
             try:
@@ -456,12 +487,8 @@ async def _execute_action(
         photo_url = config.get("photo_url", "")
         caption = config.get("caption", "")
         if photo_url:
-            photo_url = await _substitute_variables(
-                photo_url, update, context, chat_id, command_id
-            )
-            caption = await _substitute_variables(
-                caption, update, context, chat_id, command_id
-            )
+            photo_url = await _substitute_variables(photo_url, update, context, chat_id, command_id)
+            caption = await _substitute_variables(caption, update, context, chat_id, command_id)
             try:
                 await context.bot.send_photo(chat_id, photo_url, caption=caption, parse_mode="HTML")
             except Exception as e:
@@ -499,9 +526,7 @@ async def _execute_action(
         var_name = config.get("var_name", "")
         var_value = config.get("var_value", "")
         if var_name:
-            var_value = await _substitute_variables(
-                var_value, update, context, chat_id, command_id
-            )
+            var_value = await _substitute_variables(var_value, update, context, chat_id, command_id)
             try:
                 await set_variable(
                     db.pool,
@@ -514,12 +539,154 @@ async def _execute_action(
             except Exception as e:
                 logger.warning(f"[CUSTOM_CMD] set_variable action failed: {e}")
 
+    elif action_type == "send_audio":
+        audio_url = config.get("audio_url", "")
+        caption = config.get("caption", "")
+        performer = config.get("performer", "")
+        title = config.get("title", "")
+        if audio_url:
+            audio_url = await _substitute_variables(audio_url, update, context, chat_id, command_id)
+            caption = await _substitute_variables(caption, update, context, chat_id, command_id)
+            try:
+                await context.bot.send_audio(
+                    chat_id, audio_url, caption=caption, performer=performer, title=title
+                )
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_audio action failed: {e}")
 
-def _match_trigger(trigger: dict, message_text: str, is_command: bool) -> bool:
+    elif action_type == "send_video":
+        video_url = config.get("video_url", "")
+        caption = config.get("caption", "")
+        if video_url:
+            video_url = await _substitute_variables(video_url, update, context, chat_id, command_id)
+            caption = await _substitute_variables(caption, update, context, chat_id, command_id)
+            try:
+                await context.bot.send_video(chat_id, video_url, caption=caption, parse_mode="HTML")
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_video action failed: {e}")
+
+    elif action_type == "send_document":
+        document_url = config.get("document_url", "")
+        caption = config.get("caption", "")
+        if document_url:
+            document_url = await _substitute_variables(
+                document_url, update, context, chat_id, command_id
+            )
+            caption = await _substitute_variables(caption, update, context, chat_id, command_id)
+            try:
+                await context.bot.send_document(
+                    chat_id, document_url, caption=caption, parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_document action failed: {e}")
+
+    elif action_type == "send_voice":
+        voice_url = config.get("voice_url", "")
+        caption = config.get("caption", "")
+        if voice_url:
+            voice_url = await _substitute_variables(voice_url, update, context, chat_id, command_id)
+            caption = await _substitute_variables(caption, update, context, chat_id, command_id)
+            try:
+                await context.bot.send_voice(chat_id, voice_url, caption=caption)
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_voice action failed: {e}")
+
+    elif action_type == "send_location":
+        latitude = config.get("latitude", 0)
+        longitude = config.get("longitude", 0)
+        try:
+            await context.bot.send_location(chat_id, latitude, longitude)
+        except Exception as e:
+            logger.warning(f"[CUSTOM_CMD] send_location action failed: {e}")
+
+    elif action_type == "send_venue":
+        latitude = config.get("latitude", 0)
+        longitude = config.get("longitude", 0)
+        title = config.get("title", "")
+        address = config.get("address", "")
+        if latitude and longitude and title and address:
+            try:
+                await context.bot.send_venue(chat_id, latitude, longitude, title, address)
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_venue action failed: {e}")
+
+    elif action_type == "send_contact":
+        phone_number = config.get("phone_number", "")
+        first_name = config.get("first_name", "")
+        last_name = config.get("last_name", "")
+        if phone_number and first_name:
+            try:
+                await context.bot.send_contact(chat_id, phone_number, first_name, last_name)
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_contact action failed: {e}")
+
+    elif action_type == "forward":
+        to_chat_id = config.get("to_chat_id", "")
+        if to_chat_id and update.message:
+            try:
+                await context.bot.forward_message(
+                    int(to_chat_id), chat_id, update.message.message_id
+                )
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] forward action failed: {e}")
+
+    elif action_type == "send_sticker":
+        sticker_url = config.get("sticker_url", "")
+        if sticker_url:
+            sticker_url = await _substitute_variables(
+                sticker_url, update, context, chat_id, command_id
+            )
+            try:
+                await context.bot.send_sticker(chat_id, sticker_url)
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_sticker action failed: {e}")
+
+    elif action_type == "send_dice":
+        emoji = config.get("emoji", "🎲")
+        try:
+            await context.bot.send_dice(chat_id, emoji=emoji)
+        except Exception as e:
+            logger.warning(f"[CUSTOM_CMD] send_dice action failed: {e}")
+
+    elif action_type == "unpin_all":
+        try:
+            await context.bot.unpin_all_chat_messages(chat_id)
+            await update.message.reply_text("Unpinned all messages")
+        except Exception as e:
+            logger.warning(f"[CUSTOM_CMD] unpin_all action failed: {e}")
+
+    elif action_type == "set_title":
+        new_title = config.get("title", "")
+        if new_title:
+            new_title = await _substitute_variables(new_title, update, context, chat_id, command_id)
+            try:
+                await context.bot.set_chat_title(chat_id, new_title)
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] set_title action failed: {e}")
+
+    elif action_type == "set_description":
+        new_desc = config.get("description", "")
+        if new_desc:
+            new_desc = await _substitute_variables(new_desc, update, context, chat_id, command_id)
+            try:
+                await context.bot.set_chat_description(chat_id, new_desc)
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] set_description action failed: {e}")
+
+    elif action_type == "leave":
+        try:
+            await context.bot.leave_chat(chat_id)
+        except Exception as e:
+            logger.warning(f"[CUSTOM_CMD] leave action failed: {e}")
+
+
+def _match_trigger(trigger: dict, message_text: str, is_command: bool, update: Update) -> bool:
     """Check if a message matches a trigger."""
     trigger_type = trigger.get("type", "")
     trigger_value = trigger.get("value", "")
     case_sensitive = trigger.get("case_sensitive", False)
+
+    msg = update.message
 
     if trigger_type == "command":
         if not is_command:
@@ -554,12 +721,66 @@ def _match_trigger(trigger: dict, message_text: str, is_command: bool) -> bool:
             return message_text.strip() == trigger_value.strip()
         return message_text.strip().lower() == trigger_value.strip().lower()
 
+    # Content-based triggers
+    if trigger_type == "has_attachment":
+        if not msg:
+            return False
+        return bool(
+            msg.photo
+            or msg.video
+            or msg.document
+            or msg.audio
+            or msg.voice
+            or msg.location
+            or msg.venue
+            or msg.contact
+        )
+
+    if trigger_type == "has_photo":
+        if not msg:
+            return False
+        return bool(msg.photo)
+
+    if trigger_type == "has_video":
+        if not msg:
+            return False
+        return bool(msg.video)
+
+    if trigger_type == "has_document":
+        if not msg:
+            return False
+        return bool(msg.document)
+
+    if trigger_type == "has_voice":
+        if not msg:
+            return False
+        return bool(msg.voice)
+
+    if trigger_type == "has_sticker":
+        if not msg:
+            return False
+        return bool(msg.sticker)
+
+    if trigger_type == "has_link":
+        if not msg or not message_text:
+            return False
+        url_pattern = r"https?://|www\.|t\.me/|telegram\."
+        return bool(re.search(url_pattern, message_text, re.IGNORECASE))
+
+    if trigger_type == "forwarded":
+        if not msg:
+            return False
+        return bool(getattr(msg, "forward_date", False))
+
+    if trigger_type == "is_reply":
+        if not msg:
+            return False
+        return bool(msg.reply_to_message)
+
     return False
 
 
-async def custom_command_handler(
-    update: Update, context: ContextTypes.DEFAULT_TYPE
-) -> None:
+async def custom_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """
     Main handler that intercepts messages and checks for custom command triggers.
     Should be registered at a low priority group so it runs after built-in commands.
@@ -576,7 +797,11 @@ async def custom_command_handler(
     elif update.message.left_chat_member:
         message_text = "__left_member__"
 
-    if not message_text and not update.message.new_chat_members and not update.message.left_chat_member:
+    if (
+        not message_text
+        and not update.message.new_chat_members
+        and not update.message.left_chat_member
+    ):
         return
 
     is_command = message_text.startswith("/")
@@ -591,7 +816,7 @@ async def custom_command_handler(
         # Check if any trigger matches
         matched = False
         for trigger in cmd.get("triggers", []):
-            if _match_trigger(trigger, message_text, is_command):
+            if _match_trigger(trigger, message_text, is_command, update):
                 matched = True
                 break
 
@@ -601,13 +826,9 @@ async def custom_command_handler(
         # Check rate limit
         cooldown = cmd.get("cooldown_secs", 0) or 0
         if cooldown > 0:
-            allowed = await check_rate_limit(
-                db.pool, chat_id, user_id, cmd["id"], cooldown
-            )
+            allowed = await check_rate_limit(db.pool, chat_id, user_id, cmd["id"], cooldown)
             if not allowed:
-                logger.debug(
-                    f"[CUSTOM_CMD] Rate-limited: cmd={cmd['name']} user={user_id}"
-                )
+                logger.debug(f"[CUSTOM_CMD] Rate-limited: cmd={cmd['name']} user={user_id}")
                 continue
 
         # Execute actions
@@ -616,9 +837,7 @@ async def custom_command_handler(
             executed = 0
             for action in actions:
                 if executed >= MAX_ACTIONS_PER_EXEC:
-                    logger.warning(
-                        f"[CUSTOM_CMD] Max actions reached for cmd={cmd['name']}"
-                    )
+                    logger.warning(f"[CUSTOM_CMD] Max actions reached for cmd={cmd['name']}")
                     break
 
                 # Evaluate condition
@@ -633,8 +852,7 @@ async def custom_command_handler(
 
             await increment_execution(db.pool, cmd["id"])
             logger.debug(
-                f"[CUSTOM_CMD] Executed '{cmd['name']}' in chat {chat_id} "
-                f"({executed} actions)"
+                f"[CUSTOM_CMD] Executed '{cmd['name']}' in chat {chat_id} " f"({executed} actions)"
             )
         except Exception as e:
             logger.error(f"[CUSTOM_CMD] Error executing '{cmd['name']}': {e}")

@@ -10,12 +10,22 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import get_current_user
 from db.client import db
-from db.ops.custom_commands import (add_action, add_trigger, create_command,
-                                    delete_action, delete_command,
-                                    delete_trigger, get_actions, get_command,
-                                    get_triggers, get_variables, list_commands,
-                                    set_variable, update_action,
-                                    update_command)
+from db.ops.custom_commands import (
+    add_action,
+    add_trigger,
+    create_command,
+    delete_action,
+    delete_command,
+    delete_trigger,
+    get_actions,
+    get_command,
+    get_triggers,
+    get_variables,
+    list_commands,
+    set_variable,
+    update_action,
+    update_command,
+)
 
 router = APIRouter(
     prefix="/api/groups/{chat_id}/custom-commands",
@@ -47,9 +57,7 @@ async def list_custom_commands(chat_id: int, user: dict = Depends(get_current_us
 
 
 @router.post("")
-async def create_custom_command(
-    chat_id: int, body: dict, user: dict = Depends(get_current_user)
-):
+async def create_custom_command(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
     """Create a new custom command."""
     name = body.get("name", "").strip()
     if not name:
@@ -97,9 +105,7 @@ async def create_custom_command(
 
 
 @router.get("/{command_id}")
-async def get_custom_command(
-    chat_id: int, command_id: int, user: dict = Depends(get_current_user)
-):
+async def get_custom_command(chat_id: int, command_id: int, user: dict = Depends(get_current_user)):
     """Get a specific custom command with its triggers and actions."""
     try:
         cmd = await get_command(db.pool, command_id)
@@ -307,12 +313,88 @@ async def test_custom_command(
         triggers = await get_triggers(db.pool, command_id)
         actions = await get_actions(db.pool, command_id)
 
+        # Trigger types reference
+        trigger_types = [
+            "command",
+            "keyword",
+            "regex",
+            "exact",
+            "new_member",
+            "left_member",
+            "message",
+            "has_attachment",
+            "has_photo",
+            "has_video",
+            "has_document",
+            "has_voice",
+            "has_sticker",
+            "has_link",
+            "forwarded",
+            "is_reply",
+        ]
+
+        # Action types reference
+        action_types = [
+            "reply",
+            "delete",
+            "react",
+            "warn",
+            "mute",
+            "unmute",
+            "kick",
+            "ban",
+            "unban",
+            "promote",
+            "demote",
+            "pin",
+            "unpin_all",
+            "set_variable",
+            "send_photo",
+            "send_audio",
+            "send_video",
+            "send_document",
+            "send_voice",
+            "send_sticker",
+            "send_dice",
+            "send_location",
+            "send_venue",
+            "send_contact",
+            "forward",
+            "webhook",
+            "set_title",
+            "set_description",
+            "leave",
+        ]
+
+        # Condition types reference
+        condition_types = [
+            "role_check",
+            "variable_check",
+            "reply_check",
+            "has_photo",
+            "has_video",
+            "has_document",
+            "has_audio",
+            "has_voice",
+            "has_sticker",
+            "has_link",
+            "is_forwarded",
+            "user_id_match",
+            "user_name_contains",
+        ]
+
         # Build preview
         preview = {
             "command": cmd["name"],
             "enabled": cmd["enabled"],
+            "cooldown_secs": cmd.get("cooldown_secs", 0),
+            "priority": cmd.get("priority", 0),
             "triggers": [
-                {"type": t["trigger_type"], "value": t["trigger_value"]}
+                {
+                    "type": t["trigger_type"],
+                    "value": t["trigger_value"],
+                    "case_sensitive": t.get("case_sensitive"),
+                }
                 for t in triggers
             ],
             "actions": [
@@ -321,9 +403,13 @@ async def test_custom_command(
                     "config": a["action_config"],
                     "condition": a["condition"],
                     "order": a["sort_order"],
+                    "delay": a.get("delay_secs", 0),
                 }
                 for a in actions
             ],
+            "trigger_types_available": trigger_types,
+            "action_types_available": action_types,
+            "condition_types_available": condition_types,
             "variables_available": [
                 "user.name",
                 "user.first_name",

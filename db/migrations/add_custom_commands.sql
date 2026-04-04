@@ -28,7 +28,12 @@ CREATE TABLE IF NOT EXISTS command_triggers (
     command_id  BIGINT NOT NULL REFERENCES custom_commands(id) ON DELETE CASCADE,
     trigger_type TEXT NOT NULL,
     -- 'command' = /cmd, 'keyword' = contains word, 'regex' = regex match,
-    -- 'new_member' = on join, 'message' = any message
+    -- 'new_member' = on join, 'left_member' = on leave,
+    -- 'message' = any message, 'exact' = exact text match,
+    -- 'has_attachment' = has photo/video/document, 'has_photo' = has photo,
+    -- 'has_video' = has video, 'has_document' = has document,
+    -- 'has_voice' = has voice note, 'has_sticker' = has sticker,
+    -- 'has_link' = contains URL, 'forwarded' = is forwarded
     trigger_value TEXT NOT NULL DEFAULT '',
     -- e.g. the command name, keyword, or regex pattern
     case_sensitive BOOLEAN DEFAULT FALSE,
@@ -46,13 +51,21 @@ CREATE TABLE IF NOT EXISTS command_actions (
     -- 'reply' = send text, 'delete' = delete trigger msg,
     -- 'warn' = warn user, 'mute' = mute user, 'ban' = ban user,
     -- 'kick' = kick user, 'pin' = pin message, 'react' = add reaction,
-    -- 'set_variable' = set a variable value
+    -- 'set_variable' = set a variable value, 'send_photo' = send photo,
+    -- 'send_audio' = send audio, 'send_video' = send video,
+    -- 'send_document' = send document, 'send_voice' = send voice note,
+    -- 'send_location' = send location, 'send_venue' = send venue,
+    -- 'send_contact' = send contact, 'forward' = forward to another chat,
+    -- 'promote' = promote to admin, 'demote' = remove admin,
+    -- 'unmute' = unmute user, 'unban' = unban user,
+    -- 'webhook' = call external webhook
     action_config JSONB DEFAULT '{}',
     -- type-specific config, e.g. {"text": "Hello {user.name}!", "parse_mode": "HTML"}
     sort_order  INT DEFAULT 0,
     condition   JSONB DEFAULT NULL,
     -- optional condition: {"type": "role_check", "role": "admin"}
     -- or {"type": "variable_check", "var": "warned", "op": ">=", "value": 3}
+    -- or {"type": "reply_check"} - requires reply to message
     delay_secs  INT DEFAULT 0,
     created_at  TIMESTAMPTZ DEFAULT NOW()
 );

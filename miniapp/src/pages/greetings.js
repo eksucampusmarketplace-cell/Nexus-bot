@@ -175,7 +175,8 @@ export async function renderGreetingsPage(container) {
 
   let textConfig = {};
   try {
-    textConfig = await apiFetch(`/api/groups/${chatId}/text-config`) || {};
+    const resp = await apiFetch(`/api/groups/${chatId}/text-config`) || {};
+    textConfig = resp.config || resp || {};
   } catch (e) {
     console.warn('[Greetings] Could not load text config:', e);
   }
@@ -373,7 +374,7 @@ function _populateCardBody(body, msgType, displayText, isCustomized, textConfig,
       try {
         await apiFetch(`/api/groups/${chatId}/text-config`, {
           method: 'PUT',
-          body: JSON.stringify({ welcome_delete_after: parseInt(e.target.value) }),
+          body: { welcome_delete_after: parseInt(e.target.value) },
         });
         showToast('Auto-delete saved', 'success');
       } catch (err) {
@@ -492,7 +493,7 @@ async function _saveKey(chatId, initData, key, value) {
   body[key] = (value === '' || value === null) ? null : value;
   await apiFetch(`/api/groups/${chatId}/text-config`, {
     method: 'PUT',
-    body: JSON.stringify(body),
+    body: body,
   });
 }
 
@@ -633,7 +634,7 @@ async function _saveButtons(chatId, buttons) {
   try {
     await apiFetch(`/api/groups/${chatId}/text-config`, {
       method: 'PUT',
-      body: JSON.stringify({ welcome_buttons: valid }),
+      body: { welcome_buttons: valid },
     });
   } catch (e) {
     showToast('Failed to save buttons', 'error');
@@ -710,7 +711,7 @@ async function _renderNotesSection(chatId) {
     try {
       await apiFetch(`/api/groups/${chatId}/notes`, {
         method: 'POST',
-        body: JSON.stringify({ name, content }),
+        body: { name, content },
       });
       showToast(`Note #${name} saved`, 'success');
       form.querySelector('#note-name').value = '';

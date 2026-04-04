@@ -219,7 +219,7 @@ async def clone_bot(request: Request, user: dict = Depends(get_current_user)):
             "status": "active",
             "webhook_active": False,
             "group_limit": group_limit,
-            "group_access_policy": body.get("group_access_policy", "blocked"),
+            "group_access_policy": body.get("group_access_policy", "open"),
             "bot_add_notifications": body.get("bot_add_notifications", False),
         },
     )

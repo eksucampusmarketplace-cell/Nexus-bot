@@ -574,6 +574,13 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(h)
     logger.info("[FACTORY] Engagement handlers registered")
 
+    # ── Economy/Stars handlers ────────────────────────────────────────────
+    from bot.handlers.economy import economy_handlers
+
+    for h in economy_handlers:
+        app.add_handler(h)
+    logger.info("[FACTORY] Economy handlers registered")
+
     # ── v21 New Handlers ────────────────────────────────────────────────────
     # TrustNet (Federation) handlers
     from bot.handlers.federation import federation_handlers

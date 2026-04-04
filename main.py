@@ -761,6 +761,16 @@ try:
     app.include_router(custom_commands_api.router, tags=["custom_commands"])
     logger.info("[STARTUP] Custom Commands API route registered")
 
+    # New feature API routes: Trust, Economy, Insurance
+    from api.routes import trust as trust_api
+    from api.routes import economy as economy_api
+    from api.routes import insurance as insurance_api
+
+    app.include_router(trust_api.router, tags=["trust"])
+    app.include_router(economy_api.router, tags=["economy"])
+    app.include_router(insurance_api.router, tags=["insurance"])
+    logger.info("[STARTUP] ✅ Trust/Economy/Insurance API routes registered")
+
     logger.info("[STARTUP] ✅ All v21 API routes registered")
 
     # Ticket / Support System API routes

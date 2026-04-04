@@ -342,8 +342,11 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         logger.info("[FACTORY] Clone-only command redirects registered (clone bot)")
 
     # ── Help callbacks (all bots) ─────────────────────────────────────────
-    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r"^help_"))
+    # Bug fix: Register start_callback_handler first (more specific patterns)
+    # before help_callback_handler to avoid help_main being caught by help_ pattern
     app.add_handler(start_callback_handler)  # For start_clone and help_main buttons
+    # Pattern changed from r"^help_" to r"^help_\d+$" to only match numeric help categories
+    app.add_handler(CallbackQueryHandler(help_callback_handler, pattern=r"^help_(\d+|back)$"))
 
     # ── Admin request callbacks (all bots) ────────────────────────────────
     app.add_handler(
@@ -675,10 +678,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # ── CAPTCHA Callback Handlers ──────────────────────────────────────────
     # CRITICAL: Register captcha callback handlers so button clicks work
-    from bot.handlers.captcha_callback import handle_captcha_callback
-
+    # handle_captcha_callback was imported at the top of this function (line ~71)
     app.add_handler(CallbackQueryHandler(handle_captcha_callback, pattern=r"^captcha:"))
-
     logger.info("[FACTORY] CAPTCHA callback handlers registered")
 
     # ── Eight New Features ────────────────────────────────────────────────

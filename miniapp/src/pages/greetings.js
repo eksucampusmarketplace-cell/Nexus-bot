@@ -710,7 +710,7 @@ async function _renderNotesSection(chatId) {
     try {
       await apiFetch(`/api/groups/${chatId}/notes`, {
         method: 'POST',
-        body: { name, content },
+        body: JSON.stringify({ name, content }),
       });
       showToast(`Note #${name} saved`, 'success');
       form.querySelector('#note-name').value = '';

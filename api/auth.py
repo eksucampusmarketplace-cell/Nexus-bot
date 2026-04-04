@@ -106,13 +106,16 @@ async def get_current_user(request: Request):
             user["validated_bot_id"] = bot_id
 
             # Inject role based on bot ownership
+            # Hierarchy: overlord > clone_owner > admin > member
             user_id = user.get("id")
             if bot_id is None:
-                # Primary bot
+                # Primary bot (the main bot, not a clone)
                 if user_id == settings.OWNER_ID:
-                    user["role"] = "overlord"  # Main bot owner - highest privilege
+                    # Main bot owner = overlord (highest privilege)
+                    user["role"] = "overlord"
                     user["is_overlord"] = True
                 else:
+                    # Regular user using main bot
                     user["role"] = "admin"
                     user["is_overlord"] = False
                 logger.info(f"[AUTH] Validated via primary bot token | user_id={user_id} | role={user['role']}")

@@ -3,6 +3,20 @@ bot/utils/access_control.py
 
 Enhanced access control system for Nexus Bot.
 
+ROLE HIERARCHY (highest to lowest):
+1. OVERLORD (main bot owner) - unrestricted access
+2. CLONE OWNER - can manage their bot, but needs Telegram admin for group operations
+3. TELEGRAM ADMIN - can use bot commands in their groups
+4. MEMBER - basic usage only
+
+KEY CONCEPT:
+- Bot Management (Mini App "My Bots") = Based on bot ownership
+- Group Operations (Telegram commands) = Based on Telegram admin status + bot ownership
+
+Example:
+- Alice owns a clone bot. She can see all groups where her bot is in "My Bots".
+- But to ban someone in Group X, she must ALSO be a Telegram admin in Group X.
+
 Features:
 - Main bot owner (overlord) has unrestricted access
 - Clone owners have restricted access to their bot groups

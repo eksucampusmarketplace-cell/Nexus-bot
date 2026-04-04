@@ -1045,11 +1045,36 @@ async def _remove_clone(db_pool, bot_id: int, bot_record: dict):
     logger.info(f"[CLONE][REMOVE] DB record deleted | bot_id={bot_id}")
 
 
+# ─── Entry point for "Create Your Own Bot" button ─────────────────────────────
+
+async def start_clone_entry_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Entry point handler for 'Create Your Own Bot' button (start_clone callback).
+    This is registered as a ConversationHandler entry point.
+    """
+    query = update.callback_query
+    await query.answer()
+
+    is_primary = context.bot_data.get("is_primary", False)
+    if not is_primary:
+        await query.edit_message_text(
+            "⛔ Clone creation is only available on the main Nexus bot.\n\n"
+            "Please use the main bot to create your own instance.",
+            parse_mode=ParseMode.HTML,
+        )
+        return ConversationHandler.END
+
+    # Delegate to the main clone handler
+    return await clone_command_handler(update, context)
+
+
 # ─── ConversationHandler export ───────────────────────────────────────────────
 
 clone_conversation = ConversationHandler(
     entry_points=[
         CommandHandler("clone", clone_command_handler),
+        # "Create Your Own Bot" button callback
+        CallbackQueryHandler(start_clone_entry_handler, pattern=r"^start_clone$"),
         # Management callbacks (new/reauth) are handled by separate standalone handler
     ],
     states={

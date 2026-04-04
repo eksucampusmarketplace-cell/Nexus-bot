@@ -82,12 +82,13 @@ async def get_current_user(request: Request):
             },
         )
 
-    # Always try primary token first
+    # Try clone tokens FIRST, then primary token
+    # This ensures clone owners get proper is_clone_owner flag when using their bot
     from bot.registry import get_all
 
-    all_tokens = [(None, settings.PRIMARY_BOT_TOKEN)]
+    all_tokens = []
 
-    # Add all registered clone tokens
+    # Add all registered clone tokens first
     registered_bots = get_all()
     for bot_id, bot_app in registered_bots.items():
         try:
@@ -96,6 +97,9 @@ async def get_current_user(request: Request):
                 all_tokens.append((bot_id, token))
         except Exception:
             continue
+
+    # Primary token as fallback (last)
+    all_tokens.append((None, settings.PRIMARY_BOT_TOKEN))
 
     last_error = None
     for bot_id, token in all_tokens:
@@ -141,7 +145,8 @@ async def get_current_user(request: Request):
                     logger.debug(f"[AUTH] Role lookup failed: {role_err}")
 
                 logger.info(
-                    f"[AUTH] Validated via clone token bot_id={bot_id} | user_id={user_id} | role={user['role']}"
+                    f"[AUTH] Validated via clone token bot_id={bot_id} | user_id={user_id} | "
+                    f"role={user['role']} is_clone_owner={user.get('is_clone_owner', False)}"
                 )
 
             return user

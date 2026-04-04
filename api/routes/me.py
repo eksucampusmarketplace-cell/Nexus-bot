@@ -245,6 +245,8 @@ async def get_user_context(user: dict = Depends(get_current_user)):
 
     logger.info(
         f"[ME] User context ready | user_id={user_id} role={role} is_sudo={is_sudo} "
+        f"is_clone_owner={is_clone_owner} is_overlord={is_overlord} "
+        f"bot_id={bot_info.get('id')} bot_username={bot_info.get('username')} "
         f"admin={len(admin_groups)} member={len(member_groups)}"
     )
 

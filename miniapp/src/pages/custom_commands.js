@@ -18,9 +18,179 @@ const TRIGGER_TYPES = [
   { value: 'keyword', label: 'Keyword match' },
   { value: 'regex', label: 'Regex pattern' },
   { value: 'exact', label: 'Exact match' },
-  { value: 'new_member', label: 'New member' },
-  { value: 'left_member', label: 'Member left' },
+  { value: 'new_member', label: 'New member joins' },
+  { value: 'left_member', label: 'Member leaves' },
   { value: 'message', label: 'Any message' },
+  { value: 'has_attachment', label: 'Has attachment' },
+  { value: 'has_photo', label: 'Has photo' },
+  { value: 'has_video', label: 'Has video' },
+  { value: 'has_document', label: 'Has document' },
+  { value: 'has_voice', label: 'Has voice note' },
+  { value: 'has_sticker', label: 'Has sticker' },
+  { value: 'has_link', label: 'Contains link' },
+  { value: 'forwarded', label: 'Is forwarded' },
+  { value: 'is_reply', label: 'Is a reply' },
+];
+
+// Preset examples for quick command creation
+const COMMAND_EXAMPLES = [
+  {
+    name: 'welcome',
+    description: 'Welcome new members to the group',
+    triggers: [{ trigger_type: 'new_member', trigger_value: '', case_sensitive: false }],
+    actions: [
+      {
+        action_type: 'reply',
+        action_config: { text: '👋 Welcome {target.name} to {group.name}! We\'re glad to have you here.' },
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  },
+  {
+    name: 'rules',
+    description: 'Show group rules',
+    triggers: [
+      { trigger_type: 'command', trigger_value: 'rules', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'reply',
+        action_config: { text: '📋 Group Rules:\n\n1. Be respectful\n2. No spam\n3. Keep it family-friendly\n4. No advertising' },
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  },
+  {
+    name: 'info',
+    description: 'Show group info and stats',
+    triggers: [
+      { trigger_type: 'command', trigger_value: 'info', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'reply',
+        action_config: { text: '📊 Group Info:\n\n👥 Members: {group.member_count}\n📅 Date: {date}\n⏰ Time: {time}' },
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  },
+  {
+    name: 'greet',
+    description: 'Greet users who say hello',
+    triggers: [
+      { trigger_type: 'keyword', trigger_value: 'hello', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'reply',
+        action_config: { text: 'Hey {user.name}! 👋 How can I help you today?' },
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  },
+  {
+    name: 'antispam',
+    description: 'Auto-delete messages with links from non-admins',
+    triggers: [
+      { trigger_type: 'has_link', trigger_value: '', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'delete',
+        action_config: {},
+        sort_order: 0,
+        delay_secs: 0,
+        condition: { type: 'role_check', role: 'admin' }
+      },
+      {
+        action_type: 'reply',
+        action_config: { text: '{user.mention} Links are not allowed in this chat.' },
+        sort_order: 1,
+        delay_secs: 0,
+        condition: { type: 'role_check', role: 'admin' }
+      }
+    ]
+  },
+  {
+    name: 'purge_photos',
+    description: 'Delete all photos when triggered',
+    triggers: [
+      { trigger_type: 'has_photo', trigger_value: '', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'delete',
+        action_config: {},
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  },
+  {
+    name: 'userinfo',
+    description: 'Get info about a user (reply to user)',
+    triggers: [
+      { trigger_type: 'command', trigger_value: 'userinfo', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'reply',
+        action_config: { text: 'User info:\n👤 Name: {target.name}\n🆔 ID: {target.id}\n👥 Username: {target.username}' },
+        sort_order: 0,
+        delay_secs: 0,
+        condition: { type: 'reply_check' }
+      }
+    ]
+  },
+  {
+    name: 'dice',
+    description: 'Roll a dice game',
+    triggers: [
+      { trigger_type: 'command', trigger_value: 'dice', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'send_dice',
+        action_config: { emoji: '🎲' },
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  },
+  {
+    name: 'guess',
+    description: 'Guess a number game',
+    triggers: [
+      { trigger_type: 'keyword', trigger_value: 'guess', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'reply',
+        action_config: { text: '🎯 My guess: {random}' },
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  },
+  {
+    name: 'goodbye',
+    description: 'Goodbye message when member leaves',
+    triggers: [
+      { trigger_type: 'left_member', trigger_value: '', case_sensitive: false }
+    ],
+    actions: [
+      {
+        action_type: 'reply',
+        action_config: { text: '😢 Goodbye {target.name}! We hope to see you again.' },
+        sort_order: 0,
+        delay_secs: 0
+      }
+    ]
+  }
 ];
 
 const ACTION_TYPES = [
@@ -33,12 +203,26 @@ const ACTION_TYPES = [
   { value: 'kick', label: 'Kick user' },
   { value: 'ban', label: 'Ban user' },
   { value: 'unban', label: 'Unban user' },
-  { value: 'promote', label: 'Promote user' },
-  { value: 'demote', label: 'Demote user' },
+  { value: 'promote', label: 'Promote to admin' },
+  { value: 'demote', label: 'Remove admin' },
   { value: 'pin', label: 'Pin message' },
+  { value: 'unpin_all', label: 'Unpin all messages' },
   { value: 'set_variable', label: 'Set variable' },
   { value: 'send_photo', label: 'Send photo' },
+  { value: 'send_audio', label: 'Send audio' },
+  { value: 'send_video', label: 'Send video' },
+  { value: 'send_document', label: 'Send document' },
+  { value: 'send_voice', label: 'Send voice note' },
+  { value: 'send_sticker', label: 'Send sticker' },
+  { value: 'send_dice', label: 'Send dice/emoji' },
+  { value: 'send_location', label: 'Send location' },
+  { value: 'send_venue', label: 'Send venue' },
+  { value: 'send_contact', label: 'Send contact' },
+  { value: 'forward', label: 'Forward to chat' },
   { value: 'webhook', label: 'Call webhook' },
+  { value: 'set_title', label: 'Set chat title' },
+  { value: 'set_description', label: 'Set chat description' },
+  { value: 'leave', label: 'Leave chat' },
 ];
 
 const BUILTIN_VARS = [
@@ -359,8 +543,24 @@ function _buildCommandForm(existingCmd) {
 
   // ── Basic Info ──
   const infoCard = Card({ title: isEdit ? 'Edit Command' : 'Create Command', subtitle: 'Define your custom command' });
+
+  // Template selector (only for new commands)
+  let templateSelectHtml = '';
+  if (!isEdit) {
+    templateSelectHtml = `
+      <div style="margin-bottom:var(--sp-3);">
+        <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Use Template</label>
+        <select id="cc-template" class="input" style="width:100%;box-sizing:border-box;">
+          <option value="">-- Select a template or start blank --</option>
+          ${COMMAND_EXAMPLES.map(ex => `<option value="${ex.name}">${ex.name} - ${ex.description}</option>`).join('')}
+        </select>
+      </div>
+    `;
+  }
+
   infoCard.innerHTML += `
     <div style="display:flex;flex-direction:column;gap:var(--sp-3);padding-top:var(--sp-2);">
+      ${templateSelectHtml}
       <div>
         <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Command Name</label>
         <input type="text" id="cc-name" class="input" placeholder="e.g. greet, faq, rules-reminder" value="${_escHtml(existingCmd?.name || '')}" style="width:100%;box-sizing:border-box;">
@@ -381,6 +581,36 @@ function _buildCommandForm(existingCmd) {
       </div>
     </div>
   `;
+
+  // Handle template selection
+  if (!isEdit) {
+    const templateSel = infoCard.querySelector('#cc-template');
+    if (templateSel) {
+      templateSel.onchange = () => {
+        const templateName = templateSel.value;
+        if (!templateName) return;
+        const template = COMMAND_EXAMPLES.find(t => t.name === templateName);
+        if (!template) return;
+
+        // Fill form with template data
+        infoCard.querySelector('#cc-name').value = template.name;
+        infoCard.querySelector('#cc-desc').value = template.description;
+
+        // Populate triggers and actions
+        triggers.length = 0;
+        for (const t of template.triggers) {
+          triggers.push({ ...t });
+        }
+        actions.length = 0;
+        for (const a of template.actions) {
+          actions.push({ ...a, action_config: { ...a.action_config } });
+        }
+
+        renderTriggers();
+        renderActions();
+      };
+    }
+  }
   wrapper.appendChild(infoCard);
 
   // ── Triggers ──
@@ -389,6 +619,9 @@ function _buildCommandForm(existingCmd) {
   triggersContainer.id = 'cc-triggers-list';
   triggersContainer.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
   triggersCard.appendChild(triggersContainer);
+
+  // Trigger types that don't require a value input
+  const NO_VALUE_TRIGGERS = ['new_member', 'left_member', 'message', 'has_attachment', 'has_photo', 'has_video', 'has_document', 'has_voice', 'has_sticker', 'has_link', 'forwarded', 'is_reply'];
 
   function renderTriggers() {
     triggersContainer.innerHTML = '';
@@ -405,18 +638,22 @@ function _buildCommandForm(existingCmd) {
         opt.selected = tt.value === trig.trigger_type;
         sel.appendChild(opt);
       });
-      sel.onchange = () => { trig.trigger_type = sel.value; };
+      sel.onchange = () => { trig.trigger_type = sel.value; renderTriggers(); };
 
+      const isNoValue = NO_VALUE_TRIGGERS.includes(trig.trigger_type);
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.className = 'input';
-      inp.style.cssText = 'flex:1;';
+      inp.style.cssText = isNoValue ? 'display:none;' : 'flex:1;';
       inp.placeholder = trig.trigger_type === 'command' ? 'command name' : 'pattern or keyword';
       inp.value = trig.trigger_value || '';
       inp.oninput = () => { trig.trigger_value = inp.value; };
 
+      // Show/hide value input based on trigger type
+      setTimeout(() => { inp.style.display = isNoValue ? 'none' : (trig.trigger_type === 'command' ? 'flex' : 'flex'); }, 0);
+
       const csLabel = document.createElement('label');
-      csLabel.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);cursor:pointer;white-space:nowrap;';
+      csLabel.style.cssText = isNoValue ? 'display:none;' : 'display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);cursor:pointer;white-space:nowrap;';
       const csInp = document.createElement('input');
       csInp.type = 'checkbox';
       csInp.checked = !!trig.case_sensitive;
@@ -619,6 +856,209 @@ function _buildCommandForm(existingCmd) {
         pay.value = config.payload || '{}';
         pay.oninput = () => { act.action_config = { ...config, payload: pay.value }; };
         row.appendChild(pay);
+      } else if (act.action_type === 'send_audio') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        inp.placeholder = 'Audio URL';
+        inp.value = config.audio_url || '';
+        inp.oninput = () => { act.action_config = { ...config, audio_url: inp.value }; };
+        row.appendChild(inp);
+        const cap = document.createElement('input');
+        cap.type = 'text';
+        cap.className = 'input';
+        cap.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        cap.placeholder = 'Caption (optional)';
+        cap.value = config.caption || '';
+        cap.oninput = () => { act.action_config = { ...config, caption: cap.value }; };
+        row.appendChild(cap);
+        const perf = document.createElement('input');
+        perf.type = 'text';
+        perf.className = 'input';
+        perf.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        perf.placeholder = 'Performer (optional)';
+        perf.value = config.performer || '';
+        perf.oninput = () => { act.action_config = { ...config, performer: perf.value }; };
+        row.appendChild(perf);
+        const tit = document.createElement('input');
+        tit.type = 'text';
+        tit.className = 'input';
+        tit.style.cssText = 'width:100%;box-sizing:border-box;';
+        tit.placeholder = 'Title (optional)';
+        tit.value = config.title || '';
+        tit.oninput = () => { act.action_config = { ...config, title: tit.value }; };
+        row.appendChild(tit);
+      } else if (act.action_type === 'send_video') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        inp.placeholder = 'Video URL';
+        inp.value = config.video_url || '';
+        inp.oninput = () => { act.action_config = { ...config, video_url: inp.value }; };
+        row.appendChild(inp);
+        const cap = document.createElement('input');
+        cap.type = 'text';
+        cap.className = 'input';
+        cap.style.cssText = 'width:100%;box-sizing:border-box;';
+        cap.placeholder = 'Caption (optional)';
+        cap.value = config.caption || '';
+        cap.oninput = () => { act.action_config = { ...config, caption: cap.value }; };
+        row.appendChild(cap);
+      } else if (act.action_type === 'send_document') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        inp.placeholder = 'Document URL';
+        inp.value = config.document_url || '';
+        inp.oninput = () => { act.action_config = { ...config, document_url: inp.value }; };
+        row.appendChild(inp);
+        const cap = document.createElement('input');
+        cap.type = 'text';
+        cap.className = 'input';
+        cap.style.cssText = 'width:100%;box-sizing:border-box;';
+        cap.placeholder = 'Caption (optional)';
+        cap.value = config.caption || '';
+        cap.oninput = () => { act.action_config = { ...config, caption: cap.value }; };
+        row.appendChild(cap);
+      } else if (act.action_type === 'send_voice') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        inp.placeholder = 'Voice URL';
+        inp.value = config.voice_url || '';
+        inp.oninput = () => { act.action_config = { ...config, voice_url: inp.value }; };
+        row.appendChild(inp);
+        const cap = document.createElement('input');
+        cap.type = 'text';
+        cap.className = 'input';
+        cap.style.cssText = 'width:100%;box-sizing:border-box;';
+        cap.placeholder = 'Caption (optional)';
+        cap.value = config.caption || '';
+        cap.oninput = () => { act.action_config = { ...config, caption: cap.value }; };
+        row.appendChild(cap);
+      } else if (act.action_type === 'send_location') {
+        const lat = document.createElement('input');
+        lat.type = 'text';
+        lat.className = 'input';
+        lat.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        lat.placeholder = 'Latitude';
+        lat.value = config.latitude || '';
+        lat.oninput = () => { act.action_config = { ...config, latitude: lat.value }; };
+        row.appendChild(lat);
+        const lng = document.createElement('input');
+        lng.type = 'text';
+        lng.className = 'input';
+        lng.style.cssText = 'width:100%;box-sizing:border-box;';
+        lng.placeholder = 'Longitude';
+        lng.value = config.longitude || '';
+        lng.oninput = () => { act.action_config = { ...config, longitude: lng.value }; };
+        row.appendChild(lng);
+      } else if (act.action_type === 'send_venue') {
+        const lat = document.createElement('input');
+        lat.type = 'text';
+        lat.className = 'input';
+        lat.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        lat.placeholder = 'Latitude';
+        lat.value = config.latitude || '';
+        lat.oninput = () => { act.action_config = { ...config, latitude: lat.value }; };
+        row.appendChild(lat);
+        const lng = document.createElement('input');
+        lng.type = 'text';
+        lng.className = 'input';
+        lng.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        lng.placeholder = 'Longitude';
+        lng.value = config.longitude || '';
+        lng.oninput = () => { act.action_config = { ...config, longitude: lng.value }; };
+        row.appendChild(lng);
+        const title = document.createElement('input');
+        title.type = 'text';
+        title.className = 'input';
+        title.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        title.placeholder = 'Title';
+        title.value = config.title || '';
+        title.oninput = () => { act.action_config = { ...config, title: title.value }; };
+        row.appendChild(title);
+        const addr = document.createElement('input');
+        addr.type = 'text';
+        addr.className = 'input';
+        addr.style.cssText = 'width:100%;box-sizing:border-box;';
+        addr.placeholder = 'Address';
+        addr.value = config.address || '';
+        addr.oninput = () => { act.action_config = { ...config, address: addr.value }; };
+        row.appendChild(addr);
+      } else if (act.action_type === 'send_contact') {
+        const phone = document.createElement('input');
+        phone.type = 'text';
+        phone.className = 'input';
+        phone.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        phone.placeholder = 'Phone Number';
+        phone.value = config.phone_number || '';
+        phone.oninput = () => { act.action_config = { ...config, phone_number: phone.value }; };
+        row.appendChild(phone);
+        const fname = document.createElement('input');
+        fname.type = 'text';
+        fname.className = 'input';
+        fname.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        fname.placeholder = 'First Name';
+        fname.value = config.first_name || '';
+        fname.oninput = () => { act.action_config = { ...config, first_name: fname.value }; };
+        row.appendChild(fname);
+        const lname = document.createElement('input');
+        lname.type = 'text';
+        lname.className = 'input';
+        lname.style.cssText = 'width:100%;box-sizing:border-box;';
+        lname.placeholder = 'Last Name (optional)';
+        lname.value = config.last_name || '';
+        lname.oninput = () => { act.action_config = { ...config, last_name: lname.value }; };
+        row.appendChild(lname);
+      } else if (act.action_type === 'forward') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;';
+        inp.placeholder = 'Destination Chat ID';
+        inp.value = config.to_chat_id || '';
+        inp.oninput = () => { act.action_config = { ...config, to_chat_id: inp.value }; };
+        row.appendChild(inp);
+      } else if (act.action_type === 'send_sticker') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;';
+        inp.placeholder = 'Sticker URL';
+        inp.value = config.sticker_url || '';
+        inp.oninput = () => { act.action_config = { ...config, sticker_url: inp.value }; };
+        row.appendChild(inp);
+      } else if (act.action_type === 'send_dice') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;';
+        inp.placeholder = 'Emoji (🎲, 🎯, 🏀, ⚽, 🎳, 🎰)';
+        inp.value = config.emoji || '🎲';
+        inp.oninput = () => { act.action_config = { ...config, emoji: inp.value }; };
+        row.appendChild(inp);
+      } else if (act.action_type === 'set_title') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;';
+        inp.placeholder = 'New group title';
+        inp.value = config.title || '';
+        inp.oninput = () => { act.action_config = { ...config, title: inp.value }; };
+        row.appendChild(inp);
+      } else if (act.action_type === 'set_description') {
+        const ta = document.createElement('textarea');
+        ta.className = 'input';
+        ta.style.cssText = 'width:100%;box-sizing:border-box;min-height:60px;';
+        ta.placeholder = 'New group description';
+        ta.value = config.description || '';
+        ta.oninput = () => { act.action_config = { ...config, description: ta.value }; };
+        row.appendChild(ta);
       }
 
       // Condition field

@@ -964,10 +964,25 @@
       const state = getState();
       const chatId = state.activeChatId;
       const userContext = state.userContext;
+      const activeGroup = state.activeGroup;
       container.innerHTML = '';
       container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto; display: flex; flex-direction: column; gap: var(--sp-4);';
 
-      if (chatId) {
+      // Determine user permissions
+      // is_sudo = main bot owner (overlord)
+      // is_bot_owner = clone owner or overlord
+      // is_group_owner = Telegram group creator
+      // is_group_admin = Telegram group admin
+      const isSudo = userContext?.is_sudo || false;
+      const isOverlord = userContext?.is_overlord || false;
+      const isCloneOwner = userContext?.is_clone_owner || false;
+      const isBotOwner = userContext?.is_bot_owner || isSudo || isCloneOwner || isOverlord;
+      const isGroupOwner = activeGroup?.is_owner || false;
+      const isGroupAdmin = userContext?.role === 'owner' || userContext?.role === 'admin' || isGroupOwner || isSudo;
+      const canManageGroup = isGroupAdmin || isBotOwner;
+      const canManageBot = isBotOwner;
+
+      if (chatId && canManageGroup) {
         let groupSettings = {};
         try {
           const res = await apiFetch(`/api/groups/${chatId}/settings`);
@@ -1303,38 +1318,57 @@
         await renderCustomMessagesSection(groupMsgsCard.querySelector('#group-messages-container'), `/api/groups/${chatId}/messages`);
 
         // ── 8. DANGER ZONE ────────────────────────────────────────────────
-        const dangerCard = Card({ title: '⚠️ Danger Zone', subtitle: 'Irreversible actions' });
-        dangerCard.style.cssText += '; border-color: var(--danger);';
-        const dangerBody = document.createElement('div');
-        dangerBody.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-3);';
-        const resetBtn = document.createElement('button');
-        resetBtn.className = 'btn btn-danger';
-        resetBtn.style.cssText = 'align-self:flex-start;';
-        resetBtn.textContent = '🔄 Reset all settings';
-        resetBtn.onclick = async () => {
-          if (!confirm('Reset ALL settings for this group? This cannot be undone.')) return;
-          if (!confirm('Are you absolutely sure?')) return;
-          try {
-            await apiFetch(`/api/groups/${chatId}/settings/reset`, { method: 'DELETE' });
-            showToast('Settings reset', 'success');
-            await renderSettings(container);
-          } catch (err) { showToast('Failed to reset', 'error'); }
-        };
-        const leaveBtn = document.createElement('button');
-        leaveBtn.className = 'btn btn-danger';
-        leaveBtn.style.cssText = 'align-self:flex-start;';
-        leaveBtn.textContent = '🚪 Remove bot from group';
-        leaveBtn.onclick = async () => {
-          if (!confirm('Remove the bot from this group?')) return;
-          try {
-            await apiFetch(`/api/groups/${chatId}/actions/leave`, { method: 'POST' });
-            showToast('Bot left the group', 'success');
-          } catch (err) { showToast('Failed to leave group', 'error'); }
-        };
-        dangerBody.appendChild(resetBtn);
-        dangerBody.appendChild(leaveBtn);
-        dangerCard.appendChild(dangerBody);
-        container.appendChild(dangerCard);
+        // Only show danger zone to group owners or sudo users
+        if (isGroupOwner || isSudo) {
+          const dangerCard = Card({ title: '⚠️ Danger Zone', subtitle: 'Irreversible actions' });
+          dangerCard.style.cssText += '; border-color: var(--danger);';
+          const dangerBody = document.createElement('div');
+          dangerBody.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-3);';
+          const resetBtn = document.createElement('button');
+          resetBtn.className = 'btn btn-danger';
+          resetBtn.style.cssText = 'align-self:flex-start;';
+          resetBtn.textContent = '🔄 Reset all settings';
+          resetBtn.onclick = async () => {
+            if (!confirm('Reset ALL settings for this group? This cannot be undone.')) return;
+            if (!confirm('Are you absolutely sure?')) return;
+            try {
+              await apiFetch(`/api/groups/${chatId}/settings/reset`, { method: 'DELETE' });
+              showToast('Settings reset', 'success');
+              await renderSettings(container);
+            } catch (err) { showToast('Failed to reset', 'error'); }
+          };
+          const leaveBtn = document.createElement('button');
+          leaveBtn.className = 'btn btn-danger';
+          leaveBtn.style.cssText = 'align-self:flex-start;';
+          leaveBtn.textContent = '🚪 Remove bot from group';
+          leaveBtn.onclick = async () => {
+            if (!confirm('Remove the bot from this group?')) return;
+            try {
+              await apiFetch(`/api/groups/${chatId}/actions/leave`, { method: 'POST' });
+              showToast('Bot left the group', 'success');
+            } catch (err) { showToast('Failed to leave group', 'error'); }
+          };
+          dangerBody.appendChild(resetBtn);
+          dangerBody.appendChild(leaveBtn);
+          dangerCard.appendChild(dangerBody);
+          container.appendChild(dangerCard);
+        }
+      } else if (chatId && !canManageGroup) {
+        // User is a member but not admin - show read-only message
+        const noAccessCard = Card({
+          title: '🔒 Settings',
+          subtitle: 'Group settings are only available to administrators',
+          children: `
+            <div style="padding: var(--sp-4); text-align: center; color: var(--text-muted);">
+              <div style="font-size: 48px; margin-bottom: var(--sp-4);">👥</div>
+              <p>You need to be a group admin to manage settings.</p>
+              <p style="font-size: var(--text-xs); margin-top: var(--sp-2);">
+                Contact the group owner for assistance.
+              </p>
+            </div>
+          `
+        });
+        container.appendChild(noAccessCard);
       }
 
       // ── THEME ─────────────────────────────────────────────────────────────
@@ -1342,7 +1376,8 @@
       container.appendChild(themeCard);
       ThemeEngine.renderPicker(themeCard.querySelector('#theme-picker-container'));
 
-      if (userContext?.role === 'owner' && userContext.bot_info?.id) {
+      // Bot Global Messages - only visible to bot owners (overlord or clone owner)
+      if (canManageBot && userContext?.bot_info?.id) {
         const botMsgsCard = Card({ title: '🤖 Bot Global Messages', subtitle: 'Default responses for all your groups', children: '<div id="bot-messages-container"></div>' });
         container.appendChild(botMsgsCard);
         await renderCustomMessagesSection(botMsgsCard.querySelector('#bot-messages-container'), `/api/bots/${userContext.bot_info.id}/messages`);

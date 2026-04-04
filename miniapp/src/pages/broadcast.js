@@ -6,8 +6,10 @@ import { t } from '../../lib/i18n.js?v=1.6.0';
 export async function renderBroadcastPage(container) {
     const state = useStore.getState();
     const botInfo = state.userContext?.bot_info;
-    const isOwner = state.userContext?.role === 'owner';
+    // Use proper bot ownership checks (not just Telegram group role)
     const isSudo = state.is_sudo || state.userContext?.is_sudo;
+    const isCloneOwner = state.userContext?.is_clone_owner;
+    const isBotOwner = state.userContext?.is_bot_owner || isSudo || isCloneOwner;
     const chatId = state.activeChatId;
 
     container.innerHTML = `
@@ -31,7 +33,7 @@ export async function renderBroadcastPage(container) {
         return;
     }
 
-    renderBroadcastForm(document.getElementById('broadcast-form-container'), botInfo, isOwner);
+    renderBroadcastForm(document.getElementById('broadcast-form-container'), botInfo, isBotOwner);
     renderBroadcastHistory(document.getElementById('broadcast-history-container'), botInfo.id);
 
     // Disable group-specific broadcast section if no group selected

@@ -18,6 +18,11 @@ log = logging.getLogger(__name__)
 class RateLimitMiddleware:
     """
     Rate limiting middleware to prevent spam and abuse.
+    
+    Different limits based on user role:
+    - Overlord (main bot owner): Very high limit
+    - Clone owners: Higher limit than regular users
+    - Regular users: Standard limit
     """
 
     def __init__(self):
@@ -26,7 +31,9 @@ class RateLimitMiddleware:
         self.requests: Dict[str, list] = {}
         self._last_pruned: float = 0.0
         self.rate_limits = {
-            "default": {"requests": 100, "window": 60},  # 100 req/min
+            "default": {"requests": 60, "window": 60},  # 60 req/min for regular users
+            "clone_owner": {"requests": 120, "window": 60},  # 120 req/min for clone owners
+            "overlord": {"requests": 1000, "window": 60},  # Overlord has high limit
             "strict": {"requests": 30, "window": 60},  # 30 req/min
             "upload": {"requests": 10, "window": 60},  # 10 req/min
         }

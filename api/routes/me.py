@@ -150,6 +150,7 @@ async def get_user_context(user: dict = Depends(get_current_user)):
             continue
         chat_id, title, member_count, photo_big, group_settings, status = result
 
+        # Main dashboard: only show groups where user is actually a Telegram member/admin
         if status in ["owner", "admin"]:
             boost_settings = group_settings.get("member_boost", {})
             channel_settings = group_settings.get("channel_gate", {})

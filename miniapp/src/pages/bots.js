@@ -178,9 +178,51 @@ export async function renderBotsPage(container) {
           });
         }
 
-        if (!isPrimary) {
-          const botId = bot.bot_id || bot.id;
+        // Add Groups button for all bots (to see all groups where bot is active)
+        const botId = bot.bot_id || bot.id;
 
+        const groupsBtn = document.createElement('button');
+        groupsBtn.textContent = `👥 View Groups (${bot.groups_count || 0})`;
+        groupsBtn.style.cssText = 'margin-top:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;font-size:var(--text-xs);width:100%;';
+
+        const groupsPanel = document.createElement('div');
+        groupsPanel.style.cssText = 'display:none;margin-top:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);padding:var(--sp-3);max-height:300px;overflow-y:auto;';
+        groupsPanel.innerHTML = '<div style="text-align:center;padding:var(--sp-2);color:var(--text-muted);font-size:var(--text-xs);">Loading groups...</div>';
+
+        groupsBtn.addEventListener('click', async () => {
+          if (groupsPanel.style.display === 'none') {
+            groupsPanel.style.display = 'block';
+            // Load groups
+            try {
+              const groups = await apiFetch(`/api/bots/${botId}/groups`);
+              if (!groups || groups.length === 0) {
+                groupsPanel.innerHTML = '<div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);font-size:var(--text-xs);">No active groups</div>';
+              } else {
+                groupsPanel.innerHTML = groups.map(g => `
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:var(--sp-2);border-bottom:1px solid var(--border);font-size:var(--text-xs);">
+                    <div style="flex:1;min-width:0;">
+                      <div style="font-weight:var(--fw-medium);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${g.chat_title || 'Unknown'}</div>
+                      <div style="color:var(--text-muted);font-size:10px;">ID: ${g.chat_id}</div>
+                    </div>
+                    <div style="display:flex;gap:var(--sp-1);">
+                      ${g.is_owner_group ? '<span style="background:var(--accent-dim);color:var(--accent);padding:2px 6px;border-radius:var(--r-full);font-size:10px;">Owner</span>' : ''}
+                      ${g.access_status === 'pending' ? '<span style="background:var(--warning-dim);color:var(--warning);padding:2px 6px;border-radius:var(--r-full);font-size:10px;">Pending</span>' : ''}
+                    </div>
+                  </div>
+                `).join('');
+              }
+            } catch (e) {
+              groupsPanel.innerHTML = `<div style="text-align:center;padding:var(--sp-2);color:var(--danger);font-size:var(--text-xs);">Failed to load groups</div>`;
+            }
+          } else {
+            groupsPanel.style.display = 'none';
+          }
+        });
+
+        card.appendChild(groupsBtn);
+        card.appendChild(groupsPanel);
+
+        if (!isPrimary) {
           const settingsBtn = document.createElement('button');
           settingsBtn.textContent = '⚙️ Bot Settings';
           settingsBtn.style.cssText = 'margin-top:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border:1px solid var(--border);border-radius:var(--r-lg);cursor:pointer;font-size:var(--text-xs);';

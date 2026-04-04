@@ -165,6 +165,24 @@ export async function renderAutomodPage(container) {
     const res = await apiFetch(`/api/groups/${finalChatId}/settings`);
     console.debug('[AutoMod] Settings loaded:', res);
     settings = res.settings || res || {};
+
+    // Flatten nested automod keys back to flat for UI consumption
+    if (settings.automod) {
+      if (settings.automod.antiflood) {
+        settings.antiflood = settings.antiflood ?? settings.automod.antiflood.enabled;
+        settings.antiflood_limit = settings.antiflood_limit ?? settings.automod.antiflood.flood_threshold;
+        settings.antiflood_window = settings.antiflood_window ?? settings.automod.antiflood.flood_window_sec;
+      }
+      if (settings.automod.antilink) {
+        settings.antilink = settings.antilink ?? settings.automod.antilink.enabled;
+      }
+    }
+    if (settings.locks) {
+      for (const [k, v] of Object.entries(settings.locks)) {
+        settings["lock_" + k] = settings["lock_" + k] ?? v;
+      }
+    }
+
     store.getState().setSettings(settings);
 
     if (!isCurrent()) return;
@@ -185,9 +203,9 @@ export async function renderAutomodPage(container) {
   });
   container.appendChild(templatesCard);
 
-  // Render templates section DOM
-  const templatesContainer = templatesCard;
-  templatesContainer.appendChild(_renderTemplatesSection(finalChatId, settings));
+  // Render templates section DOM - append to card body, not card root
+  const templatesBody = templatesCard.querySelector('.card-body') || templatesCard.lastElementChild || templatesCard;
+  templatesBody.appendChild(_renderTemplatesSection(finalChatId, settings));
 
   if (!isCurrent()) return;
 
@@ -199,8 +217,9 @@ export async function renderAutomodPage(container) {
     });
     container.appendChild(sectionCard);
 
-    // Render section DOM
-    sectionCard.appendChild(_renderSection(section, settings, finalChatId));
+    // Render section DOM - append to card body, not card root
+    const sectionBody = sectionCard.querySelector('.card-body') || sectionCard.lastElementChild || sectionCard;
+    sectionBody.appendChild(_renderSection(section, settings, finalChatId));
   });
 }
 
@@ -234,11 +253,10 @@ function _renderTemplatesSection(chatId, currentSettings) {
       try {
         console.debug('[AutoMod] Applying template:', template.id);
 
-        // Use the bulk endpoint and send only the template settings
-        await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
-          method: 'PUT',
-          validate: false,
-          body: { settings: template.settings || {} },
+        // Use the dedicated template apply endpoint with template_id
+        await apiFetch(`/api/groups/${chatId}/automod/templates/apply`, {
+          method: 'POST',
+          body: { template_id: template.id },
         });
         console.debug('[AutoMod] Template applied successfully');
 
@@ -248,6 +266,24 @@ function _renderTemplatesSection(chatId, currentSettings) {
         try {
           const res = await apiFetch(`/api/groups/${chatId}/settings`);
           const newSettings = res.settings || res || {};
+
+          // Flatten nested automod keys back to flat for UI consumption
+          if (newSettings.automod) {
+            if (newSettings.automod.antiflood) {
+              newSettings.antiflood = newSettings.antiflood ?? newSettings.automod.antiflood.enabled;
+              newSettings.antiflood_limit = newSettings.antiflood_limit ?? newSettings.automod.antiflood.flood_threshold;
+              newSettings.antiflood_window = newSettings.antiflood_window ?? newSettings.automod.antiflood.flood_window_sec;
+            }
+            if (newSettings.automod.antilink) {
+              newSettings.antilink = newSettings.antilink ?? newSettings.automod.antilink.enabled;
+            }
+          }
+          if (newSettings.locks) {
+            for (const [k, v] of Object.entries(newSettings.locks)) {
+              newSettings["lock_" + k] = newSettings["lock_" + k] ?? v;
+            }
+          }
+
           store.getState().setSettings(newSettings);
 
           // Re-render the entire page

@@ -226,12 +226,84 @@ const ACTION_TYPES = [
 ];
 
 const BUILTIN_VARS = [
-  '{user.name}', '{user.username}', '{user.id}', '{user.mention}',
-  '{target.name}', '{target.username}', '{target.id}', '{target.mention}',
+  // User variables
+  '{user.name}', '{user.first_name}', '{user.last_name}', '{user.username}', '{user.id}', '{user.mention}',
+  // Target variables (for replies)
+  '{target.name}', '{target.first_name}', '{target.last_name}', '{target.username}', '{target.id}', '{target.mention}',
+  // Group variables
   '{group.name}', '{group.id}', '{group.member_count}',
+  // Bot variables
   '{bot.name}', '{bot.username}',
+  // Time & fun variables
   '{time}', '{date}', '{datetime}', '{random}', '{newline}',
+  // Arguments
   '{args}', '{arg1}', '{arg2}', '{arg3}',
+];
+
+// Variable guide with fun descriptions
+const VARIABLE_GUIDE = [
+  {
+    category: '👤 User Variables',
+    description: 'Info about the person who triggered the command',
+    vars: [
+      { name: 'user.name', desc: 'Full display name', example: 'John Doe' },
+      { name: 'user.first_name', desc: 'First name only', example: 'John' },
+      { name: 'user.last_name', desc: 'Last name only', example: 'Doe' },
+      { name: 'user.username', desc: '@username or full name', example: '@johndoe' },
+      { name: 'user.id', desc: 'Telegram user ID', example: '123456789' },
+      { name: 'user.mention', desc: 'Clickable mention', example: '@johndoe (clickable!)' },
+    ]
+  },
+  {
+    category: '🎯 Target Variables',
+    description: 'Info about the user being replied to (when someone replies to another user)',
+    vars: [
+      { name: 'target.name', desc: 'Their full name', example: 'Jane Smith' },
+      { name: 'target.first_name', desc: 'Their first name', example: 'Jane' },
+      { name: 'target.last_name', desc: 'Their last name', example: 'Smith' },
+      { name: 'target.username', desc: 'Their @username', example: '@janesmith' },
+      { name: 'target.id', desc: 'Their user ID', example: '987654321' },
+      { name: 'target.mention', desc: 'Clickable mention of them', example: '@janesmith (clickable!)' },
+    ]
+  },
+  {
+    category: '👥 Group Variables',
+    description: 'Info about the current group chat',
+    vars: [
+      { name: 'group.name', desc: 'Group title', example: 'My Awesome Group' },
+      { name: 'group.id', desc: 'Chat ID', example: '-1001234567890' },
+      { name: 'group.member_count', desc: 'How many members', example: '42 humans (and 3 bots)' },
+    ]
+  },
+  {
+    category: '🤖 Bot Variables',
+    description: 'Info about this bot',
+    vars: [
+      { name: 'bot.name', desc: 'Bot display name', example: 'Nexus Bot' },
+      { name: 'bot.username', desc: 'Bot @username', example: '@MyNexusBot' },
+    ]
+  },
+  {
+    category: '⏰ Time Variables',
+    description: 'Current time (UTC timezone)',
+    vars: [
+      { name: 'time', desc: 'Current time', example: '14:30 UTC' },
+      { name: 'date', desc: 'Today\'s date', example: '2024-01-15' },
+      { name: 'datetime', desc: 'Full timestamp', example: '2024-01-15 14:30 UTC' },
+    ]
+  },
+  {
+    category: '🎲 Fun & Utility',
+    description: 'Make your messages more dynamic!',
+    vars: [
+      { name: 'random', desc: 'Random number 1-100', example: '42 🎲 (for games!)' },
+      { name: 'newline', desc: 'Line break', example: 'Use for multi-line messages' },
+      { name: 'args', desc: 'Everything after the command', example: '/warn @user spam → "@user spam"' },
+      { name: 'arg1', desc: 'First word after command', example: '/warn @user → "@user"' },
+      { name: 'arg2', desc: 'Second word after command', example: '/warn @user spam → "spam"' },
+      { name: 'arg3', desc: 'Third word after command', example: 'The third piece of text' },
+    ]
+  },
 ];
 
 export async function renderCustomCommandsPage(container) {
@@ -286,7 +358,7 @@ export async function renderCustomCommandsPage(container) {
   };
 
   // Tab bar
-  const tabs = ['Commands', 'Create', 'Variables'];
+  const tabs = ['Commands', 'Create', 'Variables', 'Help'];
   const tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:var(--sp-1);margin-bottom:var(--sp-4);background:var(--bg-input);padding:4px;border-radius:var(--r-xl);';
   tabs.forEach((label, i) => {
@@ -316,6 +388,7 @@ function _switchTab(tab, container, chatId, tabBar) {
     case 'commands':  return _renderCommandsList(container, chatId, tabBar);
     case 'create':    return _renderCreateForm(container, chatId, tabBar);
     case 'variables': return _renderVariablesTab(container, chatId);
+    case 'help':      return _renderHelpTab(container);
   }
 }
 
@@ -641,16 +714,27 @@ function _buildCommandForm(existingCmd) {
       sel.onchange = () => { trig.trigger_type = sel.value; renderTriggers(); };
 
       const isNoValue = NO_VALUE_TRIGGERS.includes(trig.trigger_type);
+      const isCommand = trig.trigger_type === 'command';
+      
+      const inpWrapper = document.createElement('div');
+      inpWrapper.style.cssText = isNoValue ? 'display:none;' : 'flex:1;display:flex;align-items:center;gap:var(--sp-1);';
+      
+      // Add / prefix for command type
+      if (isCommand) {
+        const slashPrefix = document.createElement('span');
+        slashPrefix.textContent = '/';
+        slashPrefix.style.cssText = 'color:var(--text-muted);font-size:var(--text-sm);font-weight:var(--fw-bold);';
+        inpWrapper.appendChild(slashPrefix);
+      }
+      
       const inp = document.createElement('input');
       inp.type = 'text';
       inp.className = 'input';
-      inp.style.cssText = isNoValue ? 'display:none;' : 'flex:1;';
-      inp.placeholder = trig.trigger_type === 'command' ? 'command name' : 'pattern or keyword';
+      inp.style.cssText = 'flex:1;';
+      inp.placeholder = isCommand ? 'commandname' : 'pattern or keyword';
       inp.value = trig.trigger_value || '';
       inp.oninput = () => { trig.trigger_value = inp.value; };
-
-      // Show/hide value input based on trigger type
-      setTimeout(() => { inp.style.display = isNoValue ? 'none' : (trig.trigger_type === 'command' ? 'flex' : 'flex'); }, 0);
+      inpWrapper.appendChild(inp);
 
       const csLabel = document.createElement('label');
       csLabel.style.cssText = isNoValue ? 'display:none;' : 'display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);cursor:pointer;white-space:nowrap;';
@@ -668,7 +752,9 @@ function _buildCommandForm(existingCmd) {
       del.onclick = () => { triggers.splice(i, 1); renderTriggers(); };
 
       row.appendChild(sel);
-      row.appendChild(inp);
+      if (!isNoValue) {
+        row.appendChild(inpWrapper);
+      }
       row.appendChild(csLabel);
       row.appendChild(del);
       triggersContainer.appendChild(row);
@@ -1155,42 +1241,54 @@ function _buildCommandForm(existingCmd) {
 
 async function _renderVariablesTab(container, chatId) {
   container.innerHTML = '';
+  container.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-4);';
 
-  // Built-in variables reference
-  const builtinCard = Card({ title: 'Built-in Variables', subtitle: 'Available in all custom commands' });
-  const varList = document.createElement('div');
-  varList.style.cssText = 'display:flex;flex-wrap:wrap;gap:var(--sp-2);padding-top:var(--sp-2);';
-  BUILTIN_VARS.forEach(v => {
-    const chip = document.createElement('code');
-    chip.style.cssText = 'background:var(--accent-dim);color:var(--accent);padding:var(--sp-1) var(--sp-2);border-radius:var(--r-md);font-size:var(--text-xs);';
-    chip.textContent = v;
-    varList.appendChild(chip);
+  // Variable Guide with categories
+  VARIABLE_GUIDE.forEach(category => {
+    const card = Card({ 
+      title: category.category, 
+      subtitle: category.description 
+    });
+    
+    const table = document.createElement('div');
+    table.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
+    
+    category.vars.forEach(v => {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-2);background:var(--bg-input);border-radius:var(--r-lg);font-size:var(--text-xs);';
+      row.innerHTML = `
+        <code style="background:var(--accent-dim);color:var(--accent);padding:2px 6px;border-radius:var(--r-md);font-size:var(--text-xs);white-space:nowrap;">{${v.name}}</code>
+        <span style="color:var(--text-secondary);flex:1;">${v.desc}</span>
+        <span style="color:var(--text-muted);font-style:italic;">${v.example}</span>
+      `;
+      table.appendChild(row);
+    });
+    
+    card.appendChild(table);
+    container.appendChild(card);
   });
-  builtinCard.appendChild(varList);
-  container.appendChild(builtinCard);
 
-  // Custom variables
-  const customCard = Card({ title: 'Custom Variables', subtitle: 'Group-level variables you can use and set in commands' });
+  // Custom variables section
+  const customCard = Card({ title: '🎨 Custom Variables', subtitle: 'Create your own variables for this group' });
   const customContainer = document.createElement('div');
   customContainer.style.cssText = 'padding-top:var(--sp-2);';
-  customCard.appendChild(customContainer);
-
+  
   // Add variable form
   const addRow = document.createElement('div');
   addRow.style.cssText = 'display:flex;gap:var(--sp-2);margin-bottom:var(--sp-3);';
   addRow.innerHTML = `
-    <input type="text" id="cv-name" class="input" placeholder="Variable name" style="flex:1;">
+    <input type="text" id="cv-name" class="input" placeholder="Variable name (e.g. welcome_msg)" style="flex:1;">
     <input type="text" id="cv-value" class="input" placeholder="Value" style="flex:1;">
     <button id="cv-add-btn" class="btn btn-primary" style="font-size:var(--text-xs);flex-shrink:0;">Add</button>
   `;
   customCard.appendChild(addRow);
+  customCard.appendChild(customContainer);
 
   addRow.querySelector('#cv-add-btn').onclick = async () => {
     const name = addRow.querySelector('#cv-name').value.trim();
     const value = addRow.querySelector('#cv-value').value.trim();
     if (!name) { showToast('Enter variable name', 'error'); return; }
     try {
-      // Use command_id=0 for group-level variables via the API
       await apiFetch(`/api/groups/${chatId}/custom-commands/0/variables`, {
         method: 'POST',
         body: JSON.stringify({ var_name: name, var_value: value, var_type: 'string' })
@@ -1204,6 +1302,157 @@ async function _renderVariablesTab(container, chatId) {
 
   await loadCustomVars(chatId, customContainer);
   container.appendChild(customCard);
+}
+
+// ── Help Tab ─────────────────────────────────────────────────────────────
+
+function _renderHelpTab(container) {
+  container.innerHTML = '';
+  container.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-4);';
+
+  // Quick Start Guide
+  const quickStartCard = Card({ 
+    title: '🚀 Quick Start Guide', 
+    subtitle: 'Create your first custom command in 3 easy steps!' 
+  });
+  quickStartCard.innerHTML += `
+    <div style="display:flex;flex-direction:column;gap:var(--sp-3);padding-top:var(--sp-2);">
+      <div style="display:flex;gap:var(--sp-3);align-items:flex-start;">
+        <div style="background:var(--accent);color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:var(--text-xs);flex-shrink:0;">1</div>
+        <div>
+          <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">Choose a Trigger</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">Pick what activates your command - a /command, keyword, or event like "new member joins"</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--sp-3);align-items:flex-start;">
+        <div style="background:var(--accent);color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:var(--text-xs);flex-shrink:0;">2</div>
+        <div>
+          <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">Add Actions</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">Decide what happens - send a message, delete the trigger, warn/mute users, and more!</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--sp-3);align-items:flex-start;">
+        <div style="background:var(--accent);color:#000;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:var(--text-xs);flex-shrink:0;">3</div>
+        <div>
+          <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">Test & Enjoy!</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">Save your command and test it in your group. Use variables like {user.name} to personalize!</div>
+        </div>
+      </div>
+    </div>
+  `;
+  container.appendChild(quickStartCard);
+
+  // Trigger Types Explained
+  const triggersCard = Card({ 
+    title: '⚡ Trigger Types Explained', 
+    subtitle: 'What activates your command?' 
+  });
+  const triggerGuide = [
+    { icon: '/', name: 'Command', desc: 'Triggered by /commandname. Most common type!' },
+    { icon: '🔤', name: 'Keyword', desc: 'Activates when someone types a specific word anywhere in their message' },
+    { icon: '🔍', name: 'Regex', desc: 'Advanced pattern matching for power users' },
+    { icon: '🆕', name: 'New Member', desc: 'Runs when someone joins the group (great for welcomes!)' },
+    { icon: '👋', name: 'Left Member', desc: 'Runs when someone leaves (goodbye messages)' },
+    { icon: '💬', name: 'Any Message', desc: 'Fires on every single message' },
+    { icon: '📎', name: 'Has Attachment', desc: 'When someone sends any file/media' },
+    { icon: '📷', name: 'Has Photo', desc: 'Specifically for images' },
+    { icon: '🎥', name: 'Has Video', desc: 'For video files' },
+    { icon: '📄', name: 'Has Document', desc: 'For files/documents' },
+    { icon: '🎤', name: 'Has Voice', desc: 'For voice messages' },
+    { icon: '🎭', name: 'Has Sticker', desc: 'When stickers are sent' },
+    { icon: '🔗', name: 'Has Link', desc: 'When URLs are detected' },
+    { icon: '📤', name: 'Forwarded', desc: 'When someone forwards a message' },
+    { icon: '↩️', name: 'Is Reply', desc: 'Only when replying to another message' },
+  ];
+  const triggerList = document.createElement('div');
+  triggerList.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--sp-2);padding-top:var(--sp-2);';
+  triggerGuide.forEach(t => {
+    triggerList.innerHTML += `
+      <div style="background:var(--bg-input);padding:var(--sp-2);border-radius:var(--r-lg);font-size:var(--text-xs);">
+        <div style="font-weight:var(--fw-semibold);margin-bottom:2px;">${t.icon} ${t.name}</div>
+        <div style="color:var(--text-muted);">${t.desc}</div>
+      </div>
+    `;
+  });
+  triggersCard.appendChild(triggerList);
+  container.appendChild(triggersCard);
+
+  // Action Types Explained
+  const actionsCard = Card({ 
+    title: '🎬 Action Types Explained', 
+    subtitle: 'What your command can do' 
+  });
+  const actionGuide = [
+    { icon: '💬', name: 'Send Reply', desc: 'Send a text message back', example: 'Welcome to the group!' },
+    { icon: '🗑️', name: 'Delete Message', desc: 'Remove the triggering message', example: 'Auto-delete spam' },
+    { icon: '❤️', name: 'Add Reaction', desc: 'React with an emoji', example: '👍 on good posts' },
+    { icon: '⚠️', name: 'Warn User', desc: 'Give a warning to the user', example: 'Warn for rule-breaking' },
+    { icon: '🔇', name: 'Mute User', desc: 'Temporarily silence someone', example: 'Mute for 1 hour' },
+    { icon: '🔊', name: 'Unmute User', desc: 'Restore messaging rights', example: 'Unmute after time served' },
+    { icon: '👢', name: 'Kick User', desc: 'Remove from group (can rejoin)', example: 'Kick troublemakers' },
+    { icon: '🚫', name: 'Ban User', desc: 'Permanently ban from group', example: 'Ban spammers' },
+    { icon: '✅', name: 'Unban User', desc: 'Allow banned user back', example: 'Forgive and forget' },
+    { icon: '⬆️', name: 'Promote', desc: 'Make someone admin', example: 'Promote trusted members' },
+    { icon: '⬇️', name: 'Demote', desc: 'Remove admin rights', example: 'Demote inactive admins' },
+    { icon: '📌', name: 'Pin Message', desc: 'Pin the replied-to message', example: 'Pin important announcements' },
+    { icon: '📍', name: 'Unpin All', desc: 'Clear all pinned messages', example: 'Clean up old pins' },
+    { icon: '📸', name: 'Send Photo', desc: 'Send an image', example: 'Send group rules image' },
+    { icon: '🎵', name: 'Send Audio', desc: 'Send music/audio file', example: 'Play intro music' },
+    { icon: '🎬', name: 'Send Video', desc: 'Send a video', example: 'Share tutorial videos' },
+    { icon: '📄', name: 'Send Document', desc: 'Send any file', example: 'Share PDF resources' },
+    { icon: '🎤', name: 'Send Voice', desc: 'Send voice message', example: 'Voice announcements' },
+    { icon: '🎭', name: 'Send Sticker', desc: 'Send a sticker', example: 'Fun reactions' },
+    { icon: '🎲', name: 'Send Dice', desc: 'Roll a dice/game', example: '🎲 🎯 🏀 games' },
+    { icon: '📍', name: 'Send Location', desc: 'Share coordinates', example: 'Share meetup spot' },
+    { icon: '🏛️', name: 'Send Venue', desc: 'Share place with name', example: 'Share event location' },
+    { icon: '👤', name: 'Send Contact', desc: 'Share a contact', example: 'Share admin contact' },
+    { icon: '↪️', name: 'Forward', desc: 'Forward to another chat', example: 'Relay to mod chat' },
+    { icon: '🌐', name: 'Webhook', desc: 'Call external API', example: 'Integrate with services' },
+    { icon: '📝', name: 'Set Title', desc: 'Change group name', example: 'Update for events' },
+    { icon: '📋', name: 'Set Description', desc: 'Change group bio', example: 'Update description' },
+    { icon: '🚪', name: 'Leave', desc: 'Bot leaves the chat', example: 'Emergency exit' },
+    { icon: '🔧', name: 'Set Variable', desc: 'Store data for later', example: 'Save counter values' },
+  ];
+  const actionList = document.createElement('div');
+  actionList.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--sp-2);padding-top:var(--sp-2);';
+  actionGuide.forEach(a => {
+    actionList.innerHTML += `
+      <div style="background:var(--bg-input);padding:var(--sp-2);border-radius:var(--r-lg);font-size:var(--text-xs);">
+        <div style="font-weight:var(--fw-semibold);margin-bottom:2px;">${a.icon} ${a.name}</div>
+        <div style="color:var(--text-secondary);margin-bottom:2px;">${a.desc}</div>
+        <div style="color:var(--text-muted);font-style:italic;">e.g. ${a.example}</div>
+      </div>
+    `;
+  });
+  actionsCard.appendChild(actionList);
+  container.appendChild(actionsCard);
+
+  // Pro Tips
+  const tipsCard = Card({ 
+    title: '💡 Pro Tips', 
+    subtitle: 'Level up your commands!' 
+  });
+  tipsCard.innerHTML += `
+    <div style="display:flex;flex-direction:column;gap:var(--sp-3);padding-top:var(--sp-2);font-size:var(--text-xs);">
+      <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);border-left:3px solid var(--accent);">
+        <div style="font-weight:var(--fw-semibold);margin-bottom:var(--sp-1);">🔗 Chain Multiple Actions</div>
+        <div style="color:var(--text-muted);">Your command can do many things! Delete the spam message AND warn the user AND send a log to admins - all at once!</div>
+      </div>
+      <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);border-left:3px solid var(--accent);">
+        <div style="font-weight:var(--fw-semibold);margin-bottom:var(--sp-1);">🎯 Use Conditions</div>
+        <div style="color:var(--text-muted);">Make actions conditional! Only delete links from non-admins, or only welcome users on their first join.</div>
+      </div>
+      <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);border-left:3px solid var(--accent);">
+        <div style="font-weight:var(--fw-semibold);margin-bottom:var(--sp-1);">⏱️ Add Delays</div>
+        <div style="color:var(--text-muted);">Space out your actions! Welcome message immediately, then a rules reminder after 5 seconds.</div>
+      </div>
+      <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);border-left:3px solid var(--accent);">
+        <div style="font-weight:var(--fw-semibold);margin-bottom:var(--sp-1);">🎲 Make It Fun!</div>
+        <div style="color:var(--text-muted);">Use {random} for games, {user.mention} to ping people nicely, and {newline} for formatting!</div>
+      </div>
+    </div>
+  `;
+  container.appendChild(tipsCard);
 }
 
 async function loadCustomVars(chatId, container) {

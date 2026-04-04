@@ -411,28 +411,35 @@ async def test_custom_command(
             "action_types_available": action_types,
             "condition_types_available": condition_types,
             "variables_available": [
+                # User variables
                 "user.name",
                 "user.first_name",
                 "user.last_name",
                 "user.username",
                 "user.id",
                 "user.mention",
+                # Target variables (for replies)
                 "target.name",
                 "target.first_name",
                 "target.last_name",
                 "target.username",
                 "target.id",
                 "target.mention",
+                # Group variables
                 "group.name",
                 "group.id",
                 "group.member_count",
+                # Bot variables
                 "bot.name",
                 "bot.username",
+                # Time & date
                 "time",
                 "date",
                 "datetime",
+                # Fun & utility
                 "random",
                 "newline",
+                # Arguments
                 "args",
                 "arg1",
                 "arg2",

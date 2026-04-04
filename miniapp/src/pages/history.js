@@ -97,7 +97,7 @@ export async function renderHistoryPage(container) {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/name-history`, {
         method: 'POST',
-        body: JSON.stringify({ enabled, limit })
+        body: { enabled, limit }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {
@@ -127,10 +127,10 @@ async function loadRecentHistory(chatId) {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2);background:var(--bg-input);border-radius:var(--r-lg);font-size:0.85rem;';
       item.innerHTML = `
-        <span style="font-weight:600">${escapeText(entry.user_name || 'Unknown')}</span>
+        <span>${escapeText(entry.old_name || '(unknown)')}</span>
         <span style="color:var(--text-muted)">\u2192</span>
-        <span>${escapeText(entry.old_name || '')}</span>
-        <span style="color:var(--text-muted);margin-left:auto">${new Date(entry.changed_at).toLocaleDateString()}</span>
+        <span style="font-weight:600">${escapeText(entry.user_name || 'Unknown')}</span>
+        <span style="color:var(--text-muted);margin-left:auto">${entry.changed_at ? new Date(entry.changed_at).toLocaleDateString() : '—'}</span>
       `;
       list.appendChild(item);
     });

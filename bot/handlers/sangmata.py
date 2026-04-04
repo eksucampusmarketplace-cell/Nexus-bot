@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from telegram import Update
-from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ChatMemberHandler, ContextTypes, CommandHandler, MessageHandler, filters
 
 from bot.utils.permissions import is_admin
 
@@ -128,6 +128,115 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
     except Exception as e:
         log.debug(f"[SANGMATA] Tracking error: {e}")
+
+
+async def track_name_change_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Track name changes from chat_member updates (ChatMemberHandler).
+    This catches name changes even when users don't send messages.
+    """
+    change = update.chat_member
+    if not change:
+        return
+    
+    old_user = change.old_chat_member.user
+    new_user = change.new_chat_member.user
+    chat = change.chat
+    
+    # Skip bots
+    if old_user.is_bot or new_user.is_bot:
+        return
+    
+    # Only track in groups
+    if chat.type not in ["group", "supergroup"]:
+        return
+    
+    db = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    if not db:
+        return
+    
+    # Check if name/username actually changed
+    name_changed = (
+        old_user.first_name != new_user.first_name or
+        old_user.last_name != new_user.last_name or
+        old_user.username != new_user.username
+    )
+    if not name_changed:
+        return
+    
+    # Check if tracking is enabled for this group
+    try:
+        async with db.acquire() as conn:
+            enabled = await conn.fetchval(
+                "SELECT name_history_enabled FROM groups WHERE chat_id = $1", chat.id
+            )
+            if not enabled:
+                return
+    except Exception:
+        return
+    
+    # Check if user has opted out
+    try:
+        async with db.acquire() as conn:
+            optout = await conn.fetchval(
+                "SELECT 1 FROM user_history_optout WHERE user_id = $1",
+                new_user.id
+            )
+            if optout:
+                return
+    except Exception:
+        pass
+    
+    # Record the name change
+    try:
+        async with db.acquire() as conn:
+            # Record what changed
+            changes = []
+            if old_user.first_name != new_user.first_name:
+                changes.append(f"first_name: {old_user.first_name} → {new_user.first_name}")
+            if old_user.last_name != new_user.last_name:
+                changes.append(f"last_name: {old_user.last_name} → {new_user.last_name}")
+            if old_user.username != new_user.username:
+                old_un = old_user.username or "(none)"
+                new_un = new_user.username or "(none)"
+                changes.append(f"username: @{old_un} → @{new_un}")
+            
+            # Log to history with both old and new values
+            await conn.execute(
+                """INSERT INTO user_name_history
+                   (user_id, first_name, last_name, username, source_chat_id,
+                    old_first_name, old_last_name, old_username, changed_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())""",
+                new_user.id,
+                new_user.first_name or "",
+                new_user.last_name or "",
+                new_user.username or "",
+                chat.id,
+                old_user.first_name or "",
+                old_user.last_name or "",
+                old_user.username or ""
+            )
+            
+            # Update/create snapshot
+            await conn.execute(
+                """INSERT INTO user_snapshots 
+                   (user_id, first_name, last_name, username, source_chat_id)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT (user_id, source_chat_id) DO UPDATE
+                   SET first_name = EXCLUDED.first_name,
+                       last_name = EXCLUDED.last_name,
+                       username = EXCLUDED.username,
+                       captured_at = NOW()""",
+                new_user.id,
+                new_user.first_name or "",
+                new_user.last_name or "",
+                new_user.username or "",
+                chat.id
+            )
+            
+            log.debug(f"[SANGMATA] ChatMember change detected for {new_user.id}: {'; '.join(changes)}")
+    except Exception as e:
+        log.error(f"[SANGMATA] ChatMember tracking error: {e}")
 
 
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -368,6 +477,8 @@ sangmata_handlers = [
     CommandHandler("historyoptout", cmd_historyoptout),
     CommandHandler("historyoptin", cmd_historyoptin),
     CommandHandler("historydelete", cmd_historydelete),
-    # Message handler for passive tracking
+    # Message handler for passive tracking (when users send messages)
     MessageHandler(filters.ALL & filters.ChatType.GROUPS, track_name_change),
+    # ChatMember handler for tracking name changes without messages
+    ChatMemberHandler(track_name_change_chat_member, ChatMemberHandler.CHAT_MEMBER),
 ]

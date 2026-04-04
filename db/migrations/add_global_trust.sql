@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS trust_rewards (
     -- role, title, badge, xp_bonus, feature
     reward_value TEXT NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
-    PRIMARY KEY (chat_id, bot_id, tier, reward_type)
+    UNIQUE(chat_id, bot_id, tier, reward_type)
 );
 
 -- Indexes

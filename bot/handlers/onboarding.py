@@ -240,6 +240,8 @@ onboarding_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
     name="onboarding",
     persistent=False,
+    per_message=True,
+    per_chat=True,
 )
 
 setup_command = CommandHandler("setup", cmd_setup)

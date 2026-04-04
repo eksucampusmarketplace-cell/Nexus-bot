@@ -505,14 +505,29 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Add CORS middleware
-# Bug #1 fix: allow_origins=["*"] with allow_credentials=True is forbidden by the CORS spec.
-# Use allow_origin_regex to match any origin explicitly while still allowing credentials.
+# Security fix: restrict origins to known domains
+import re as _re
+
+_ALLOWED_ORIGINS = [
+    # Your Render deployment URL
+    r"https://[\w-]+\.onrender\.com",
+    # Telegram Mini App origin
+    r"https://[\w-]+\.telegram\.org",
+    r"https://web\.telegram\.org",
+    # Local development
+    r"http://localhost:\d+",
+    r"http://127\.0\.0\.1:\d+",
+]
+
+# Combine into single alternation pattern
+_CORS_REGEX = "|".join(f"({p})" for p in _ALLOWED_ORIGINS)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://.*",
+    allow_origin_regex=_CORS_REGEX,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "x-init-data", "Content-Type"],
 )
 
 # Register security middleware

@@ -1,6 +1,7 @@
 import sys
 from typing import List, Optional
 
+from cryptography.fernet import Fernet
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY: str
     SUPABASE_CONNECTION_STRING: str  # For asyncpg
-    OWNER_ID: Optional[int] = None
+    OWNER_ID: int
     SKIP_AUTH: bool = False
     DEBUG: bool = False
     PORT: int = 8000
@@ -90,8 +91,20 @@ class Settings(BaseSettings):
         if not self.SUPABASE_CONNECTION_STRING or "your" in self.SUPABASE_CONNECTION_STRING.lower():
             missing.append("SUPABASE_CONNECTION_STRING")
 
-        if not self.SECRET_KEY or len(self.SECRET_KEY) < 32:
-            missing.append("SECRET_KEY")
+        if not self.SECRET_KEY:
+            missing.append("SECRET_KEY (not set)")
+        else:
+            try:
+                Fernet(self.SECRET_KEY.encode())
+            except Exception:
+                missing.append(
+                    "SECRET_KEY (invalid format — must be a Fernet key). "
+                    "Generate with: python -c \"from cryptography.fernet import "
+                    "Fernet; print(Fernet.generate_key().decode())\""
+                )
+
+        if not self.OWNER_ID or self.OWNER_ID <= 0:
+            missing.append("OWNER_ID (your Telegram user ID, e.g. 123456789)")
 
         if missing:
             print("=" * 60, file=sys.stderr)

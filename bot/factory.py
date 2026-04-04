@@ -422,9 +422,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
             if update and update.effective_message:
                 from bot.utils.messages import DEFAULTS
 
-                suffix = DEFAULTS.get("error_suffix", "").format(
-                    main_bot=settings.MAIN_BOT_USERNAME
-                )
+                suffix = DEFAULTS.get("error_suffix", "")
                 await update.effective_message.reply_text(
                     f"❌ Something went wrong. {suffix}"
                 )

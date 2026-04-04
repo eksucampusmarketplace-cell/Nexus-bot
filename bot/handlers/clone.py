@@ -43,7 +43,6 @@ from telegram.ext import (
     filters,
 )
 
-from bot.factory import create_application
 from bot.registry import deregister as registry_deregister
 from bot.registry import register as registry_register
 from bot.utils.crypto import (
@@ -357,6 +356,9 @@ async def token_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                     await update_bot_status(db_pool, reauth_bot_id, "active", webhook_active=True)
 
                     # Spin up PTB Application for the reactivated bot
+                    # Import here to avoid circular import with factory.py
+                    from bot.factory import create_application
+
                     clone_app = create_application(token, is_primary=False)
                     clone_app.bot_data["db_pool"] = db_pool
                     await clone_app.initialize()
@@ -794,7 +796,7 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
     )
 
 
-# ─── /cloneset ────────────────────────────────────────�����───────────────────────
+# ─── /cloneset ────────���───────────────────────────────�������───────��───────────────
 
 
 async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -975,6 +977,9 @@ async def _complete_clone_registration(db_pool, pending: dict, owner_user_id: in
 
     # Step 4: Spin up PTB Application
     logger.debug(f"[CLONE][REGISTER] Step 4: Spinning up PTB app | bot_id={bot_id}")
+    # Import here to avoid circular import with factory.py
+    from bot.factory import create_application
+
     clone_app = create_application(token, is_primary=False)
     clone_app.bot_data["db_pool"] = db_pool
     await clone_app.initialize()

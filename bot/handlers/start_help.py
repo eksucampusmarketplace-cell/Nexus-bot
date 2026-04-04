@@ -106,16 +106,10 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         start_param = context.args[0] if context.args else None
 
         if start_param == "clone":
-            # Redirect to clone flow
-            from bot.handlers.clone import clone_conversation
+            # Redirect to clone flow - call the clone command handler directly
+            from bot.handlers.clone import clone_command_handler
 
-            await update.message.reply_text(
-                "🤖 <b>Create Your Own Bot</b>\n\n"
-                "Let's create your own branded Nexus bot! Follow the steps below:",
-                parse_mode=ParseMode.HTML,
-            )
-            # Let the clone handler take over
-            return
+            return await clone_command_handler(update, context)
 
         msg = await get_message(
             key="start_private",
@@ -257,33 +251,12 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_start_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handle callback queries from /start buttons.
-    - start_clone: Start the clone conversation flow
     - help_main: Show help message
     """
     query = update.callback_query
     await query.answer()
 
-    is_primary = context.bot_data.get("is_primary", False)
-
-    if query.data == "start_clone":
-        # Only allow clone creation on primary bot
-        if not is_primary:
-            await query.edit_message_text(
-                "⛔ Clone creation is only available on the main Nexus bot.\n\n"
-                f"Please use the main bot to create your own instance.",
-                parse_mode=ParseMode.HTML,
-            )
-            return
-
-        # Send instruction message — let user trigger /clone properly
-        await query.edit_message_text(
-            "🤖 <b>Create Your Own Bot</b>\n\n"
-            "Send /clone to begin the bot creation wizard.\n\n"
-            "You will need a bot token from @BotFather.",
-            parse_mode=ParseMode.HTML,
-        )
-
-    elif query.data == "help_main":
+    if query.data == "help_main":
         # Show help message
         await handle_help(update, context)
 
@@ -336,5 +309,5 @@ async def help_callback_handler(update: Update, context: ContextTypes.DEFAULT_TY
 start_handler = CommandHandler("start", handle_start)
 help_handler = CommandHandler("help", handle_help)
 start_callback_handler = CallbackQueryHandler(
-    handle_start_callback, pattern=r"^start_clone$|^help_main$"
+    handle_start_callback, pattern=r"^help_main$"
 )

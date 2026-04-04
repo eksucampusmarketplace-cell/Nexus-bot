@@ -201,6 +201,10 @@ async def get_user_context(user: dict = Depends(get_current_user)):
     # Check if user is the owner (for owner panel gating)
     is_sudo = user_id == settings.OWNER_ID
 
+    # Check bot ownership from auth layer (if user came through clone bot auth)
+    is_clone_owner = user.get("is_clone_owner", False)
+    is_overlord = user.get("is_overlord", False) or is_sudo
+
     # Build user object
     user_obj = {
         "id": user_id,
@@ -226,6 +230,9 @@ async def get_user_context(user: dict = Depends(get_current_user)):
         "user_id": user_id,
         "role": role,
         "is_sudo": is_sudo,
+        "is_overlord": is_overlord,
+        "is_clone_owner": is_clone_owner,
+        "is_bot_owner": is_sudo or is_clone_owner,  # Convenience flag for UI
         "groups": all_managed_groups,
         "admin_groups": admin_groups,
         "mod_groups": mod_groups,
@@ -238,6 +245,8 @@ async def get_user_context(user: dict = Depends(get_current_user)):
 
     logger.info(
         f"[ME] User context ready | user_id={user_id} role={role} is_sudo={is_sudo} "
+        f"is_clone_owner={is_clone_owner} is_overlord={is_overlord} "
+        f"bot_id={bot_info.get('id')} bot_username={bot_info.get('username')} "
         f"admin={len(admin_groups)} member={len(member_groups)}"
     )
 

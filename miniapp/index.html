@@ -677,7 +677,9 @@
     async function navigateToPage(pageId) {
       // Update state
       store.setState({ activePage: pageId });
-      getState().setActivePage?.(pageId);
+      if (getState().setActivePage) {
+        getState().setActivePage(pageId);
+      }
 
       // Update UI - hide all pages first
       document.querySelectorAll('.page').forEach(p => {
@@ -693,7 +695,19 @@
       if (activePageEl) {
         activePageEl.classList.add('active');
         // Always re-render to ensure fresh data
-        await renderPage(pageId);
+        try {
+          await renderPage(pageId);
+        } catch (err) {
+          console.error(`[App] Failed to render page ${pageId}:`, err);
+          activePageEl.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:var(--sp-8);text-align:center;gap:var(--sp-4);">
+              <div style="font-size:48px;">⚠️</div>
+              <div style="font-size:var(--text-lg);font-weight:var(--fw-bold);">Failed to load page</div>
+              <div style="color:var(--text-muted);font-size:var(--text-sm);">${err.message || 'Unknown error'}</div>
+              <button class="btn btn-primary" onclick="location.reload()">Reload App</button>
+            </div>
+          `;
+        }
       }
 
       document.querySelectorAll('.sidebar-item').forEach(el => {
@@ -711,8 +725,14 @@
       const container = document.getElementById(`page-${pageId}`);
       if (!container) return;
 
-      // Clear container first to prevent content overlap/duplication
-      container.innerHTML = '';
+      // Clear container first and show loading state
+      container.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:var(--sp-12);gap:var(--sp-4);">
+          <div style="width:32px;height:32px;border:3px solid var(--bg-overlay);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+          <div style="color:var(--text-muted);font-size:var(--text-sm);">Loading...</div>
+        </div>
+        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+      `;
 
       switch (pageId) {
         case 'dashboard': {
@@ -1310,7 +1330,7 @@
         await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
           method: 'PUT',
           validate: false,
-          body: JSON.stringify({ settings: { [key]: val } }),
+          body: { settings: { [key]: val } },
         });
         state.updateSetting(key, val);
         showToast('Saved', 'success');

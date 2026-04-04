@@ -54,12 +54,41 @@ export async function renderCustomCommandsPage(container) {
   }
 
   const header = document.createElement('div');
-  header.style.cssText = 'margin-bottom:var(--sp-4);';
+  header.style.cssText = 'margin-bottom:var(--sp-4);display:flex;justify-content:space-between;align-items:flex-start;';
   header.innerHTML = `
-    <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">Custom Commands</h2>
-    <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Build custom bot commands with triggers, conditions, and actions</p>
+    <div>
+      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">Custom Commands</h2>
+      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Build custom bot commands with triggers, conditions, and actions</p>
+    </div>
+    <div style="display:flex;gap:var(--sp-2);">
+      <button id="cc-refresh-btn" class="btn btn-secondary" style="padding:var(--sp-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+    </div>
   `;
   container.appendChild(header);
+
+  header.querySelector('#cc-refresh-btn').onclick = () => {
+    const activeTab = tabBar.querySelector('button[style*="var(--bg-card)"]')?.dataset.tab || 'commands';
+    _switchTab(activeTab, content, chatId, tabBar);
+  };
+
+  const searchContainer = document.createElement('div');
+  searchContainer.style.cssText = 'margin-bottom:var(--sp-4);';
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'input';
+  searchInput.placeholder = 'Search commands by name or trigger...';
+  searchInput.style.width = '100%';
+  searchContainer.appendChild(searchInput);
+  container.appendChild(searchContainer);
+
+  searchInput.oninput = () => {
+    const term = searchInput.value.toLowerCase();
+    const cards = content.querySelectorAll('.command-card');
+    cards.forEach(card => {
+      const text = card.textContent.toLowerCase();
+      card.style.display = text.includes(term) ? 'block' : 'none';
+    });
+  };
 
   // Tab bar
   const tabs = ['Commands', 'Create', 'Variables'];
@@ -123,6 +152,7 @@ async function _renderCommandsList(container, chatId, tabBar) {
 
   commands.forEach(cmd => {
     const card = document.createElement('div');
+    card.className = 'command-card';
     card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-3);';
 
     const triggers = (cmd.triggers || []).map(t => {
@@ -145,6 +175,7 @@ async function _renderCommandsList(container, chatId, tabBar) {
       <div style="font-size:var(--text-xs);color:var(--text-muted);">Triggers: ${_escHtml(triggers)}</div>
       <div style="display:flex;gap:var(--sp-2);margin-top:var(--sp-2);">
         <button class="btn btn-secondary cmd-edit-btn" data-id="${cmd.id}" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);">Edit</button>
+        <button class="btn btn-secondary cmd-clone-btn" data-id="${cmd.id}" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);">Clone</button>
         <button class="btn btn-danger cmd-del-btn" data-id="${cmd.id}" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);">Delete</button>
       </div>
     `;
@@ -175,6 +206,41 @@ async function _renderCommandsList(container, chatId, tabBar) {
         showToast('Deleted', 'success');
         _renderCommandsList(container, chatId, tabBar);
       } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+    });
+
+    // Clone handler
+    card.querySelector('.cmd-clone-btn').addEventListener('click', async () => {
+      try {
+        // Fetch full command
+        const resp = await apiFetch(`/api/groups/${chatId}/custom-commands/${cmd.id}`);
+        const fullCmd = resp.command;
+        
+        const cloneData = {
+          name: fullCmd.name + '_copy',
+          description: fullCmd.description,
+          cooldown_secs: fullCmd.cooldown_secs,
+          priority: fullCmd.priority,
+          triggers: (fullCmd.triggers || []).map(t => ({
+            trigger_type: t.trigger_type,
+            trigger_value: t.trigger_value + '_copy',
+            case_sensitive: t.case_sensitive
+          })),
+          actions: (fullCmd.actions || []).map(a => ({
+            action_type: a.action_type,
+            action_config: a.action_config,
+            sort_order: a.sort_order,
+            condition: a.condition,
+            delay_secs: a.delay_secs
+          }))
+        };
+        
+        await apiFetch(`/api/groups/${chatId}/custom-commands`, {
+          method: 'POST',
+          body: JSON.stringify(cloneData)
+        });
+        showToast('Command cloned!', 'success');
+        _renderCommandsList(container, chatId, tabBar);
+      } catch (e) { showToast('Clone failed: ' + e.message, 'error'); }
     });
 
     // Edit handler
@@ -338,6 +404,15 @@ function _buildCommandForm(existingCmd) {
       inp.value = trig.trigger_value || '';
       inp.oninput = () => { trig.trigger_value = inp.value; };
 
+      const csLabel = document.createElement('label');
+      csLabel.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted);cursor:pointer;white-space:nowrap;';
+      const csInp = document.createElement('input');
+      csInp.type = 'checkbox';
+      csInp.checked = !!trig.case_sensitive;
+      csInp.onchange = () => { trig.case_sensitive = csInp.checked; };
+      csLabel.appendChild(csInp);
+      csLabel.appendChild(document.createTextNode('Case sens.'));
+
       const del = document.createElement('button');
       del.className = 'btn btn-danger';
       del.style.cssText = 'padding:var(--sp-1) var(--sp-2);font-size:var(--text-xs);flex-shrink:0;';
@@ -346,6 +421,7 @@ function _buildCommandForm(existingCmd) {
 
       row.appendChild(sel);
       row.appendChild(inp);
+      row.appendChild(csLabel);
       row.appendChild(del);
       triggersContainer.appendChild(row);
     });
@@ -415,8 +491,21 @@ function _buildCommandForm(existingCmd) {
         row.appendChild(ta);
 
         const varsHint = document.createElement('div');
-        varsHint.style.cssText = 'font-size:9px;color:var(--text-muted);margin-top:4px;word-break:break-all;';
-        varsHint.textContent = 'Variables: ' + BUILTIN_VARS.join(' ');
+        varsHint.style.cssText = 'font-size:9px;color:var(--text-muted);margin-top:4px;word-break:break-all;display:flex;flex-wrap:wrap;gap:4px;';
+        BUILTIN_VARS.forEach(v => {
+          const vBtn = document.createElement('span');
+          vBtn.textContent = v;
+          vBtn.style.cssText = 'cursor:pointer;background:var(--bg-card);padding:1px 4px;border-radius:4px;border:1px solid var(--border);';
+          vBtn.onclick = () => {
+            const start = ta.selectionStart;
+            const end = ta.selectionEnd;
+            ta.value = ta.value.substring(0, start) + v + ta.value.substring(end);
+            ta.selectionStart = ta.selectionEnd = start + v.length;
+            ta.focus();
+            act.action_config = { ...config, text: ta.value };
+          };
+          varsHint.appendChild(vBtn);
+        });
         row.appendChild(varsHint);
       } else if (act.action_type === 'react') {
         const inp = document.createElement('input');
@@ -456,10 +545,30 @@ function _buildCommandForm(existingCmd) {
         varRow.appendChild(nameInp);
         varRow.appendChild(valInp);
         row.appendChild(varRow);
-      }
+        }
 
-      // Delay field
-      const delayRow = document.createElement('div');
+        // Condition field
+        const condRow = document.createElement('div');
+        condRow.style.cssText = 'margin-top:var(--sp-2);';
+        const condInp = document.createElement('input');
+        condInp.type = 'text';
+        condInp.className = 'input';
+        condInp.style.cssText = 'width:100%;font-size:var(--text-xs);';
+        condInp.placeholder = 'Condition (JSON), e.g. {"role": "admin"}';
+        condInp.value = act.condition ? JSON.stringify(act.condition) : '';
+        condInp.oninput = () => {
+        try {
+          act.condition = condInp.value ? JSON.parse(condInp.value) : null;
+          condInp.style.borderColor = '';
+        } catch (e) {
+          condInp.style.borderColor = 'var(--danger)';
+        }
+        };
+        condRow.appendChild(condInp);
+        row.appendChild(condRow);
+
+        // Delay field
+
       delayRow.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);margin-top:var(--sp-2);';
       const delayLabel = document.createElement('span');
       delayLabel.style.cssText = 'font-size:var(--text-xs);color:var(--text-muted);';

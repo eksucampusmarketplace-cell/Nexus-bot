@@ -131,7 +131,7 @@ export async function renderCommunityVotePage(container) {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/community-vote`, {
         method: 'POST',
-        body: JSON.stringify({ enabled: voteEnabled, threshold, timeout, action, autoDetectScams: scamEnabled })
+        body: { enabled: voteEnabled, threshold, timeout, action, autoDetectScams: scamEnabled }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {

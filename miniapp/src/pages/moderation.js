@@ -57,6 +57,9 @@ export async function renderModerationPage(container) {
   `;
   container.appendChild(header);
 
+  const content = document.createElement('div');
+  content.id = 'mod-tab-content';
+
   // Tabs: Members, Actions, Warns, Filters (Locks removed)
   const tabs = ['Members', 'Actions', 'Warns', 'Filters'];
   const tabBar = document.createElement('div');
@@ -66,38 +69,37 @@ export async function renderModerationPage(container) {
     btn.textContent = t;
     btn.dataset.tab = t.toLowerCase();
     btn.style.cssText = `flex:1;padding:var(--sp-2) var(--sp-3);border:none;border-radius:var(--r-lg);font-size:var(--text-sm);font-weight:var(--fw-medium);cursor:pointer;white-space:nowrap;transition:all var(--dur-fast);background:${i===0?'var(--bg-card)':'transparent'};color:${i===0?'var(--text-primary)':'var(--text-muted)'};`;
-    btn.onclick = () => switchTab(t.toLowerCase(), container, chatId);
+    btn.onclick = () => switchTab(t.toLowerCase(), content, chatId);
     tabBar.appendChild(btn);
   });
   container.appendChild(tabBar);
-
-  const content = document.createElement('div');
-  content.id = 'mod-tab-content';
   container.appendChild(content);
 
-  await switchTab('members', container, chatId);
+  await switchTab('members', content, chatId);
 
   // Reset cancel flag when (re-)entering the page, then connect SSE
   _sseCancelled = false;
   _connectSSE(chatId);
 }
 
-function switchTab(tab, container, chatId) {
-  container.querySelectorAll('[data-tab]').forEach(btn => {
-    const isActive = btn.dataset.tab === tab;
-    btn.style.background = isActive ? 'var(--bg-card)' : 'transparent';
-    btn.style.color = isActive ? 'var(--text-primary)' : 'var(--text-muted)';
-  });
+function switchTab(tab, contentDiv, chatId) {
+  const container = contentDiv.parentElement;
+  if (container) {
+    container.querySelectorAll('[data-tab]').forEach(btn => {
+      const isActive = btn.dataset.tab === tab;
+      btn.style.background = isActive ? 'var(--bg-card)' : 'transparent';
+      btn.style.color = isActive ? 'var(--text-primary)' : 'var(--text-muted)';
+    });
+  }
 
-  const content = document.getElementById('mod-tab-content');
-  if (!content) return;
-  content.innerHTML = '';
+  if (!contentDiv || !contentDiv.isConnected) return;
+  contentDiv.innerHTML = '';
 
   switch (tab) {
-    case 'members': return _renderMembersTab(content, chatId);
-    case 'actions': return _renderActionsTab(content, chatId);
-    case 'warns':   return _renderWarnsTab(content, chatId);
-    case 'filters': return _renderFiltersTab(content, chatId);
+    case 'members': return _renderMembersTab(contentDiv, chatId);
+    case 'actions': return _renderActionsTab(contentDiv, chatId);
+    case 'warns':   return _renderWarnsTab(contentDiv, chatId);
+    case 'filters': return _renderFiltersTab(contentDiv, chatId);
   }
 }
 
@@ -682,25 +684,23 @@ async function _renderFiltersTab(container, chatId) {
   filtersCard.appendChild(addFilterRow);
   container.appendChild(filtersCard);
 
-  setTimeout(() => {
-    filtersCard.querySelector('#add-filter-btn')?.addEventListener('click', async () => {
-      const keyword = filtersCard.querySelector('#filter-keyword').value.trim().toLowerCase();
-      const response = filtersCard.querySelector('#filter-response').value.trim();
-      if (!keyword || !response) { showToast('Keyword and response required', 'error'); return; }
-      try {
-        const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, {
-          method: 'POST',
-          validate: false,
-          body: { keyword, reply_content: response }
-        });
-        filters.push({ keyword, reply_content: response, id: newFilter?.id || Date.now() });
-        renderFilters(filters);
-        filtersCard.querySelector('#filter-keyword').value = '';
-        filtersCard.querySelector('#filter-response').value = '';
-        showToast('Filter added', 'success');
-      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
-    });
-  }, 0);
+  filtersCard.querySelector('#add-filter-btn').addEventListener('click', async () => {
+    const keyword = filtersCard.querySelector('#filter-keyword').value.trim().toLowerCase();
+    const response = filtersCard.querySelector('#filter-response').value.trim();
+    if (!keyword || !response) { showToast('Keyword and response required', 'error'); return; }
+    try {
+      const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, {
+        method: 'POST',
+        validate: false,
+        body: { keyword, reply_content: response }
+      });
+      filters.push({ keyword, reply_content: response, id: newFilter?.id || Date.now() });
+      renderFilters(filters);
+      filtersCard.querySelector('#filter-keyword').value = '';
+      filtersCard.querySelector('#filter-response').value = '';
+      showToast('Filter added', 'success');
+    } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+  });
 
   // Word Blacklist
   const blacklistCard = Card({ title: '🚫 Word Blacklist', subtitle: 'Automatically act on these words' });
@@ -709,12 +709,31 @@ async function _renderFiltersTab(container, chatId) {
   chipsContainer.id = 'blacklist-chips';
   chipsContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:var(--sp-3);min-height:32px;';
 
+  const _removeBlacklistWordLocal = async (cid, word) => {
+    try {
+      await apiFetch(`/api/groups/${cid}/blacklist/${encodeURIComponent(word)}`, {
+        method: 'DELETE',
+        validate: false
+      });
+      blacklist = blacklist.filter(w => w !== word);
+      renderChips(blacklist);
+      showToast('Word removed', 'success');
+    } catch (e) {
+      showToast('Failed to remove', 'error');
+    }
+  };
+
   const renderChips = (words) => {
     chipsContainer.innerHTML = '';
     words.forEach(word => {
       const chip = document.createElement('span');
       chip.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:var(--bg-overlay);border:1px solid var(--border);border-radius:var(--r-full);font-size:var(--text-xs);';
-      chip.innerHTML = `${word} <button onclick="this.parentElement.remove();window._removeBlacklistWord('${chatId}','${word}')" style="background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:14px;line-height:1;">&times;</button>`;
+      chip.textContent = word + ' ';
+      const delBtn = document.createElement('button');
+      delBtn.innerHTML = '&times;';
+      delBtn.style.cssText = 'background:none;border:none;cursor:pointer;color:var(--text-muted);padding:0;font-size:14px;line-height:1;';
+      delBtn.onclick = () => _removeBlacklistWordLocal(chatId, word);
+      chip.appendChild(delBtn);
       chipsContainer.appendChild(chip);
     });
   };
@@ -752,24 +771,10 @@ async function _renderFiltersTab(container, chatId) {
 
   container.appendChild(blacklistCard);
 
-  setTimeout(() => {
-    blacklistCard.querySelector('#add-blacklist-btn')?.addEventListener('click', addWord);
-    blacklistCard.querySelector('#blacklist-input')?.addEventListener('keydown', e => { if (e.key === 'Enter') addWord(); });
-  }, 0);
-
-  window._removeBlacklistWord = async (cid, word) => {
-    try {
-      await apiFetch(`/api/groups/${cid}/blacklist/${encodeURIComponent(word)}`, {
-        method: 'DELETE',
-        validate: false
-      });
-      blacklist = blacklist.filter(w => w !== word);
-      showToast('Word removed', 'success');
-    } catch (e) {
-      showToast('Failed to remove', 'error');
-    }
-  };
+  blacklistCard.querySelector('#add-blacklist-btn').addEventListener('click', addWord);
+  blacklistCard.querySelector('#blacklist-input').addEventListener('keydown', e => { if (e.key === 'Enter') addWord(); });
 }
+
 
 function _connectSSE(chatId) {
   if (_sseSource) {

@@ -456,7 +456,7 @@ async function _renderCommandsList(container, chatId, tabBar) {
       onChange: async (v) => {
         try {
           await apiFetch(`/api/groups/${chatId}/custom-commands/${cmd.id}`, {
-            method: 'PUT', body: JSON.stringify({ enabled: v })
+            method: 'PUT', body: { enabled: v }
           });
           showToast(v ? 'Enabled' : 'Disabled', 'success');
         } catch (e) { showToast('Failed', 'error'); }
@@ -504,7 +504,7 @@ async function _renderCommandsList(container, chatId, tabBar) {
         
         await apiFetch(`/api/groups/${chatId}/custom-commands`, {
           method: 'POST',
-          body: JSON.stringify(cloneData)
+          body: cloneData
         });
         showToast('Command cloned!', 'success');
         _renderCommandsList(container, chatId, tabBar);
@@ -534,7 +534,7 @@ async function _renderCreateForm(container, chatId, tabBar) {
     try {
       await apiFetch(`/api/groups/${chatId}/custom-commands`, {
         method: 'POST',
-        body: JSON.stringify(data)
+        body: data
       });
       showToast('Command created!', 'success');
       _switchTab('commands', container, chatId, tabBar);
@@ -572,7 +572,7 @@ async function _renderEditForm(container, chatId, cmd, tabBar) {
       // Update command metadata
       await apiFetch(`/api/groups/${chatId}/custom-commands/${cmd.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name: data.name, description: data.description, cooldown_secs: data.cooldown_secs, priority: data.priority })
+        body: { name: data.name, description: data.description, cooldown_secs: data.cooldown_secs, priority: data.priority }
       });
 
       // Delete existing triggers and re-add
@@ -581,7 +581,7 @@ async function _renderEditForm(container, chatId, cmd, tabBar) {
       }
       for (const t of (data.triggers || [])) {
         await apiFetch(`/api/groups/${chatId}/custom-commands/${cmd.id}/triggers`, {
-          method: 'POST', body: JSON.stringify(t)
+          method: 'POST', body: t
         });
       }
 
@@ -591,7 +591,7 @@ async function _renderEditForm(container, chatId, cmd, tabBar) {
       }
       for (const a of (data.actions || [])) {
         await apiFetch(`/api/groups/${chatId}/custom-commands/${cmd.id}/actions`, {
-          method: 'POST', body: JSON.stringify(a)
+          method: 'POST', body: a
         });
       }
 
@@ -1291,7 +1291,7 @@ async function _renderVariablesTab(container, chatId) {
     try {
       await apiFetch(`/api/groups/${chatId}/custom-commands/0/variables`, {
         method: 'POST',
-        body: JSON.stringify({ var_name: name, var_value: value, var_type: 'string' })
+        body: { var_name: name, var_value: value, var_type: 'string' }
       });
       showToast('Variable set!', 'success');
       addRow.querySelector('#cv-name').value = '';

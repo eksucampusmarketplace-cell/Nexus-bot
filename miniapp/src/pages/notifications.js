@@ -241,7 +241,7 @@ export async function renderNotificationsPage(container) {
             try {
               await apiFetch(`/api/owner/notifications/${pref.error_type}`, {
                 method: 'PUT',
-                body: JSON.stringify({ muted: !enabled })
+                body: { muted: !enabled }
               });
               showToast(`${info.label} ${enabled ? 'enabled' : 'muted'}`, 'success');
             } catch (e) {

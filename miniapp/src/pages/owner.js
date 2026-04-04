@@ -185,7 +185,7 @@ export async function renderOwnerPage(container) {
     const amt = parseInt(econCard.querySelector('#grant-amt').value);
     if (!uid || !amt) { showToast(t('owner_enter_uid_amt', 'Enter user ID and amount'), 'error'); return; }
     try {
-      await apiFetch('/api/billing/grant-bonus', { method: 'POST', body: JSON.stringify({ user_id: uid, amount: amt, reason: 'Owner grant via miniapp' }) });
+      await apiFetch('/api/billing/grant-bonus', { method: 'POST', body: { user_id: uid, amount: amt, reason: 'Owner grant via miniapp' } });
       showToast('Granted ' + amt + ' Stars to ' + uid, 'success');
       econCard.querySelector('#grant-uid').value = '';
       econCard.querySelector('#grant-amt').value = '';
@@ -198,7 +198,7 @@ export async function renderOwnerPage(container) {
     const uses = parseInt(econCard.querySelector('#promo-uses').value) || 10;
     if (!code || !amt) { showToast(t('owner_enter_code_amt', 'Enter code and amount'), 'error'); return; }
     try {
-      await apiFetch('/api/billing/create-promo', { method: 'POST', body: JSON.stringify({ code, amount: amt, max_uses: uses }) });
+      await apiFetch('/api/billing/create-promo', { method: 'POST', body: { code, amount: amt, max_uses: uses } });
       showToast('Promo ' + code + ' created (' + amt + ' Stars, ' + uses + ' uses)', 'success');
       econCard.querySelector('#promo-code').value = '';
       econCard.querySelector('#promo-amt').value = '';

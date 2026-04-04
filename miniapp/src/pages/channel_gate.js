@@ -58,7 +58,7 @@ export async function renderChannelGatePage(container) {
         try {
           await apiFetch(`/api/groups/${chatId}/channel-gate/config`, {
             method: 'PUT',
-            body: JSON.stringify({ enabled: v })
+            body: { enabled: v }
           });
           card.querySelector('#gate-config-fields').style.display = v ? 'flex' : 'none';
           showToast(`Channel gate ${v ? 'enabled' : 'disabled'}`, 'success');
@@ -72,7 +72,7 @@ export async function renderChannelGatePage(container) {
       try {
         await apiFetch(`/api/groups/${chatId}/channel-gate/config`, {
           method: 'PUT',
-          body: JSON.stringify({ channel_id: channelId })
+          body: { channel_id: channelId }
         });
         const statusEl = card.querySelector('#gate-status');
         statusEl.style.display = 'block';

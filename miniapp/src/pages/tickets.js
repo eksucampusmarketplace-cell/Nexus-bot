@@ -172,7 +172,7 @@ export async function renderTicketsPage(container) {
             try {
               await apiFetch(`/api/groups/${chatId}/tickets/${tid}/${action}`, {
                 method: 'POST',
-                body: JSON.stringify({})
+                body: {}
               });
               showToast(`Ticket ${action === 'close' ? 'closed' : 'escalated'}`, 'success');
               loadTickets(currentStatus);
@@ -283,7 +283,7 @@ export async function renderTicketsPage(container) {
               try {
                 await apiFetch(`/api/groups/${chatId}/tickets/${ticketId}/message`, {
                   method: 'POST',
-                  body: JSON.stringify({ message_text: text, is_staff: true })
+                  body: { message_text: text, is_staff: true }
                 });
                 showToast('Reply sent', 'success');
                 showTicketDetail(ticketId);
@@ -321,7 +321,7 @@ export async function renderTicketsPage(container) {
             try {
               await apiFetch(`/api/groups/${chatId}/tickets/${ticketId}/${btn.dataset.action}`, {
                 method: 'POST',
-                body: JSON.stringify({})
+                body: {}
               });
               showToast(`Ticket ${btn.dataset.action === 'close' ? 'closed' : 'escalated'}`, 'success');
               showTicketDetail(ticketId);
@@ -340,7 +340,7 @@ export async function renderTicketsPage(container) {
               try {
                 await apiFetch(`/api/groups/${chatId}/tickets/${ticketId}/priority`, {
                   method: 'POST',
-                  body: JSON.stringify({ priority: newPriority })
+                  body: { priority: newPriority }
                 });
                 showToast(`Priority changed to ${newPriority}`, 'success');
                 showTicketDetail(ticketId);
@@ -519,13 +519,13 @@ export async function renderTicketsPage(container) {
               try {
                 await apiFetch(`/api/groups/${chatId}/tickets/sla`, {
                   method: 'PUT',
-                  body: JSON.stringify({
+                  body: {
                     priority: p,
                     response_time_mins: responseTime,
                     resolution_time_mins: resolveTime,
                     auto_close_hours: autoClose,
                     escalation_chain: [],
-                  })
+                  }
                 });
               } catch (err) {
                 showToast(`Failed to save ${p}: ${err.message}`, 'error');
@@ -597,7 +597,7 @@ export async function renderTicketsPage(container) {
             try {
               await apiFetch(`/api/groups/${chatId}/tickets/templates`, {
                 method: 'POST',
-                body: JSON.stringify({ name, content: tplContent })
+                body: { name, content: tplContent }
               });
               showToast('Template saved!', 'success');
               overlay.remove();

@@ -116,7 +116,7 @@ export async function renderReportsPage(container) {
             try {
               await apiFetch(`/api/groups/${chatId}/reports/${rid}`, {
                 method: 'PUT',
-                body: JSON.stringify({ status: action === 'ban' ? 'resolved' : action, action })
+                body: { status: action === 'ban' ? 'resolved' : action, action }
               });
               showToast(`Report ${action === 'dismissed' ? 'dismissed' : action + 'd'}`, 'success');
               loadReports(currentStatus);

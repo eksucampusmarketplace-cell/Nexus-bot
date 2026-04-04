@@ -216,7 +216,7 @@ async function _showSessionResult(container, session, library, auth) {
     try {
       const res = await apiFetch('/api/session/convert', {
         method: 'POST',
-        body: JSON.stringify({ gramjs_session: session, target: targetFormat }),
+        body: { gramjs_session: session, target: targetFormat },
       });
       if (targetFormat === 'pyrogram') {
         displaySession = res.pyrogram_session || res.session || session;

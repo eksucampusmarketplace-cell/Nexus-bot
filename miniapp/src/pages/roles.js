@@ -116,7 +116,7 @@ export async function renderRolesPage(container) {
   container.appendChild(header);
   header.querySelector('#new-role-btn').addEventListener('click', () => {
     _showRoleModal(finalChatId, null, async (data) => {
-      await apiFetch(`/api/groups/${finalChatId}/roles`, { method: 'POST', body: JSON.stringify(data) });
+      await apiFetch(`/api/groups/${finalChatId}/roles`, { method: 'POST', body: data });
       showToast('Role created!', 'success');
       await renderRolesPage(container);
     });
@@ -151,7 +151,7 @@ export async function renderRolesPage(container) {
       `;
       row.querySelector('[data-action="edit"]').addEventListener('click', () => {
         _showRoleModal(finalChatId, role, async (data) => {
-          await apiFetch(`/api/groups/${finalChatId}/roles/${role.id}`, { method: 'PUT', body: JSON.stringify(data) });
+          await apiFetch(`/api/groups/${finalChatId}/roles/${role.id}`, { method: 'PUT', body: data });
           showToast('Role updated!', 'success');
           await renderRolesPage(container);
         });

@@ -183,7 +183,7 @@ async function _renderSettingsTab(container, chatId) {
         checked: !!settings[row.key],
         onChange: async (v) => {
           try {
-            await apiFetch(`/api/groups/${chatId}/antiraid/settings`, { method: 'PUT', body: JSON.stringify({ ...settings, [row.key]: v }) });
+            await apiFetch(`/api/groups/${chatId}/antiraid/settings`, { method: 'PUT', body: { ...settings, [row.key]: v } });
             settings[row.key] = v;
             showToast('Saved', 'success');
           } catch (e) { showToast('Failed', 'error'); }
@@ -199,7 +199,7 @@ async function _renderSettingsTab(container, chatId) {
       input.style.cssText = 'width:5rem;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--r-lg);padding:var(--sp-2) var(--sp-3);font-size:var(--text-sm);color:var(--text-primary);text-align:right;';
       input.addEventListener('change', async () => {
         try {
-          await apiFetch(`/api/groups/${chatId}/antiraid/settings`, { method: 'PUT', body: JSON.stringify({ ...settings, [row.key]: parseInt(input.value) }) });
+          await apiFetch(`/api/groups/${chatId}/antiraid/settings`, { method: 'PUT', body: { ...settings, [row.key]: parseInt(input.value) } });
           settings[row.key] = parseInt(input.value);
           showToast('Saved', 'success');
         } catch (e) { showToast('Failed', 'error'); }
@@ -294,7 +294,7 @@ async function _renderRaidersTab(container, chatId) {
     card.querySelector('[data-action="ban"]').addEventListener('click', async (e) => {
       const uid = parseInt(e.target.dataset.uid);
       try {
-        await apiFetch(`/api/groups/${chatId}/bans`, { method: 'POST', body: JSON.stringify({ user_id: uid, reason: 'Anti-raid', duration: null }) });
+        await apiFetch(`/api/groups/${chatId}/bans`, { method: 'POST', body: { user_id: uid, reason: 'Anti-raid', duration: null } });
         showToast('User banned', 'success');
         card.remove();
       } catch (err) { showToast('Failed: ' + err.message, 'error'); }
@@ -374,7 +374,7 @@ async function _renderGlobalListTab(container, chatId) {
       const reason = container.querySelector('#gbl-reason').value.trim();
       if (!uid) { showToast('Enter a valid user ID', 'error'); return; }
       try {
-        await apiFetch('/api/antiraid/banlist', { method: 'POST', body: JSON.stringify({ user_id: uid, chat_id: chatId, reason }) });
+        await apiFetch('/api/antiraid/banlist', { method: 'POST', body: { user_id: uid, chat_id: chatId, reason } });
         banList.push({ user_id: uid, reason, flagged_at: new Date().toISOString(), is_active: true });
         renderList(banList);
         container.querySelector('#gbl-user-id').value = '';

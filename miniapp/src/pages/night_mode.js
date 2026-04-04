@@ -145,7 +145,7 @@ export async function renderNightModePage(container) {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/night-mode`, {
         method: 'POST',
-        body: JSON.stringify({ enabled, startTime, endTime, timezone, nightMessage, morningMessage })
+        body: { enabled, startTime, endTime, timezone, nightMessage, morningMessage }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {

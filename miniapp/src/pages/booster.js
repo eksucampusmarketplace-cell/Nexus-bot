@@ -71,7 +71,7 @@ export async function renderBoosterPage(container) {
         try {
           await apiFetch(`/api/groups/${chatId}/boost/config`, {
             method: 'PUT',
-            body: JSON.stringify({ enabled: v })
+            body: { enabled: v }
           });
           showToast(t('nav_booster', 'Booster') + ' ' + (v ? t('enabled', 'enabled') : t('disabled', 'disabled')), 'success');
         } catch (e) { showToast(t('error_update', 'Error updating booster'), 'error'); }
@@ -83,7 +83,7 @@ export async function renderBoosterPage(container) {
       try {
         await apiFetch(`/api/groups/${chatId}/boost/config`, {
           method: 'PUT',
-          body: JSON.stringify({ required_count: count })
+          body: { required_count: count }
         });
         showToast(t('toast_save_success', 'Configuration saved'), 'success');
       } catch (e) {
@@ -117,7 +117,7 @@ export async function renderBoosterPage(container) {
       try {
         await apiFetch(`/api/groups/${chatId}/boost/grant`, {
           method: 'POST',
-          body: JSON.stringify({ user_id: uid })
+          body: { user_id: uid }
         });
         showToast(t('booster_granted', 'Access granted to user ') + uid, 'success');
         grantCard.querySelector('#grant-user-id').value = '';
@@ -133,7 +133,7 @@ export async function renderBoosterPage(container) {
       try {
         await apiFetch(`/api/groups/${chatId}/boost/revoke`, {
           method: 'POST',
-          body: JSON.stringify({ user_id: uid })
+          body: { user_id: uid }
         });
         showToast(t('booster_revoked', 'Access revoked for user ') + uid, 'success');
         grantCard.querySelector('#grant-user-id').value = '';

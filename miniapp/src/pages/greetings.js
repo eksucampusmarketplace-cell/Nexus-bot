@@ -175,7 +175,8 @@ export async function renderGreetingsPage(container) {
 
   let textConfig = {};
   try {
-    textConfig = await apiFetch(`/api/groups/${chatId}/text-config`) || {};
+    const resp = await apiFetch(`/api/groups/${chatId}/text-config`) || {};
+    textConfig = resp.config || resp || {};
   } catch (e) {
     console.warn('[Greetings] Could not load text config:', e);
   }

@@ -189,12 +189,15 @@ export async function renderBotsPage(container) {
         groupsPanel.style.cssText = 'display:none;margin-top:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);padding:var(--sp-3);max-height:300px;overflow-y:auto;';
         groupsPanel.innerHTML = '<div style="text-align:center;padding:var(--sp-2);color:var(--text-muted);font-size:var(--text-xs);">Loading groups...</div>';
 
+        let groupsLoaded = false;
         groupsBtn.addEventListener('click', async () => {
-          if (groupsPanel.style.display === 'none') {
-            groupsPanel.style.display = 'block';
-            // Load groups
+          const isVisible = groupsPanel.style.display !== 'none';
+          groupsPanel.style.display = isVisible ? 'none' : 'block';
+          if (!isVisible && !groupsLoaded) {
+            groupsLoaded = true;
             try {
               const groups = await apiFetch(`/api/bots/${botId}/groups`);
+              if (!groupsPanel.isConnected) { groupsLoaded = false; return; }
               if (!groups || groups.length === 0) {
                 groupsPanel.innerHTML = '<div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);font-size:var(--text-xs);">No active groups</div>';
               } else {
@@ -212,11 +215,9 @@ export async function renderBotsPage(container) {
                 `).join('');
               }
             } catch (e) {
+              groupsLoaded = false;
               groupsPanel.innerHTML = `<div style="text-align:center;padding:var(--sp-2);color:var(--danger);font-size:var(--text-xs);">Failed to load groups</div>`;
             }
-          } else {
-            groupsPanel.style.display = 'none';
-          }
         });
 
         card.appendChild(groupsBtn);

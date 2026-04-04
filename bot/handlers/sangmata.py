@@ -68,10 +68,10 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     last_snapshot["last_name"] != current_last or
                     last_snapshot["username"] != current_username
                 )
-                
+
                 if not changed:
                     return
-                
+
                 # Record what changed
                 changes = []
                 if last_snapshot["first_name"] != current_first:
@@ -82,15 +82,17 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     old_un = last_snapshot["username"] or "(none)"
                     new_un = current_username or "(none)"
                     changes.append(f"username: @{old_un} → @{new_un}")
-                
-                # Log to history
+
+                # Log to history with both old and new values
                 await conn.execute(
-                    """INSERT INTO user_name_history 
-                       (user_id, first_name, last_name, username, source_chat_id)
-                       VALUES ($1, $2, $3, $4, $5)""",
-                    user.id, current_first, current_last, current_username, chat.id
+                    """INSERT INTO user_name_history
+                       (user_id, first_name, last_name, username, source_chat_id,
+                        old_first_name, old_last_name, old_username)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+                    user.id, current_first, current_last, current_username, chat.id,
+                    last_snapshot["first_name"], last_snapshot["last_name"], last_snapshot["username"]
                 )
-                
+
                 log.debug(f"[SANGMATA] Change detected for {user.id}: {'; '.join(changes)}")
             
             # Create/update snapshot

@@ -82,19 +82,36 @@ async def get_recent_name_changes(chat_id: int, user: dict = Depends(require_aut
             if not enabled:
                 return []
 
-            # Get recent name changes
+            # Get recent name changes with proper old/new name fields
             rows = await conn.fetch(
-                """SELECT uhh.user_id, uhh.old_name, uhh.new_name, uhh.changed_at,
-                          COALESCE(u.username, 'Unknown') as username
+                """SELECT uhh.user_id,
+                          CASE
+                            WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' THEN uhh.first_name || ' ' || uhh.last_name
+                            ELSE uhh.first_name
+                          END as user_name,
+                          CASE
+                            WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' THEN uhh.old_first_name || ' ' || uhh.old_last_name
+                            ELSE uhh.old_first_name
+                          END as old_name,
+                          uhh.changed_at
                    FROM user_name_history uhh
                    LEFT JOIN users u ON u.user_id = uhh.user_id
                    WHERE uhh.source_chat_id = $1
+                     AND (uhh.old_first_name IS NOT NULL OR uhh.old_last_name IS NOT NULL OR uhh.old_username IS NOT NULL)
                    ORDER BY uhh.changed_at DESC
                    LIMIT 20""",
                 chat_id,
             )
 
-        return [dict(r) for r in rows]
+        return [
+            {
+                "user_id": r["user_id"],
+                "user_name": r["user_name"] or "Unknown",
+                "old_name": r["old_name"] or "",
+                "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
+            }
+            for r in rows
+        ]
     except Exception as e:
         logger.error(f"Failed to get recent name changes: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch name history")

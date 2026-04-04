@@ -526,7 +526,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=_CORS_REGEX,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "x-init-data", "Content-Type"],
 )
 

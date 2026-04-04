@@ -18,6 +18,9 @@ const TRIGGER_TYPES = [
   { value: 'keyword', label: 'Keyword match' },
   { value: 'regex', label: 'Regex pattern' },
   { value: 'exact', label: 'Exact match' },
+  { value: 'new_member', label: 'New member' },
+  { value: 'left_member', label: 'Member left' },
+  { value: 'message', label: 'Any message' },
 ];
 
 const ACTION_TYPES = [
@@ -26,17 +29,25 @@ const ACTION_TYPES = [
   { value: 'react', label: 'Add reaction' },
   { value: 'warn', label: 'Warn user' },
   { value: 'mute', label: 'Mute user' },
+  { value: 'unmute', label: 'Unmute user' },
   { value: 'kick', label: 'Kick user' },
   { value: 'ban', label: 'Ban user' },
+  { value: 'unban', label: 'Unban user' },
+  { value: 'promote', label: 'Promote user' },
+  { value: 'demote', label: 'Demote user' },
   { value: 'pin', label: 'Pin message' },
   { value: 'set_variable', label: 'Set variable' },
+  { value: 'send_photo', label: 'Send photo' },
+  { value: 'webhook', label: 'Call webhook' },
 ];
 
 const BUILTIN_VARS = [
   '{user.name}', '{user.username}', '{user.id}', '{user.mention}',
+  '{target.name}', '{target.username}', '{target.id}', '{target.mention}',
   '{group.name}', '{group.id}', '{group.member_count}',
   '{bot.name}', '{bot.username}',
   '{time}', '{date}', '{datetime}', '{random}', '{newline}',
+  '{args}', '{arg1}', '{arg2}', '{arg3}',
 ];
 
 export async function renderCustomCommandsPage(container) {
@@ -545,30 +556,93 @@ function _buildCommandForm(existingCmd) {
         varRow.appendChild(nameInp);
         varRow.appendChild(valInp);
         row.appendChild(varRow);
-        }
+      } else if (act.action_type === 'mute' || act.action_type === 'ban') {
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;';
+        inp.placeholder = 'Duration in seconds (0 for permanent)';
+        inp.value = config.duration || 0;
+        inp.oninput = () => { act.action_config = { ...config, duration: parseInt(inp.value) || 0 }; };
+        row.appendChild(inp);
+      } else if (act.action_type === 'unban') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;';
+        inp.placeholder = 'User ID (or reply to a user)';
+        inp.value = config.user_id || '';
+        inp.oninput = () => { act.action_config = { ...config, user_id: inp.value }; };
+        row.appendChild(inp);
+      } else if (act.action_type === 'send_photo') {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.className = 'input';
+        inp.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:var(--sp-2);';
+        inp.placeholder = 'Photo URL';
+        inp.value = config.photo_url || '';
+        inp.oninput = () => { act.action_config = { ...config, photo_url: inp.value }; };
+        row.appendChild(inp);
+        const cap = document.createElement('input');
+        cap.type = 'text';
+        cap.className = 'input';
+        cap.style.cssText = 'width:100%;box-sizing:border-box;';
+        cap.placeholder = 'Caption (optional)';
+        cap.value = config.caption || '';
+        cap.oninput = () => { act.action_config = { ...config, caption: cap.value }; };
+        row.appendChild(cap);
+      } else if (act.action_type === 'webhook') {
+        const urlInp = document.createElement('input');
+        urlInp.className = 'input';
+        urlInp.style.cssText = 'width:100%;margin-bottom:var(--sp-2);';
+        urlInp.placeholder = 'Webhook URL';
+        urlInp.value = config.url || '';
+        urlInp.oninput = () => { act.action_config = { ...config, url: urlInp.value }; };
+        row.appendChild(urlInp);
 
-        // Condition field
-        const condRow = document.createElement('div');
-        condRow.style.cssText = 'margin-top:var(--sp-2);';
-        const condInp = document.createElement('input');
-        condInp.type = 'text';
-        condInp.className = 'input';
-        condInp.style.cssText = 'width:100%;font-size:var(--text-xs);';
-        condInp.placeholder = 'Condition (JSON), e.g. {"role": "admin"}';
-        condInp.value = act.condition ? JSON.stringify(act.condition) : '';
-        condInp.oninput = () => {
+        const meth = document.createElement('select');
+        meth.className = 'input';
+        meth.style.cssText = 'width:100%;margin-bottom:var(--sp-2);';
+        ['POST', 'GET'].forEach(m => {
+          const o = document.createElement('option');
+          o.value = m; o.textContent = m;
+          o.selected = config.method === m;
+          meth.appendChild(o);
+        });
+        meth.onchange = () => { act.action_config = { ...config, method: meth.value }; };
+        row.appendChild(meth);
+
+        const pay = document.createElement('textarea');
+        pay.className = 'input';
+        pay.style.cssText = 'width:100%;min-height:60px;';
+        pay.placeholder = 'JSON Payload';
+        pay.value = config.payload || '{}';
+        pay.oninput = () => { act.action_config = { ...config, payload: pay.value }; };
+        row.appendChild(pay);
+      }
+
+      // Condition field
+      const condRow = document.createElement('div');
+      condRow.style.cssText = 'margin-top:var(--sp-2);';
+      const condInp = document.createElement('input');
+      condInp.type = 'text';
+      condInp.className = 'input';
+      condInp.style.cssText = 'width:100%;font-size:var(--text-xs);';
+      condInp.placeholder = 'Condition (JSON), e.g. {"role": "admin"}';
+      condInp.value = act.condition ? JSON.stringify(act.condition) : '';
+      condInp.oninput = () => {
         try {
           act.condition = condInp.value ? JSON.parse(condInp.value) : null;
           condInp.style.borderColor = '';
         } catch (e) {
           condInp.style.borderColor = 'var(--danger)';
         }
-        };
-        condRow.appendChild(condInp);
-        row.appendChild(condRow);
+      };
+      condRow.appendChild(condInp);
+      row.appendChild(condRow);
 
-        // Delay field
-
+      // Delay field
+      const delayRow = document.createElement('div');
       delayRow.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);margin-top:var(--sp-2);';
       const delayLabel = document.createElement('span');
       delayLabel.style.cssText = 'font-size:var(--text-xs);color:var(--text-muted);';

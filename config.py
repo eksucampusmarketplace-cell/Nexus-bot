@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY: str
     SUPABASE_CONNECTION_STRING: str  # For asyncpg
-    OWNER_ID: Optional[int] = None
+    OWNER_ID: int
     SKIP_AUTH: bool = False
     DEBUG: bool = False
     PORT: int = 8000
@@ -102,6 +102,9 @@ class Settings(BaseSettings):
                     "Generate with: python -c \"from cryptography.fernet import "
                     "Fernet; print(Fernet.generate_key().decode())\""
                 )
+
+        if not self.OWNER_ID or self.OWNER_ID <= 0:
+            missing.append("OWNER_ID (your Telegram user ID, e.g. 123456789)")
 
         if missing:
             print("=" * 60, file=sys.stderr)

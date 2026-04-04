@@ -3,7 +3,7 @@ services:
     name: nexus-bot
     env: python
     buildCommand: apt-get install -y ffmpeg && pip install -r requirements.txt
-    startCommand: python -m db.migrate && uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PRIMARY_BOT_TOKEN
         sync: false
@@ -32,6 +32,10 @@ services:
       - key: PYROGRAM_API_ID
         sync: false
       - key: PYROGRAM_API_HASH
+        sync: false
+      - key: TG_API_ID
+        sync: false
+      - key: TG_API_HASH
         sync: false
       - key: RENDER_GIT_COMMIT
         sync: false

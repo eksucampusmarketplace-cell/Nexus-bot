@@ -373,6 +373,6 @@ setmessage_conversation = ConversationHandler(
         CONFIRMING: [CallbackQueryHandler(on_confirm, pattern=r"^setmsg_confirm:")],
     },
     fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
-    per_message=False,
+    per_message=True,
     per_chat=True,
 )

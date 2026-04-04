@@ -37,6 +37,21 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not db:
         return
     
+    # Only track in groups where it's enabled
+    if chat.type in ["group", "supergroup"]:
+        try:
+            async with db.acquire() as conn:
+                # Check if name history tracking is enabled for this group
+                history_enabled = await conn.fetchval(
+                    "SELECT name_history_enabled FROM groups WHERE chat_id = $1",
+                    chat.id
+                )
+                if not history_enabled:
+                    return
+        except Exception:
+            # If we can't check, assume disabled to be safe
+            return
+    
     try:
         async with db.acquire() as conn:
             # Check if user has opted out

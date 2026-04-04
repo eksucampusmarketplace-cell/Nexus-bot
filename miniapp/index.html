@@ -577,7 +577,9 @@
       
       // Render initial page with small delay to ensure all init is complete
       setTimeout(() => {
-        const activePage = getState().activePage || 'dashboard';
+        // Try to restore saved page from localStorage, fallback to dashboard
+        const savedPage = loadSavedPageState();
+        const activePage = savedPage || getState().activePage || 'dashboard';
         navigateToPage(activePage);
       }, 100);
     });
@@ -674,12 +676,57 @@
     // Expose navigateToPage globally so external page modules can use it
     window.navigateToPage = navigateToPage;
 
+    // Page persistence keys
+    const PAGE_STORAGE_KEY = 'nexus_active_page';
+    const CHAT_STORAGE_KEY = 'nexus_active_chat';
+
+    // Save page state to localStorage
+    function savePageState(pageId) {
+      try {
+        localStorage.setItem(PAGE_STORAGE_KEY, pageId);
+      } catch (e) {
+        console.debug('[App] Could not save page state:', e);
+      }
+    }
+
+    // Save chat state to localStorage
+    function saveChatState(chatId) {
+      try {
+        if (chatId) {
+          localStorage.setItem(CHAT_STORAGE_KEY, String(chatId));
+        }
+      } catch (e) {
+        console.debug('[App] Could not save chat state:', e);
+      }
+    }
+
+    // Load saved page state
+    function loadSavedPageState() {
+      try {
+        return localStorage.getItem(PAGE_STORAGE_KEY);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Load saved chat state
+    function loadSavedChatState() {
+      try {
+        return localStorage.getItem(CHAT_STORAGE_KEY);
+      } catch (e) {
+        return null;
+      }
+    }
+
     async function navigateToPage(pageId) {
       // Update state
       store.setState({ activePage: pageId });
       if (getState().setActivePage) {
         getState().setActivePage(pageId);
       }
+      
+      // Save to localStorage for persistence
+      savePageState(pageId);
 
       // Update UI - hide all pages first
       document.querySelectorAll('.page').forEach(p => {

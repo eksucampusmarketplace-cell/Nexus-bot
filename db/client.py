@@ -50,7 +50,9 @@ class Database:
                 return
             except Exception as e:
                 last_error = e
-                logger.warning(f"Database connection attempt {attempt}/{max_retries} failed: {e}")
+                logger.warning(
+                    f"Database connection attempt {attempt}/{max_retries} failed: {e}"
+                )
                 if attempt < max_retries:
                     await asyncio.sleep(2**attempt)  # Exponential backoff
 
@@ -93,7 +95,8 @@ class Database:
                     modules JSONB DEFAULT '{}'::jsonb,
                     text_config JSONB DEFAULT '{}'::jsonb,
                     member_count INTEGER DEFAULT 0,
-                    last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    chat_type VARCHAR DEFAULT 'group'
                 );
 
                 CREATE TABLE IF NOT EXISTS users (
@@ -109,6 +112,7 @@ class Database:
                     trust_score INTEGER DEFAULT 50,
                     join_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                     last_seen TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    is_sudo BOOLEAN DEFAULT FALSE,
                     PRIMARY KEY (user_id, chat_id)
                 );
 
@@ -186,7 +190,11 @@ class Database:
                     death_reason TEXT,
                     group_limit INT DEFAULT 1 CHECK (group_limit BETWEEN 1 AND 20),
                     group_access_policy TEXT DEFAULT 'blocked' CHECK (group_access_policy IN ('open','approval','blocked')),
-                    bot_add_notifications BOOLEAN DEFAULT FALSE
+                    bot_add_notifications BOOLEAN DEFAULT FALSE,
+                    plan VARCHAR DEFAULT 'free',
+                    plan_expires_at TIMESTAMPTZ,
+                    trial_ends_at TIMESTAMPTZ,
+                    trial_used BOOLEAN DEFAULT FALSE
                 );
 
                 -- Tracks every group a clone bot has been added to
@@ -218,6 +226,7 @@ class Database:
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS text_config JSONB DEFAULT '{}'::jsonb;
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS photo_big TEXT;
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS photo_small TEXT;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS chat_type VARCHAR DEFAULT 'group';
 
                 -- Ensure columns exist in users table
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS trust_score INTEGER DEFAULT 50;
@@ -225,6 +234,7 @@ class Database:
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS warns JSONB DEFAULT '[]'::jsonb;
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_muted BOOLEAN DEFAULT FALSE;
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE;
+                ALTER TABLE users ADD COLUMN IF NOT EXISTS is_sudo BOOLEAN DEFAULT FALSE;
 
                 -- Ensure columns exist in member_boost_records table
                 ALTER TABLE member_boost_records ADD COLUMN IF NOT EXISTS invited_count INTEGER DEFAULT 0;
@@ -248,6 +258,34 @@ class Database:
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS token_hash TEXT;
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
                 ALTER TABLE bots ALTER COLUMN owner_user_id DROP NOT NULL;
+
+                -- Ensure billing/trial columns exist in bots table
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS plan VARCHAR DEFAULT 'free';
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS plan_expires_at TIMESTAMPTZ;
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ;
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE;
+
+                -- Add check constraint for plan values if it doesn't exist
+                DO $
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'chk_bot_plan'
+                    ) THEN
+                        ALTER TABLE bots
+                        ADD CONSTRAINT chk_bot_plan
+                        CHECK (plan IN ('primary', 'free', 'trial', 'trial_expired', 'basic', 'starter', 'pro', 'unlimited'));
+                    END IF;
+                END $;
+
+                -- Backfill existing bots with appropriate plan values if not set
+                UPDATE bots
+                SET plan = 'primary', trial_used = TRUE
+                WHERE is_primary = TRUE AND (plan IS NULL OR plan = '');
+
+                UPDATE bots
+                SET plan = 'free', trial_used = TRUE
+                WHERE is_primary = FALSE AND (plan IS NULL OR plan = '') AND owner_user_id IS NOT NULL;
                 
                 -- Rate limiting table
                 CREATE TABLE IF NOT EXISTS clone_attempts (
@@ -347,6 +385,8 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_bots_owner ON bots(owner_user_id);
                 CREATE INDEX IF NOT EXISTS idx_bots_status ON bots(status);
                 CREATE INDEX IF NOT EXISTS idx_bots_token_hash ON bots(token_hash);
+                CREATE INDEX IF NOT EXISTS idx_bots_trial ON bots(plan, trial_ends_at)
+                  WHERE plan = 'trial';
                 CREATE INDEX IF NOT EXISTS idx_clone_attempts_user ON clone_attempts(user_id, attempted_at);
                 CREATE INDEX IF NOT EXISTS idx_boost_records_group ON member_boost_records(group_id);
                 CREATE INDEX IF NOT EXISTS idx_boost_records_user ON member_boost_records(user_id);

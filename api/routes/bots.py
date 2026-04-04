@@ -125,6 +125,11 @@ async def clone_bot(request: Request, user: dict = Depends(get_current_user)):
 
     body = await request.json()
     token = body.get("token", "").strip()
+    group_limit = body.get("group_limit", 1)
+
+    # Restrict unlimited groups (0) to the primary bot owner only
+    if group_limit == 0 and user_id != settings.OWNER_ID:
+        group_limit = 1
 
     if not token:
         raise HTTPException(
@@ -213,7 +218,7 @@ async def clone_bot(request: Request, user: dict = Depends(get_current_user)):
             "is_primary": False,
             "status": "active",
             "webhook_active": False,
-            "group_limit": body.get("group_limit", 1),
+            "group_limit": group_limit,
             "group_access_policy": body.get("group_access_policy", "blocked"),
             "bot_add_notifications": body.get("bot_add_notifications", False),
         },
@@ -533,6 +538,11 @@ async def update_bot_access(bot_id: int, request: Request, user: dict = Depends(
 
     body = await request.json()
     group_limit = body.get("group_limit")
+    
+    # Restrict unlimited groups (0) to the primary bot owner only
+    if group_limit == 0 and user_id != settings.OWNER_ID:
+        group_limit = 1
+        
     group_access_policy = body.get("group_access_policy")
     bot_add_notifications = body.get("bot_add_notifications")
 
@@ -567,6 +577,11 @@ async def update_bot_config(bot_id: int, request: Request, user: dict = Depends(
 
     body = await request.json()
     group_limit = body.get("group_limit")
+    
+    # Restrict unlimited groups (0) to the primary bot owner only
+    if group_limit == 0 and user_id != settings.OWNER_ID:
+        group_limit = 1
+        
     group_access_policy = body.get("group_access_policy")
     bot_add_notifications = body.get("bot_add_notifications")
 

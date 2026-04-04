@@ -326,9 +326,17 @@ async def test_custom_command(
             ],
             "variables_available": [
                 "user.name",
+                "user.first_name",
+                "user.last_name",
                 "user.username",
                 "user.id",
                 "user.mention",
+                "target.name",
+                "target.first_name",
+                "target.last_name",
+                "target.username",
+                "target.id",
+                "target.mention",
                 "group.name",
                 "group.id",
                 "group.member_count",
@@ -339,6 +347,10 @@ async def test_custom_command(
                 "datetime",
                 "random",
                 "newline",
+                "args",
+                "arg1",
+                "arg2",
+                "arg3",
             ],
         }
 

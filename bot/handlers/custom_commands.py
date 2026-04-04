@@ -6,11 +6,13 @@ Intercepts messages, matches triggers, evaluates conditions, and executes action
 """
 
 import asyncio
+import json
 import logging
 import random
 import re
 from datetime import datetime, timezone
 
+import httpx
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -31,6 +33,12 @@ BUILTIN_VARS = {
     "user.username",
     "user.id",
     "user.mention",
+    "target.name",
+    "target.first_name",
+    "target.last_name",
+    "target.username",
+    "target.id",
+    "target.mention",
     "group.name",
     "group.id",
     "group.member_count",
@@ -41,6 +49,10 @@ BUILTIN_VARS = {
     "datetime",
     "random",
     "newline",
+    "args",
+    "arg1",
+    "arg2",
+    "arg3",
 }
 
 # Max actions per command execution (abuse prevention)
@@ -61,6 +73,11 @@ async def _resolve_variable(
     """Resolve a variable name to its value."""
     user = update.effective_user
     chat = update.effective_chat
+    target = (
+        update.message.reply_to_message.from_user
+        if update.message and update.message.reply_to_message
+        else None
+    )
 
     # Built-in variables
     if var_name == "user.name":
@@ -81,6 +98,22 @@ async def _resolve_variable(
         if user:
             return f'<a href="tg://user?id={user.id}">{user.full_name}</a>'
         return "Unknown"
+
+    if var_name == "target.name":
+        return target.full_name if target else ""
+    if var_name == "target.first_name":
+        return target.first_name if target else ""
+    if var_name == "target.last_name":
+        return (target.last_name or "") if target else ""
+    if var_name == "target.username":
+        return f"@{target.username}" if target and target.username else ""
+    if var_name == "target.id":
+        return str(target.id) if target else ""
+    if var_name == "target.mention":
+        if target:
+            return f'<a href="tg://user?id={target.id}">{target.full_name}</a>'
+        return ""
+
     if var_name == "group.name":
         return chat.title if chat else "Unknown"
     if var_name == "group.id":
@@ -105,6 +138,21 @@ async def _resolve_variable(
         return str(random.randint(1, 100))
     if var_name == "newline":
         return "\n"
+
+    # Command arguments
+    if var_name.startswith("arg") or var_name == "args":
+        text = update.message.text or update.message.caption or ""
+        parts = text.split()
+        if len(parts) > 1:
+            if var_name == "args":
+                return " ".join(parts[1:])
+            try:
+                idx = int(var_name[3:])
+                if 0 < idx < len(parts):
+                    return parts[idx]
+            except (ValueError, IndexError):
+                pass
+        return ""
 
     # Custom variables from DB
     try:
@@ -276,12 +324,44 @@ async def _execute_action(
         )
         if target:
             try:
+                duration = int(config.get("duration", 0))
+                until_date = None
+                if duration > 0:
+                    until_date = datetime.now(timezone.utc).timestamp() + duration
                 await context.bot.restrict_chat_member(
-                    chat_id, target.id, permissions={"can_send_messages": False}
+                    chat_id,
+                    target.id,
+                    permissions={"can_send_messages": False},
+                    until_date=until_date,
                 )
-                await update.message.reply_text(f"Muted {target.full_name}")
+                await update.message.reply_text(
+                    f"Muted {target.full_name}"
+                    + (f" for {duration}s" if duration > 0 else "")
+                )
             except Exception as e:
                 logger.warning(f"[CUSTOM_CMD] mute action failed: {e}")
+
+    elif action_type == "unmute":
+        target = (
+            update.message.reply_to_message.from_user
+            if update.message.reply_to_message
+            else None
+        )
+        if target:
+            try:
+                await context.bot.restrict_chat_member(
+                    chat_id,
+                    target.id,
+                    permissions={
+                        "can_send_messages": True,
+                        "can_send_media_messages": True,
+                        "can_send_other_messages": True,
+                        "can_add_web_page_previews": True,
+                    },
+                )
+                await update.message.reply_text(f"Unmuted {target.full_name}")
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] unmute action failed: {e}")
 
     elif action_type == "kick":
         target = (
@@ -304,10 +384,107 @@ async def _execute_action(
         )
         if target:
             try:
-                await context.bot.ban_chat_member(chat_id, target.id)
-                await update.message.reply_text(f"Banned {target.full_name}")
+                duration = int(config.get("duration", 0))
+                until_date = None
+                if duration > 0:
+                    until_date = datetime.now(timezone.utc).timestamp() + duration
+                await context.bot.ban_chat_member(
+                    chat_id, target.id, until_date=until_date
+                )
+                await update.message.reply_text(
+                    f"Banned {target.full_name}"
+                    + (f" for {duration}s" if duration > 0 else "")
+                )
             except Exception as e:
                 logger.warning(f"[CUSTOM_CMD] ban action failed: {e}")
+
+    elif action_type == "unban":
+        target_id = config.get("user_id")
+        if not target_id and update.message.reply_to_message:
+            target_id = update.message.reply_to_message.from_user.id
+
+        if target_id:
+            try:
+                await context.bot.unban_chat_member(chat_id, int(target_id))
+                await update.message.reply_text(f"Unbanned user {target_id}")
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] unban action failed: {e}")
+
+    elif action_type == "promote":
+        target = (
+            update.message.reply_to_message.from_user
+            if update.message.reply_to_message
+            else None
+        )
+        if target:
+            try:
+                await context.bot.promote_chat_member(
+                    chat_id,
+                    target.id,
+                    can_manage_chat=True,
+                    can_delete_messages=True,
+                    can_restrict_members=True,
+                    can_invite_users=True,
+                    can_pin_messages=True,
+                )
+                await update.message.reply_text(f"Promoted {target.full_name} to admin")
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] promote action failed: {e}")
+
+    elif action_type == "demote":
+        target = (
+            update.message.reply_to_message.from_user
+            if update.message.reply_to_message
+            else None
+        )
+        if target:
+            try:
+                await context.bot.promote_chat_member(
+                    chat_id,
+                    target.id,
+                    can_manage_chat=False,
+                    can_delete_messages=False,
+                    can_restrict_members=False,
+                    can_invite_users=False,
+                    can_pin_messages=False,
+                )
+                await update.message.reply_text(f"Demoted {target.full_name}")
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] demote action failed: {e}")
+
+    elif action_type == "send_photo":
+        photo_url = config.get("photo_url", "")
+        caption = config.get("caption", "")
+        if photo_url:
+            photo_url = await _substitute_variables(
+                photo_url, update, context, chat_id, command_id
+            )
+            caption = await _substitute_variables(
+                caption, update, context, chat_id, command_id
+            )
+            try:
+                await context.bot.send_photo(chat_id, photo_url, caption=caption, parse_mode="HTML")
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] send_photo action failed: {e}")
+
+    elif action_type == "webhook":
+        url = config.get("url", "")
+        method = config.get("method", "POST")
+        payload = config.get("payload", "{}")
+        if url:
+            url = await _substitute_variables(url, update, context, chat_id, command_id)
+            try:
+                payload_str = await _substitute_variables(
+                    payload, update, context, chat_id, command_id
+                )
+                data = json.loads(payload_str)
+                async with httpx.AsyncClient() as client:
+                    if method.upper() == "POST":
+                        await client.post(url, json=data, timeout=5.0)
+                    elif method.upper() == "GET":
+                        await client.get(url, params=data, timeout=5.0)
+            except Exception as e:
+                logger.warning(f"[CUSTOM_CMD] webhook action failed: {e}")
 
     elif action_type == "pin":
         try:
@@ -366,6 +543,12 @@ def _match_trigger(trigger: dict, message_text: str, is_command: bool) -> bool:
     if trigger_type == "message":
         return True  # Matches any message
 
+    if trigger_type == "new_member":
+        return message_text == "__new_member__"
+
+    if trigger_type == "left_member":
+        return message_text == "__left_member__"
+
     if trigger_type == "exact":
         if case_sensitive:
             return message_text.strip() == trigger_value.strip()
@@ -388,7 +571,12 @@ async def custom_command_handler(
     user_id = update.effective_user.id if update.effective_user else 0
     message_text = update.message.text or update.message.caption or ""
 
-    if not message_text:
+    if update.message.new_chat_members:
+        message_text = "__new_member__"
+    elif update.message.left_chat_member:
+        message_text = "__left_member__"
+
+    if not message_text and not update.message.new_chat_members and not update.message.left_chat_member:
         return
 
     is_command = message_text.startswith("/")

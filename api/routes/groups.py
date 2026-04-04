@@ -182,7 +182,39 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
     token_hash = hash_token(bot_token) if bot_token else None
     
     # Get existing merged settings
-    existing = await get_group_settings(db.pool, chat_id, token_hash)
+    existing_full = await get_group_settings(db.pool, chat_id, token_hash)
+    
+    # Extract only settings-related keys (not group metadata like title, member_count, etc.)
+    settings_keys = {
+        # All individual columns from groups table that are settings
+        "antiraid_enabled", "antiraid_mode", "antiraid_threshold", "antiraid_duration_mins",
+        "auto_antiraid_enabled", "auto_antiraid_threshold",
+        "captcha_enabled", "captcha_mode", "captcha_timeout_mins", "captcha_kick_on_timeout",
+        "self_destruct_enabled", "self_destruct_minutes", "lock_admins",
+        "unofficial_tg_lock", "bot_inviter_ban",
+        "duplicate_limit", "duplicate_window_mins",
+        "min_words", "max_words", "min_lines", "max_lines", "min_chars", "max_chars",
+        "necessary_words_active", "regex_active",
+        "group_password", "password_kick_on_fail", "password_attempts", "password_timeout_mins",
+        "log_channel_id", "log_include_preview", "log_include_userid", "inline_mode_enabled",
+        # Media locks
+        "lock_photo", "lock_video", "lock_sticker", "lock_gif", "lock_voice", "lock_audio", "lock_document",
+        # Communication locks
+        "lock_link", "lock_forward", "lock_poll", "lock_contact",
+        # Additional content locks
+        "lock_username", "lock_bot", "lock_bot_inviter", "lock_website", "lock_channel",
+        # Content filters
+        "lock_porn", "lock_hashtag", "lock_unofficial_tg", "lock_userbots",
+        # Anti-flood
+        "antiflood", "antiflood_limit", "antiflood_window", "antiflood_action",
+        # Anti-spam
+        "antispam",
+        # Nested settings
+        "locks", "automod", "warnings", "welcome", "goodbye", "rules",
+        "modules", "_modules", "timed_locks",
+    }
+    existing = {k: v for k, v in existing_full.items() if k in settings_keys}
+    
     incoming = settings.copy()
     _normalize_settings(incoming, existing)
     
@@ -251,7 +283,39 @@ async def bulk_update_settings(
     token_hash = hash_token(bot_token) if bot_token else None
     
     # Get existing merged settings
-    existing = await get_group_settings(db.pool, chat_id, token_hash)
+    existing_full = await get_group_settings(db.pool, chat_id, token_hash)
+    
+    # Extract only settings-related keys (not group metadata like title, member_count, etc.)
+    settings_keys = {
+        # All individual columns from groups table that are settings
+        "antiraid_enabled", "antiraid_mode", "antiraid_threshold", "antiraid_duration_mins",
+        "auto_antiraid_enabled", "auto_antiraid_threshold",
+        "captcha_enabled", "captcha_mode", "captcha_timeout_mins", "captcha_kick_on_timeout",
+        "self_destruct_enabled", "self_destruct_minutes", "lock_admins",
+        "unofficial_tg_lock", "bot_inviter_ban",
+        "duplicate_limit", "duplicate_window_mins",
+        "min_words", "max_words", "min_lines", "max_lines", "min_chars", "max_chars",
+        "necessary_words_active", "regex_active",
+        "group_password", "password_kick_on_fail", "password_attempts", "password_timeout_mins",
+        "log_channel_id", "log_include_preview", "log_include_userid", "inline_mode_enabled",
+        # Media locks
+        "lock_photo", "lock_video", "lock_sticker", "lock_gif", "lock_voice", "lock_audio", "lock_document",
+        # Communication locks
+        "lock_link", "lock_forward", "lock_poll", "lock_contact",
+        # Additional content locks
+        "lock_username", "lock_bot", "lock_bot_inviter", "lock_website", "lock_channel",
+        # Content filters
+        "lock_porn", "lock_hashtag", "lock_unofficial_tg", "lock_userbots",
+        # Anti-flood
+        "antiflood", "antiflood_limit", "antiflood_window", "antiflood_action",
+        # Anti-spam
+        "antispam",
+        # Nested settings
+        "locks", "automod", "warnings", "welcome", "goodbye", "rules",
+        "modules", "_modules", "timed_locks",
+    }
+    existing = {k: v for k, v in existing_full.items() if k in settings_keys}
+    
     incoming = settings.copy()
     _normalize_settings(incoming, existing)
 

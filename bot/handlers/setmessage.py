@@ -30,21 +30,22 @@ Rules:
 """
 
 import logging
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import (
-    ContextTypes,
-    CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
+    CommandHandler,
+    ContextTypes,
     ConversationHandler,
+    MessageHandler,
     filters,
 )
-from telegram.constants import ParseMode
 
-from config import settings
-from bot.utils.messages import DEFAULTS, get_message, POWERED_BY_FOOTER
-from bot.utils.keyboards import support_keyboard
 from bot.utils.format import get_main_bot_ref
+from bot.utils.keyboards import support_keyboard
+from bot.utils.messages import DEFAULTS, POWERED_BY_FOOTER, get_message
+from config import settings
 from db.ops.groups import require_admin
 
 log = logging.getLogger("setmessage")
@@ -373,6 +374,6 @@ setmessage_conversation = ConversationHandler(
         CONFIRMING: [CallbackQueryHandler(on_confirm, pattern=r"^setmsg_confirm:")],
     },
     fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
-    per_message=True,
+    per_message=False,
     per_chat=True,
 )

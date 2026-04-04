@@ -1047,6 +1047,7 @@ async def _remove_clone(db_pool, bot_id: int, bot_record: dict):
 
 # ─── Entry point for "Create Your Own Bot" button ─────────────────────────────
 
+
 async def start_clone_entry_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Entry point handler for 'Create Your Own Bot' button (start_clone callback).
@@ -1110,5 +1111,5 @@ clone_conversation = ConversationHandler(
         CommandHandler("cancel", lambda u, c: ConversationHandler.END),
     ],
     per_chat=True,
-    per_message=True,
+    per_message=False,
 )

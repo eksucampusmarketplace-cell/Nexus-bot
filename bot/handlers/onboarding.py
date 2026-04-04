@@ -9,8 +9,8 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
-    ConversationHandler,
     ContextTypes,
+    ConversationHandler,
     MessageHandler,
     filters,
 )
@@ -240,7 +240,7 @@ onboarding_handler = ConversationHandler(
     fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
     name="onboarding",
     persistent=False,
-    per_message=True,
+    per_message=False,
     per_chat=True,
 )
 

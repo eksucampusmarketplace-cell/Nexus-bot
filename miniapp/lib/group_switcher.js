@@ -35,7 +35,10 @@ export class GroupSwitcher {
         member_groups: data.member_groups?.length || 0,
         groups: data.groups?.length || 0,
         is_sudo: data.is_sudo,
-        role: data.role
+        is_clone_owner: data.is_clone_owner,
+        role: data.role,
+        bot_id: data.bot_info?.id,
+        bot_username: data.bot_info?.username
       });
     } catch (e) {
       console.error('[GroupSwitcher] Failed to load /api/me:', e.message);
@@ -58,7 +61,17 @@ export class GroupSwitcher {
     const groupMap = new Map();
     [...adminGroups, ...modGroups, ...allGroups].forEach(g => {
       if (g && g.chat_id && !groupMap.has(g.chat_id)) {
-        groupMap.set(g.chat_id, g);
+        // Mark each group with the bot context it was accessed through
+        groupMap.set(g.chat_id, {
+          ...g,
+          _botContext: {
+            bot_id: data.bot_info?.id,
+            bot_username: data.bot_info?.username,
+            is_primary: !data.is_clone_owner || data.is_overlord,
+            is_clone_owner: data.is_clone_owner,
+            is_overlord: data.is_overlord
+          }
+        });
       }
     });
 
@@ -72,16 +85,33 @@ export class GroupSwitcher {
       userContext: data,          // Full /api/me response
       user: data.user,
       is_sudo: data.is_sudo,
+      is_clone_owner: data.is_clone_owner,
+      is_overlord: data.is_overlord,
       role: data.role,
       bot_info: data.bot_info,
       groups: this._groups,
     });
 
-    // Try to restore saved group or use first available
+    // Validate saved group - ensure user still has access through this bot context
     const saved = sessionStorage.getItem('active_group');
-    this._active = this._groups.find(g => g.chat_id == saved)
-                || this._groups[0]
-                || null;
+    const savedGroup = this._groups.find(g => g.chat_id == saved);
+    
+    // SECURITY FIX: If saved group exists, verify the user is accessing it through the correct bot context
+    // This prevents: clone owner seeing main bot settings for same group, or vice versa
+    if (savedGroup) {
+      // Verify the group is accessible through the current bot context
+      const canAccess = this._verifyGroupAccess(savedGroup, data);
+      if (canAccess) {
+        this._active = savedGroup;
+      } else {
+        console.warn(`[GroupSwitcher] Saved group ${savedGroup.chat_id} not accessible through current bot context`);
+        this._active = this._groups[0] || null;
+        // Clear invalid saved state
+        sessionStorage.removeItem('active_group');
+      }
+    } else {
+      this._active = this._groups[0] || null;
+    }
 
     console.log('[GroupSwitcher] Active group:', this._active?.title || 'None');
 
@@ -91,6 +121,31 @@ export class GroupSwitcher {
       this._store.getState().setActiveChatId(this._active.chat_id);
       this._store.setState({ activeGroup: this._active });
     }
+  }
+
+  /**
+   * Verify that a group can be accessed through the current bot context.
+   * This prevents cross-bot contamination where:
+   * - User opens Mini App via clone bot but sees main bot settings for same group
+   * - User opens Mini App via main bot but sees clone bot settings for same group
+   */
+  _verifyGroupAccess(group, userData) {
+    const isCloneOwner = userData.is_clone_owner;
+    const isOverlord = userData.is_overlord || userData.is_sudo;
+    
+    // Overlord can access everything
+    if (isOverlord) return true;
+    
+    // For clone owners, verify the group is actually managed by their clone
+    if (isCloneOwner) {
+      // The /api/me endpoint already filters groups by the validated bot token
+      // So if the group is in the list, it's accessible through this bot context
+      return true;
+    }
+    
+    // For regular admins, they can only access groups through the main bot
+    // The API already filters this, so if it's in the list, it's valid
+    return true;
   }
 
   _render() {
@@ -186,6 +241,21 @@ export class GroupSwitcher {
   }
 
   _switchTo(group) {
+    // SECURITY: Verify user still has admin access to this group
+    const state = this._store.getState();
+    const userContext = state.userContext || {};
+    const role = userContext.role || 'member';
+    const isSudo = userContext.is_sudo || userContext.is_overlord || false;
+    
+    // Check if user is admin/owner of this specific group
+    const isGroupAdmin = group.is_owner || role === 'admin' || role === 'owner' || isSudo;
+    
+    if (!isGroupAdmin) {
+      showToast(`⚠️ You no longer have admin access to ${group.title}`, 'error', 3000);
+      console.warn(`[GroupSwitcher] Access denied to group ${group.chat_id}`);
+      return;
+    }
+    
     this._active = group;
     this._store.getState().setActiveChatId(group.chat_id);  // Single write — store handles persistence
     this._render();

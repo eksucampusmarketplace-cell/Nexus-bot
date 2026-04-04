@@ -313,6 +313,7 @@ async def bulk_update_settings(
 
 @router.get("/{chat_id}/logs")
 async def group_logs(chat_id: int, limit: int = 50, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     logs = await get_recent_logs(chat_id)
     if isinstance(logs, list):
         return logs[:limit]
@@ -324,6 +325,7 @@ async def group_logs(chat_id: int, limit: int = 50, user: dict = Depends(get_cur
 @router.post("/{chat_id}/copy-settings")
 async def copy_settings_to_groups(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
     """Copy settings from source group to target groups."""
+    await _verify_group_access(chat_id, user)
     target_chat_ids = body.get("target_chat_ids", [])
     modules = body.get("modules", [])
     if not target_chat_ids:
@@ -372,6 +374,7 @@ async def copy_settings_to_groups(chat_id: int, body: dict, user: dict = Depends
 
 @router.post("/{chat_id}/actions/slowmode")
 async def set_slowmode(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     seconds = max(0, min(3600, int(body.get("seconds", 0))))
     from bot.registry import get_all
 
@@ -386,6 +389,7 @@ async def set_slowmode(chat_id: int, body: dict, user: dict = Depends(get_curren
 
 @router.delete("/{chat_id}/settings/reset")
 async def reset_settings(chat_id: int, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     await update_group_settings(chat_id, {})
     return {"ok": True}
 
@@ -396,6 +400,26 @@ async def update_group_personality_api(
 ):
     """Update bot personality settings for a group (handles multiple frontend variants)."""
     await _verify_group_access(chat_id, user)
+    
+    # Verify bot context - clone owners can only modify their own bot's personality
+    bot_token = user.get("validated_bot_token")
+    if bot_token:
+        token_hash = hash_token(bot_token)
+        # Check if this user owns the bot being used
+        is_clone_owner = user.get("role") == "owner" and user.get("validated_bot_id") is not None
+        if is_clone_owner:
+            # Clone owners can only modify settings for groups where their bot is active
+            async with db.pool.acquire() as conn:
+                access_row = await conn.fetchrow(
+                    """
+                    SELECT 1 FROM clone_bot_groups cbg
+                    JOIN bots b ON b.bot_id = cbg.bot_id
+                    WHERE cbg.chat_id = $1 AND b.token_hash = $2 AND cbg.is_active = TRUE
+                    """,
+                    chat_id, token_hash
+                )
+                if not access_row:
+                    raise HTTPException(status_code=403, detail="Not authorized for this group")
     
     # Extract values from various possible frontend key formats
     tone = body.get("tone") or body.get("botTone") or body.get("persona_tone")
@@ -446,6 +470,7 @@ async def update_group_personality_api(
 
 @router.post("/{chat_id}/actions/leave")
 async def leave_group(chat_id: int, user: dict = Depends(get_current_user)):
+    await _verify_group_access(chat_id, user)
     from bot.registry import get_all
 
     for bid, app_instance in get_all().items():

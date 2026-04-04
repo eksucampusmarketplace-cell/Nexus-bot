@@ -458,6 +458,33 @@
   </div>
 
   <script type="module">
+    /**
+     * NEXUS MINI APP - Security & Access Control Model
+     * 
+     * Role Hierarchy (highest to lowest):
+     * 1. OVERLORD (main bot owner) - Full access to everything
+     * 2. CLONE OWNER - Can manage their clone bot's groups
+     * 3. ADMIN - Telegram group admin
+     * 4. MEMBER - Regular group member
+     * 
+     * Bot Context Isolation:
+     * - When user opens Mini App via clone bot, they only see groups where that clone is active
+     * - Settings are isolated per-bot via bot_group_settings table
+     * - User cannot access main bot settings for groups added to a clone
+     * 
+     * Page Visibility by Role:
+     * - member: dashboard, commands, gamification, engagement, notes, session, notifications, trustnet, language
+     * - admin: moderation, automod, members, roles, analytics, webhooks, broadcast, booster, 
+     *          custom-commands, channel-gate, backup, settings, logs, greetings, reports, 
+     *          antiraid, federation, captcha, community-vote, night-mode, history, persona, tickets
+     * - bot_owner: bots page
+     * - overlord: owner panel
+     * 
+     * Group Access Verification:
+     * - API verifies group access via _verify_group_access() for all group-specific endpoints
+     * - Group switcher validates admin status before switching
+     * - Settings are loaded with bot_token_hash context to ensure isolation
+     */
     import { ThemeEngine } from './lib/theme.js?v=1.6.0';
     import { GroupSwitcher } from './lib/group_switcher.js?v=1.6.0';
     import { NotificationCenter } from './lib/notifications.js?v=1.6.0';
@@ -587,53 +614,70 @@
     async function setupNavigation() {
       const sidebarNav = document.getElementById('sidebar-nav');
       
+      // Get user context for role-based filtering
+      const userContext = getState().userContext || {};
+      const isSudo = userContext.is_sudo || userContext.is_overlord || false;
+      const isCloneOwner = userContext.is_clone_owner || false;
+      const isBotOwner = isSudo || isCloneOwner;
+      const role = userContext.role || 'member';
+      const isAdmin = role === 'admin' || role === 'owner' || isSudo;
+      
       const pages = [
-        { id: 'dashboard', label: 'Dashboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>' },
-        { id: 'bots', label: 'My Bots', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>' },
-        { id: 'commands', label: 'Commands', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>' },
-        { id: 'moderation', label: 'Moderation', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
-        { id: 'automod', label: 'AutoMod', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>' },
-        { id: 'members', label: 'Members', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' },
-        { id: 'gamification', label: 'Leaderboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>' },
-        { id: 'roles', label: 'Roles', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' },
-        { id: 'engagement', label: 'XP', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' },
-        { id: 'analytics', label: 'Analytics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' },
-        { id: 'webhooks', label: 'Integrations', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' },
-        { id: 'broadcast', label: 'Broadcast', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8z"/><path d="M22 12l-4-4v8l4-4z"/></svg>' },
-        { id: 'booster', label: 'Member Booster', icon: '🚀' },
-        { id: 'notes', label: 'Notes', icon: '📝' },
-        { id: 'custom-commands', label: 'Custom Commands', icon: '⚙️' },
-        { id: 'channel-gate', label: 'Channel Gate', icon: '📢' },
-        { id: 'backup', label: 'Backup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' },
-        { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>' },
-        { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' },
-        { id: 'greetings', label: 'Greetings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' },
-        { id: 'reports', label: 'Reports', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
-        { id: 'antiraid', label: 'Anti-Raid', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>' },
-        { id: 'session', label: 'Session', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' },
+        { id: 'dashboard', label: 'Dashboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', minRole: 'member' },
+        { id: 'bots', label: 'My Bots', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>', minRole: 'bot_owner' },
+        { id: 'commands', label: 'Commands', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>', minRole: 'member' },
+        { id: 'moderation', label: 'Moderation', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
+        { id: 'automod', label: 'AutoMod', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
+        { id: 'members', label: 'Members', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', minRole: 'admin' },
+        { id: 'gamification', label: 'Leaderboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>', minRole: 'member' },
+        { id: 'roles', label: 'Roles', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>', minRole: 'admin' },
+        { id: 'engagement', label: 'XP', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', minRole: 'member' },
+        { id: 'analytics', label: 'Analytics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>', minRole: 'admin' },
+        { id: 'webhooks', label: 'Integrations', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', minRole: 'admin' },
+        { id: 'broadcast', label: 'Broadcast', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8z"/><path d="M22 12l-4-4v8l4-4z"/></svg>', minRole: 'admin' },
+        { id: 'booster', label: 'Member Booster', icon: '🚀', minRole: 'admin' },
+        { id: 'notes', label: 'Notes', icon: '📝', minRole: 'member' },
+        { id: 'custom-commands', label: 'Custom Commands', icon: '⚙️', minRole: 'admin' },
+        { id: 'channel-gate', label: 'Channel Gate', icon: '📢', minRole: 'admin' },
+        { id: 'backup', label: 'Backup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', minRole: 'admin' },
+        { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>', minRole: 'admin' },
+        { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', minRole: 'admin' },
+        { id: 'greetings', label: 'Greetings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', minRole: 'admin' },
+        { id: 'reports', label: 'Reports', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>', minRole: 'admin' },
+        { id: 'antiraid', label: 'Anti-Raid', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', minRole: 'admin' },
+        { id: 'session', label: 'Session', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>', minRole: 'member' },
         { id: 'owner', label: 'Owner Panel', icon: '👑', ownerOnly: true },
-        { id: 'notifications', label: 'Alerts', icon: '🔔' },
-      { id: 'trustnet', label: 'TrustNet', icon: '🌐' },
-        { id: 'federation', label: 'Federation', icon: '🔗' },
-        { id: 'captcha', label: 'Captcha', icon: '🤖' },
-        { id: 'community-vote', label: 'Community Vote', icon: '⚖️' },
-        { id: 'night-mode', label: 'Night Mode', icon: '🌙' },
-        { id: 'history', label: 'Name History', icon: '📜' },
-        { id: 'language', label: 'Language', icon: '🌍' },
-        { id: 'persona', label: 'Bot Persona', icon: '🎭' },
-        { id: 'tickets', label: 'Tickets', icon: '🎫' },
+        { id: 'notifications', label: 'Alerts', icon: '🔔', minRole: 'member' },
+        { id: 'trustnet', label: 'TrustNet', icon: '🌐', minRole: 'member' },
+        { id: 'federation', label: 'Federation', icon: '🔗', minRole: 'admin' },
+        { id: 'captcha', label: 'Captcha', icon: '🤖', minRole: 'admin' },
+        { id: 'community-vote', label: 'Community Vote', icon: '⚖️', minRole: 'admin' },
+        { id: 'night-mode', label: 'Night Mode', icon: '🌙', minRole: 'admin' },
+        { id: 'history', label: 'Name History', icon: '📜', minRole: 'admin' },
+        { id: 'language', label: 'Language', icon: '🌍', minRole: 'member' },
+        { id: 'persona', label: 'Bot Persona', icon: '🎭', minRole: 'admin' },
+        { id: 'tickets', label: 'Tickets', icon: '🎫', minRole: 'admin' },
       ];
 
-      // Build sidebar nav (owner panel only shown if API confirms ownership)
-      const userContext = getState().userContext || {};
-      const isSudo = userContext.is_sudo || getState().is_sudo || false;
+      // Role hierarchy for comparison
+      const roleHierarchy = { 'member': 0, 'admin': 1, 'owner': 2, 'bot_owner': 2, 'overlord': 3 };
+      const userRoleLevel = isSudo ? roleHierarchy['overlord'] : (isBotOwner ? roleHierarchy['bot_owner'] : roleHierarchy[role] || 0);
+      
+      // Build sidebar nav with role-based filtering
       // Skip extra API call for non-owners - use is_sudo from /api/me
       let ownerStatsOk = isSudo;
       if (isSudo) {
         // Only check admin stats if already identified as owner
         ownerStatsOk = await apiFetch('/api/admin/stats').then(() => true).catch(() => false);
       }
-      const visiblePages = pages.filter(p => !p.ownerOnly || ownerStatsOk);
+      
+      const visiblePages = pages.filter(p => {
+        // Check owner-only pages
+        if (p.ownerOnly) return ownerStatsOk;
+        // Check role-based access
+        const requiredLevel = roleHierarchy[p.minRole] || 0;
+        return userRoleLevel >= requiredLevel;
+      });
       sidebarNav.innerHTML = visiblePages.map(p => `
         <div class="sidebar-item ${getState().activePage === p.id ? 'active' : ''}" data-page="${p.id}">
           ${p.icon}
@@ -717,7 +761,111 @@
       }
     }
 
+    // Permission check for page access
+    function checkPagePermission(pageId) {
+      const userContext = getState().userContext || {};
+      const isSudo = userContext.is_sudo || userContext.is_overlord || false;
+      const isCloneOwner = userContext.is_clone_owner || false;
+      const isBotOwner = isSudo || isCloneOwner;
+      const role = userContext.role || 'member';
+      const activeGroup = getState().activeGroup;
+      const chatId = getState().activeChatId;
+      
+      // Role hierarchy
+      const roleHierarchy = { 'member': 0, 'admin': 1, 'owner': 2, 'bot_owner': 2, 'overlord': 3 };
+      const userRoleLevel = isSudo ? roleHierarchy['overlord'] : (isBotOwner ? roleHierarchy['bot_owner'] : roleHierarchy[role] || 0);
+      
+      // Page permission requirements
+      const pagePermissions = {
+        'dashboard': 'member',
+        'bots': 'bot_owner',
+        'commands': 'member',
+        'moderation': 'admin',
+        'automod': 'admin',
+        'members': 'admin',
+        'gamification': 'member',
+        'roles': 'admin',
+        'engagement': 'member',
+        'analytics': 'admin',
+        'webhooks': 'admin',
+        'broadcast': 'admin',
+        'booster': 'admin',
+        'notes': 'member',
+        'custom-commands': 'admin',
+        'channel-gate': 'admin',
+        'backup': 'admin',
+        'settings': 'admin',
+        'logs': 'admin',
+        'greetings': 'admin',
+        'reports': 'admin',
+        'antiraid': 'admin',
+        'session': 'member',
+        'owner': 'overlord',
+        'notifications': 'member',
+        'trustnet': 'member',
+        'federation': 'admin',
+        'captcha': 'admin',
+        'community-vote': 'admin',
+        'night-mode': 'admin',
+        'history': 'admin',
+        'language': 'member',
+        'persona': 'admin',
+        'tickets': 'admin',
+      };
+      
+      const requiredRole = pagePermissions[pageId] || 'member';
+      const requiredLevel = roleHierarchy[requiredRole] || 0;
+      
+      // Check role level
+      if (userRoleLevel < requiredLevel) {
+        return { allowed: false, reason: `This page requires ${requiredRole} access` };
+      }
+      
+      // Check if user is admin in the current group (for group-specific admin pages)
+      const groupAdminPages = ['moderation', 'automod', 'members', 'roles', 'broadcast', 'booster', 
+                               'channel-gate', 'backup', 'settings', 'logs', 'greetings', 
+                               'reports', 'antiraid', 'federation', 'captcha', 'community-vote', 
+                               'night-mode', 'history', 'persona', 'tickets'];
+      
+      if (groupAdminPages.includes(pageId) && chatId) {
+        // Check if user is actually an admin in this specific group
+        const isGroupAdmin = activeGroup?.is_owner || role === 'admin' || role === 'owner' || isSudo;
+        if (!isGroupAdmin) {
+          return { allowed: false, reason: 'You need to be an admin in this group to access this page' };
+        }
+      }
+      
+      return { allowed: true };
+    }
+
     async function navigateToPage(pageId) {
+      // Check permissions before navigating
+      const permission = checkPagePermission(pageId);
+      if (!permission.allowed) {
+        console.warn(`[Navigation] Blocked access to ${pageId}: ${permission.reason}`);
+        // Show access denied message in the page container
+        const container = document.getElementById(`page-${pageId}`);
+        if (container) {
+          container.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:var(--sp-8);text-align:center;gap:var(--sp-4);">
+              <div style="font-size:48px;">🔒</div>
+              <div style="font-size:var(--text-lg);font-weight:var(--fw-bold);">Access Denied</div>
+              <div style="color:var(--text-muted);font-size:var(--text-sm);">${permission.reason}</div>
+            </div>
+          `;
+        }
+        // Still update the active state but don't try to render
+        store.setState({ activePage: pageId });
+        savePageState(pageId);
+        document.querySelectorAll('.sidebar-item').forEach(el => {
+          el.classList.toggle('active', el.dataset.page === pageId);
+        });
+        document.querySelectorAll('.bottom-nav-item').forEach(el => {
+          el.classList.toggle('active', el.dataset.page === pageId);
+        });
+        return;
+      }
+      
       // Update state
       store.setState({ activePage: pageId });
       if (getState().setActivePage) {

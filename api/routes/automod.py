@@ -187,6 +187,11 @@ async def apply_template(chat_id: int, request: Request):
     from db.ops.automod import bulk_update_group_settings
 
     await bulk_update_group_settings(db, chat_id, settings)
+
+    # Publish SSE event so UI re-renders with new settings
+    from api.routes.events import EventBus
+    await EventBus.publish(chat_id, "settings_change", {"settings": settings})
+
     return {"ok": True, "applied": row["name"]}
 
 

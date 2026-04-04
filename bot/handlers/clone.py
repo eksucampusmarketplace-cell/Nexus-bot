@@ -1110,5 +1110,5 @@ clone_conversation = ConversationHandler(
         CommandHandler("cancel", lambda u, c: ConversationHandler.END),
     ],
     per_chat=True,
-    per_message=True,
+    per_message=False,
 )

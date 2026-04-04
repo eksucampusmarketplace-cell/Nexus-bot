@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS community_quests (
 
 -- User quest progress
 CREATE TABLE IF NOT EXISTS community_quest_progress (
+    id BIGSERIAL PRIMARY KEY,
     quest_id BIGINT REFERENCES community_quests(id),
     user_id BIGINT NOT NULL,
     progress_value INTEGER DEFAULT 0,

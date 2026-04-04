@@ -87,7 +87,7 @@ DEFAULTS = {
     ),
     # Appended to every error message sent to users
     # Variables: {main_bot}
-    "error_suffix": ("If this keeps happening, please report it to @{main_bot}."),
+    "error_suffix": ("If this keeps happening, please report it to the main support channel or try again later."),
     # Warn notification DM
     # Variables: {first_name}, {group_name}, {reason}, {warn_count}, {warn_limit}
     "warn_dm": (

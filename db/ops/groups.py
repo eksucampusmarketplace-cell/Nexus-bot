@@ -3,9 +3,25 @@ import json
 from db.client import db
 
 
-async def get_group(chat_id: int):
+async def get_group(chat_id: int, bot_token_hash: str = None):
     async with db.pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM groups WHERE chat_id = $1", chat_id)
+        
+        bot_settings_json = {}
+        if bot_token_hash:
+            bot_row = await conn.fetchrow(
+                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
+                bot_token_hash,
+                chat_id,
+            )
+            if bot_row and bot_row["settings"]:
+                bot_settings_json = bot_row["settings"]
+                if isinstance(bot_settings_json, str):
+                    try:
+                        bot_settings_json = json.loads(bot_settings_json)
+                    except Exception:
+                        bot_settings_json = {}
+
         if row:
             res = dict(row)
             if isinstance(res.get("settings"), str):
@@ -13,6 +29,20 @@ async def get_group(chat_id: int):
                     res["settings"] = json.loads(res["settings"])
                 except Exception:
                     res["settings"] = {}
+            if not res.get("settings"):
+                res["settings"] = {}
+
+            if bot_settings_json:
+                # Merge bot-specific overrides into settings
+                def deep_merge(base, new):
+                    for k, v in new.items():
+                        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+                            deep_merge(base[k], v)
+                        else:
+                            base[k] = v
+                    return base
+                deep_merge(res["settings"], bot_settings_json)
+
             if isinstance(res.get("modules"), str):
                 try:
                     res["modules"] = json.loads(res["modules"])
@@ -20,9 +50,8 @@ async def get_group(chat_id: int):
                     res["modules"] = {}
             elif res.get("modules") is None:
                 res["modules"] = {}
+            
             # Merge modules into settings for backward compatibility
-            if not res.get("settings"):
-                res["settings"] = {}
             # Add module settings to the settings dict for easier access
             res["settings"]["_modules"] = res["modules"]
             return res

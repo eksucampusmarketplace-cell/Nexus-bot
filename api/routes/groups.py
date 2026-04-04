@@ -135,25 +135,9 @@ async def get_settings(chat_id: int, user=Depends(get_current_user)):
     from db.ops.automod import get_group_settings
 
     bot_token = user.get("validated_bot_token")
-    if bot_token:
-        token_hash = hash_token(bot_token)
-        async with db.pool.acquire() as conn:
-            row = await conn.fetchrow(
-                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
-                token_hash,
-                chat_id,
-            )
-        if row and row["settings"]:
-            import json
-            s = row["settings"]
-            if isinstance(s, str):
-                try:
-                    s = json.loads(s)
-                except Exception:
-                    s = {}
-            return {"status": "ok", "settings": s}
-
-    s = await get_group_settings(db.pool, chat_id)
+    token_hash = hash_token(bot_token) if bot_token else None
+    
+    s = await get_group_settings(db.pool, chat_id, token_hash)
     return {"status": "ok", "settings": s}
 
 
@@ -195,21 +179,15 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
     from db.ops.automod import bulk_update_group_settings, get_group_settings
 
     bot_token = user.get("validated_bot_token")
-    if bot_token:
+    token_hash = hash_token(bot_token) if bot_token else None
+    
+    # Get existing merged settings
+    existing = await get_group_settings(db.pool, chat_id, token_hash)
+    incoming = settings.copy()
+    _normalize_settings(incoming, existing)
+    
+    if token_hash:
         import json as _json
-        token_hash = hash_token(bot_token)
-        async with db.pool.acquire() as conn:
-            existing_row = await conn.fetchrow(
-                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
-                token_hash,
-                chat_id,
-            )
-        existing = {}
-        if existing_row and existing_row["settings"]:
-            s = existing_row["settings"]
-            existing = s if isinstance(s, dict) else (_json.loads(s) if isinstance(s, str) else {})
-        incoming = settings.copy()
-        _normalize_settings(incoming, existing)
         existing.update(incoming)
         async with db.pool.acquire() as conn:
             await conn.execute(
@@ -221,26 +199,10 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
                 chat_id,
                 _json.dumps(existing),
             )
-        return {"status": "ok"}
+    else:
+        await bulk_update_group_settings(db.pool, chat_id, incoming)
 
-    existing = await get_group_settings(db.pool, chat_id)
-    incoming = settings.copy()
-    _normalize_settings(incoming, existing)
-
-    await bulk_update_group_settings(db.pool, chat_id, incoming)
-
-    # Sync locks to the locks table if any were updated
-    if "locks" in incoming:
-        from api.routes.moderation import update_locks
-
-        # Create a mock user since update_locks needs one
-        mock_user = {"id": user.get("id"), "first_name": "System"}
-        try:
-            await update_locks(chat_id, incoming["locks"], user=mock_user)
-        except Exception as e:
-            logger.warning(f"Failed to sync locks to locks table: {e}")
-
-    # NEW: Sync any flat lock_* keys to the locks table
+    # Sync any flat lock_* keys to the locks table
     LOCK_KEY_MAP = {
         "lock_photo": "photo",
         "lock_video": "video",
@@ -283,23 +245,19 @@ async def bulk_update_settings(
     body = await request.json()
     settings = body.get("settings", {})
 
-    from db.ops.automod import bulk_update_group_settings
+    from db.ops.automod import bulk_update_group_settings, get_group_settings
 
     bot_token = user.get("validated_bot_token")
-    if bot_token:
+    token_hash = hash_token(bot_token) if bot_token else None
+    
+    # Get existing merged settings
+    existing = await get_group_settings(db.pool, chat_id, token_hash)
+    incoming = settings.copy()
+    _normalize_settings(incoming, existing)
+
+    if token_hash:
         import json as _json
-        token_hash = hash_token(bot_token)
-        async with db.pool.acquire() as conn:
-            existing_row = await conn.fetchrow(
-                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
-                token_hash,
-                chat_id,
-            )
-        existing = {}
-        if existing_row and existing_row["settings"]:
-            s = existing_row["settings"]
-            existing = s if isinstance(s, dict) else (_json.loads(s) if isinstance(s, str) else {})
-        existing.update(settings)
+        existing.update(incoming)
         async with db.pool.acquire() as conn:
             await conn.execute(
                 """INSERT INTO bot_group_settings (bot_token_hash, chat_id, settings, updated_at)
@@ -311,7 +269,7 @@ async def bulk_update_settings(
                 _json.dumps(existing),
             )
     else:
-        await bulk_update_group_settings(db.pool, chat_id, settings)
+        await bulk_update_group_settings(db.pool, chat_id, incoming)
 
     # Sync any flat lock_* keys to the locks table
     LOCK_KEY_MAP = {
@@ -328,7 +286,7 @@ async def bulk_update_settings(
         "lock_contact": "contact",
     }
     lock_updates = {
-        LOCK_KEY_MAP[k]: v for k, v in settings.items() if k in LOCK_KEY_MAP and isinstance(v, bool)
+        LOCK_KEY_MAP[k]: v for k, v in incoming.items() if k in LOCK_KEY_MAP and isinstance(v, bool)
     }
     if lock_updates:
         try:
@@ -348,7 +306,7 @@ async def bulk_update_settings(
     # Publish SSE event
     from api.routes.events import EventBus
 
-    await EventBus.publish(chat_id, "settings_change", {"settings": settings})
+    await EventBus.publish(chat_id, "settings_change", {"settings": incoming})
 
     return {"status": "ok"}
 

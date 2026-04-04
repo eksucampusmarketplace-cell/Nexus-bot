@@ -55,6 +55,9 @@ class LockdownManager:
 
             await publish_event(chat_id, "lockdown_change", {"active": True, "reason": reason})
 
+            # Trigger insurance incident if group is insured
+            await self._trigger_insurance_incident(chat_id, reason, "high")
+
             await self.bot.send_message(
                 chat_id, f"🔒 *LOCKDOWN ACTIVATED*\n\nReason: {reason}\nAll new members restricted."
             )
@@ -86,3 +89,35 @@ class LockdownManager:
         except Exception as e:
             log.error(f"Failed to deactivate lockdown: {e}")
             return False
+
+    async def _trigger_insurance_incident(
+        self, chat_id: int, reason: str, severity: str
+    ):
+        """Trigger insurance incident if group has active insurance."""
+        try:
+            from bot.billing.group_insurance import (
+                PROTECTION_RAID,
+                record_incident,
+            )
+            from db.client import db
+
+            bot_id = self.bot.id
+
+            # Determine incident type
+            incident_type = PROTECTION_RAID
+            if "spam" in reason.lower():
+                incident_type = "spam"
+
+            # Record incident - will auto-lockdown if enabled
+            result = await record_incident(
+                db.pool, chat_id, bot_id, incident_type, severity, {"reason": reason}
+            )
+
+            if result.get("auto_action"):
+                log.info(
+                    f"[INSURANCE] Incident recorded for {chat_id}, "
+                    f"auto_action={result.get('auto_action')}"
+                )
+        except Exception as e:
+            # Don't fail lockdown if insurance check fails
+            log.debug(f"Insurance check failed: {e}")

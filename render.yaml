@@ -35,23 +35,5 @@ services:
         sync: false
       - key: RENDER_GIT_COMMIT
         sync: false
-    healthCheckPath: /
-    autoDeploy: true
-
-  - type: worker
-    name: nexus-music
-    env: python
-    buildCommand: apt-get install -y ffmpeg && pip install -r requirements.txt
-    startCommand: python music_service.py
-    envVars:
-      - key: SUPABASE_CONNECTION_STRING
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: PYROGRAM_API_ID
-        sync: false
-      - key: PYROGRAM_API_HASH
-        sync: false
-      - key: PYTHON_VERSION
-        value: "3.11.9"
+    healthCheckPath: /health
     autoDeploy: true

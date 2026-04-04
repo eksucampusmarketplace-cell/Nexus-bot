@@ -1,6 +1,7 @@
 import sys
 from typing import List, Optional
 
+from cryptography.fernet import Fernet
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -90,8 +91,17 @@ class Settings(BaseSettings):
         if not self.SUPABASE_CONNECTION_STRING or "your" in self.SUPABASE_CONNECTION_STRING.lower():
             missing.append("SUPABASE_CONNECTION_STRING")
 
-        if not self.SECRET_KEY or len(self.SECRET_KEY) < 32:
-            missing.append("SECRET_KEY")
+        if not self.SECRET_KEY:
+            missing.append("SECRET_KEY (not set)")
+        else:
+            try:
+                Fernet(self.SECRET_KEY.encode())
+            except Exception:
+                missing.append(
+                    "SECRET_KEY (invalid format — must be a Fernet key). "
+                    "Generate with: python -c \"from cryptography.fernet import "
+                    "Fernet; print(Fernet.generate_key().decode())\""
+                )
 
         if missing:
             print("=" * 60, file=sys.stderr)

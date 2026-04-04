@@ -482,7 +482,9 @@ async def update_warn_settings(chat_id: int, body: dict, user: dict = Depends(ge
             {k: v for k, v in body.items() if k in ("warn_max", "warn_action", "warn_expiry")}
         )
         await conn.execute(
-            "UPDATE groups SET settings=$1 WHERE chat_id=$2", json.dumps(settings), chat_id
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id = $2",
+            json.dumps(settings),
+            chat_id,
         )
     return {"ok": True}
 
@@ -813,7 +815,9 @@ async def add_blacklist_word(chat_id: int, body: dict, user: dict = Depends(get_
             words.append(word)
         settings["blacklist_words"] = words
         await conn.execute(
-            "UPDATE groups SET settings=$1 WHERE chat_id=$2", json.dumps(settings), chat_id
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id = $2",
+            json.dumps(settings),
+            chat_id,
         )
     return {"ok": True}
 
@@ -840,6 +844,8 @@ async def remove_blacklist_word(chat_id: int, word: str, user: dict = Depends(ge
         words = settings.get("blacklist_words", [])
         settings["blacklist_words"] = [w for w in words if w != word.lower()]
         await conn.execute(
-            "UPDATE groups SET settings=$1 WHERE chat_id=$2", json.dumps(settings), chat_id
+            "UPDATE groups SET settings = $1::jsonb WHERE chat_id = $2",
+            json.dumps(settings),
+            chat_id,
         )
     return {"ok": True}

@@ -390,6 +390,60 @@ async def reset_settings(chat_id: int, user: dict = Depends(get_current_user)):
     return {"ok": True}
 
 
+@router.post("/{chat_id}/personality")
+async def update_group_personality_api(
+    chat_id: int, body: dict, user: dict = Depends(get_current_user)
+):
+    """Update bot personality settings for a group (handles multiple frontend variants)."""
+    await _verify_group_access(chat_id, user)
+    
+    # Extract values from various possible frontend key formats
+    tone = body.get("tone") or body.get("botTone") or body.get("persona_tone")
+    name = body.get("name") or body.get("botName") or body.get("persona_name")
+    lang = body.get("language") or body.get("language_code") or body.get("persona_language")
+    
+    # Emoji can be boolean or string style
+    emoji = body.get("emoji")
+    if emoji is None:
+        emoji = body.get("emojiStyle")
+    if isinstance(emoji, str):
+        emoji = emoji.lower() not in ("none", "false", "0")
+
+    updates = []
+    values = []
+    
+    if tone:
+        updates.append("persona_tone = $" + str(len(values) + 1))
+        values.append(tone)
+    if name:
+        updates.append("persona_name = $" + str(len(values) + 1))
+        values.append(name)
+    if lang:
+        updates.append("persona_language = $" + str(len(values) + 1))
+        values.append(lang)
+    if emoji is not None:
+        updates.append("persona_emoji = $" + str(len(values) + 1))
+        values.append(bool(emoji))
+
+    # Also handle custom greeting/welcome if present in body
+    welcome_msg = body.get("welcomeMessage") or body.get("custom_welcome")
+    if welcome_msg is not None:
+        updates.append("welcome_text = $" + str(len(values) + 1))
+        values.append(welcome_msg)
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No valid personality fields provided")
+
+    values.append(chat_id)
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            f"UPDATE groups SET {', '.join(updates)} WHERE chat_id = ${len(values)}",
+            *values
+        )
+    
+    return {"ok": True}
+
+
 @router.post("/{chat_id}/actions/leave")
 async def leave_group(chat_id: int, user: dict = Depends(get_current_user)):
     from bot.registry import get_all

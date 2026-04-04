@@ -8,7 +8,7 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from api.auth import get_current_user, require_auth
 from db.client import db
@@ -19,11 +19,15 @@ logger = logging.getLogger(__name__)
 
 class NightModeSettings(BaseModel):
     enabled: bool = False
-    start_time: str = "23:00"
-    end_time: str = "07:00"
+    start_time: str = Field("23:00", alias="startTime")
+    end_time: str = Field("07:00", alias="endTime")
     timezone: str = "UTC"
-    night_message: Optional[str] = None
-    morning_message: Optional[str] = None
+    night_message: Optional[str] = Field(None, alias="nightMessage")
+    morning_message: Optional[str] = Field(None, alias="morningMessage")
+
+    class Config:
+        populate_by_name = True
+        extra = "ignore"
 
 
 @router.get("")

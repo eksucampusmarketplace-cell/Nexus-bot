@@ -38,6 +38,6 @@ async def update_text_config(chat_id: int, body: dict, user: dict = Depends(get_
         config.update(body)
 
         await conn.execute(
-            "UPDATE groups SET text_config = $1 WHERE chat_id = $2", json.dumps(config), chat_id
+            "UPDATE groups SET text_config = $1::jsonb WHERE chat_id = $2", json.dumps(config), chat_id
         )
     return {"status": "ok"}

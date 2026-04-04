@@ -597,7 +597,6 @@
         { id: 'gamification', label: 'Leaderboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>' },
         { id: 'roles', label: 'Roles', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>' },
         { id: 'engagement', label: 'XP', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>' },
-        { id: 'modules', label: 'Modules', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>' },
         { id: 'analytics', label: 'Analytics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>' },
         { id: 'webhooks', label: 'Integrations', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>' },
         { id: 'broadcast', label: 'Broadcast', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8z"/><path d="M22 12l-4-4v8l4-4z"/></svg>' },
@@ -809,11 +808,6 @@
         case 'commands':
           await renderCommandsPage(container);
           break;
-        case 'modules': {
-          const { renderModules } = await import('./src/pages/modules.js?v=1.6.0');
-          await renderModules(container);
-          break;
-        }
         case 'analytics':
           await renderAnalyticsPage(container);
           break;
@@ -946,6 +940,22 @@
     // Helper functions imported from lib/helpers.js — no inline duplicates
     const { getActionEmoji, formatAction, formatTime } = await import("./lib/helpers.js?v=1.6.0");
 
+    const MODULE_LIST = [
+      { id: 'welcome',    name: '👋 Welcome Messages',  desc: 'Greet new members',               settingKey: 'welcome_enabled',      page: 'greetings' },
+      { id: 'goodbye',    name: '👋 Goodbye Messages',  desc: 'Farewell leaving members',         settingKey: 'goodbye_enabled',      page: 'greetings' },
+      { id: 'rules',      name: '📋 Group Rules',        desc: '/rules command',                   settingKey: 'rules_enabled',        page: null },
+      { id: 'captcha',    name: '🔐 Captcha',            desc: 'Verify new members',               settingKey: 'captcha_enabled',      page: 'automod' },
+      { id: 'xp',         name: '⭐ XP & Levels',        desc: 'Member progression',               settingKey: 'xp_enabled',           page: 'engagement' },
+      { id: 'games',      name: '🎮 Games',               desc: 'In-chat games',                    settingKey: 'games_enabled',        page: null },
+      { id: 'channel',    name: '📢 Channel Posting',    desc: 'Post to linked channel',           settingKey: 'channel_enabled',      page: null },
+      { id: 'logging',    name: '📋 Mod Logging',         desc: 'Log actions to channel',           settingKey: 'log_enabled',          page: 'logs' },
+      { id: 'inline',     name: '⚡ Inline Mode',         desc: '@botname queries',                 settingKey: 'inline_mode_enabled',  page: null },
+      { id: 'reports',    name: '🚨 Reports',             desc: '/report command',                  settingKey: 'reports_enabled',      page: 'reports' },
+      { id: 'notes',      name: '📝 Notes',               desc: 'Save and retrieve notes',          settingKey: 'notes_enabled',        page: 'notes' },
+      { id: 'broadcast',  name: '📡 Broadcast',           desc: 'Mass message system',              settingKey: 'broadcast_enabled',    page: 'broadcast' },
+      { id: 'autodelete', name: '🗑️ Auto-Delete',          desc: 'Delete messages after N seconds', settingKey: 'autodelete_enabled',   page: null },
+    ];
+
     async function renderSettings(container) {
       // Render guard: cancel any previous in-flight render
       const myToken = ++_settingsRenderToken;
@@ -1030,28 +1040,47 @@
           } catch (err) { showToast('Failed to save', 'error'); }
         };
 
-        // ── 2. WELCOME & GOODBYE ──────────────────────────────────────────
-        const greetCard = Card({
-          title: '👋 Welcome & Goodbye',
-          subtitle: 'Control greeting messages',
-          children: `
-            <div style="display:flex;flex-direction:column;gap:var(--sp-2);">
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
-                <span style="font-size:var(--text-sm);">Welcome messages enabled</span>
-                <div id="toggle-welcome"></div>
-              </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
-                <span style="font-size:var(--text-sm);">Goodbye messages enabled</span>
-                <div id="toggle-goodbye"></div>
-              </div>
-              <button class="btn btn-secondary" style="margin-top:var(--sp-2);font-size:var(--text-xs);" id="btn-edit-messages">Edit messages →</button>
-            </div>
-          `
+        // ── 2. FEATURE MODULES ───────────────────────────────────────────
+        const modulesCard = Card({
+          title: `📦 ${t('nav_modules', 'Modules')}`,
+          subtitle: t('modules_subtitle', 'Enable or disable bot features for this group'),
         });
-        container.appendChild(greetCard);
-        greetCard.querySelector('#toggle-welcome').appendChild(Toggle({ checked: groupSettings.welcome_enabled || false, onChange: (v) => _updateGroupSetting('welcome_enabled', v) }));
-        greetCard.querySelector('#toggle-goodbye').appendChild(Toggle({ checked: groupSettings.goodbye_enabled || false, onChange: (v) => _updateGroupSetting('goodbye_enabled', v) }));
-        greetCard.querySelector('#btn-edit-messages').onclick = () => navigateToPage('greetings');
+        const modulesListContainer = document.createElement('div');
+        modulesListContainer.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
+
+        MODULE_LIST.forEach(m => {
+          const row = document.createElement('div');
+          row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;border-bottom:1px solid var(--border);';
+
+          const info = document.createElement('div');
+          info.innerHTML = `
+            <div style="font-size:var(--text-sm);font-weight:var(--fw-medium);">${m.name}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">${m.desc}</div>
+          `;
+
+          const ctrl = document.createElement('div');
+          ctrl.style.cssText = 'display:flex;align-items:center;gap:var(--sp-3);';
+
+          if (m.page) {
+            const cfgBtn = document.createElement('button');
+            cfgBtn.className = 'btn btn-secondary';
+            cfgBtn.style.cssText = 'padding:var(--sp-1) var(--sp-2);font-size:10px;height:24px;';
+            cfgBtn.textContent = t('configure', 'Configure') + ' →';
+            cfgBtn.onclick = () => navigateToPage(m.page);
+            ctrl.appendChild(cfgBtn);
+          }
+
+          ctrl.appendChild(Toggle({
+            checked: groupSettings[m.settingKey] || false,
+            onChange: (v) => _updateGroupSetting(m.settingKey, v)
+          }));
+
+          row.appendChild(info);
+          row.appendChild(ctrl);
+          modulesListContainer.appendChild(row);
+        });
+        modulesCard.appendChild(modulesListContainer);
+        container.appendChild(modulesCard);
 
         // ── 3. SECURITY & ENTRY ───────────────────────────────────────────
         const slowModeOptions = [
@@ -1211,17 +1240,12 @@
                 <span style="font-size: var(--text-sm);">Delete Join/Leave Messages</span>
                 <div id="toggle-delete-joinleave"></div>
               </div>
-              <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
-                <span style="font-size: var(--text-sm);">Inline Mode</span>
-                <div id="toggle-inline-mode"></div>
-              </div>
             </div>
           `
         });
         container.appendChild(advancedCard);
         advancedCard.querySelector('#toggle-silent-commands').appendChild(Toggle({ checked: groupSettings.silent_commands || false, onChange: (v) => _updateGroupSetting('silent_commands', v) }));
         advancedCard.querySelector('#toggle-delete-joinleave').appendChild(Toggle({ checked: groupSettings.delete_join_leave || false, onChange: (v) => _updateGroupSetting('delete_join_leave', v) }));
-        advancedCard.querySelector('#toggle-inline-mode').appendChild(Toggle({ checked: groupSettings.inline_mode_enabled || false, onChange: (v) => _updateGroupSetting('inline_mode_enabled', v) }));
 
         // ── Auto-Delete row ────────────────────────────────────────────────
         const autoDelSep = document.createElement('hr');

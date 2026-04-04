@@ -366,18 +366,7 @@ async def get_usage(user: dict = Depends(get_current_user)):
             "SELECT group_limit FROM bots WHERE owner_user_id=$1 AND is_primary=TRUE", user_id
         )
 
-    # Determine limits based on plan
-    group_limit = 10  # default for free
-    if primary_bot:
-        gl = primary_bot.get("group_limit") or 0
-        # 0 = unlimited (primary bot on any plan)
-        group_limit = gl if gl > 0 else 0
-
-    # Clone bot limit: 3 for free, could be higher for paid plans
-    # For now, hardcode to 3 (Free plan) - in production would come from user plan
-    bot_limit = 3
-
-    # Query for active subscription to get actual plan_name
+    # Query for active subscription to get actual plan_name first
     plan_name = "Free"
     try:
         async with db.pool.acquire() as conn:
@@ -392,6 +381,18 @@ async def get_usage(user: dict = Depends(get_current_user)):
             plan_name = subscription["plan"].title()
     except Exception as e:
         logger.warning(f"[ME] Could not fetch subscription info: {e}")
+
+    # Determine limits based on plan
+    group_limit = 10  # default for free
+    if primary_bot:
+        gl = primary_bot.get("group_limit") or 0
+        # 0 = unlimited (primary bot on any plan)
+        group_limit = gl if gl > 0 else 0
+
+    # Clone bot limit: derive from plan config
+    PLAN_BOT_LIMITS = {"free": 3, "starter": 5, "pro": 10, "enterprise": 50}
+    plan_key = plan_name.lower() if plan_name else "free"
+    bot_limit = PLAN_BOT_LIMITS.get(plan_key, 3)
 
     return {
         "bots_count": int(bots_count),

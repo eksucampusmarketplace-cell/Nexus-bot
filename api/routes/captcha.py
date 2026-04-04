@@ -62,14 +62,18 @@ async def save_captcha_settings(
     """Save captcha settings for a group."""
     try:
         async with db.pool.acquire() as conn:
+            # Map kick_failures to boolean captcha_kick_on_timeout
+            # Store kick_failures as captcha_max_attempts (for future granular control)
             await conn.execute(
                 """UPDATE groups 
-                   SET captcha_enabled = $1, captcha_mode = $2, captcha_timeout_mins = $3, captcha_max_attempts = $4
-                   WHERE chat_id = $5""",
+                   SET captcha_enabled = $1, captcha_mode = $2, captcha_timeout_mins = $3, 
+                       captcha_max_attempts = $4, captcha_kick_on_timeout = $5
+                   WHERE chat_id = $6""",
                 settings.enabled,
                 settings.type,
                 max(1, settings.timeout // 60),
                 settings.kick_failures,
+                settings.kick_failures > 0,  # boolean: kick if failures > 0
                 chat_id,
             )
 

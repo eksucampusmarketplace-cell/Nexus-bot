@@ -14,14 +14,16 @@ const store = useStore;
 const getState = store.getState;
 
 let _sseSource = null;
-let _sseCancelled = false;  // Cancel flag to prevent orphaned reconnects
+let _connectionToken = { cancelled: false };  // Per-connection cancel token
 
 /**
  * Close any active SSE connection and cancel pending reconnects.
  * Call this on page teardown / before navigating away.
  */
 export function teardownModerationPage() {
-  _sseCancelled = true;
+  // Invalidate current token and create fresh one for next entry
+  _connectionToken.cancelled = true;
+  _connectionToken = { cancelled: false };
   if (_sseSource) {
     _sseSource.close();
     _sseSource = null;
@@ -77,8 +79,8 @@ export async function renderModerationPage(container) {
 
   await switchTab('members', container, chatId);
 
-  // Reset cancel flag when (re-)entering the page, then connect SSE
-  _sseCancelled = false;
+  // Reset and connect SSE
+  _connectionToken = { cancelled: false };
   _connectSSE(chatId);
 }
 
@@ -772,6 +774,9 @@ async function _renderFiltersTab(container, chatId) {
 }
 
 function _connectSSE(chatId) {
+  // Capture the current token at call time
+  const token = _connectionToken;
+
   if (_sseSource) {
     _sseSource.close();
     _sseSource = null;
@@ -781,8 +786,8 @@ function _connectSSE(chatId) {
   const label = document.getElementById('sse-label');
 
   try {
-    const token = encodeURIComponent(window.Telegram?.WebApp?.initData || '');
-    _sseSource = new EventSource(`/api/events/moderation/${chatId}?token=${token}`);
+    const tokenParam = encodeURIComponent(window.Telegram?.WebApp?.initData || '');
+    _sseSource = new EventSource(`/api/events/moderation/${chatId}?token=${tokenParam}`);
 
     // Bug C fix: Use connected/heartbeat events as onopen fallback
     _sseSource.addEventListener('connected', () => {
@@ -808,8 +813,8 @@ function _connectSSE(chatId) {
       if (dot) { dot.style.background = 'var(--danger)'; dot.style.animation = ''; }
       if (label) label.textContent = 'Reconnecting...';
       setTimeout(() => {
-        // Only reconnect if the page is still active (not cancelled/navigated away)
-        if (!_sseCancelled && document.getElementById('sse-dot')) {
+        // Only reconnect if token is not cancelled and the page is still active
+        if (!token.cancelled && document.getElementById('sse-dot')) {
           _connectSSE(chatId);
         }
       }, 5000);

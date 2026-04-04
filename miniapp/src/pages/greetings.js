@@ -373,7 +373,7 @@ function _populateCardBody(body, msgType, displayText, isCustomized, textConfig,
       try {
         await apiFetch(`/api/groups/${chatId}/text-config`, {
           method: 'PUT',
-          body: JSON.stringify({ welcome_delete_after: parseInt(e.target.value) }),
+          body: { welcome_delete_after: parseInt(e.target.value) },
         });
         showToast('Auto-delete saved', 'success');
       } catch (err) {
@@ -492,7 +492,7 @@ async function _saveKey(chatId, initData, key, value) {
   body[key] = (value === '' || value === null) ? null : value;
   await apiFetch(`/api/groups/${chatId}/text-config`, {
     method: 'PUT',
-    body: JSON.stringify(body),
+    body: body,
   });
 }
 
@@ -633,7 +633,7 @@ async function _saveButtons(chatId, buttons) {
   try {
     await apiFetch(`/api/groups/${chatId}/text-config`, {
       method: 'PUT',
-      body: JSON.stringify({ welcome_buttons: valid }),
+      body: { welcome_buttons: valid },
     });
   } catch (e) {
     showToast('Failed to save buttons', 'error');

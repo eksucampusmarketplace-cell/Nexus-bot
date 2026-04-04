@@ -150,12 +150,15 @@ async def verify_button(
     if challenge["user_id"] != user_id:
         return False
 
+    # Get max attempts from settings, default to 3
+    max_attempts = settings.get("captcha_max_attempts", 3)
+
     if is_correct:
         await _pass_captcha(bot, chat_id, user_id, challenge, db)
         return True
     else:
         attempts = await increment_attempts(db, challenge_id)
-        if attempts >= 3:
+        if attempts >= max_attempts:
             await _fail_captcha(
                 bot, chat_id, user_id, challenge, db, reason="Too many wrong attempts"
             )
@@ -176,6 +179,9 @@ async def verify_text_answer(
     if challenge["mode"] not in ("math", "text"):
         return False
 
+    # Get max attempts from settings, default to 3
+    max_attempts = settings.get("captcha_max_attempts", 3)
+
     correct = answer_text.strip().lower() == challenge["answer"].lower()
 
     if correct:
@@ -183,7 +189,7 @@ async def verify_text_answer(
         return True
     else:
         attempts = await increment_attempts(db, challenge["challenge_id"])
-        if attempts >= 3:
+        if attempts >= max_attempts:
             await _fail_captcha(
                 bot, chat_id, user_id, challenge, db, reason="Too many wrong attempts"
             )
@@ -191,7 +197,7 @@ async def verify_text_answer(
             try:
                 await bot.send_message(
                     chat_id=chat_id,
-                    text=f"❌ Wrong answer. {3 - attempts} attempt(s) left.",
+                    text=f"❌ Wrong answer. {max_attempts - attempts} attempt(s) left.",
                     reply_to_message_id=challenge["message_id"],
                 )
             except TelegramError:

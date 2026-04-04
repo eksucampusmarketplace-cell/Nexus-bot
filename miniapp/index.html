@@ -881,7 +881,14 @@
         });
         return;
       }
-      
+
+      // Teardown previous page if needed
+      const prevPage = getState().activePage;
+      if (prevPage === 'moderation') {
+        const { teardownModerationPage } = await import('./src/pages/moderation.js?v=1.6.0');
+        teardownModerationPage();
+      }
+
       // Update state
       store.setState({ activePage: pageId });
       if (getState().setActivePage) {

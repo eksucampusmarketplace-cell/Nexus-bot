@@ -72,10 +72,9 @@ export async function renderBotsPage(container) {
   container.appendChild(listContainer);
 
   try {
-    const [bots, usage] = await Promise.all([
-      apiFetch('/api/bots'),
-      apiFetch('/api/me/usage').catch(() => null)
-    ]);
+    // Fetch bots first, then usage (sequential to ensure usage reflects latest state after bot operations)
+    const bots = await apiFetch('/api/bots');
+    const usage = await apiFetch('/api/me/usage').catch(() => null);
 
     listContainer.innerHTML = '';
 

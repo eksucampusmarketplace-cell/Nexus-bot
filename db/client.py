@@ -266,17 +266,10 @@ class Database:
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS trial_used BOOLEAN DEFAULT FALSE;
 
                 -- Add check constraint for plan values if it doesn't exist
-                DO $
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_constraint
-                        WHERE conname = 'chk_bot_plan'
-                    ) THEN
-                        ALTER TABLE bots
-                        ADD CONSTRAINT chk_bot_plan
-                        CHECK (plan IN ('primary', 'free', 'trial', 'trial_expired', 'basic', 'starter', 'pro', 'unlimited'));
-                    END IF;
-                END $;
+                -- Note: Using separate query to avoid dollar-quoting issues with pgbouncer
+                ALTER TABLE bots DROP CONSTRAINT IF EXISTS chk_bot_plan;
+                ALTER TABLE bots ADD CONSTRAINT chk_bot_plan
+                    CHECK (plan IN ('primary', 'free', 'trial', 'trial_expired', 'basic', 'starter', 'pro', 'unlimited'));
 
                 -- Backfill existing bots with appropriate plan values if not set
                 UPDATE bots

@@ -37,7 +37,8 @@ async def get_user_history(user_id: int, user: dict = Depends(require_auth)):
             
             # Get history
             history = await conn.fetch(
-                """SELECT first_name, last_name, username, changed_at, source_chat_id
+                """SELECT first_name, last_name, username, old_first_name, old_last_name, old_username,
+                          changed_at, source_chat_id
                    FROM user_name_history
                    WHERE user_id = $1
                    ORDER BY changed_at DESC

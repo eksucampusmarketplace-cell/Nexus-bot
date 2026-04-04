@@ -92,7 +92,9 @@ async def check_message(
         return AutomodResult()
 
     # Load settings
-    settings = await get_group_settings(db, chat.id)
+    from bot.utils.crypto import hash_token
+    token_hash = hash_token(context.bot.token)
+    settings = await get_group_settings(db, chat.id, token_hash)
     if not settings:
         return AutomodResult()
 

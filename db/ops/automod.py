@@ -635,14 +635,32 @@ async def get_user_warning_count(pool, chat_id: int, user_id: int) -> int:
     return row["count"] if row else 0
 
 
-async def get_group_settings(pool, chat_id: int) -> dict:
-    """Get full settings dict for a group (merges settings JSONB with individual columns)."""
+async def get_group_settings(pool, chat_id: int, bot_token_hash: str = None) -> dict:
+    """Get full settings dict for a group (merges settings JSONB with individual columns).
+    If bot_token_hash is provided, it will also merge overrides from bot_group_settings.
+    """
     import json
 
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM groups WHERE chat_id=$1", chat_id)
+        
+        bot_settings_json = {}
+        if bot_token_hash:
+            bot_row = await conn.fetchrow(
+                "SELECT settings FROM bot_group_settings WHERE bot_token_hash=$1 AND chat_id=$2",
+                bot_token_hash,
+                chat_id,
+            )
+            if bot_row and bot_row["settings"]:
+                bot_settings_json = bot_row["settings"]
+                if isinstance(bot_settings_json, str):
+                    try:
+                        bot_settings_json = json.loads(bot_settings_json)
+                    except Exception:
+                        bot_settings_json = {}
+
     if not row:
-        return {}
+        return bot_settings_json if bot_token_hash else {}
 
     res = dict(row)
     settings_json = res.pop("settings", {})
@@ -665,6 +683,19 @@ async def get_group_settings(pool, chat_id: int) -> dict:
     # Merge settings_json into the main dict
     if settings_json:
         res.update(settings_json)
+
+    # Merge bot-specific overrides if provided
+    if bot_settings_json:
+        # Deep merge bot_settings_json into res
+        def deep_merge(base, new):
+            for k, v in new.items():
+                if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+                    deep_merge(base[k], v)
+                else:
+                    base[k] = v
+            return base
+            
+        deep_merge(res, bot_settings_json)
 
     # Add modules under _modules key for checking in handlers
     res["_modules"] = modules_json
@@ -691,6 +722,16 @@ async def get_group_settings(pool, chat_id: int) -> dict:
         "lock_hashtag": "hashtag",
         "lock_unofficial_tg": "unofficial_tg",
         "lock_userbots": "userbots",
+        "lock_text": "text",
+        "lock_no_caption": "no_caption",
+        "lock_emoji": "emoji",
+        "lock_emoji_only": "emoji_only",
+        "lock_english": "english",
+        "lock_arabic_farsi": "arabic_farsi",
+        "lock_reply": "reply",
+        "lock_external_reply": "external_reply",
+        "lock_spoiler": "spoiler",
+        "lock_slash": "slash",
     }
     res["locks"] = {
         short: bool(res.get(flat))

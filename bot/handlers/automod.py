@@ -135,10 +135,10 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as _te:
             logger.debug(f"[AUTOMOD] Trust score update failed: {_te}")
 
-    group = await get_group(chat_id)
+    token_hash = hash_token(context.bot.token)
+    group = await get_group(chat_id, token_hash)
     if not group:
         # Auto-register group if not exists
-        token_hash = hash_token(context.bot.token)
         await upsert_group(chat_id, update.effective_chat.title, token_hash)
         return
 
@@ -220,7 +220,8 @@ async def antiflood_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
-    group = await get_group(chat_id)
+    token_hash = hash_token(context.bot.token)
+    group = await get_group(chat_id, token_hash)
     if not group:
         return
 
@@ -287,7 +288,8 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
 
-    group = await get_group(chat_id)
+    token_hash = hash_token(context.bot.token)
+    group = await get_group(chat_id, token_hash)
     if not group:
         return
 
@@ -319,7 +321,8 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def member_join_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    group = await get_group(chat_id)
+    token_hash = hash_token(context.bot.token)
+    group = await get_group(chat_id, token_hash)
     if not group:
         return
 

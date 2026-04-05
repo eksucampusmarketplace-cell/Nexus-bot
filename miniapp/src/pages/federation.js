@@ -65,7 +65,7 @@ export async function renderFederationPage(container) {
 
   // Federation Bans section
   const bansSection = document.createElement('div');
-  bansSection.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);';
+  bansSection.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);margin-bottom:var(--sp-4);';
   bansSection.innerHTML = `
     <div style="font-weight:600;margin-bottom:var(--sp-3)">${t('federation_bans', 'Federation Bans')}</div>
     
@@ -84,13 +84,37 @@ export async function renderFederationPage(container) {
     </div>
   `;
   container.appendChild(bansSection);
+  
+  // Federation Name History section
+  const historySection = document.createElement('div');
+  historySection.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);';
+  historySection.innerHTML = `
+    <div style="font-weight:600;margin-bottom:var(--sp-3)">Federation Name History</div>
+    
+    <div class="toggle-row">
+      <span>Enable cross-group name history</span>
+      <div class="toggle" id="fed-history-toggle">
+        <div class="toggle-dot"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:var(--sp-3);font-size:0.85rem;color:var(--text-muted)">
+      Track and share name changes across all groups in your federation
+    </div>
+    
+    <div id="fed-history-content" style="margin-top:var(--sp-3);">
+      <!-- Will be populated if user has a federation -->
+    </div>
+  `;
+  container.appendChild(historySection);
 
   // Load federation data
-  loadFederationData(myFedSection);
+  loadFederationData(myFedSection, historySection);
 
   // Toggle functionality
   setupToggle(bansSection.querySelector('#ban-prop-toggle'));
   setupToggle(bansSection.querySelector('#share-rep-toggle'));
+  setupToggle(historySection.querySelector('#fed-history-toggle'));
 
   // Join button
   joinSection.querySelector('#join-fed-btn').onclick = async () => {
@@ -133,7 +157,7 @@ function setupToggle(toggle) {
   return () => enabled;
 }
 
-async function loadFederationData(container) {
+async function loadFederationData(container, historySection = null) {
   try {
     const fed = await apiFetch('/api/federation/my');
     const content = container.querySelector('#my-fed-content');
@@ -156,6 +180,11 @@ async function loadFederationData(container) {
         navigator.clipboard.writeText(fed.invite_code);
         showToast(t('copied', 'Copied!'));
       };
+      
+      // Load federation name history if section exists
+      if (historySection) {
+        loadFederationNameHistory(historySection, fed.id);
+      }
     } else {
       content.innerHTML = `
         <div style="text-align:center;padding:var(--sp-4);color:var(--text-muted)">
@@ -184,12 +213,21 @@ async function loadFederationData(container) {
             body: JSON.stringify({ name: name.trim(), chat_id: chatId })
           });
           showToast(t('created', 'Federation created!'));
-          loadFederationData(container);
+          loadFederationData(container, historySection);
         } catch (err) {
           console.error('Failed to create federation:', err);
           showToast(t('create_failed', 'Failed to create') + (err.message ? ': ' + err.message : ''));
         }
       };
+      
+      // Hide history section if no federation
+      if (historySection) {
+        historySection.querySelector('#fed-history-content').innerHTML = `
+          <div style="text-align:center;padding:var(--sp-3);color:var(--text-muted);font-size:0.85rem">
+            Join or create a federation to see cross-group name history
+          </div>
+        `;
+      }
     }
   } catch (err) {
     container.querySelector('#my-fed-content').innerHTML = `
@@ -198,4 +236,76 @@ async function loadFederationData(container) {
       </div>
     `;
   }
+}
+
+async function loadFederationNameHistory(container, fedId) {
+  const contentDiv = container.querySelector('#fed-history-content');
+  if (!contentDiv) return;
+  
+  try {
+    contentDiv.innerHTML = '<div style="text-align:center;padding:var(--sp-3);color:var(--text-muted)">Loading...</div>';
+    
+    const data = await apiFetch(`/api/federation/federations/${fedId}/name-history?limit=20`);
+    
+    if (!data.history || data.history.length === 0) {
+      contentDiv.innerHTML = `
+        <div style="text-align:center;padding:var(--sp-3);color:var(--text-muted);font-size:0.85rem">
+          No name changes recorded across federation yet
+        </div>
+      `;
+      return;
+    }
+    
+    // Build history list
+    let html = '<div style="max-height:300px;overflow-y:auto;">';
+    data.history.forEach(entry => {
+      const date = entry.changed_at ? new Date(entry.changed_at).toLocaleDateString() : '—';
+      const oldName = entry.old_name || '(unknown)';
+      const fedBadge = entry.is_federated ? '<span style="font-size:0.7rem;background:var(--accent);color:#000;padding:1px 4px;border-radius:4px;margin-left:4px">FED</span>' : '';
+      
+      html += `
+        <div style="padding:var(--sp-2) 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+          <div style="display:flex;align-items:center;gap:var(--sp-2);">
+            <span style="color:var(--text-muted);text-decoration:line-through;">${escapeHtml(oldName)}</span>
+            <span style="color:var(--accent)">→</span>
+            <span style="font-weight:500;">${escapeHtml(entry.user_name)}</span>
+            ${fedBadge}
+          </div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">
+            ${date} • ${escapeHtml(entry.group_name)}
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    
+    // Add stats link
+    html += `
+      <div style="margin-top:var(--sp-3);text-align:center;">
+        <button class="btn btn-secondary" id="view-fed-stats" style="font-size:0.85rem;">
+          View Federation Stats
+        </button>
+      </div>
+    `;
+    
+    contentDiv.innerHTML = html;
+    
+    contentDiv.querySelector('#view-fed-stats').onclick = () => {
+      window.open(`/api/federation/federations/${fedId}/name-history/stats`, '_blank');
+    };
+    
+  } catch (err) {
+    console.error('Failed to load federation name history:', err);
+    contentDiv.innerHTML = `
+      <div style="text-align:center;padding:var(--sp-3);color:var(--text-muted);font-size:0.85rem">
+        Failed to load history
+      </div>
+    `;
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
 }

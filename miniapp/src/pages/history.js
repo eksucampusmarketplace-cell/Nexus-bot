@@ -39,6 +39,8 @@ export async function renderHistoryPage(container) {
   let currentRetention = 0;
   let alertEnabled = false;
   let alertThreshold = 1;
+  let federationSync = false;
+  let trackPhotos = true;
 
   try {
     const resp = await apiFetch(`/api/groups/${chatId}/name-history`);
@@ -47,6 +49,8 @@ export async function renderHistoryPage(container) {
     currentRetention = resp?.retention_days ?? 0;
     alertEnabled = resp?.alert_enabled ?? false;
     alertThreshold = resp?.alert_threshold ?? 1;
+    federationSync = resp?.federation_sync ?? false;
+    trackPhotos = resp?.track_photos ?? true;
   } catch (err) {
     console.debug('Failed to load history settings:', err);
   }
@@ -95,7 +99,7 @@ export async function renderHistoryPage(container) {
   } else if (activeTab === 'search') {
     await renderSearchTab(contentSection, chatId, currentEnabled);
   } else if (activeTab === 'settings') {
-    await renderSettingsTab(contentSection, chatId, currentEnabled, currentLimit, currentRetention, alertEnabled, alertThreshold);
+    await renderSettingsTab(contentSection, chatId, currentEnabled, currentLimit, currentRetention, alertEnabled, alertThreshold, federationSync, trackPhotos);
   }
 }
 
@@ -138,15 +142,25 @@ async function renderRecentTab(container, chatId, isEnabled) {
     history.forEach((entry, index) => {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);font-size:0.85rem;cursor:pointer;transition:background var(--dur-fast);';
+      
+      // Show federation badge if entry is federated and from a different group
+      const fedBadge = (entry.is_federated && entry.source_chat_id && entry.source_chat_id !== chatId) 
+        ? `<span style="font-size:0.65rem;background:var(--accent);color:#000;padding:2px 6px;border-radius:4px;margin-left:var(--sp-1)">FED</span>` 
+        : '';
+      const groupLabel = (entry.is_federated && entry.group_name && entry.source_chat_id !== chatId)
+        ? `<span style="font-size:0.7rem;color:var(--accent);margin-left:auto">${escapeText(entry.group_name)}</span>`
+        : `<span style="color:var(--text-muted);margin-left:auto;font-size:0.75rem">${entry.changed_at ? new Date(entry.changed_at).toLocaleDateString() : '—'}</span>`;
+      
       item.innerHTML = `
         <span style="color:var(--text-muted)">${escapeText(entry.old_name || '(unknown)')}</span>
         <span style="color:var(--accent)">→</span>
         <span style="font-weight:600">${escapeText(entry.user_name || 'Unknown')}</span>
-        <span style="color:var(--text-muted);margin-left:auto;font-size:0.75rem">${entry.changed_at ? new Date(entry.changed_at).toLocaleDateString() : '—'}</span>
+        ${fedBadge}
+        ${groupLabel}
       `;
       item.onmouseenter = () => item.style.background = 'var(--bg-hover)';
       item.onmouseleave = () => item.style.background = 'var(--bg-card)';
-      item.onclick = () => openUserTimeline(chatId, entry.user_id, entry.user_name);
+      item.onclick = () => openUserTimeline(entry.source_chat_id || chatId, entry.user_id, entry.user_name);
       listContainer.appendChild(item);
     });
   } catch (err) {
@@ -315,7 +329,7 @@ async function renderSearchTab(container, chatId, isEnabled) {
   };
 }
 
-async function renderSettingsTab(container, chatId, currentEnabled, currentLimit, currentRetention, alertEnabled, alertThreshold) {
+async function renderSettingsTab(container, chatId, currentEnabled, currentLimit, currentRetention, alertEnabled, alertThreshold, federationSync, trackPhotos) {
   const section = document.createElement('div');
   section.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-4);';
   section.innerHTML = `
@@ -325,6 +339,11 @@ async function renderSettingsTab(container, chatId, currentEnabled, currentLimit
       <div class="toggle-row" style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
         <span>${t('enable_label', 'Track Name Changes')}</span>
         <div id="history-toggle-wrapper"></div>
+      </div>
+
+      <div class="toggle-row" style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;margin-top:var(--sp-2);">
+        <span>Track Profile Photo Changes</span>
+        <div id="photo-toggle-wrapper"></div>
       </div>
 
       <div style="margin-top:var(--sp-4)">
@@ -369,10 +388,19 @@ async function renderSettingsTab(container, chatId, currentEnabled, currentLimit
           Only alert after user has changed names this many times
         </div>
       </div>
+    </div>
 
-      <button class="btn btn-primary" style="margin-top:var(--sp-4);width:100%" id="save-alerts">
-        Save Alert Settings
-      </button>
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-4);">
+      <div style="font-weight:600;margin-bottom:var(--sp-4)">Federation Settings</div>
+      
+      <div class="toggle-row" style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
+        <span>Sync name history across federation</span>
+        <div id="federation-toggle-wrapper"></div>
+      </div>
+      
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:var(--sp-2)">
+        Share name history with all groups in your federation
+      </div>
     </div>
   `;
   container.appendChild(section);
@@ -380,6 +408,8 @@ async function renderSettingsTab(container, chatId, currentEnabled, currentLimit
   // Toggles
   let enabled = currentEnabled;
   let alertsEnabled = alertEnabled;
+  let federationEnabled = federationSync;
+  let photosEnabled = trackPhotos;
   
   section.querySelector('#history-toggle-wrapper').appendChild(Toggle({
     checked: currentEnabled,
@@ -391,37 +421,39 @@ async function renderSettingsTab(container, chatId, currentEnabled, currentLimit
     onChange: (val) => { alertsEnabled = val; }
   }));
 
-  // Save tracking settings
+  section.querySelector('#federation-toggle-wrapper').appendChild(Toggle({
+    checked: federationSync,
+    onChange: (val) => { federationEnabled = val; }
+  }));
+
+  section.querySelector('#photo-toggle-wrapper').appendChild(Toggle({
+    checked: trackPhotos,
+    onChange: (val) => { photosEnabled = val; }
+  }));
+
+  // Save tracking settings (now includes all settings in one call)
   section.querySelector('#save-history').onclick = async () => {
     const limit = parseInt(section.querySelector('#history-limit').value);
     const retention = parseInt(section.querySelector('#history-retention').value);
+    const threshold = parseInt(section.querySelector('#alert-threshold').value);
 
     try {
       showToast(t('loading', 'Saving...'));
       await apiFetch(`/api/groups/${chatId}/name-history`, {
         method: 'POST',
-        body: { enabled, limit, retention_days: retention }
+        body: { 
+          enabled, 
+          limit, 
+          retention_days: retention,
+          alert_enabled: alertsEnabled,
+          alert_threshold: threshold,
+          federation_sync: federationEnabled,
+          track_photos: photosEnabled
+        }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
     } catch (err) {
       console.error('Failed to save history settings:', err);
-      showToast(t('error', 'Failed to save'));
-    }
-  };
-
-  // Save alert settings
-  section.querySelector('#save-alerts').onclick = async () => {
-    const threshold = parseInt(section.querySelector('#alert-threshold').value);
-
-    try {
-      showToast(t('loading', 'Saving...'));
-      await apiFetch(`/api/groups/${chatId}/settings/bulk`, {
-        method: 'PUT',
-        body: { settings: { name_history_alert_enabled: alertsEnabled, name_history_alert_threshold: threshold } }
-      });
-      showToast(t('toast_save_success', 'Saved successfully!'));
-    } catch (err) {
-      console.error('Failed to save alert settings:', err);
       showToast(t('error', 'Failed to save'));
     }
   };

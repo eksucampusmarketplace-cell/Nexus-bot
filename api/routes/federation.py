@@ -450,3 +450,148 @@ async def get_group_federations(chat_id: int, user: dict = Depends(require_auth)
     except Exception as e:
         logger.error(f"Failed to get group federations: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch federations")
+
+
+# === Federation Name History ===
+
+@legacy_router.get("/federations/{fed_id}/name-history")
+async def get_federation_name_history(fed_id: str, limit: int = 50, user: dict = Depends(get_current_user)):
+    """Get name history across all groups in a federation."""
+    user_id = user.get("id")
+    
+    try:
+        async with db.pool.acquire() as conn:
+            # Check if user owns or is admin of this federation
+            is_authorized = await conn.fetchval(
+                """SELECT 1 FROM federations f
+                   LEFT JOIN federation_admins fa ON fa.federation_id = f.id AND fa.user_id = $2
+                   WHERE f.id = $1 AND (f.owner_id = $2 OR fa.user_id IS NOT NULL)""",
+                fed_id, user_id
+            )
+            
+            if not is_authorized:
+                raise HTTPException(status_code=403, detail="Not authorized for this federation")
+            
+            # Get all groups in federation
+            group_ids = await conn.fetch(
+                "SELECT chat_id FROM federation_members WHERE federation_id = $1",
+                fed_id
+            )
+            chat_ids = [g["chat_id"] for g in group_ids]
+            
+            if not chat_ids:
+                return {"history": [], "groups": []}
+            
+            # Get name history from all groups in federation
+            rows = await conn.fetch(
+                """SELECT 
+                    uhh.user_id,
+                    CASE
+                      WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' 
+                      THEN COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown') || ' ' || uhh.last_name
+                      ELSE COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown')
+                    END as user_name,
+                    CASE
+                      WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' 
+                      THEN COALESCE(uhh.old_first_name, '') || ' ' || COALESCE(uhh.old_last_name, '')
+                      ELSE COALESCE(uhh.old_first_name, '')
+                    END as old_name,
+                    uhh.old_username,
+                    uhh.username,
+                    uhh.changed_at,
+                    uhh.source_chat_id,
+                    g.title as group_name,
+                    uhh.is_federated
+                 FROM user_name_history uhh
+                 LEFT JOIN groups g ON g.chat_id = uhh.source_chat_id
+                 WHERE uhh.source_chat_id = ANY($1)
+                 ORDER BY uhh.changed_at DESC
+                 LIMIT $2""",
+                chat_ids, limit
+            )
+            
+            # Get group info
+            groups = await conn.fetch(
+                "SELECT chat_id, title FROM groups WHERE chat_id = ANY($1)",
+                chat_ids
+            )
+        
+        return {
+            "history": [
+                {
+                    "user_id": r["user_id"],
+                    "user_name": r["user_name"] or r["username"] or "Unknown",
+                    "old_name": r["old_name"] or r["old_username"] or "",
+                    "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
+                    "chat_id": r["source_chat_id"],
+                    "group_name": r["group_name"] or f"Group {r['source_chat_id']}",
+                    "is_federated": r["is_federated"] or False,
+                }
+                for r in rows
+            ],
+            "groups": [{"chat_id": g["chat_id"], "title": g["title"]} for g in groups]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get federation name history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch federation name history")
+
+
+@legacy_router.get("/federations/{fed_id}/name-history/stats")
+async def get_federation_name_stats(fed_id: str, user: dict = Depends(get_current_user)):
+    """Get name change statistics across a federation."""
+    user_id = user.get("id")
+    
+    try:
+        async with db.pool.acquire() as conn:
+            # Check authorization
+            is_authorized = await conn.fetchval(
+                """SELECT 1 FROM federations f
+                   LEFT JOIN federation_admins fa ON fa.federation_id = f.id AND fa.user_id = $2
+                   WHERE f.id = $1 AND (f.owner_id = $2 OR fa.user_id IS NOT NULL)""",
+                fed_id, user_id
+            )
+            
+            if not is_authorized:
+                raise HTTPException(status_code=403, detail="Not authorized")
+            
+            # Get stats across federation
+            rows = await conn.fetch(
+                """SELECT 
+                    uhh.user_id,
+                    COUNT(*) as change_count,
+                    MAX(uhh.changed_at) as last_changed,
+                    (SELECT CASE
+                        WHEN last_name IS NOT NULL AND last_name != '' 
+                        THEN COALESCE(NULLIF(first_name,''), username, 'Unknown') || ' ' || last_name
+                        ELSE COALESCE(NULLIF(first_name,''), username, 'Unknown')
+                     END 
+                     FROM user_name_history u2 
+                     WHERE u2.user_id = uhh.user_id 
+                       AND u2.source_chat_id IN (SELECT chat_id FROM federation_members WHERE federation_id = $1)
+                     ORDER BY changed_at DESC LIMIT 1) as user_name,
+                     array_agg(DISTINCT uhh.source_chat_id) as chat_ids
+                 FROM user_name_history uhh
+                 WHERE uhh.source_chat_id IN (SELECT chat_id FROM federation_members WHERE federation_id = $1)
+                 GROUP BY uhh.user_id
+                 ORDER BY change_count DESC
+                 LIMIT 20""",
+                fed_id
+            )
+        
+        return [
+            {
+                "user_id": r["user_id"],
+                "user_name": r["user_name"] or "Unknown",
+                "change_count": r["change_count"],
+                "last_changed": r["last_changed"].isoformat() if r["last_changed"] else None,
+                "groups_affected": len(r["chat_ids"]) if r["chat_ids"] else 0,
+            }
+            for r in rows
+        ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get federation name stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch federation stats")

@@ -20,6 +20,10 @@ class HistorySettings(BaseModel):
     enabled: bool = False
     limit: int = 10
     retention_days: int = 0  # F-06: retention period (0 = never purge)
+    alert_enabled: bool = False
+    alert_threshold: int = 1
+    federation_sync: bool = False
+    track_photos: bool = True
 
 
 @router.get("")
@@ -28,7 +32,11 @@ async def get_history_settings(chat_id: int, user: dict = Depends(require_auth))
     try:
         async with db.pool.acquire() as conn:
             row = await conn.fetchrow(
-                """SELECT name_history_enabled, name_history_limit, name_history_retention_days
+                """SELECT name_history_enabled, name_history_limit, name_history_retention_days,
+                          settings->>'name_history_alert_enabled' as alert_enabled,
+                          settings->>'name_history_alert_threshold' as alert_threshold,
+                          settings->>'name_history_federation_sync' as federation_sync,
+                          settings->>'name_history_track_photos' as track_photos
                    FROM groups WHERE chat_id = $1""",
                 chat_id,
             )
@@ -36,10 +44,30 @@ async def get_history_settings(chat_id: int, user: dict = Depends(require_auth))
             if not row:
                 raise HTTPException(status_code=404, detail="Group not found")
 
+        # Parse boolean/numeric values from JSON strings
+        def parse_bool(val, default=False):
+            if val is None:
+                return default
+            if isinstance(val, bool):
+                return val
+            return str(val).lower() in ('true', '1', 'yes', 'on')
+
+        def parse_int(val, default=0):
+            if val is None:
+                return default
+            try:
+                return int(val)
+            except (ValueError, TypeError):
+                return default
+
         return {
             "enabled": row["name_history_enabled"] if row else False,
             "limit": row["name_history_limit"] if row else 10,
             "retention_days": row["name_history_retention_days"] if row else 0,
+            "alert_enabled": parse_bool(row["alert_enabled"] if row else None, False),
+            "alert_threshold": parse_int(row["alert_threshold"] if row else None, 1),
+            "federation_sync": parse_bool(row["federation_sync"] if row else None, False),
+            "track_photos": parse_bool(row["track_photos"] if row else None, True),
         }
     except HTTPException:
         raise
@@ -55,28 +83,45 @@ async def save_history_settings(
     """Save name history settings for a group."""
     try:
         async with db.pool.acquire() as conn:
-            # Check which columns exist
+            # Update main columns
             await conn.execute(
                 """UPDATE groups 
-                   SET name_history_enabled = $1, name_history_limit = $2
-                   WHERE chat_id = $3""",
+                   SET name_history_enabled = $1, name_history_limit = $2,
+                       name_history_retention_days = $3
+                   WHERE chat_id = $4""",
                 settings.enabled,
                 settings.limit,
+                settings.retention_days,
                 chat_id,
             )
-            # Try to update retention_days if the column exists
-            try:
-                await conn.execute(
-                    """UPDATE groups 
-                       SET name_history_retention_days = $1
-                       WHERE chat_id = $2""",
-                    settings.retention_days,
-                    chat_id,
-                )
-            except Exception:
-                pass  # Column may not exist yet
+            
+            # Update settings JSONB with alert and federation settings
+            await conn.execute(
+                """UPDATE groups 
+                   SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object(
+                       'name_history_alert_enabled', $1,
+                       'name_history_alert_threshold', $2,
+                       'name_history_federation_sync', $3,
+                       'name_history_track_photos', $4
+                   )
+                   WHERE chat_id = $5""",
+                settings.alert_enabled,
+                settings.alert_threshold,
+                settings.federation_sync,
+                settings.track_photos,
+                chat_id,
+            )
 
-        return {"ok": True, "enabled": settings.enabled, "limit": settings.limit, "retention_days": settings.retention_days}
+        return {
+            "ok": True, 
+            "enabled": settings.enabled, 
+            "limit": settings.limit, 
+            "retention_days": settings.retention_days,
+            "alert_enabled": settings.alert_enabled,
+            "alert_threshold": settings.alert_threshold,
+            "federation_sync": settings.federation_sync,
+            "track_photos": settings.track_photos,
+        }
     except Exception as e:
         logger.error(f"Failed to save history settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to save history settings")
@@ -100,33 +145,119 @@ async def get_recent_name_changes(chat_id: int, user: dict = Depends(require_aut
                 "SELECT COALESCE(name_history_limit, 20) FROM groups WHERE chat_id = $1",
                 chat_id,
             )
-
-            # Get recent name changes with proper old/new name fields
-            # NH-03 fix: include username-only changes (WHERE old_first_name OR old_username)
-            # NH-03 fix: use username as fallback when first_name is empty
-            rows = await conn.fetch(
-                """SELECT uhh.user_id,
-                          CASE
-                            WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' 
-                            THEN COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown') || ' ' || uhh.last_name
-                            ELSE COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown')
-                          END as user_name,
-                          CASE
-                            WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' 
-                            THEN COALESCE(uhh.old_first_name, '') || ' ' || COALESCE(uhh.old_last_name, '')
-                            ELSE COALESCE(uhh.old_first_name, '')
-                          END as old_name,
-                          uhh.old_username,
-                          uhh.username,
-                          uhh.changed_at
-                   FROM user_name_history uhh
-                   WHERE uhh.source_chat_id = $1
-                     AND (uhh.old_first_name IS NOT NULL OR uhh.old_username IS NOT NULL)
-                   ORDER BY uhh.changed_at DESC
-                   LIMIT $2""",
-                chat_id,
-                limit_val,
+            
+            # Check if federation sync is enabled
+            federation_sync = await conn.fetchval(
+                """SELECT COALESCE(settings->>'name_history_federation_sync', 'false')::boolean
+                   FROM groups WHERE chat_id = $1""",
+                chat_id
             )
+            
+            # Build query - include federated entries if sync is enabled
+            if federation_sync:
+                # Get all federations this group is in
+                fed_ids = await conn.fetch(
+                    "SELECT federation_id FROM federation_members WHERE chat_id = $1",
+                    chat_id
+                )
+                fed_id_list = [f["federation_id"] for f in fed_ids]
+                
+                if fed_id_list:
+                    # Get all groups in these federations
+                    fed_groups = await conn.fetch(
+                        "SELECT chat_id FROM federation_members WHERE federation_id = ANY($1)",
+                        fed_id_list
+                    )
+                    fed_chat_ids = list(set([g["chat_id"] for g in fed_groups]))
+                    
+                    # Get recent name changes from all federation groups
+                    rows = await conn.fetch(
+                        """SELECT uhh.user_id,
+                                  CASE
+                                    WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' 
+                                    THEN COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown') || ' ' || uhh.last_name
+                                    ELSE COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown')
+                                  END as user_name,
+                                  CASE
+                                    WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' 
+                                    THEN COALESCE(uhh.old_first_name, '') || ' ' || COALESCE(uhh.old_last_name, '')
+                                    ELSE COALESCE(uhh.old_first_name, '')
+                                  END as old_name,
+                                  uhh.old_username,
+                                  uhh.username,
+                                  uhh.changed_at,
+                                  uhh.is_federated,
+                                  uhh.source_chat_id,
+                                  g.title as group_name
+                           FROM user_name_history uhh
+                           LEFT JOIN groups g ON g.chat_id = uhh.source_chat_id
+                           WHERE uhh.source_chat_id = ANY($1)
+                             AND (uhh.old_first_name IS NOT NULL OR uhh.old_username IS NOT NULL)
+                           ORDER BY uhh.changed_at DESC
+                           LIMIT $2""",
+                        fed_chat_ids,
+                        limit_val,
+                    )
+                else:
+                    # No federations, just get this group's history
+                    rows = await conn.fetch(
+                        """SELECT uhh.user_id,
+                                  CASE
+                                    WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' 
+                                    THEN COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown') || ' ' || uhh.last_name
+                                    ELSE COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown')
+                                  END as user_name,
+                                  CASE
+                                    WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' 
+                                    THEN COALESCE(uhh.old_first_name, '') || ' ' || COALESCE(uhh.old_last_name, '')
+                                    ELSE COALESCE(uhh.old_first_name, '')
+                                  END as old_name,
+                                  uhh.old_username,
+                                  uhh.username,
+                                  uhh.changed_at,
+                                  uhh.is_federated,
+                                  uhh.source_chat_id,
+                                  g.title as group_name
+                           FROM user_name_history uhh
+                           LEFT JOIN groups g ON g.chat_id = uhh.source_chat_id
+                           WHERE uhh.source_chat_id = $1
+                             AND (uhh.old_first_name IS NOT NULL OR uhh.old_username IS NOT NULL)
+                           ORDER BY uhh.changed_at DESC
+                           LIMIT $2""",
+                        chat_id,
+                        limit_val,
+                    )
+            else:
+                # Get recent name changes with proper old/new name fields (non-federated)
+                # NH-03 fix: include username-only changes (WHERE old_first_name OR old_username)
+                # NH-03 fix: use username as fallback when first_name is empty
+                rows = await conn.fetch(
+                    """SELECT uhh.user_id,
+                              CASE
+                                WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' 
+                                THEN COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown') || ' ' || uhh.last_name
+                                ELSE COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown')
+                              END as user_name,
+                              CASE
+                                WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' 
+                                THEN COALESCE(uhh.old_first_name, '') || ' ' || COALESCE(uhh.old_last_name, '')
+                                ELSE COALESCE(uhh.old_first_name, '')
+                              END as old_name,
+                              uhh.old_username,
+                              uhh.username,
+                              uhh.changed_at,
+                              uhh.is_federated,
+                              uhh.source_chat_id,
+                              g.title as group_name
+                       FROM user_name_history uhh
+                       LEFT JOIN groups g ON g.chat_id = uhh.source_chat_id
+                       WHERE uhh.source_chat_id = $1
+                         AND (uhh.old_first_name IS NOT NULL OR uhh.old_username IS NOT NULL)
+                       ORDER BY uhh.changed_at DESC
+                       LIMIT $2""",
+                    chat_id,
+                    limit_val,
+                )
 
         return [
             {
@@ -134,6 +265,9 @@ async def get_recent_name_changes(chat_id: int, user: dict = Depends(require_aut
                 "user_name": r["user_name"] or r["username"] or "Unknown",
                 "old_name": r["old_name"] or r["old_username"] or "",
                 "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
+                "is_federated": r["is_federated"] or False,
+                "source_chat_id": r["source_chat_id"],
+                "group_name": r["group_name"] or f"Group {r['source_chat_id']}",
             }
             for r in rows
         ]

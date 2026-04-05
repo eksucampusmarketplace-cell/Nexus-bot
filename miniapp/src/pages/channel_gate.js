@@ -22,12 +22,20 @@ export async function renderChannelGatePage(container) {
   header.innerHTML = '<h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">📢 Channel Gate</h2><p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Require users to join a channel before chatting</p>';
   container.appendChild(header);
 
+  const loadingEl = document.createElement('div');
+  loadingEl.style.cssText = 'text-align:center;padding:var(--sp-8);color:var(--text-muted);';
+  loadingEl.textContent = 'Loading...';
+  container.appendChild(loadingEl);
+
   try {
     const config = await apiFetch(`/api/groups/${chatId}/channel-gate/config`);
+    loadingEl.remove();
     const card = Card({ title: 'Gate Settings', subtitle: 'Configure force-join requirements' });
 
     const formEl = document.createElement('div');
     formEl.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-4);padding-top:var(--sp-2);';
+    const isEnabled = config?.force_channel_enabled || config?.enabled || false;
+    const channelId = config?.force_channel_id || config?.force_channel_username || config?.channel_id || '';
     formEl.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div>
@@ -36,13 +44,13 @@ export async function renderChannelGatePage(container) {
         </div>
         <div id="gate-toggle-wrapper"></div>
       </div>
-      <div id="gate-config-fields" style="display:${config?.enabled ? 'flex' : 'none'};flex-direction:column;gap:var(--sp-3);">
+      <div id="gate-config-fields" style="display:${isEnabled ? 'flex' : 'none'};flex-direction:column;gap:var(--sp-3);">
         <div>
           <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:var(--sp-1);">Target Channel ID/Username</label>
-          <input type="text" id="gate-channel" class="input" value="${config?.channel_id || ''}" placeholder="-100... or @channel">
+          <input type="text" id="gate-channel" class="input" value="${channelId}" placeholder="-100... or @channel">
         </div>
-        <div id="gate-status" style="display:${config?.channel_id ? 'block' : 'none'};padding:var(--sp-2);background:var(--bg-input);border-radius:var(--r-md);font-size:var(--text-xs);">
-          ${config?.channel_id ? '✅ Channel gate is configured for: ' + (config.channel_id) : ''}
+        <div id="gate-status" style="display:${channelId ? 'block' : 'none'};padding:var(--sp-2);background:var(--bg-input);border-radius:var(--r-md);font-size:var(--text-xs);">
+          ${channelId ? '✅ Channel gate is configured for: ' + channelId : ''}
         </div>
         <button id="save-gate-config" class="btn btn-primary">Save Gate</button>
       </div>
@@ -53,26 +61,32 @@ export async function renderChannelGatePage(container) {
     // Toggle
     const toggleWrapper = card.querySelector('#gate-toggle-wrapper');
     toggleWrapper.appendChild(Toggle({
-      checked: config?.enabled || false,
+      checked: isEnabled,
       onChange: async (v) => {
         try {
           await apiFetch(`/api/groups/${chatId}/channel-gate/config`, {
             method: 'PUT',
-            body: JSON.stringify({ enabled: v })
+            body: JSON.stringify({ force_channel_enabled: v })
           });
           card.querySelector('#gate-config-fields').style.display = v ? 'flex' : 'none';
           showToast(`Channel gate ${v ? 'enabled' : 'disabled'}`, 'success');
-        } catch (e) { showToast('Error', 'error'); }
+        } catch (e) { showToast('Error updating channel gate', 'error'); }
       }
     }));
 
     card.querySelector('#save-gate-config').onclick = async () => {
       const channelId = card.querySelector('#gate-channel').value.trim();
       if (!channelId) { showToast('Enter a channel ID or username', 'error'); return; }
+
+      // Determine if it's an ID or username
+      const isId = channelId.startsWith('-100') || /^\d+$/.test(channelId);
+      const updateData = isId ? { force_channel_id: parseInt(channelId), force_channel_username: null }
+                                   : { force_channel_id: null, force_channel_username: channelId.replace('@', '') };
+
       try {
         await apiFetch(`/api/groups/${chatId}/channel-gate/config`, {
           method: 'PUT',
-          body: JSON.stringify({ channel_id: channelId })
+          body: JSON.stringify(updateData)
         });
         const statusEl = card.querySelector('#gate-status');
         statusEl.style.display = 'block';
@@ -81,6 +95,7 @@ export async function renderChannelGatePage(container) {
       } catch (e) { showToast('Error saving gate config', 'error'); }
     };
   } catch (e) {
+    loadingEl.remove();
     container.appendChild(EmptyState({ icon: '⚠️', title: 'Channel Gate', description: 'API not responding. Please try again.' }));
   }
 }

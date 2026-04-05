@@ -39,7 +39,7 @@ export async function renderBoosterPage(container) {
   container.appendChild(loadingEl);
 
   try {
-    const config = await apiFetch(`/api/groups/${chatId}/boost/config`);
+    const config = await apiFetch(`/api/groups/${chatId}/boost/config`) || {};
     loadingEl.remove();
 
     // --- Configuration Card ---
@@ -57,7 +57,7 @@ export async function renderBoosterPage(container) {
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <span>${t('booster_required', 'Required Invites')}</span>
-        <input type="number" id="boost-count-input" class="input" style="width:80px;" value="${config?.required_count || 0}" min="0">
+        <input type="number" id="boost-count-input" class="input" style="width:80px;" value="${config?.force_add_required || config?.required_count || 0}" min="0">
       </div>
       <button id="save-booster-config" class="btn btn-primary">${t('save_btn', 'Save Configuration')}</button>
     `;
@@ -66,24 +66,24 @@ export async function renderBoosterPage(container) {
     
     const toggleContainer = configCard.querySelector('#booster-enabled-toggle');
     toggleContainer.appendChild(Toggle({
-      checked: config?.enabled || false,
+      checked: config?.force_add_enabled || config?.enabled || false,
       onChange: async (v) => {
         try {
           await apiFetch(`/api/groups/${chatId}/boost/config`, {
             method: 'PUT',
-            body: JSON.stringify({ enabled: v })
+            body: JSON.stringify({ force_add_enabled: v })
           });
           showToast(t('nav_booster', 'Booster') + ' ' + (v ? t('enabled', 'enabled') : t('disabled', 'disabled')), 'success');
         } catch (e) { showToast(t('error_update', 'Error updating booster'), 'error'); }
       }
     }));
-    
+
     configCard.querySelector('#save-booster-config').onclick = async () => {
       const count = parseInt(configCard.querySelector('#boost-count-input').value);
       try {
         await apiFetch(`/api/groups/${chatId}/boost/config`, {
           method: 'PUT',
-          body: JSON.stringify({ required_count: count })
+          body: JSON.stringify({ force_add_required: count })
         });
         showToast(t('toast_save_success', 'Configuration saved'), 'success');
       } catch (e) {

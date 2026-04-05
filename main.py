@@ -458,6 +458,39 @@ async def lifespan(app: FastAPI):
     logger.info("[STARTUP] ✅ Ticket background jobs started (auto-close + surveys)")
     # ───────────────────────────────────────────────────────────────────────
 
+    # ── Broadcast Worker ────────────────────────────────────────────────────
+    try:
+        from bot.utils.broadcast_engine import BroadcastEngine
+
+        broadcast_engine = BroadcastEngine(pool)
+        from bot.utils.broadcast_engine import broadcast_engine as global_broadcast_engine
+
+        global_broadcast_engine = broadcast_engine
+
+        async def _broadcast_worker():
+            """Background worker to process pending broadcast tasks."""
+            from db.ops.broadcast import get_pending_broadcast_tasks
+
+            while True:
+                try:
+                    # Check for pending tasks every 30 seconds
+                    tasks = await get_pending_broadcast_tasks(pool)
+                    for task in tasks:
+                        if task["status"] == "pending":
+                            logger.info(
+                                f"[BROADCAST] Starting pending task {task['id']}"
+                            )
+                            await broadcast_engine.start_broadcast(task["id"])
+                except Exception as e:
+                    logger.error(f"[BROADCAST] Worker error: {e}")
+                await asyncio.sleep(30)
+
+        asyncio.create_task(_broadcast_worker())
+        logger.info("[STARTUP] ✅ Broadcast worker started")
+    except Exception as e:
+        logger.warning(f"[STARTUP] ⚠️ Broadcast worker failed to start: {e}")
+    # ───────────────────────────────────────────────────────────────────────
+
     # ── Phase 5: Self Keep-Alive Ping ─────────────────────────────────────
     async def _keep_alive_ping():
         import aiohttp

@@ -17,6 +17,7 @@ Hard rules:
   4. Properties = groups + channels combined
 """
 
+from datetime import datetime
 from typing import Dict, List
 
 PLANS: Dict[str, dict] = {
@@ -88,7 +89,8 @@ PLANS: Dict[str, dict] = {
             "Custom bot persona",
             "ML spam classifier",
             "Community voting",
-            "Full engagement system (XP/badges)"
+            "Full engagement system (XP/badges)",
+            "UltraPro: Banned symbols filtering (auto-ban by username)"
         ]
     },
 
@@ -105,7 +107,8 @@ PLANS: Dict[str, dict] = {
             "Unlimited properties on primary bot",
             "Clone bots max 500 properties each",
             "White-label support",
-            "All future features"
+            "All future features",
+            "UltraPro: Banned symbols filtering (auto-ban by username)"
         ]
     },
 

@@ -298,6 +298,20 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("unblacklist", unblacklist_command, filters=GROUP))
     app.add_handler(CommandHandler("blacklistmode", blacklistmode_command, filters=GROUP))
 
+    # ── Banned Symbols handlers (UltraPro feature) ─────────────────────────
+    from bot.handlers.banned_symbols import (
+        bannedsymbol_command,
+        unbannedsymbol_command,
+        clearbannedsymbols_command,
+        bannedsymbolaction_command,
+    )
+
+    app.add_handler(CommandHandler("bannedsymbol", bannedsymbol_command, filters=GROUP))
+    app.add_handler(CommandHandler("unbannedsymbol", unbannedsymbol_command, filters=GROUP))
+    app.add_handler(CommandHandler("clearbannedsymbols", clearbannedsymbols_command, filters=GROUP))
+    app.add_handler(CommandHandler("bannedsymbolaction", bannedsymbolaction_command, filters=GROUP))
+    logger.info("[FACTORY] Banned Symbols handlers registered")
+
     from bot.handlers.notes import (
         delnote_command,
         note_command,

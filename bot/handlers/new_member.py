@@ -105,6 +105,17 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
             log.debug(f"Federation ban check failed: {e}")
         # ──────────────────────────────────────────────────────────────────────
 
+        # ── Banned Symbols Check (UltraPro feature) ────────────────────────────
+        try:
+            from bot.handlers.banned_symbols_enforcement import check_new_member_username
+
+            removed = await check_new_member_username(update, context)
+            if removed:
+                return  # User was removed due to banned symbols
+        except Exception as e:
+            log.debug(f"Banned symbols check failed: {e}")
+        # ──────────────────────────────────────────────────────────────────────
+
         # ── Phase 2: Rule-Based Risk Scorer ───────────────────────────────────
         try:
             from bot.ml.risk_scorer import UserRiskScorer

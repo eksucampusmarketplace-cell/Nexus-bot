@@ -544,8 +544,9 @@ async def on_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
+    esc_username = escape_markdown_v2(pending['username'])
     await query.edit_message_text(
-        rf"⚙️ Registering @{pending['username']}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
+        rf"⚙️ Registering @{esc_username}\.\.\.", parse_mode=ParseMode.MARKDOWN_V2
     )
 
     try:
@@ -796,7 +797,7 @@ async def myclones_command_handler(update: Update, context: ContextTypes.DEFAULT
     )
 
 
-# ─── /cloneset ────────���───────────────────────────────�������───────��───────────────
+# ─── /cloneset ────────�����───────────────────────────────�������───────��───────────────
 
 
 async def cloneset_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

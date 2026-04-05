@@ -82,6 +82,20 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         asyncio.create_task(record_mod_action(target.id, chat_id, "ban", reason))
 
+        # Update federation reputation (v21)
+        try:
+            import db.ops.federation as fed_ops
+
+            # Get federations for this group
+            feds = await fed_ops.get_group_federations(db.pool, chat_id)
+            for fed in feds:
+                # Decrease trust score by 30 points for ban
+                await fed_ops.update_reputation(
+                    db.pool, target.id, fed["id"], -30, f"Banned in group: {reason}"
+                )
+        except Exception as e:
+            log.debug(f"Federation reputation update failed: {e}")
+
         # Notify log channel
         await notify_log_channel(context.bot, chat_id, "ban", target, invoker, reason)
 
@@ -278,6 +292,20 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reason,
             time_str,
         )
+
+        # Update federation reputation (v21)
+        try:
+            import db.ops.federation as fed_ops
+
+            # Get federations for this group
+            feds = await fed_ops.get_group_federations(db.pool, chat_id)
+            for fed in feds:
+                # Decrease trust score by 20 points for temp ban
+                await fed_ops.update_reputation(
+                    db.pool, target.id, fed["id"], -20, f"Temp banned ({time_str}): {reason}"
+                )
+        except Exception as e:
+            log.debug(f"Federation reputation update failed: {e}")
 
         # Publish event
         await publish_event(

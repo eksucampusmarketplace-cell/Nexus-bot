@@ -50,7 +50,7 @@ async def get_history_settings(chat_id: int, user: dict = Depends(require_auth))
                 return default
             if isinstance(val, bool):
                 return val
-            return str(val).lower() in ('true', '1', 'yes', 'on')
+            return str(val).lower() in ("true", "1", "yes", "on")
 
         def parse_int(val, default=0):
             if val is None:
@@ -94,15 +94,15 @@ async def save_history_settings(
                 settings.retention_days,
                 chat_id,
             )
-            
+
             # Update settings JSONB with alert and federation settings
             await conn.execute(
-                """UPDATE groups 
+                """UPDATE groups
                    SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object(
-                       'name_history_alert_enabled', $1,
-                       'name_history_alert_threshold', $2,
-                       'name_history_federation_sync', $3,
-                       'name_history_track_photos', $4
+                       'name_history_alert_enabled', $1::boolean,
+                       'name_history_alert_threshold', $2::integer,
+                       'name_history_federation_sync', $3::boolean,
+                       'name_history_track_photos', $4::boolean
                    )
                    WHERE chat_id = $5""",
                 settings.alert_enabled,
@@ -113,9 +113,9 @@ async def save_history_settings(
             )
 
         return {
-            "ok": True, 
-            "enabled": settings.enabled, 
-            "limit": settings.limit, 
+            "ok": True,
+            "enabled": settings.enabled,
+            "limit": settings.limit,
             "retention_days": settings.retention_days,
             "alert_enabled": settings.alert_enabled,
             "alert_threshold": settings.alert_threshold,
@@ -145,31 +145,30 @@ async def get_recent_name_changes(chat_id: int, user: dict = Depends(require_aut
                 "SELECT COALESCE(name_history_limit, 20) FROM groups WHERE chat_id = $1",
                 chat_id,
             )
-            
+
             # Check if federation sync is enabled
             federation_sync = await conn.fetchval(
                 """SELECT COALESCE(settings->>'name_history_federation_sync', 'false')::boolean
                    FROM groups WHERE chat_id = $1""",
-                chat_id
+                chat_id,
             )
-            
+
             # Build query - include federated entries if sync is enabled
             if federation_sync:
                 # Get all federations this group is in
                 fed_ids = await conn.fetch(
-                    "SELECT federation_id FROM federation_members WHERE chat_id = $1",
-                    chat_id
+                    "SELECT federation_id FROM federation_members WHERE chat_id = $1", chat_id
                 )
                 fed_id_list = [f["federation_id"] for f in fed_ids]
-                
+
                 if fed_id_list:
                     # Get all groups in these federations
                     fed_groups = await conn.fetch(
                         "SELECT chat_id FROM federation_members WHERE federation_id = ANY($1)",
-                        fed_id_list
+                        fed_id_list,
                     )
                     fed_chat_ids = list(set([g["chat_id"] for g in fed_groups]))
-                    
+
                     # Get recent name changes from all federation groups
                     rows = await conn.fetch(
                         """SELECT uhh.user_id,
@@ -325,7 +324,7 @@ async def search_name_history(chat_id: int, q: str = "", user: dict = Depends(re
     """Search name history by old name or username."""
     if not q or len(q) < 2:
         raise HTTPException(status_code=400, detail="Search query must be at least 2 characters")
-    
+
     try:
         search_term = f"%{q.lower()}%"
         async with db.pool.acquire() as conn:
@@ -364,7 +363,9 @@ async def search_name_history(chat_id: int, q: str = "", user: dict = Depends(re
         return [
             {
                 "user_id": r["user_id"],
-                "current_name": f"{r['first_name'] or ''} {r['last_name'] or ''}".strip() or r['username'] or "Unknown",
+                "current_name": f"{r['first_name'] or ''} {r['last_name'] or ''}".strip()
+                or r["username"]
+                or "Unknown",
                 "matched_field": r["matched_field"],
                 "matched_value": r["matched_value"],
                 "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
@@ -400,28 +401,40 @@ async def get_user_name_timeline(chat_id: int, user_id: int, user: dict = Depend
 
         timeline = []
         for r in rows:
-            old_name = f"{r['old_first_name'] or ''} {r['old_last_name'] or ''}".strip() or r['old_username'] or "(unknown)"
-            new_name = f"{r['first_name'] or ''} {r['last_name'] or ''}".strip() or r['username'] or "(unknown)"
-            
+            old_name = (
+                f"{r['old_first_name'] or ''} {r['old_last_name'] or ''}".strip()
+                or r["old_username"]
+                or "(unknown)"
+            )
+            new_name = (
+                f"{r['first_name'] or ''} {r['last_name'] or ''}".strip()
+                or r["username"]
+                or "(unknown)"
+            )
+
             # Determine change type
-            name_changed = (r['old_first_name'] != r['first_name']) or (r['old_last_name'] != r['last_name'])
-            username_changed = r['old_username'] != r['username']
-            
+            name_changed = (r["old_first_name"] != r["first_name"]) or (
+                r["old_last_name"] != r["last_name"]
+            )
+            username_changed = r["old_username"] != r["username"]
+
             if username_changed and not name_changed:
                 change_type = "username"
             elif name_changed and not username_changed:
                 change_type = "name"
             else:
                 change_type = "both"
-            
-            timeline.append({
-                "old_name": old_name,
-                "new_name": new_name,
-                "old_username": r['old_username'],
-                "new_username": r['username'],
-                "change_type": change_type,
-                "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
-            })
+
+            timeline.append(
+                {
+                    "old_name": old_name,
+                    "new_name": new_name,
+                    "old_username": r["old_username"],
+                    "new_username": r["username"],
+                    "change_type": change_type,
+                    "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
+                }
+            )
 
         return timeline
     except Exception as e:
@@ -454,8 +467,12 @@ async def export_name_history(chat_id: int, user: dict = Depends(require_auth)):
         return [
             {
                 "user_id": r["user_id"],
-                "old_name": f"{r['old_first_name'] or ''} {r['old_last_name'] or ''}".strip() or r['old_username'] or "",
-                "new_name": f"{r['first_name'] or ''} {r['last_name'] or ''}".strip() or r['username'] or "",
+                "old_name": f"{r['old_first_name'] or ''} {r['old_last_name'] or ''}".strip()
+                or r["old_username"]
+                or "",
+                "new_name": f"{r['first_name'] or ''} {r['last_name'] or ''}".strip()
+                or r["username"]
+                or "",
                 "old_username": r["old_username"] or "",
                 "new_username": r["username"] or "",
                 "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,

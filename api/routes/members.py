@@ -4,6 +4,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from api.auth import get_current_user
+from api.utils.bot_helper import get_bot_for_group
 from db.client import db
 
 logger = logging.getLogger(__name__)
@@ -13,16 +14,7 @@ router = APIRouter(prefix="/api/groups/{chat_id}")
 
 async def _fetch_admins_from_telegram(chat_id: int) -> list:
     """Fetch admin list from Telegram to get accurate member data."""
-    from bot.registry import get_all
-
-    bots = get_all()
-    if not bots:
-        return []
-
-    bot_app = None
-    for bid, app in bots.items():
-        bot_app = app
-        break
+    bot_app = await get_bot_for_group(chat_id)
 
     if not bot_app:
         return []
@@ -297,14 +289,7 @@ async def mute_member(chat_id: int, user_id: int, request: Request, user: dict =
     duration = body.get("duration", 3600)  # Default 1 hour
 
     try:
-        # Get bot app for this group
-        from bot.registry import get_all
-
-        bots = get_all()
-        bot_app = None
-        for bid, app in bots.items():
-            bot_app = app
-            break
+        bot_app = await get_bot_for_group(chat_id)
 
         if not bot_app:
             raise HTTPException(status_code=503, detail="Bot service unavailable")
@@ -347,14 +332,7 @@ async def mute_member(chat_id: int, user_id: int, request: Request, user: dict =
 async def kick_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Kick a member from the group."""
     try:
-        # Get bot app for this group
-        from bot.registry import get_all
-
-        bots = get_all()
-        bot_app = None
-        for bid, app in bots.items():
-            bot_app = app
-            break
+        bot_app = await get_bot_for_group(chat_id)
 
         if not bot_app:
             raise HTTPException(status_code=503, detail="Bot service unavailable")
@@ -383,14 +361,7 @@ async def kick_member(chat_id: int, user_id: int, request: Request, user: dict =
 async def ban_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Ban a member from the group."""
     try:
-        # Get bot app for this group
-        from bot.registry import get_all
-
-        bots = get_all()
-        bot_app = None
-        for bid, app in bots.items():
-            bot_app = app
-            break
+        bot_app = await get_bot_for_group(chat_id)
 
         if not bot_app:
             raise HTTPException(status_code=503, detail="Bot service unavailable")
@@ -428,14 +399,7 @@ async def ban_member(chat_id: int, user_id: int, request: Request, user: dict = 
 async def unban_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Unban a member from the group."""
     try:
-        # Get bot app for this group
-        from bot.registry import get_all
-
-        bots = get_all()
-        bot_app = None
-        for bid, app in bots.items():
-            bot_app = app
-            break
+        bot_app = await get_bot_for_group(chat_id)
 
         if not bot_app:
             raise HTTPException(status_code=503, detail="Bot service unavailable")
@@ -471,14 +435,7 @@ async def unban_member(chat_id: int, user_id: int, request: Request, user: dict 
 async def unmute_member(chat_id: int, user_id: int, request: Request, user: dict = Depends(get_current_user)):
     """Unmute a member (restore permissions)."""
     try:
-        # Get bot app for this group
-        from bot.registry import get_all
-
-        bots = get_all()
-        bot_app = None
-        for bid, app in bots.items():
-            bot_app = app
-            break
+        bot_app = await get_bot_for_group(chat_id)
 
         if not bot_app:
             raise HTTPException(status_code=503, detail="Bot service unavailable")
@@ -595,14 +552,7 @@ async def bulk_action(chat_id: int, request: Request, user: dict = Depends(get_c
 
     results = {"ok": [], "failed": []}
 
-    # Get bot app for this group
-    from bot.registry import get_all
-
-    bots = get_all()
-    bot_app = None
-    for bid, app in bots.items():
-        bot_app = app
-        break
+    bot_app = await get_bot_for_group(chat_id)
 
     async with db.pool.acquire() as conn:
         for uid in user_ids[:50]:  # max 50 per bulk action
@@ -762,15 +712,7 @@ async def toggle_antiraid(chat_id: int, request: Request, user: dict = Depends(g
     body = await request.json()
     enable = body.get("enable", False)
 
-    # Need to call the bot handler or trigger it.
-    # Since we have the bot app and settings, we can call manual_toggle_raid.
-    from bot.registry import get_all
-
-    bots = get_all()
-    bot_app = None
-    for bid, app in bots.items():
-        bot_app = app
-        break
+    bot_app = await get_bot_for_group(chat_id)
 
     if not bot_app:
         raise HTTPException(status_code=503, detail="Bot service unavailable")

@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
+
+from api.utils.bot_helper import get_bot_for_group
 from db.ops.booster import (
     get_channel_gate_config,
     save_channel_gate_config,
@@ -142,9 +144,8 @@ async def verify_user(chat_id: int, user_id: int, data: VerifyRequest):
 @router.post("/kick/{user_id}")
 async def kick_user(chat_id: int, user_id: int):
     """Kick a user from the group."""
-    from bot.registry import get as registry_get
+    ptb_app = await get_bot_for_group(chat_id)
 
-    ptb_app = registry_get(0)
     if not ptb_app:
         raise HTTPException(status_code=500, detail="Bot not available")
 

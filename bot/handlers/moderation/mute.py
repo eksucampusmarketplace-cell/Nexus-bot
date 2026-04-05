@@ -127,6 +127,20 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id, "mute", target.id, target.full_name, invoker.id, invoker.full_name, reason
         )
 
+        # Update federation reputation (v21)
+        try:
+            import db.ops.federation as fed_ops
+
+            # Get federations for this group
+            feds = await fed_ops.get_group_federations(db.pool, chat_id)
+            for fed in feds:
+                # Decrease trust score by 10 points for mute
+                await fed_ops.update_reputation(
+                    db.pool, target.id, fed["id"], -10, f"Muted in group: {reason}"
+                )
+        except Exception as e:
+            log.debug(f"Federation reputation update failed: {e}")
+
         await publish_event(
             chat_id,
             "mod_action",
@@ -226,6 +240,20 @@ async def tmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reason,
             unmute_at,
         )
+
+        # Update federation reputation (v21)
+        try:
+            import db.ops.federation as fed_ops
+
+            # Get federations for this group
+            feds = await fed_ops.get_group_federations(db.pool, chat_id)
+            for fed in feds:
+                # Decrease trust score by 8 points for temp mute
+                await fed_ops.update_reputation(
+                    db.pool, target.id, fed["id"], -8, f"Temp muted ({time_str}): {reason}"
+                )
+        except Exception as e:
+            log.debug(f"Federation reputation update failed: {e}")
 
         await update.message.reply_text(
             f"🔇 Temp Muted | {await mention_user(target)}\n"

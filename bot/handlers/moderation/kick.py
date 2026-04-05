@@ -59,6 +59,22 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await log_action(
             chat_id, "kick", target.id, target.full_name, invoker.id, invoker.full_name, reason
         )
+
+        # Update federation reputation (v21)
+        try:
+            from db.client import db
+            import db.ops.federation as fed_ops
+
+            # Get federations for this group
+            feds = await fed_ops.get_group_federations(db.pool, chat_id)
+            for fed in feds:
+                # Decrease trust score by 15 points for kick
+                await fed_ops.update_reputation(
+                    db.pool, target.id, fed["id"], -15, f"Kicked from group: {reason}"
+                )
+        except Exception as e:
+            log.debug(f"Federation reputation update failed: {e}")
+
         await publish_event(
             chat_id,
             "mod_action",

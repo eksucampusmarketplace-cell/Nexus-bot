@@ -602,6 +602,12 @@ async def root():
     return RedirectResponse(url="/miniapp/index.html")
 
 
+# Privacy policy redirect (legacy fallback)
+@app.get("/privacy")
+async def privacy():
+    return RedirectResponse(url="/miniapp/privacy.html")
+
+
 # Bot webhooks
 # Bug #12/#13 fix: Use opaque webhook secret derived from token hash instead of raw token in URL.
 # The raw bot token is no longer exposed in webhook URLs or server logs.

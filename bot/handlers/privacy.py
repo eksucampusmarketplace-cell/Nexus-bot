@@ -60,7 +60,7 @@ View the complete policy with detailed information."""
     keyboard = []
     if privacy_url:
         keyboard.append(
-            [InlineKeyboardButton("📄 View Full Privacy Policy", web_app={"url": privacy_url})]
+            [InlineKeyboardButton("📄 View Full Privacy Policy", url=privacy_url)]
         )
     support_url = settings.SUPPORT_GROUP_URL or (
         f"https://t.me/{settings.MAIN_BOT_USERNAME}" if settings.MAIN_BOT_USERNAME else None

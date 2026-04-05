@@ -192,9 +192,6 @@ export async function renderGreetingsPage(container) {
     const card = _buildMessageCard(msgType, textConfig, chatId, initData);
     container.appendChild(card);
   });
-
-  const notesSection = await _renderNotesSection(chatId);
-  container.appendChild(notesSection);
 }
 
 function _buildMessageCard(msgType, textConfig, chatId, initData) {
@@ -638,91 +635,4 @@ async function _saveButtons(chatId, buttons) {
   } catch (e) {
     showToast('Failed to save buttons', 'error');
   }
-}
-
-async function _renderNotesSection(chatId) {
-  const wrapper = document.createElement('div');
-
-  let notes = [];
-  try {
-    const res = await apiFetch(`/api/groups/${chatId}/notes`);
-    notes = res.data || res.notes || res || [];
-  } catch (e) {
-    notes = [];
-  }
-
-  const card = Card({
-    title: '📝 Saved Notes',
-    subtitle: 'Notes are retrieved with /note <name> or via inline mode',
-  });
-
-  const form = document.createElement('div');
-  form.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3);';
-  form.innerHTML = `
-    <div style="display:flex;gap:var(--sp-2);">
-      <input id="note-name" class="input" placeholder="Note name (e.g. rules, faq)" style="flex:1;">
-    </div>
-    <textarea id="note-content" class="input" placeholder="Note content..." style="min-height:60px;resize:vertical;font-family:inherit;"></textarea>
-    <button id="note-save-btn" class="btn btn-primary" style="align-self:flex-start;">💾 Save Note</button>
-  `;
-  card.appendChild(form);
-
-  const notesList = document.createElement('div');
-  notesList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
-
-  const renderNotes = (noteData) => {
-    notesList.innerHTML = '';
-    if (!noteData.length) {
-      notesList.innerHTML = '<div style="color:var(--text-muted);font-size:var(--text-sm);text-align:center;padding:var(--sp-3);">No notes yet</div>';
-      return;
-    }
-    noteData.forEach(n => {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border:1px solid var(--border);';
-      row.innerHTML = `
-        <div style="flex:1;min-width:0;">
-          <span style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">#${n.name}</span>
-          <span style="color:var(--text-muted);font-size:var(--text-xs);margin-left:var(--sp-2);">${n.media_type ? '📎 ' + n.media_type : (n.content || '').slice(0, 60)}</span>
-        </div>
-        <button data-del="${n.name}" style="background:none;border:1px solid var(--danger);border-radius:var(--r-lg);padding:2px 8px;font-size:var(--text-xs);color:var(--danger);cursor:pointer;">Delete</button>
-      `;
-      row.querySelector('[data-del]').onclick = async () => {
-        try {
-          await apiFetch(`/api/groups/${chatId}/notes/${n.name}`, { method: 'DELETE' });
-          showToast(`Note #${n.name} deleted`, 'success');
-          notes = notes.filter(x => x.name !== n.name);
-          renderNotes(notes);
-        } catch (e) {
-          showToast('Failed to delete note', 'error');
-        }
-      };
-      notesList.appendChild(row);
-    });
-  };
-
-  card.appendChild(notesList);
-  renderNotes(notes);
-
-  form.querySelector('#note-save-btn').onclick = async () => {
-    const name = form.querySelector('#note-name').value.trim().toLowerCase();
-    const content = form.querySelector('#note-content').value.trim();
-    if (!name) { showToast('Note name required', 'error'); return; }
-    try {
-      await apiFetch(`/api/groups/${chatId}/notes`, {
-        method: 'POST',
-        body: JSON.stringify({ name, content }),
-      });
-      showToast(`Note #${name} saved`, 'success');
-      form.querySelector('#note-name').value = '';
-      form.querySelector('#note-content').value = '';
-      const res = await apiFetch(`/api/groups/${chatId}/notes`);
-      notes = res.data || res.notes || res || [];
-      renderNotes(notes);
-    } catch (e) {
-      showToast('Failed to save note', 'error');
-    }
-  };
-
-  wrapper.appendChild(card);
-  return wrapper;
 }

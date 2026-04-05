@@ -1560,12 +1560,7 @@
           }
         });
 
-        // ── 7. CUSTOM MESSAGES ────────────────────────────────────────────
-        const groupMsgsCard = Card({ title: '📝 Group Custom Messages', subtitle: 'Customize responses for this group', children: '<div id="group-messages-container"></div>' });
-        container.appendChild(groupMsgsCard);
-        await renderCustomMessagesSection(groupMsgsCard.querySelector('#group-messages-container'), `/api/groups/${chatId}/messages`);
-
-        // ── 8. DANGER ZONE ────────────────────────────────────────────────
+        // ── 7. DANGER ZONE ────────────────────────────────────────────────
         // Only show danger zone to group owners or sudo users
         if (isGroupOwner || isSudo) {
           const dangerCard = Card({ title: '⚠️ Danger Zone', subtitle: 'Irreversible actions' });

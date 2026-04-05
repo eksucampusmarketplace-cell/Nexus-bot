@@ -52,8 +52,8 @@ const AUTOMOD_SECTIONS = [
       { key: 'lock_username', label: 'Block spam usernames', type: 'toggle' },
       { key: 'lock_bot', label: 'Block bot invites', type: 'toggle' },
       { key: 'lock_bot_inviter', label: 'Block bots from adding users', type: 'toggle' },
-      { key: 'duplicate_limit', label: 'Max duplicate messages', type: 'number', min: 1, max: 10, default: 2 },
-      { key: 'duplicate_window_mins', label: 'Duplicate window (mins)', type: 'number', min: 1, max: 60, default: 5 },
+      { key: 'duplicate_limit', label: 'Max duplicate messages', type: 'number', min: 1, max: 10, default: 1 },
+      { key: 'duplicate_window_mins', label: 'Duplicate window (mins)', type: 'number', min: 1, max: 60, default: 60 },
     ],
   },
   {
@@ -84,7 +84,7 @@ const AUTOMOD_SECTIONS = [
       { key: 'regex_active', label: 'Enable Regex Filters', type: 'toggle' },
       { key: 'necessary_words_active', label: 'Enable Required Words', type: 'toggle' },
       { key: 'self_destruct_enabled', label: 'Enable Self-Destruct', type: 'toggle' },
-      { key: 'self_destruct_minutes', label: 'Self-Destruct (minutes)', type: 'number', min: 1, max: 1440, default: 60 },
+      { key: 'self_destruct_minutes', label: 'Self-Destruct (minutes)', type: 'number', min: 1, max: 1440, default: 2 },
     ],
   },
   {
@@ -170,8 +170,12 @@ export async function renderAutomodPage(container) {
     if (settings.automod) {
       if (settings.automod.antiflood) {
         settings.antiflood = settings.antiflood ?? settings.automod.antiflood.enabled;
-        settings.antiflood_limit = settings.antiflood_limit ?? settings.automod.antiflood.flood_threshold;
-        settings.antiflood_window = settings.antiflood_window ?? settings.automod.antiflood.flood_window_sec;
+        if (settings.automod.antiflood.flood_threshold != null) {
+          settings.antiflood_limit = settings.automod.antiflood.flood_threshold;
+        }
+        if (settings.automod.antiflood.flood_window_sec != null) {
+          settings.antiflood_window = settings.automod.antiflood.flood_window_sec;
+        }
       }
       if (settings.automod.antilink) {
         settings.antilink = settings.antilink ?? settings.automod.antilink.enabled;
@@ -179,7 +183,7 @@ export async function renderAutomodPage(container) {
     }
     if (settings.locks) {
       for (const [k, v] of Object.entries(settings.locks)) {
-        settings["lock_" + k] = settings["lock_" + k] ?? v;
+        settings["lock_" + k] = v;
       }
     }
 
@@ -253,11 +257,7 @@ function _renderTemplatesSection(chatId, currentSettings) {
       try {
         console.debug('[AutoMod] Applying template:', template.id);
 
-        // Use the dedicated template apply endpoint with template_id
-        await apiFetch(`/api/groups/${chatId}/automod/templates/apply`, {
-          method: 'POST',
-          body: { template_id: template.id },
-        });
+        await applyTemplate(chatId, template.id);
         console.debug('[AutoMod] Template applied successfully');
 
         btn.innerHTML = '<span style="color: var(--success);">✅ Applied! Refreshing...</span>';
@@ -271,8 +271,12 @@ function _renderTemplatesSection(chatId, currentSettings) {
           if (newSettings.automod) {
             if (newSettings.automod.antiflood) {
               newSettings.antiflood = newSettings.antiflood ?? newSettings.automod.antiflood.enabled;
-              newSettings.antiflood_limit = newSettings.antiflood_limit ?? newSettings.automod.antiflood.flood_threshold;
-              newSettings.antiflood_window = newSettings.antiflood_window ?? newSettings.automod.antiflood.flood_window_sec;
+              if (newSettings.automod.antiflood.flood_threshold != null) {
+                newSettings.antiflood_limit = newSettings.automod.antiflood.flood_threshold;
+              }
+              if (newSettings.automod.antiflood.flood_window_sec != null) {
+                newSettings.antiflood_window = newSettings.automod.antiflood.flood_window_sec;
+              }
             }
             if (newSettings.automod.antilink) {
               newSettings.antilink = newSettings.antilink ?? newSettings.automod.antilink.enabled;
@@ -280,7 +284,7 @@ function _renderTemplatesSection(chatId, currentSettings) {
           }
           if (newSettings.locks) {
             for (const [k, v] of Object.entries(newSettings.locks)) {
-              newSettings["lock_" + k] = newSettings["lock_" + k] ?? v;
+              newSettings["lock_" + k] = v;
             }
           }
 

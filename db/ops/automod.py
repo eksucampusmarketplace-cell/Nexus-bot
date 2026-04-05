@@ -717,11 +717,13 @@ async def get_group_settings(pool, chat_id: int, bot_token_hash: str = None) -> 
         "lock_contact": "contact",
         "lock_username": "username",
         "lock_bot": "bot",
+        "lock_bot_inviter": "bot_inviter",
         "lock_website": "website",
         "lock_channel": "forward_channel",
         "lock_hashtag": "hashtag",
         "lock_unofficial_tg": "unofficial_tg",
         "lock_userbots": "userbots",
+        "lock_porn": "porn",
         "lock_text": "text",
         "lock_no_caption": "no_caption",
         "lock_emoji": "emoji",
@@ -733,8 +735,9 @@ async def get_group_settings(pool, chat_id: int, bot_token_hash: str = None) -> 
         "lock_spoiler": "spoiler",
         "lock_slash": "slash",
     }
+    jsonb_locks = res.get("locks") if isinstance(res.get("locks"), dict) else {}
     res["locks"] = {
-        short: bool(res.get(flat))
+        short: bool(jsonb_locks.get(short, res.get(flat)))
         for flat, short in LOCK_KEY_MAP.items()
     }
 

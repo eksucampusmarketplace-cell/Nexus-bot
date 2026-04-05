@@ -36,13 +36,18 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reason = reason or "No reason provided"
 
     # Add warning to DB
-    await db.execute(
-        "INSERT INTO warnings (chat_id, user_id, reason, issued_by) VALUES ($1, $2, $3, $4)",
-        chat_id,
-        target.id,
-        reason,
-        invoker.id,
-    )
+    try:
+        await db.execute(
+            "INSERT INTO warnings (chat_id, user_id, reason, issued_by) VALUES ($1, $2, $3, $4)",
+            chat_id,
+            target.id,
+            reason,
+            invoker.id,
+        )
+    except Exception as e:
+        log.error(f"[WARN] DB insert failed for user {target.id}: {e}")
+        await update.message.reply_text("❌ Failed to record warning. Check bot logs.")
+        return
 
     # Count active warnings
     count = await db.fetchval(
@@ -64,6 +69,7 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         warn_action = settings["warn_action"]
 
     # Use personality engine for warning message (v21)
+    warn_message = None
     try:
         from bot.personality.engine import get_personality
 
@@ -82,7 +88,25 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👮 By: {await mention_user(invoker)}"
         )
 
-    await update.message.reply_text(warn_message, parse_mode="Markdown")
+    # Record ML signal BEFORE reply (fire-and-forget, cannot block action)
+    import asyncio
+
+    from bot.ml.signal_collector import record_mod_action
+
+    t = asyncio.create_task(record_mod_action(target.id, chat_id, "warn", reason))
+    _bg_tasks.add(t)
+    t.add_done_callback(_bg_tasks.discard)
+
+    # Send warning message with Markdown fallback
+    try:
+        await update.message.reply_text(warn_message, parse_mode="Markdown")
+    except Exception:
+        # Fallback: send without Markdown if formatting fails
+        plain = warn_message.replace("*", "").replace("`", "").replace("_", "")
+        try:
+            await update.message.reply_text(plain)
+        except Exception as send_err:
+            log.error(f"[WARN] Failed to send warning message: {send_err}")
 
     # Update federation reputation (v21)
     try:
@@ -101,15 +125,6 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await log_action(
         chat_id, "warn", target.id, target.full_name, invoker.id, invoker.full_name, reason
     )
-
-    # Phase 1: Record signal for ML pipeline
-    import asyncio
-
-    from bot.ml.signal_collector import record_mod_action
-
-    t = asyncio.create_task(record_mod_action(target.id, chat_id, "warn", reason))
-    _bg_tasks.add(t)
-    t.add_done_callback(_bg_tasks.discard)
 
     await publish_event(
         chat_id,
@@ -189,7 +204,9 @@ async def warns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target = update.effective_user
 
     history = await db.fetch(
-        "SELECT reason, issued_at FROM warnings WHERE chat_id = $1 AND user_id = $2 AND is_active = TRUE ORDER BY issued_at DESC",
+        "SELECT reason, issued_at FROM warnings "
+        "WHERE chat_id = $1 AND user_id = $2 AND is_active = TRUE "
+        "ORDER BY issued_at DESC",
         chat_id,
         target.id,
     )

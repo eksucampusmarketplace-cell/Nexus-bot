@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from telegram import Update
+from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import (
@@ -19,6 +20,21 @@ from db.client import db
 log = logging.getLogger("[MOD_BAN]")
 
 
+async def _check_bot_rights(bot, chat_id: int) -> tuple[bool, str]:
+    """Check if the bot has permission to restrict/ban users."""
+    try:
+        bot_member = await bot.get_chat_member(chat_id, bot.id)
+        if not getattr(bot_member, "can_restrict_members", False):
+            return False, (
+                "❌ I need **Ban Users** permission to do this.\n"
+                "Go to group settings → Administrators → Nexus Bot → enable 'Ban Users'."
+            )
+        return True, ""
+    except Exception:
+        # If we can't check, proceed and let Telegram reject it
+        return True, ""
+
+
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
@@ -33,6 +49,12 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
         return
 
+    # Check bot has rights
+    has_rights, error_msg = await _check_bot_rights(context.bot, chat_id)
+    if not has_rights:
+        await update.message.reply_text(error_msg, parse_mode="Markdown")
+        return
+
     reason = reason or "No reason provided"
 
     try:
@@ -42,8 +64,9 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = """
         INSERT INTO bans (chat_id, user_id, banned_by, reason)
         VALUES ($1, $2, $3, $4)
-        ON CONFLICT (chat_id, user_id) DO UPDATE 
-        SET banned_by = EXCLUDED.banned_by, reason = EXCLUDED.reason, banned_at = NOW(), is_active = TRUE, unban_at = NULL
+        ON CONFLICT (chat_id, user_id) DO UPDATE
+        SET banned_by = EXCLUDED.banned_by, reason = EXCLUDED.reason,
+            banned_at = NOW(), is_active = TRUE, unban_at = NULL
         """
         await db.execute(query, chat_id, target.id, invoker.id, reason)
 
@@ -53,9 +76,11 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         # Phase 1: Record signal for ML pipeline
-        from bot.ml.signal_collector import record_mod_action
         import asyncio
-        asyncio.create_task(record_mod_action(target.id, chat_id, 'ban', reason))
+
+        from bot.ml.signal_collector import record_mod_action
+
+        asyncio.create_task(record_mod_action(target.id, chat_id, "ban", reason))
 
         # Notify log channel
         await notify_log_channel(context.bot, chat_id, "ban", target, invoker, reason)
@@ -95,9 +120,21 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
+    except Forbidden:
+        await update.message.reply_text(
+            "❌ Cannot ban — I don't have Ban Users rights.\n"
+            "Make me admin with: Ban Users + Delete Messages permissions."
+        )
+    except BadRequest as e:
+        if "CHAT_ADMIN_REQUIRED" in str(e):
+            await update.message.reply_text("❌ I need to be an admin first.")
+        elif "user_not_found" in str(e).lower() or "USER_NOT_FOUND" in str(e):
+            await update.message.reply_text("❌ User not found in this group.")
+        else:
+            await update.message.reply_text(f"❌ Telegram error: {e}")
     except Exception as e:
-        log.error(f"Ban failed: {e}")
-        await update.message.reply_text(f"❌ Failed to ban user: {str(e)}")
+        log.error(f"Ban failed unexpectedly: {e}")
+        await update.message.reply_text("❌ Unexpected error. Check bot logs.")
 
 
 async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -184,27 +221,17 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(context.args) < 2:
             await update.message.reply_text("❌ Usage: /tban @user <time> [reason]")
             return
-        # Resolve target from first arg
-        # This is a bit complex because resolve_target expects args to be [target, reason...]
-        # Here it is [target, time, reason...]
-        # I'll manually handle it
-        target_str = context.args[0]
-        time_str = context.args[1]
-        reason = " ".join(context.args[2:]) or "No reason provided"
+        # Use resolve_target for @username support
+        # Temporarily remap args so resolve_target sees [target, ...rest]
+        original_args = context.args
+        context.args = [context.args[0]] + list(context.args[2:])  # skip time
+        target, reason = await resolve_target(update, context)
+        context.args = original_args  # restore
+        time_str = original_args[1]
+        reason = reason or "No reason provided"
 
-        try:
-            if target_str.isdigit():
-                member = await context.bot.get_chat_member(chat_id, int(target_str))
-                target = member.user
-            elif target_str.startswith("@"):
-                # Still hard to resolve username to user object without more context
-                await update.message.reply_text("❌ Mention the user or use their ID.")
-                return
-            else:
-                await update.message.reply_text("❌ Invalid target.")
-                return
-        except Exception:
-            await update.message.reply_text("❌ User not found.")
+        if not target:
+            await update.message.reply_text(ERRORS["no_target"])
             return
 
     duration = parse_time(time_str)
@@ -215,6 +242,12 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
     if not allowed:
         await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        return
+
+    # Check bot has rights
+    has_rights, error_msg = await _check_bot_rights(context.bot, chat_id)
+    if not has_rights:
+        await update.message.reply_text(error_msg, parse_mode="Markdown")
         return
 
     from datetime import timezone
@@ -228,8 +261,9 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = """
         INSERT INTO bans (chat_id, user_id, banned_by, reason, unban_at)
         VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (chat_id, user_id) DO UPDATE 
-        SET banned_by = EXCLUDED.banned_by, reason = EXCLUDED.reason, banned_at = NOW(), is_active = TRUE, unban_at = EXCLUDED.unban_at
+        ON CONFLICT (chat_id, user_id) DO UPDATE
+        SET banned_by = EXCLUDED.banned_by, reason = EXCLUDED.reason,
+            banned_at = NOW(), is_active = TRUE, unban_at = EXCLUDED.unban_at
         """
         await db.execute(query, chat_id, target.id, invoker.id, reason, unban_at)
 
@@ -268,8 +302,21 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Unban time: {unban_at.strftime('%Y-%m-%d %H:%M')} UTC",
             parse_mode="Markdown",
         )
+    except Forbidden:
+        await update.message.reply_text(
+            "❌ Cannot temp-ban — I don't have Ban Users rights.\n"
+            "Make me admin with: Ban Users + Delete Messages permissions."
+        )
+    except BadRequest as e:
+        if "CHAT_ADMIN_REQUIRED" in str(e):
+            await update.message.reply_text("❌ I need to be an admin first.")
+        elif "user_not_found" in str(e).lower() or "USER_NOT_FOUND" in str(e):
+            await update.message.reply_text("❌ User not found in this group.")
+        else:
+            await update.message.reply_text(f"❌ Telegram error: {e}")
     except Exception as e:
-        await update.message.reply_text(f"❌ Failed to tban: {e}")
+        log.error(f"Tban failed unexpectedly: {e}")
+        await update.message.reply_text("❌ Unexpected error. Check bot logs.")
 
 
 async def sban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -290,15 +337,21 @@ async def sban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.ban_chat_member(chat_id, target.id)
         await update.message.delete()
         # Still log and publish event
-        from bot.ml.signal_collector import record_mod_action
         import asyncio
-        asyncio.create_task(record_mod_action(target.id, chat_id, 'ban', reason))
-        
+
+        from bot.ml.signal_collector import record_mod_action
+
+        asyncio.create_task(record_mod_action(target.id, chat_id, "ban", reason))
+
         await log_action(
             chat_id, "sban", target.id, target.full_name, invoker.id, invoker.full_name, reason
         )
         await publish_event(
             chat_id, "mod_action", {"action": "ban", "target_id": target.id, "silent": True}
         )
-    except Exception:
-        pass
+    except Forbidden:
+        log.warning(f"[SBAN] Bot lacks ban rights in chat {chat_id}")
+    except BadRequest as e:
+        log.debug(f"[SBAN] BadRequest: {e}")
+    except Exception as e:
+        log.debug(f"[SBAN] Failed: {e}")

@@ -4,7 +4,18 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from bot.handlers.moderation.utils import ERRORS, check_permissions, log_action
+from bot.handlers.moderation.utils import ERRORS, log_action
+
+log = logging.getLogger("[MOD_PURGE]")
+
+
+async def _auto_delete(message, delay: int = 5):
+    """Auto-delete a message after delay seconds."""
+    await asyncio.sleep(delay)
+    try:
+        await message.delete()
+    except Exception:
+        pass
 
 
 async def purge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19,6 +30,9 @@ async def purge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     message = update.effective_message
+    # Get message_thread_id for topic-aware purge (forum groups)
+    thread_id = message.message_thread_id
+
     if message.reply_to_message:
         # Purge from replied message to now
         start_id = message.reply_to_message.message_id
@@ -35,8 +49,9 @@ async def purge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Batch delete
+    # Track actual deleted count
     count_deleted = 0
+
     # Telegram allows deleting max 100 messages at once
     for i in range(0, len(message_ids), 100):
         batch = message_ids[i : i + 100]
@@ -50,14 +65,17 @@ async def purge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     await context.bot.delete_message(chat_id, mid)
                     count_deleted += 1
                 except Exception:
-                    pass
+                    continue  # Message doesn't exist or already deleted
 
-    confirm = await update.message.reply_text(f"🗑️ Purged {count_deleted} messages")
-    await asyncio.sleep(5)
-    try:
-        await confirm.delete()
-    except Exception:
-        pass
+    # Send confirmation with message_thread_id for forum groups
+    confirm = await context.bot.send_message(
+        chat_id,
+        f"🧹 Purged ~{count_deleted} messages.",
+        message_thread_id=thread_id,
+    )
+
+    # Auto-delete confirmation after 5 seconds
+    asyncio.create_task(_auto_delete(confirm, 5))
 
     await log_action(
         chat_id,
@@ -91,7 +109,9 @@ async def delall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not update.message.reply_to_message:
-        await update.message.reply_text("❌ Reply to a message to delete all messages from that user.")
+        await update.message.reply_text(
+            "❌ Reply to a message to delete all messages from that user."
+        )
         return
 
     target_user = update.message.reply_to_message.from_user
@@ -111,19 +131,26 @@ async def delall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-    confirm = await update.message.reply_text(f"🗑️ Attempted to delete up to 200 recent messages.")
+    confirm = await update.message.reply_text("🗑️ Attempted to delete up to 200 recent messages.")
     await asyncio.sleep(5)
     try:
         await confirm.delete()
     except Exception:
         pass
 
-    await log_action(chat_id, "delall", target_user.id, target_user.full_name, invoker.id, invoker.full_name, f"Deleted all messages")
+    await log_action(
+        chat_id,
+        "delall",
+        target_user.id,
+        target_user.full_name,
+        invoker.id,
+        invoker.full_name,
+        "Deleted all messages",
+    )
 
 
 async def purgeme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
-    invoker = update.effective_user
 
     msg_id = update.message.message_id
     count = 50
@@ -135,7 +162,7 @@ async def purgeme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     deleted = 0
     for i in range(0, len(message_ids), 100):
-        batch = message_ids[i:i + 100]
+        batch = message_ids[i : i + 100]
         try:
             await context.bot.delete_messages(chat_id, batch)
             deleted += len(batch)

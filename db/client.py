@@ -188,7 +188,7 @@ class Database:
                     updated_at TIMESTAMPTZ DEFAULT NOW(),
                     last_seen TIMESTAMPTZ DEFAULT NOW(),
                     death_reason TEXT,
-                    group_limit INT DEFAULT 1 CHECK (group_limit BETWEEN 1 AND 20),
+                    group_limit INT DEFAULT 1 CHECK (group_limit BETWEEN 0 AND 20),
                     group_access_policy TEXT DEFAULT 'blocked' CHECK (group_access_policy IN ('open','approval','blocked')),
                     bot_add_notifications BOOLEAN DEFAULT FALSE,
                     plan VARCHAR DEFAULT 'free',
@@ -253,7 +253,7 @@ class Database:
                 ALTER TABLE actions_log ADD COLUMN IF NOT EXISTS bot_token_hash TEXT;
 
                 -- Ensure columns exist in bots table for existing installations
-                ALTER TABLE bots ADD COLUMN IF NOT EXISTS group_limit INT DEFAULT 1 CHECK (group_limit BETWEEN 1 AND 20);
+                ALTER TABLE bots ADD COLUMN IF NOT EXISTS group_limit INT DEFAULT 1 CHECK (group_limit BETWEEN 0 AND 20);
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS group_access_policy TEXT DEFAULT 'blocked' CHECK (group_access_policy IN ('open','approval','blocked'));
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS bot_add_notifications BOOLEAN DEFAULT FALSE;
                 ALTER TABLE bots ADD COLUMN IF NOT EXISTS is_primary BOOLEAN DEFAULT FALSE;

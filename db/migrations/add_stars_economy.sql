@@ -34,6 +34,9 @@ CREATE INDEX IF NOT EXISTS idx_bonus_stars_owner
     ON bonus_stars(owner_id, created_at DESC);
 
 -- ── Bonus Stars balance view ──────────────────────────────────────────────
+-- Drop the table version if it exists (created by add_billing_tables.sql)
+-- and replace with the correct VIEW that aggregates from the ledger.
+DROP TABLE IF EXISTS bonus_stars_balance;
 CREATE OR REPLACE VIEW bonus_stars_balance AS
 SELECT owner_id, COALESCE(SUM(amount), 0) AS balance
 FROM bonus_stars

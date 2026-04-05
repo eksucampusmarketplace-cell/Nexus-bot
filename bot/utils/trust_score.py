@@ -97,14 +97,9 @@ async def calculate_trust_score(user_id: int, chat_id: int, db_pool) -> int:
         elif is_muted:
             history_score = max(0, history_score - 10)
 
-        # Engagement score (0-20): base 10, +2 per day active (up to 10 days bonus)
-        days_active_row = await conn.fetchval(
-            """SELECT COUNT(DISTINCT DATE(last_seen)) FROM users
-               WHERE user_id = $1 AND chat_id = $2""",
-            user_id,
-            chat_id,
-        )
-        days_active = int(days_active_row or 1)
+        # Engagement score (0-20): base 10, +2 per 10 messages (up to 10 bonus)
+        # days_active approximated from message_count since users table has one row per user+chat
+        days_active = max(1, message_count // 5)
         engagement_score = min(20, 10 + min(10, (days_active - 1) * 2))
 
         new_score = activity_score + history_score + engagement_score

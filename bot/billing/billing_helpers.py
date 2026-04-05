@@ -13,13 +13,12 @@ Key functions:
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Tuple
+from datetime import datetime, timezone
+from typing import Tuple
 
 import asyncpg
 
 from bot.billing.plans import PLANS, get_plan, get_clone_bot_limit, get_primary_bot_limit
-from db.client import db
 
 logger = logging.getLogger("billing_helpers")
 
@@ -37,33 +36,33 @@ async def get_bot_plan(db_pool: asyncpg.Pool, bot_id: int) -> str:
       - 'trial_expired': Trial ended
       - 'basic', 'starter', 'pro', 'unlimited': Paid plans
     """
+    now = datetime.now(timezone.utc)
+
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT plan, trial_ends_at, is_primary FROM bots WHERE bot_id = $1",
             bot_id
         )
 
-    if not row:
-        logger.warning(f"[BILLING] Bot not found: {bot_id}")
-        return "free"
+        if not row:
+            logger.warning(f"[BILLING] Bot not found: {bot_id}")
+            return "free"
 
-    plan = row["plan"]
-    is_primary = row["is_primary"]
+        plan = row["plan"]
+        is_primary = row["is_primary"]
 
-    # Check trial expiration
-    if plan == "trial":
-        trial_ends_at = row["trial_ends_at"]
-        if trial_ends_at and trial_ends_at.replace(tzinfo=None) < datetime.utcnow():
-            # Trial expired - update DB and return trial_expired
-            await conn.execute(
-                "UPDATE bots SET plan = 'trial_expired' WHERE bot_id = $1",
-                bot_id
-            )
-            return "trial_expired"
+        if plan == "trial":
+            trial_ends_at = row["trial_ends_at"]
+            if trial_ends_at:
+                trial_dt = trial_ends_at if trial_ends_at.tzinfo else trial_ends_at.replace(tzinfo=timezone.utc)
+                if trial_dt < now:
+                    await conn.execute(
+                        "UPDATE bots SET plan = 'trial_expired' WHERE bot_id = $1",
+                        bot_id
+                    )
+                    return "trial_expired"
 
-    # Primary bot's plan is determined by owner's subscription
-    if is_primary:
-        async with db_pool.acquire() as conn:
+        if is_primary:
             owner_row = await conn.fetchrow("""
                 SELECT plan, plan_expires_at
                 FROM billing_subscriptions
@@ -72,14 +71,16 @@ async def get_bot_plan(db_pool: asyncpg.Pool, bot_id: int) -> str:
                 LIMIT 1
             """, bot_id)
 
-        if owner_row:
-            owner_plan = owner_row["plan"]
-            # Check if subscription expired
-            if owner_row["plan_expires_at"] and owner_row["plan_expires_at"].replace(tzinfo=None) < datetime.utcnow():
-                owner_plan = "free"
-            return owner_plan if owner_plan in PLANS else "free"
+            if owner_row:
+                owner_plan = owner_row["plan"]
+                if owner_row["plan_expires_at"]:
+                    exp = owner_row["plan_expires_at"]
+                    exp_dt = exp if exp.tzinfo else exp.replace(tzinfo=timezone.utc)
+                    if exp_dt < now:
+                        owner_plan = "free"
+                return owner_plan if owner_plan in PLANS else "free"
 
-        return "free"
+            return "free"
 
     return plan if plan in PLANS else "free"
 
@@ -191,7 +192,7 @@ def should_ignore_message(bot_plan: str, is_private_chat_with_owner: bool = Fals
     return True
 
 
-async def enforce_trial_limits(db_pool: asyncpg.Pool, bot_id: int, context) -> bool:
+async def enforce_trial_limits(db_pool: asyncpg.Pool, bot_id: int, update, context) -> bool:
     """
     Check if bot should skip processing due to trial expiration.
 
@@ -201,31 +202,29 @@ async def enforce_trial_limits(db_pool: asyncpg.Pool, bot_id: int, context) -> b
         True if processing should continue, False if should ignore
 
     Usage in handlers:
-        if not await enforce_trial_limits(db_pool, bot_id, context):
+        if not await enforce_trial_limits(db_pool, bot_id, update, context):
             return
     """
     plan = await get_bot_plan(db_pool, bot_id)
 
-    # Check if should ignore
     if plan == "trial_expired":
-        # Check if this is private chat with owner
-        is_private = context.chat and context.chat.type == "private"
+        chat = update.effective_chat
+        is_private = chat and chat.type == "private"
 
         if is_private:
-            # Check if this is the owner
             async with db_pool.acquire() as conn:
                 owner_id = await conn.fetchval(
                     "SELECT owner_user_id FROM bots WHERE bot_id = $1",
                     bot_id
                 )
 
-            if context.effective_user_id == owner_id:
-                # Allow /start and /help commands only
-                message_text = context.message and context.message.text
-                if message_text and message_text in ("/start", "/help"):
+            user = update.effective_user
+            if user and user.id == owner_id:
+                message = update.effective_message
+                message_text = message.text if message else None
+                if message_text and message_text.split()[0] in ("/start", "/help"):
                     return True
 
-        # Ignore all other messages
         return False
 
     return True
@@ -253,9 +252,11 @@ async def get_owner_plan(db_pool: asyncpg.Pool, owner_id: int) -> str:
 
     plan = row["plan"]
 
-    # Check if expired
-    if row["plan_expires_at"] and row["plan_expires_at"].replace(tzinfo=None) < datetime.utcnow():
-        return "free"
+    if row["plan_expires_at"]:
+        exp = row["plan_expires_at"]
+        exp_dt = exp if exp.tzinfo else exp.replace(tzinfo=timezone.utc)
+        if exp_dt < datetime.now(timezone.utc):
+            return "free"
 
     return plan if plan in PLANS else "free"
 

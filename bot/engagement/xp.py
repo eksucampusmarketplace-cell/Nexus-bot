@@ -16,7 +16,7 @@ Level 2: 100 XP
 Level 3: 250 XP
 Level 4: 500 XP
 Level 5: 900 XP
-Level N: previous + (N * 150)
+Level N (N>=6): xp_for_level(N-1) + N * 150
 
 This creates a curve where early levels are quick
 (feels rewarding) and later levels take real commitment.
@@ -26,7 +26,6 @@ Double XP events multiply all earnings by 2x.
 Log prefix: [XP]
 """
 
-import asyncio
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -34,37 +33,15 @@ from typing import Optional
 log = logging.getLogger("xp")
 
 
-def calculate_level(xp: int) -> int:
-    """
-    Calculate level from total XP.
-    Uses the formula above.
-    Returns level integer (minimum 1).
-    """
-    if xp < 100:
-        return 1
-    if xp < 250:
-        return 2
-    if xp < 500:
-        return 3
-    if xp < 900:
-        return 4
-
-    level = 5
-    threshold = 900
-    increment = 5 * 150
-
-    while threshold + increment <= xp:
-        level += 1
-        threshold += increment
-        increment = level * 150
-
-    return level
-
-
 def xp_for_level(level: int) -> int:
     """
     Calculate total XP required to reach a given level.
-    Inverse of calculate_level.
+    Level 1: 0
+    Level 2: 100
+    Level 3: 250
+    Level 4: 500
+    Level 5: 900
+    Level N (N>=6): xp_for_level(N-1) + N * 150
     """
     if level <= 1:
         return 0
@@ -81,6 +58,28 @@ def xp_for_level(level: int) -> int:
     for i in range(6, level + 1):
         total += i * 150
     return total
+
+
+def calculate_level(xp: int) -> int:
+    """
+    Calculate level from total XP.
+    Uses xp_for_level as the authoritative threshold source.
+    Returns level integer (minimum 1).
+    """
+    if xp < 100:
+        return 1
+    if xp < 250:
+        return 2
+    if xp < 500:
+        return 3
+    if xp < 900:
+        return 4
+
+    level = 5
+    while xp >= xp_for_level(level + 1):
+        level += 1
+
+    return level
 
 
 def xp_to_next_level(current_xp: int) -> tuple[int, int]:
@@ -125,20 +124,15 @@ class XPEngine:
         Never raises.
         """
         try:
-            # Check rate limiting for messages
-            if reason == "message" and await self.is_rate_limited(
-                redis, chat_id, user_id
-            ):
+            if reason == "message" and await self.is_rate_limited(redis, chat_id, user_id):
                 return {"ok": False, "error": "rate_limited"}
 
-            # Check for double XP
             if redis:
                 double_xp_key = f"nexus:xp:double:{chat_id}:{bot_id}"
                 double_active = await redis.exists(double_xp_key)
                 if double_active:
                     amount *= 2
 
-            # Get current XP
             async with pool.acquire() as conn:
                 row = await conn.fetchrow(
                     """
@@ -163,32 +157,52 @@ class XPEngine:
                 new_level = calculate_level(new_xp)
                 leveled_up = new_level > current_level
 
-                # Upsert member_xp
-                await conn.execute(
-                    """
-                    INSERT INTO member_xp
-                        (chat_id, user_id, bot_id, xp, level, total_messages,
-                         last_message_at, last_xp_at, streak_days)
-                    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(),
-                        COALESCE((SELECT streak_days FROM member_xp
-                                  WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3), 0))
-                    ON CONFLICT (chat_id, user_id, bot_id)
-                    DO UPDATE SET
-                        xp = EXCLUDED.xp,
-                        level = EXCLUDED.level,
-                        total_messages = member_xp.total_messages + 1,
-                        last_message_at = NOW(),
-                        last_xp_at = NOW()
-                    """,
-                    chat_id,
-                    user_id,
-                    bot_id,
-                    new_xp,
-                    new_level,
-                    total_messages + 1,
-                )
+                is_message = reason == "message"
+                new_total_messages = total_messages + (1 if is_message else 0)
 
-                # Log transaction
+                if is_message:
+                    await conn.execute(
+                        """
+                        INSERT INTO member_xp
+                            (chat_id, user_id, bot_id, xp, level, total_messages,
+                             last_message_at, last_xp_at, streak_days)
+                        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), 0)
+                        ON CONFLICT (chat_id, user_id, bot_id)
+                        DO UPDATE SET
+                            xp = EXCLUDED.xp,
+                            level = EXCLUDED.level,
+                            total_messages = $6,
+                            last_message_at = NOW(),
+                            last_xp_at = NOW()
+                        """,
+                        chat_id,
+                        user_id,
+                        bot_id,
+                        new_xp,
+                        new_level,
+                        new_total_messages,
+                    )
+                else:
+                    await conn.execute(
+                        """
+                        INSERT INTO member_xp
+                            (chat_id, user_id, bot_id, xp, level, total_messages,
+                             last_xp_at, streak_days)
+                        VALUES ($1, $2, $3, $4, $5, $6, NOW(), 0)
+                        ON CONFLICT (chat_id, user_id, bot_id)
+                        DO UPDATE SET
+                            xp = EXCLUDED.xp,
+                            level = EXCLUDED.level,
+                            last_xp_at = NOW()
+                        """,
+                        chat_id,
+                        user_id,
+                        bot_id,
+                        new_xp,
+                        new_level,
+                        new_total_messages,
+                    )
+
                 await conn.execute(
                     """
                     INSERT INTO xp_transactions
@@ -203,7 +217,6 @@ class XPEngine:
                     given_by,
                 )
 
-            # Handle level up
             if leveled_up:
                 await self._handle_level_up(
                     pool, redis, bot, chat_id, user_id, bot_id, new_level, current_level
@@ -239,8 +252,7 @@ class XPEngine:
         """Handle level up event - check rewards, badges, announce."""
         try:
             async with pool.acquire() as conn:
-                # Get level rewards
-                rewards = await conn.fetch(
+                await conn.fetch(
                     """
                     SELECT * FROM level_rewards
                     WHERE chat_id=$1 AND bot_id=$2 AND level=$3 AND is_active=TRUE
@@ -250,7 +262,6 @@ class XPEngine:
                     new_level,
                 )
 
-                # Get level title from config
                 level_config = await conn.fetchrow(
                     """
                     SELECT title FROM level_config
@@ -260,9 +271,8 @@ class XPEngine:
                     bot_id,
                     new_level,
                 )
-                title = level_config["title"] if level_config else f"Level {new_level}"
+                level_config["title"] if level_config else f"Level {new_level}"
 
-            # Publish event to Redis for miniapp
             if redis:
                 await redis.publish(
                     f"nexus:events:{chat_id}",
@@ -274,11 +284,9 @@ class XPEngine:
                 f"[XP] User {user_id} leveled up to {new_level} in chat {chat_id}"
             )
 
-            # Check auto-role assignments on level up
             try:
                 from bot.handlers.auto_role import check_auto_roles
 
-                # Get current XP for the user
                 async with pool.acquire() as ar_conn:
                     xp_row = await ar_conn.fetchrow(
                         "SELECT xp FROM member_xp WHERE chat_id=$1 AND user_id=$2 AND bot_id=$3",
@@ -347,7 +355,6 @@ class XPEngine:
                     bot_id,
                 )
 
-                # Log transaction (negative amount)
                 await conn.execute(
                     """
                     INSERT INTO xp_transactions
@@ -373,17 +380,17 @@ class XPEngine:
     ) -> list[dict]:
         """
         Get top members by XP for a group.
-        Returns [{rank, user_id, xp, level, title}]
+        Returns [{rank, user_id, xp, level}]
         """
         try:
             async with pool.acquire() as conn:
                 rows = await conn.fetch(
                     """
                     SELECT user_id, xp, level,
-                           ROW_NUMBER() OVER (ORDER BY level DESC, xp DESC) as rank
+                           ROW_NUMBER() OVER (ORDER BY xp DESC) as rank
                     FROM member_xp
                     WHERE chat_id=$1 AND bot_id=$2
-                    ORDER BY level DESC, xp DESC
+                    ORDER BY xp DESC
                     LIMIT $3 OFFSET $4
                     """,
                     chat_id,
@@ -415,7 +422,6 @@ class XPEngine:
         """
         try:
             async with pool.acquire() as conn:
-                # Get member data
                 row = await conn.fetchrow(
                     """
                     SELECT xp, level FROM member_xp
@@ -429,21 +435,17 @@ class XPEngine:
                 if not row:
                     return {"rank": None, "total_members": 0}
 
-                # Get rank
                 rank_row = await conn.fetchrow(
                     """
                     SELECT COUNT(*) + 1 as rank
                     FROM member_xp
-                    WHERE chat_id=$1 AND bot_id=$2
-                    AND (level > $3 OR (level = $3 AND xp > $4))
+                    WHERE chat_id=$1 AND bot_id=$2 AND xp > $3
                     """,
                     chat_id,
                     bot_id,
-                    row["level"],
                     row["xp"],
                 )
 
-                # Get total members
                 total_row = await conn.fetchrow(
                     """
                     SELECT COUNT(*) as total FROM member_xp
@@ -479,7 +481,7 @@ class XPEngine:
         """
         Check if user is in cooldown for XP earning from messages.
         Redis key: nexus:xp:cooldown:{chat_id}:{user_id}
-        TTL: xp_settings.message_cooldown_s (default 60)
+        TTL: 60 seconds default
         """
         if not redis:
             return False
@@ -489,7 +491,6 @@ class XPEngine:
         if exists:
             return True
 
-        # Set cooldown (60 seconds default)
         await redis.setex(key, 60, "1")
         return False
 
@@ -498,9 +499,8 @@ class XPEngine:
     ) -> bool:
         """Enable double XP event for a group for N hours."""
         try:
-            until = datetime.now(timezone.utc) + __import__("datetime").timedelta(
-                hours=hours
-            )
+            import datetime as dt
+            until = datetime.now(timezone.utc) + dt.timedelta(hours=hours)
             async with pool.acquire() as conn:
                 await conn.execute(
                     """
@@ -534,11 +534,7 @@ class XPEngine:
                 if not row or not row["double_xp_active"]:
                     return False
 
-                # Check if expired
-                if row["double_xp_until"] and row["double_xp_until"] < datetime.now(
-                    timezone.utc
-                ):
-                    # Reset expired double XP
+                if row["double_xp_until"] and row["double_xp_until"] < datetime.now(timezone.utc):
                     await conn.execute(
                         """
                         UPDATE xp_settings
@@ -558,6 +554,15 @@ class XPEngine:
 
     async def get_xp_settings(self, pool, chat_id: int, bot_id: int) -> dict:
         """Get XP settings for a group."""
+        defaults = {
+            "enabled": True,
+            "xp_per_message": 1,
+            "xp_per_daily": 10,
+            "xp_per_game_win": 5,
+            "xp_per_game_play": 1,
+            "message_cooldown_s": 60,
+            "level_up_announce": True,
+        }
         try:
             async with pool.acquire() as conn:
                 row = await conn.fetchrow(
@@ -580,25 +585,8 @@ class XPEngine:
                         "level_up_announce": row["level_up_announce"],
                     }
 
-                # Return defaults
-                return {
-                    "enabled": True,
-                    "xp_per_message": 1,
-                    "xp_per_daily": 10,
-                    "xp_per_game_win": 5,
-                    "xp_per_game_play": 1,
-                    "message_cooldown_s": 60,
-                    "level_up_announce": True,
-                }
+                return defaults
 
         except Exception as e:
             self.log.error(f"[XP] Error getting XP settings: {e}")
-            return {
-                "enabled": True,
-                "xp_per_message": 1,
-                "xp_per_daily": 10,
-                "xp_per_game_win": 5,
-                "xp_per_game_play": 1,
-                "message_cooldown_s": 60,
-                "level_up_announce": True,
-            }
+            return defaults

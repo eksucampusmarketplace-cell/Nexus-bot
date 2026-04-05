@@ -179,50 +179,44 @@ def get_plans_for_display() -> List[dict]:
     return display_plans
 
 
-def can_add_clone_bot(db_pool, owner_id: int) -> tuple[bool, str]:
+async def can_add_clone_bot(db_pool, owner_id: int) -> tuple[bool, str]:
     """
     Check if owner can add another clone bot based on their plan.
 
     Returns (can_add, error_message)
     """
-    import asyncpg
+    from datetime import datetime, timezone
     from db.ops.bots import get_bots_by_owner
 
-    async def check():
-        # Get owner's current plan
-        async with db_pool.acquire() as conn:
-            # Find owner's plan from their most recent purchase or default to free
-            row = await conn.fetchrow("""
-                SELECT plan, plan_expires_at
-                FROM billing_subscriptions
-                WHERE owner_id = $1
-                ORDER BY created_at DESC
-                LIMIT 1
-            """, owner_id)
+    async with db_pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT plan, plan_expires_at
+            FROM billing_subscriptions
+            WHERE owner_id = $1
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, owner_id)
 
-        if not row:
-            # No subscription, check free plan
-            plan_config = PLANS["free"]
-        else:
-            plan_key = row["plan"]
-            plan_config = PLANS.get(plan_key, PLANS["free"])
+    if not row:
+        plan_config = PLANS["free"]
+    else:
+        plan_key = row["plan"]
+        plan_config = PLANS.get(plan_key, PLANS["free"])
 
-            # Check if plan expired
-            if row["plan_expires_at"] and row["plan_expires_at"].replace(tzinfo=None) < datetime.utcnow():
+        if row["plan_expires_at"]:
+            exp = row["plan_expires_at"]
+            exp_dt = exp if exp.tzinfo else exp.replace(tzinfo=timezone.utc)
+            if exp_dt < datetime.now(timezone.utc):
                 plan_config = PLANS["free"]
 
-        # Count current clone bots
-        bots = await get_bots_by_owner(db_pool, owner_id)
-        clone_count = sum(1 for b in bots if not b.get("is_primary", False))
+    bots = await get_bots_by_owner(db_pool, owner_id)
+    clone_count = sum(1 for b in bots if not b.get("is_primary", False))
 
-        max_clones = plan_config["clone_bots"]
+    max_clones = plan_config["clone_bots"]
 
-        if clone_count >= max_clones:
-            return False, f"You've reached your plan limit of {max_clones} clone bots. Upgrade to add more."
+    if clone_count >= max_clones:
+        return False, f"You've reached your plan limit of {max_clones} clone bots. Upgrade to add more."
 
-        return True, ""
-
-    # For now, return synchronous (will be used in async context)
     return True, ""
 
 

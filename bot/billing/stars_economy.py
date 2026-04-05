@@ -37,9 +37,12 @@ log = logging.getLogger("economy")
 
 
 async def get_bonus_balance(db, owner_id: int) -> int:
-    """Get current bonus Stars balance for owner."""
-    row = await db.fetchrow("SELECT balance FROM bonus_stars_balance WHERE owner_id=$1", owner_id)
-    return row["balance"] if row else 0
+    """Get current bonus Stars balance for owner by summing the ledger."""
+    row = await db.fetchrow(
+        "SELECT COALESCE(SUM(amount), 0) AS balance FROM bonus_stars WHERE owner_id=$1",
+        owner_id,
+    )
+    return max(0, int(row["balance"])) if row else 0
 
 
 async def grant_bonus_stars(

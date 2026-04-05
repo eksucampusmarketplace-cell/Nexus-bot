@@ -53,7 +53,7 @@ def support_keyboard(
         if docs_url:
             buttons.append([InlineKeyboardButton("📚 Help & Docs", url=docs_url)])
 
-    # Privacy Policy button — fall back to the app's own /privacy page
+    # Privacy Policy button — fall back to /privacy redirect
     if include_privacy:
         privacy_url = settings.PRIVACY_POLICY_URL or (
             f"{settings.webhook_url}/privacy" if settings.RENDER_EXTERNAL_URL else None

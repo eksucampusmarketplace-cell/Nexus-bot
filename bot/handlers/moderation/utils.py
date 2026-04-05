@@ -19,6 +19,18 @@ RANK_RESTRICTED = 1
 RANK_BANNED = 0
 
 
+def _make_fake_user(row) -> User:
+    """Create minimal User-like object from DB row for banned/left users."""
+    from telegram import User as TGUser
+
+    return TGUser(
+        id=row["user_id"],
+        first_name=row.get("first_name") or "Unknown",
+        is_bot=False,
+        username=row.get("username"),
+    )
+
+
 async def resolve_target(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> Tuple[Optional[User], Optional[str]]:
@@ -33,6 +45,7 @@ async def resolve_target(
     """
     message = update.effective_message
     args = context.args
+    chat_id = update.effective_chat.id
 
     if message.reply_to_message:
         target_user = message.reply_to_message.from_user
@@ -49,27 +62,38 @@ async def resolve_target(
     if target_str.isdigit() or (target_str.startswith("-") and target_str[1:].isdigit()):
         try:
             user_id = int(target_str)
-            member = await context.bot.get_chat_member(update.effective_chat.id, user_id)
+            member = await context.bot.get_chat_member(chat_id, user_id)
             return member.user, reason
         except BadRequest:
             pass
 
-    # Bug #5 fix: Resolve @username via DB lookup or get_chat_member
+    # Resolve @username via DB lookup
     if target_str.startswith("@"):
         username = target_str[1:]  # Remove the @ prefix
-        # Try to find user_id from DB first
         try:
             row = await db.fetchrow(
-                "SELECT user_id FROM users WHERE LOWER(username) = LOWER($1)",
+                "SELECT user_id, first_name, username FROM users WHERE LOWER(username) = LOWER($1)",
                 username,
             )
             if row:
-                member = await context.bot.get_chat_member(
-                    update.effective_chat.id, row["user_id"]
-                )
-                return member.user, reason
-        except Exception:
-            pass
+                try:
+                    member = await context.bot.get_chat_member(chat_id, row["user_id"])
+                    return member.user, reason
+                except BadRequest:
+                    # User left but we have their ID — return a synthetic user object
+                    # by fetching from users table
+                    user_row = await db.fetchrow(
+                        "SELECT user_id, first_name, username FROM users WHERE user_id=$1",
+                        row["user_id"],
+                    )
+                    if user_row:
+                        return _make_fake_user(user_row), reason
+                    return None, f"@{username} is not in this group"
+            else:
+                return None, f"@{username} not found in bot database"
+        except Exception as e:
+            log.warning(f"resolve_target username lookup failed: {e}")
+            return None, f"Could not resolve @{username}"
 
     return None, "User not found or invalid format."
 
@@ -140,8 +164,9 @@ async def log_action(
 ):
     """Write to mod_logs table"""
     query = """
-    INSERT INTO mod_logs (chat_id, action, target_id, target_name, admin_id, admin_name, reason, duration)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    INSERT INTO mod_logs (
+        chat_id, action, target_id, target_name, admin_id, admin_name, reason, duration
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     """
     await db.execute(
         query, chat_id, action, target_id, target_name, admin_id, admin_name, reason, duration
@@ -177,13 +202,15 @@ async def notify_log_channel(
     chat = await bot.get_chat(chat_id)
 
     text = f"🔨 {action.upper()} | {chat.title}\n"
-    text += f"👤 User: {target_user.full_name} (@{target_user.username if target_user.username else 'N/A'}) [{target_user.id}]\n"
-    text += f"👮 Admin: {admin_user.full_name} (@{admin_user.username if admin_user.username else 'N/A'})\n"
+    username = target_user.username or "N/A"
+    admin_username = admin_user.username or "N/A"
+    text += f"👤 User: {target_user.full_name} (@{username}) [{target_user.id}]\n"
+    text += f"👮 Admin: {admin_user.full_name} (@{admin_username})\n"
     text += f"📋 Reason: {reason}\n"
     if duration:
         text += f"⏱ Duration: {duration}\n"
     else:
-        text += f"⏱ Duration: permanent\n"
+        text += "⏱ Duration: permanent\n"
     text += f"🕐 Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')}"
 
     try:
@@ -246,19 +273,20 @@ async def send_and_auto_delete(message, text: str, delay: int = 30):
 
 class EventBus:
     """In-memory event bus for single-process deployments without Redis."""
+
     _handlers = {}
-    
+
     @classmethod
     def subscribe(cls, chat_id: int, handler):
         if chat_id not in cls._handlers:
             cls._handlers[chat_id] = []
         cls._handlers[chat_id].append(handler)
-    
+
     @classmethod
     def unsubscribe(cls, chat_id: int, handler):
         if chat_id in cls._handlers:
             cls._handlers[chat_id] = [h for h in cls._handlers[chat_id] if h != handler]
-    
+
     @classmethod
     async def publish(cls, chat_id: int, event_type: str, data: dict):
         payload = {
@@ -288,7 +316,7 @@ async def publish_event(chat_id: int, event_type: str, data: dict):
         "timestamp": datetime.now(timezone.utc).isoformat(),
         **data,
     }
-    
+
     # Try Redis first
     if db.redis:
         try:
@@ -296,7 +324,7 @@ async def publish_event(chat_id: int, event_type: str, data: dict):
             return
         except Exception as e:
             log.debug(f"[EVENTS] Redis publish failed: {e}")
-    
+
     # Fall back to in-memory event bus
     try:
         await EventBus.publish(chat_id, event_type, data)

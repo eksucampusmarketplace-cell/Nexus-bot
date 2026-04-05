@@ -68,6 +68,7 @@ class NexusScheduler:
         self._tasks = [
             asyncio.create_task(self._message_loop()),
             asyncio.create_task(self._silent_time_loop()),
+            asyncio.create_task(self._name_history_purge_loop()),  # F-06: Auto-purge old name history
         ]
         log.info("[SCHEDULER] Started")
 
@@ -254,6 +255,65 @@ class NexusScheduler:
                 await self.bot.send_message(chat_id=chat_id, text=text)
         except Exception as e:
             log.warning(f"[SCHEDULER] Silent disable failed | chat={chat_id} err={e}")
+
+    # F-06: Name History Purge Extension
+    async def _name_history_purge_loop(self):
+        """Runs nightly to purge old name history records based on retention settings."""
+        # Wait a bit before first run to not interfere with startup
+        await asyncio.sleep(300)  # 5 minutes
+        
+        while True:
+            try:
+                await self._purge_old_name_history()
+            except asyncpg.UndefinedTableError as e:
+                log.warning(f"[SCHEDULER] Name history table missing — run migrations: {e}")
+                await asyncio.sleep(3600)
+                continue
+            except asyncpg.UndefinedColumnError as e:
+                log.warning(f"[SCHEDULER] Column missing — run migrations: {e}")
+                await asyncio.sleep(3600)
+                continue
+            except Exception as e:
+                log.error(f"[SCHEDULER] Name history purge error: {e}")
+            
+            # Run once per day
+            await asyncio.sleep(86400)
+
+    async def _purge_old_name_history(self):
+        """Delete name history records older than retention period for each group."""
+        async with self.db.acquire() as conn:
+            # Find all groups with name history enabled and retention > 0
+            rows = await conn.fetch(
+                """SELECT chat_id, name_history_retention_days 
+                   FROM groups 
+                   WHERE name_history_enabled = TRUE 
+                     AND COALESCE(name_history_retention_days, 0) > 0"""
+            )
+        
+        total_deleted = 0
+        for row in rows:
+            chat_id = row["chat_id"]
+            retention_days = row["name_history_retention_days"]
+            
+            try:
+                async with self.db.acquire() as conn:
+                    result = await conn.execute(
+                        """DELETE FROM user_name_history 
+                           WHERE source_chat_id = $1 
+                             AND changed_at < NOW() - INTERVAL '$2 days'""",
+                        chat_id, retention_days
+                    )
+                    # Extract count from result (e.g., "DELETE 42")
+                    deleted = int(result.split()[1]) if result and len(result.split()) > 1 else 0
+                    total_deleted += deleted
+                    
+                    if deleted > 0:
+                        log.info(f"[SCHEDULER] Purged {deleted} old name history records for chat={chat_id} (retention={retention_days}d)")
+            except Exception as e:
+                log.warning(f"[SCHEDULER] Failed to purge name history for chat={chat_id}: {e}")
+        
+        if total_deleted > 0:
+            log.info(f"[SCHEDULER] Total name history records purged: {total_deleted}")
 
 
 def _calc_next_send(msg: dict) -> datetime:

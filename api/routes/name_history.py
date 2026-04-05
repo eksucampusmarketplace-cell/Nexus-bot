@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 class HistorySettings(BaseModel):
     enabled: bool = False
     limit: int = 10
+    retention_days: int = 0  # F-06: retention period (0 = never purge)
 
 
 @router.get("")
@@ -27,7 +28,7 @@ async def get_history_settings(chat_id: int, user: dict = Depends(require_auth))
     try:
         async with db.pool.acquire() as conn:
             row = await conn.fetchrow(
-                """SELECT name_history_enabled, name_history_limit
+                """SELECT name_history_enabled, name_history_limit, name_history_retention_days
                    FROM groups WHERE chat_id = $1""",
                 chat_id,
             )
@@ -38,6 +39,7 @@ async def get_history_settings(chat_id: int, user: dict = Depends(require_auth))
         return {
             "enabled": row["name_history_enabled"] if row else False,
             "limit": row["name_history_limit"] if row else 10,
+            "retention_days": row["name_history_retention_days"] if row else 0,
         }
     except HTTPException:
         raise
@@ -53,6 +55,7 @@ async def save_history_settings(
     """Save name history settings for a group."""
     try:
         async with db.pool.acquire() as conn:
+            # Check which columns exist
             await conn.execute(
                 """UPDATE groups 
                    SET name_history_enabled = $1, name_history_limit = $2
@@ -61,8 +64,19 @@ async def save_history_settings(
                 settings.limit,
                 chat_id,
             )
+            # Try to update retention_days if the column exists
+            try:
+                await conn.execute(
+                    """UPDATE groups 
+                       SET name_history_retention_days = $1
+                       WHERE chat_id = $2""",
+                    settings.retention_days,
+                    chat_id,
+                )
+            except Exception:
+                pass  # Column may not exist yet
 
-        return {"ok": True, "enabled": settings.enabled, "limit": settings.limit}
+        return {"ok": True, "enabled": settings.enabled, "limit": settings.limit, "retention_days": settings.retention_days}
     except Exception as e:
         logger.error(f"Failed to save history settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to save history settings")
@@ -126,3 +140,194 @@ async def get_recent_name_changes(chat_id: int, user: dict = Depends(require_aut
     except Exception as e:
         logger.error(f"Failed to get recent name changes: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch name history")
+
+
+# F-01: Username Change Leaderboard
+@router.get("/stats")
+async def get_name_change_stats(chat_id: int, user: dict = Depends(require_auth)):
+    """Get name change statistics (leaderboard) for a group."""
+    try:
+        async with db.pool.acquire() as conn:
+            # Get top 20 users by name change count
+            rows = await conn.fetch(
+                """SELECT 
+                    user_id,
+                    COUNT(*) as change_count,
+                    MAX(changed_at) as last_changed,
+                    -- Get most recent name for this user
+                    (SELECT CASE
+                        WHEN last_name IS NOT NULL AND last_name != '' 
+                        THEN COALESCE(NULLIF(first_name,''), username, 'Unknown') || ' ' || last_name
+                        ELSE COALESCE(NULLIF(first_name,''), username, 'Unknown')
+                     END 
+                     FROM user_name_history u2 
+                     WHERE u2.user_id = u1.user_id AND u2.source_chat_id = u1.source_chat_id
+                     ORDER BY changed_at DESC LIMIT 1) as user_name
+                   FROM user_name_history u1
+                   WHERE source_chat_id = $1
+                   GROUP BY user_id, source_chat_id
+                   ORDER BY change_count DESC
+                   LIMIT 20""",
+                chat_id,
+            )
+
+        return [
+            {
+                "user_id": r["user_id"],
+                "user_name": r["user_name"] or "Unknown",
+                "change_count": r["change_count"],
+                "last_changed": r["last_changed"].isoformat() if r["last_changed"] else None,
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"Failed to get name change stats: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch name change statistics")
+
+
+# F-03: Search Name History by Old Name
+@router.get("/search")
+async def search_name_history(chat_id: int, q: str = "", user: dict = Depends(require_auth)):
+    """Search name history by old name or username."""
+    if not q or len(q) < 2:
+        raise HTTPException(status_code=400, detail="Search query must be at least 2 characters")
+    
+    try:
+        search_term = f"%{q.lower()}%"
+        async with db.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT DISTINCT ON (user_id)
+                    user_id,
+                    first_name,
+                    last_name,
+                    username,
+                    old_first_name,
+                    old_last_name,
+                    old_username,
+                    changed_at,
+                    CASE
+                        WHEN LOWER(old_first_name) LIKE $2 THEN 'first_name'
+                        WHEN LOWER(old_last_name) LIKE $2 THEN 'last_name'
+                        WHEN LOWER(old_username) LIKE $2 THEN 'username'
+                        ELSE 'name'
+                    END as matched_field,
+                    CASE
+                        WHEN LOWER(old_first_name) LIKE $2 THEN old_first_name
+                        WHEN LOWER(old_last_name) LIKE $2 THEN old_last_name
+                        WHEN LOWER(old_username) LIKE $2 THEN old_username
+                        ELSE old_first_name
+                    END as matched_value
+                   FROM user_name_history
+                   WHERE source_chat_id = $1
+                     AND (LOWER(old_first_name) LIKE $2 
+                          OR LOWER(old_last_name) LIKE $2 
+                          OR LOWER(old_username) LIKE $2)
+                   ORDER BY user_id, changed_at DESC""",
+                chat_id,
+                search_term,
+            )
+
+        return [
+            {
+                "user_id": r["user_id"],
+                "current_name": f"{r['first_name'] or ''} {r['last_name'] or ''}".strip() or r['username'] or "Unknown",
+                "matched_field": r["matched_field"],
+                "matched_value": r["matched_value"],
+                "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"Failed to search name history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to search name history")
+
+
+# F-04: Name Change Timeline per User
+@router.get("/user/{user_id}")
+async def get_user_name_timeline(chat_id: int, user_id: int, user: dict = Depends(require_auth)):
+    """Get full name change timeline for a specific user."""
+    try:
+        async with db.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT 
+                    old_first_name,
+                    old_last_name,
+                    old_username,
+                    first_name,
+                    last_name,
+                    username,
+                    changed_at
+                   FROM user_name_history
+                   WHERE user_id = $1 AND source_chat_id = $2
+                   ORDER BY changed_at ASC""",
+                user_id,
+                chat_id,
+            )
+
+        timeline = []
+        for r in rows:
+            old_name = f"{r['old_first_name'] or ''} {r['old_last_name'] or ''}".strip() or r['old_username'] or "(unknown)"
+            new_name = f"{r['first_name'] or ''} {r['last_name'] or ''}".strip() or r['username'] or "(unknown)"
+            
+            # Determine change type
+            name_changed = (r['old_first_name'] != r['first_name']) or (r['old_last_name'] != r['last_name'])
+            username_changed = r['old_username'] != r['username']
+            
+            if username_changed and not name_changed:
+                change_type = "username"
+            elif name_changed and not username_changed:
+                change_type = "name"
+            else:
+                change_type = "both"
+            
+            timeline.append({
+                "old_name": old_name,
+                "new_name": new_name,
+                "old_username": r['old_username'],
+                "new_username": r['username'],
+                "change_type": change_type,
+                "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
+            })
+
+        return timeline
+    except Exception as e:
+        logger.error(f"Failed to get user timeline: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user timeline")
+
+
+# F-05: Export Name History as CSV
+@router.get("/export")
+async def export_name_history(chat_id: int, user: dict = Depends(require_auth)):
+    """Export all name history for a group as JSON (frontend converts to CSV)."""
+    try:
+        async with db.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT 
+                    user_id,
+                    old_first_name,
+                    old_last_name,
+                    old_username,
+                    first_name,
+                    last_name,
+                    username,
+                    changed_at
+                   FROM user_name_history
+                   WHERE source_chat_id = $1
+                   ORDER BY changed_at DESC""",
+                chat_id,
+            )
+
+        return [
+            {
+                "user_id": r["user_id"],
+                "old_name": f"{r['old_first_name'] or ''} {r['old_last_name'] or ''}".strip() or r['old_username'] or "",
+                "new_name": f"{r['first_name'] or ''} {r['last_name'] or ''}".strip() or r['username'] or "",
+                "old_username": r["old_username"] or "",
+                "new_username": r["username"] or "",
+                "changed_at": r["changed_at"].isoformat() if r["changed_at"] else None,
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"Failed to export name history: {e}")
+        raise HTTPException(status_code=500, detail="Failed to export name history")

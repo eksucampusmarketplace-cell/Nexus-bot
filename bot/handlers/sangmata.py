@@ -110,6 +110,10 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
 
                 log.debug(f"[SANGMATA] Change detected for {user.id}: {'; '.join(changes)}")
+                
+                # F-02: Send real-time alert if enabled
+                await _maybe_send_alert(context.bot, chat.id, user.id, prev_first, prev_last, prev_username,
+                                       current_first, current_last, current_username, conn)
             
             # Create/update snapshot using upsert (NH-01 fix: ON CONFLICT to prevent crashes)
             snapshot_id = await conn.fetchval(
@@ -241,8 +245,68 @@ async def track_name_change_chat_member(update: Update, context: ContextTypes.DE
             )
             
             log.debug(f"[SANGMATA] ChatMember change detected for {new_user.id}: {'; '.join(changes)}")
+            
+            # F-02: Send real-time alert if enabled
+            await _maybe_send_alert(context.bot, chat.id, new_user.id,
+                                   old_user.first_name or "", old_user.last_name or "", old_user.username or "",
+                                   new_user.first_name or "", new_user.last_name or "", new_user.username or "",
+                                   conn)
     except Exception as e:
         log.error(f"[SANGMATA] ChatMember tracking error: {e}")
+
+
+async def _maybe_send_alert(bot, chat_id: int, user_id: int,
+                            old_first: str, old_last: str, old_username: str,
+                            new_first: str, new_last: str, new_username: str,
+                            conn):
+    """F-02: Send real-time name change alert if enabled and threshold met."""
+    try:
+        # Get alert settings from groups table
+        row = await conn.fetchrow(
+            """SELECT 
+                COALESCE(settings->>'name_history_alert_enabled', 'false')::boolean as alert_enabled,
+                COALESCE(settings->>'name_history_alert_threshold', '1')::int as alert_threshold
+               FROM groups WHERE chat_id = $1""",
+            chat_id
+        )
+        
+        if not row or not row["alert_enabled"]:
+            return
+        
+        threshold = row["alert_threshold"] or 1
+        
+        # Count total name changes for this user in this group
+        count_row = await conn.fetchrow(
+            "SELECT COUNT(*) FROM user_name_history WHERE user_id = $1 AND source_chat_id = $2",
+            user_id, chat_id
+        )
+        change_count = count_row["count"] if count_row else 0
+        
+        # Only alert if threshold is met
+        if change_count < threshold:
+            return
+        
+        # Build old and new display names
+        old_display = f"{old_first} {old_last}".strip() or old_username or "(unknown)"
+        new_display = f"{new_first} {new_last}".strip() or new_username or "(unknown)"
+        
+        # Build mention
+        mention = f"<a href='tg://user?id={user_id}'>{new_display}</a>"
+        
+        # Send alert
+        text = (
+            f"📋 <b>Name Change Detected</b>\n\n"
+            f"👤 {mention} changed their name\n"
+            f"Was: <code>{old_display}</code>\n"
+            f"Now: <code>{new_display}</code>\n"
+            f"Total changes: {change_count}"
+        )
+        
+        await bot.send_message(chat_id, text, parse_mode="HTML")
+        log.debug(f"[SANGMATA] Sent name change alert for user {user_id}")
+        
+    except Exception as e:
+        log.warning(f"[SANGMATA] Failed to send alert: {e}")
 
 
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -593,3 +593,56 @@ async def leave_group(chat_id: int, user: dict = Depends(get_current_user)):
         except Exception:
             continue
     return {"ok": True}
+
+
+# ── Command Toggle System ─────────────────────────────────────────────────────
+
+@router.get("/{chat_id}/commands/states")
+async def get_command_states(chat_id: int, user: dict = Depends(get_current_user)):
+    """Get command enabled/disabled states for a group."""
+    await _verify_group_access(chat_id, user)
+    
+    async with db.pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT disabled_commands FROM groups WHERE chat_id = $1",
+            chat_id
+        )
+        if row and row["disabled_commands"]:
+            try:
+                import json
+                return json.loads(row["disabled_commands"])
+            except Exception:
+                pass
+    return {}
+
+
+@router.put("/{chat_id}/commands/states")
+async def update_command_states(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
+    """Update command enabled/disabled states for a group."""
+    await _verify_group_access(chat_id, user)
+    
+    import json
+    states_json = json.dumps(body)
+    
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE groups SET disabled_commands = $1 WHERE chat_id = $2",
+            states_json,
+            chat_id
+        )
+    
+    return {"ok": True}
+
+
+@router.delete("/{chat_id}/commands/states")
+async def reset_command_states(chat_id: int, user: dict = Depends(get_current_user)):
+    """Reset all command states to defaults (all enabled)."""
+    await _verify_group_access(chat_id, user)
+    
+    async with db.pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE groups SET disabled_commands = NULL WHERE chat_id = $1",
+            chat_id
+        )
+    
+    return {"ok": True, "message": "All commands reset to enabled"}

@@ -24,7 +24,8 @@ const AVAILABLE_LANGUAGES = {
   ru: '🇷🇺 Русский',
   tr: '🇹🇷 Türkçe',
   id: '🇮🇩 Indonesia',
-  de: '🇩🇪 Deutsch'
+  de: '🇩🇪 Deutsch',
+  th: '🇹🇭 ไทย (Thai)'
 };
 
 /**
@@ -32,6 +33,26 @@ const AVAILABLE_LANGUAGES = {
  */
 function isRTL(lang) {
   return lang === 'ar';
+}
+
+/**
+ * Get language flag emoji
+ */
+function getLanguageFlag(lang) {
+  const flags = {
+    en: '🇬🇧',
+    ar: '🇸🇦',
+    es: '🇪🇸',
+    fr: '🇫🇷',
+    hi: '🇮🇳',
+    pt: '🇧🇷',
+    ru: '🇷🇺',
+    tr: '🇹🇷',
+    id: '🇮🇩',
+    de: '🇩🇪',
+    th: '🇹🇭',
+  };
+  return flags[lang] || '🏳️';
 }
 
 /**
@@ -255,7 +276,8 @@ export {
   isRTL,
   initI18n,
   changeLanguage,
-  AVAILABLE_LANGUAGES
+  AVAILABLE_LANGUAGES,
+  getLanguageFlag
 };
 
 // Also make available globally for inline scripts
@@ -266,6 +288,7 @@ if (typeof window !== 'undefined') {
     isRTL,
     initI18n,
     changeLanguage,
-    AVAILABLE_LANGUAGES
+    AVAILABLE_LANGUAGES,
+    getLanguageFlag
   };
 }

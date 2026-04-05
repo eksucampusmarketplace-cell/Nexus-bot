@@ -2,7 +2,7 @@
 bot/utils/localization.py
 
 Localization system for Nexus Bot v21.
-Supports 10 languages: en, ar, es, fr, hi, pt, ru, tr, id, de
+Supports 11 languages: en, ar, es, fr, hi, pt, ru, tr, id, de, th
 
 No paid API used - all strings are hardcoded for reliability.
 """
@@ -24,6 +24,7 @@ SUPPORTED_LANGUAGES = {
     "tr": "Türkçe (Turkish)",
     "id": "Bahasa Indonesia (Indonesian)",
     "de": "Deutsch (German)",
+    "th": "ไทย (Thai)",
 }
 
 # Default language
@@ -45,6 +46,7 @@ STRINGS = {
         "tr": "👋 {group}'a hoş geldin {name}!",
         "id": "👋 Selamat datang {name} di {group}!",
         "de": "👋 Willkommen {name} in {group}!",
+        "th": "👋 ยินดีต้อนรับ {name} สู่ {group}!",
     },
     "goodbye": {
         "en": "👋 Goodbye {name}!",
@@ -57,6 +59,7 @@ STRINGS = {
         "tr": "👋 Güle güle {name}!",
         "id": "👋 Sampai jumpa {name}!",
         "de": "👋 Auf Wiedersehen {name}!",
+        "th": "👋 ลาก่อน {name}!",
     },
     # ============================================
     # WARN / UNWARN
@@ -72,6 +75,7 @@ STRINGS = {
         "tr": "⚠️ <b>Uyarı Verildi</b>\nKullanıcı: {name}\nSebep: {reason}\nSayı: {count}/{max}",
         "id": "⚠️ <b>Peringatan Diberikan</b>\nPengguna: {name}\nAlasan: {reason}\nJumlah: {count}/{max}",
         "de": "⚠️ <b>Warnung Ausgestellt</b>\nBenutzer: {name}\nGrund: {reason}\nAnzahl: {count}/{max}",
+        "th": "⚠️ <b>คำเตือน</b>\nผู้ใช้: {name}\nเหตุผล: {reason}\nจำนวน: {count}/{max}",
     },
     "warn_max_reached": {
         "en": "🚫 <b>Max Warnings Reached!</b>\nUser {name} has reached {max} warnings.\nAction: {action}",
@@ -84,6 +88,7 @@ STRINGS = {
         "tr": "🚫 <b>Maks Uyarı Sayısına Ulaşıldı!</b>\n{name} kullanıcısı {max} uyarıya ulaştı.\nEylem: {action}",
         "id": "🚫 <b>Batas Maks Peringatan Tercapai!</b>\nPengguna {name} telah mencapai {max} peringatan.\nTindakan: {action}",
         "de": "🚫 <b>Maximale Warnungen Erreicht!</b>\nBenutzer {name} hat {max} Warnungen erreicht.\nAktion: {action}",
+        "th": "🚫 <b>ถึงขีดจำกัดคำเตือน!</b>\nผู้ใช้ {name} ได้รับคำเตือน {max} ครั้งแล้ว\nการกระทำ: {action}",
     },
     "warn_removed": {
         "en": "✅ <b>Warning Removed</b>\nUser: {name}\nRemaining: {count}",
@@ -96,6 +101,7 @@ STRINGS = {
         "tr": "✅ <b>Uyarı Kaldırıldı</b>\nKullanıcı: {name}\nKalan: {count}",
         "id": "✅ <b>Peringatan Dihapus</b>\nPengguna: {name}\nTersisa: {count}",
         "de": "✅ <b>Warnung Entfernt</b>\nBenutzer: {name}\nVerbleibend: {count}",
+        "th": "✅ <b>ลบคำเตือน</b>\nผู้ใช้: {name}\nเหลืออยู่: {count}",
     },
     # ============================================
     # BAN / KICK / MUTE
@@ -111,6 +117,7 @@ STRINGS = {
         "tr": "🚫 <b>Kullanıcı Yasaklandı</b>\nKullanıcı: {name}\nSebep: {reason}",
         "id": "🚫 <b>Pengguna Diblokir</b>\nPengguna: {name}\nAlasan: {reason}",
         "de": "🚫 <b>Benutzer Gebannt</b>\nBenutzer: {name}\nGrund: {reason}",
+        "th": "🚫 <b>ผู้ใช้ถูกแบน</b>\nผู้ใช้: {name}\nเหตุผล: {reason}",
     },
     "user_unbanned": {
         "en": "✅ <b>User Unbanned</b>\nUser: {name}",
@@ -123,6 +130,7 @@ STRINGS = {
         "tr": "✅ <b>Kullanıcı Yasağı Kaldırıldı</b>\nKullanıcı: {name}",
         "id": "✅ <b>Blokir Pengguna Dibuka</b>\nPengguna: {name}",
         "de": "✅ <b>Benutzer Entbannt</b>\nBenutzer: {name}",
+        "th": "✅ <b>ยกเลิกการแบนผู้ใช้</b>\nผู้ใช้: {name}",
     },
     "user_kicked": {
         "en": "👢 <b>User Kicked</b>\nUser: {name}\nReason: {reason}",
@@ -135,6 +143,7 @@ STRINGS = {
         "tr": "👢 <b>Kullanıcı Atıldı</b>\nKullanıcı: {name}\nSebep: {reason}",
         "id": "👢 <b>Pengguna Ditendang</b>\nPengguna: {name}\nAlasan: {reason}",
         "de": "👢 <b>Benutzer Entfernt</b>\nBenutzer: {name}\nGrund: {reason}",
+        "th": "👢 <b>เตะผู้ใช้</b>\nผู้ใช้: {name}\nเหตุผล: {reason}",
     },
     "user_muted": {
         "en": "🔇 <b>User Muted</b>\nUser: {name}\nDuration: {duration}",
@@ -147,6 +156,7 @@ STRINGS = {
         "tr": "🔇 <b>Kullanıcı Susturuldu</b>\nKullanıcı: {name}\nSüre: {duration}",
         "id": "🔇 <b>Pengguna Dibisukan</b>\nPengguna: {name}\nDurasi: {duration}",
         "de": "🔇 <b>Benutzer Stummgeschaltet</b>\nBenutzer: {name}\nDauer: {duration}",
+        "th": "🔇 <b>ปิดเสียงผู้ใช้</b>\nผู้ใช้: {name}\nระยะเวลา: {duration}",
     },
     "user_unmuted": {
         "en": "🔊 <b>User Unmuted</b>\nUser: {name}",
@@ -159,6 +169,7 @@ STRINGS = {
         "tr": "🔊 <b>Kullanıcının Susturulması Kaldırıldı</b>\nKullanıcı: {name}",
         "id": "🔊 <b>Pembisuan Pengguna Dibuka</b>\nPengguna: {name}",
         "de": "🔊 <b>Benutzer Entstummt</b>\nBenutzer: {name}",
+        "th": "🔊 <b>ยกเลิกการปิดเสียง</b>\nผู้ใช้: {name}",
     },
     # ============================================
     # CAPTCHA
@@ -174,6 +185,7 @@ STRINGS = {
         "tr": "🔐 <b>CAPTCHA Doğrulaması</b>\nLütfen aşağıdaki butona tıklayarak insan olduğunuzu doğrulayın.",
         "id": "🔐 <b>Verifikasi CAPTCHA</b>\nSilakan verifikasi bahwa Anda manusia dengan mengklik tombol di bawah.",
         "de": "🔐 <b>CAPTCHA-Verifizierung</b>\nBitte verifizieren Sie, dass Sie ein Mensch sind, indem Sie auf die Schaltfläche unten klicken.",
+        "th": "🔐 <b>ตรวจสอบ CAPTCHA</b>\nกรุณายืนยันว่าคุณเป็นมนุษย์โดยคลิกปุ่มด้านล่าง",
     },
     "captcha_passed": {
         "en": "✅ <b>CAPTCHA Passed!</b>\nWelcome {name}! You can now chat.",
@@ -186,6 +198,7 @@ STRINGS = {
         "tr": "✅ <b>CAPTCHA Başarılı!</b>\nHoş geldin {name}! Artık sohbet edebilirsin.",
         "id": "✅ <b>CAPTCHA Lulus!</b>\nSelamat datang {name}! Anda sekarang dapat mengobrol.",
         "de": "✅ <b>CAPTCHA Bestanden!</b>\nWillkommen {name}! Sie können jetzt chatten.",
+        "th": "✅ <b>ผ่าน CAPTCHA!</b>\nยินดีต้อนรับ {name}! คุณสามารถแชทได้แล้ว",
     },
     "captcha_failed": {
         "en": "❌ <b>CAPTCHA Failed!</b>\nPlease try again.",
@@ -198,6 +211,7 @@ STRINGS = {
         "tr": "❌ <b>CAPTCHA Başarısız!</b>\nLütfen tekrar deneyin.",
         "id": "❌ <b>CAPTCHA Gagal!</b>\nSilakan coba lagi.",
         "de": "❌ <b>CAPTCHA Fehlgeschlagen!</b>\nBitte versuchen Sie es erneut.",
+        "th": "❌ <b>CAPTCHA ล้มเหลว!</b>\nกรุณาลองอีกครั้ง",
     },
     "captcha_timeout": {
         "en": "⏰ <b>CAPTCHA Timeout</b>\nYou took too long to respond. Please try joining again.",
@@ -210,6 +224,7 @@ STRINGS = {
         "tr": "⏰ <b>CAPTCHA Zaman Aşımı</b>\nYanıt vermek çok uzun sürdü. Lütfen tekrar katılmayı deneyin.",
         "id": "⏰ <b>Waktu Habis CAPTCHA</b>\nAnda terlalu lama merespons. Silakan coba bergabung lagi.",
         "de": "⏰ <b>CAPTCHA-Zeitüberschreitung</b>\nSie haben zu lange gebraucht zu antworten. Bitte versuchen Sie erneut beizutreten.",
+        "th": "⏰ <b>หมดเวลา CAPTCHA</b>\nคุณใช้เวลานานเกินไป กรุณาลองเข้าร่วมอีกครั้ง",
     },
     # ============================================
     # TRUSTNET (FEDERATION)
@@ -225,6 +240,7 @@ STRINGS = {
         "tr": "🌐 <b>Federasyon Yasağı Bildirimi</b>\n{name} kullanıcısı {federation}'da yasaklı.\nSebep: {reason}",
         "id": "🌐 <b>Pemberitahuan Blokir Federasi</b>\nPengguna {name} diblokir di {federation}.\nAlasan: {reason}",
         "de": "🌐 <b>Föderations-Bann-Benachrichtigung</b>\nBenutzer {name} ist in {federation} gebannt.\nGrund: {reason}",
+        "th": "🌐 <b>การแจ้งเตือนการแบนสหพันธ์</b>\nผู้ใช้ {name} ถูกแบนใน {federation}\nเหตุผล: {reason}",
     },
     "trust_score_label": {
         "en": "🛡️ Trust Score: {score}/100",
@@ -237,6 +253,7 @@ STRINGS = {
         "tr": "🛡️ Güven Puanı: {score}/100",
         "id": "🛡️ Skor Kepercayaan: {score}/100",
         "de": "🛡️ Vertrauenswert: {score}/100",
+        "th": "🛡️ คะแนนความน่าเชื่อถือ: {score}/100",
     },
     # ============================================
     # NIGHT MODE
@@ -252,6 +269,7 @@ STRINGS = {
         "tr": "🌙 <b>Gece Modu Etkinleştirildi</b>\nGrup, {end_time} kadar kısıtlı modda.",
         "id": "🌙 <b>Mode Malam Diaktifkan</b>\nGrup dalam mode terbatas sampai {end_time}.",
         "de": "🌙 <b>Nachtmodus Aktiviert</b>\nGruppe ist bis {end_time} im eingeschränkten Modus.",
+        "th": "🌙 <b>เปิดใช้งานโหมดกลางคืน</b>\nกลุ่มอยู่ในโหมดจำกัดจนถึง {end_time}",
     },
     "night_mode_off": {
         "en": "☀️ <b>Night Mode Deactivated</b>\nGroup permissions restored. Good morning!",
@@ -264,6 +282,7 @@ STRINGS = {
         "tr": "☀️ <b>Gece Modu Devre Dışı</b>\nGrup izinleri geri yüklendi. Günaydın!",
         "id": "☀️ <b>Mode Malam Dinonaktifkan</b>\nIzin grup dipulihkan. Selamat pagi!",
         "de": "☀️ <b>Nachtmodus Deaktiviert</b>\nGruppenberechtigungen wiederhergestellt. Guten Morgen!",
+        "th": "☀️ <b>ปิดใช้งานโหมดกลางคืน</b>\nสิทธิ์กลุ่มได้รับการคืนค่า สวัสดีตอนเช้า!",
     },
     "morning": {
         "en": "Good morning! The group is now open.",
@@ -276,6 +295,7 @@ STRINGS = {
         "tr": "Günaydın! Grup şimdi açık.",
         "id": "Selamat pagi! Grup sekarang terbuka.",
         "de": "Guten Morgen! Die Gruppe ist jetzt offen.",
+        "th": "สวัสดีตอนเช้า! กลุ่มเปิดแล้ว",
     },
     # ============================================
     # COMMUNITY VOTE
@@ -291,6 +311,7 @@ STRINGS = {
         "tr": "⚖️ <b>Topluluk Oylaması Başladı</b>\nHedef: {user}\nSebep: {reason}\nAşağıdaki butonlarla oy verin.\nEşik: {threshold} oy | Süre: {timeout} dk",
         "id": "⚖️ <b>Pemungutan Suara Komunitas Dimulai</b>\nTarget: {user}\nAlasan: {reason}\nPilih dengan tombol di bawah.\nAmbang: {threshold} suara | Batas: {timeout} menit",
         "de": "⚖️ <b>Community-Abstimmung Gestartet</b>\nZiel: {user}\nGrund: {reason}\nStimmen Sie mit den Buttons unten ab.\nSchwelle: {threshold} Stimmen | Zeitlimit: {timeout} min",
+        "th": "⚖️ <b>เริ่มการโหวตชุมชน</b>\nเป้าหมาย: {user}\nเหตุผล: {reason}\nโหวตด้วยปุ่มด้านล่าง\nเกณฑ์: {threshold} โหวต | หมดเวลา: {timeout} นาที",
     },
     "vote_passed": {
         "en": "✅ <b>Vote Passed</b>\nThe community has decided.\nAction: {action}",
@@ -303,6 +324,7 @@ STRINGS = {
         "tr": "✅ <b>Oylama Kabul Edildi</b>\nTopluluk karar verdi.\nEylem: {action}",
         "id": "✅ <b>Pemungutan Suara Diterima</b>\nKomunitas telah memutuskan.\nTindakan: {action}",
         "de": "✅ <b>Abstimmung Bestanden</b>\nDie Community hat entschieden.\nAktion: {action}",
+        "th": "✅ <b>ผ่านการโหวต</b>\nชุมชนตัดสินใจแล้ว\nการกระทำ: {action}",
     },
     "vote_failed": {
         "en": "❌ <b>Vote Failed</b>\nNot enough votes. The user stays.",
@@ -315,6 +337,7 @@ STRINGS = {
         "tr": "❌ <b>Oylama Başarısız</b>\nYeterli oy yok. Kullanıcı kalıyor.",
         "id": "❌ <b>Pemungutan Suara Gagal</b>\nTidak cukup suara. Pengguna tetap.",
         "de": "❌ <b>Abstimmung Fehlgeschlagen</b>\nNicht genug Stimmen. Der Benutzer bleibt.",
+        "th": "❌ <b>การโหวตล้มเหลว</b>\nโหวตไม่เพียงพอ ผู้ใช้ยังคงอยู่",
     },
     # ============================================
     # RULES / NOTES
@@ -330,6 +353,7 @@ STRINGS = {
         "tr": "📋 <b>Grup Kuralları</b>",
         "id": "📋 <b>Aturan Grup</b>",
         "de": "📋 <b>Gruppenregeln</b>",
+        "th": "📋 <b>กฎของกลุ่ม</b>",
     },
     "no_rules": {
         "en": "📋 No rules have been set for this group yet.",
@@ -342,6 +366,7 @@ STRINGS = {
         "tr": "📋 Bu grup için henüz kural belirlenmemiş.",
         "id": "📋 Belum ada aturan yang ditetapkan untuk grup ini.",
         "de": "📋 Für diese Gruppe wurden noch keine Regeln festgelegt.",
+        "th": "📋 ยังไม่มีกฎสำหรับกลุ่มนี้",
     },
     # ============================================
     # LANGUAGE SETTINGS
@@ -357,6 +382,7 @@ STRINGS = {
         "tr": "✅ Diliniz {lang} olarak ayarlandı.",
         "id": "✅ Bahasa Anda telah diatur ke {lang}.",
         "de": "✅ Ihre Sprache wurde auf {lang} gesetzt.",
+        "th": "✅ ตั้งค่าภาษาของคุณเป็น {lang}",
     },
     "grouplang_set": {
         "en": "✅ Group language has been set to {lang}.",
@@ -369,6 +395,7 @@ STRINGS = {
         "tr": "✅ Grup dili {lang} olarak ayarlandı.",
         "id": "✅ Bahasa grup telah diatur ke {lang}.",
         "de": "✅ Gruppensprache wurde auf {lang} gesetzt.",
+        "th": "✅ ตั้งค่าภาษากลุ่มเป็น {lang}",
     },
     # ============================================
     # GENERAL ERRORS / SUCCESS
@@ -384,6 +411,7 @@ STRINGS = {
         "tr": "❌ Bu komutu kullanmak için yönetici olmalısınız.",
         "id": "❌ Anda harus menjadi admin untuk menggunakan perintah ini.",
         "de": "❌ Sie müssen Administrator sein, um diesen Befehl zu verwenden.",
+        "th": "❌ คุณต้องเป็นผู้ดูแลระบบเพื่อใช้คำสั่งนี้",
     },
     "no_reply": {
         "en": "❌ Please reply to a message to use this command.",
@@ -396,6 +424,7 @@ STRINGS = {
         "tr": "❌ Bu komutu kullanmak için lütfen bir mesaja yanıt verin.",
         "id": "❌ Silakan balas pesan untuk menggunakan perintah ini.",
         "de": "❌ Bitte antworten Sie auf eine Nachricht, um diesen Befehl zu verwenden.",
+        "th": "❌ กรุณาตอบกลับข้อความเพื่อใช้คำสั่งนี้",
     },
     "groups_only": {
         "en": "❌ This command only works in groups.",
@@ -408,6 +437,7 @@ STRINGS = {
         "tr": "❌ Bu komut yalnızca gruplarda çalışır.",
         "id": "❌ Perintah ini hanya berfungsi di grup.",
         "de": "❌ Dieser Befehl funktioniert nur in Gruppen.",
+        "th": "❌ คำสั่งนี้ใช้ได้เฉพาะในกลุ่ม",
     },
     "generic_error": {
         "en": "❌ An error occurred. Please try again later.",
@@ -420,6 +450,7 @@ STRINGS = {
         "tr": "❌ Bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
         "id": "❌ Terjadi kesalahan. Silakan coba lagi nanti.",
         "de": "❌ Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.",
+        "th": "❌ เกิดข้อผิดพลาด กรุณาลองอีกครั้งในภายหลัง",
     },
     "success": {
         "en": "✅ Done!",
@@ -432,13 +463,14 @@ STRINGS = {
         "tr": "✅ Tamamlandı!",
         "id": "✅ Selesai!",
         "de": "✅ Erledigt!",
+        "th": "✅ เสร็จสิ้น!",
     },
     # ============================================
     # SYNC COMMAND
     # ============================================
     "sync_success": {
         "en": "✅ Group synced successfully!",
-        "ar": "✅ تمت مزامنة المجموعة بنجاح!",
+        "ar": "��� تمت مزامنة المجموعة بنجاح!",
         "es": "✅ ¡Grupo sincronizado exitosamente!",
         "fr": "✅ Groupe synchronisé avec succès!",
         "hi": "✅ समूह सफलतापूर्वक सिंक किया गया!",
@@ -447,6 +479,7 @@ STRINGS = {
         "tr": "✅ Grup başarıyla senkronize edildi!",
         "id": "✅ Grup berhasil disinkronkan!",
         "de": "✅ Gruppe erfolgreich synchronisiert!",
+        "th": "✅ ซิงค์กลุ่มสำเร็จ!",
     },
     # ============================================
     # NAVIGATION LABELS (v21)

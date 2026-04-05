@@ -38,12 +38,12 @@ async def get_i18n_strings(lang: str = "en"):
     # Extract UI strings (navigation, buttons, status, etc.)
     ui_keys = [
         # Navigation labels
-        "nav_dashboard", "nav_bots", "nav_moderation", "nav_automod", 
+        "nav_dashboard", "nav_bots", "nav_moderation", "nav_automod",
         "nav_members", "nav_analytics", "nav_broadcast", "nav_reports",
         "nav_greetings", "nav_antiraid", "nav_settings", "nav_logs",
         "nav_roles", "nav_notes", "nav_xp", "nav_owner",
         # v21 navigation
-        "nav_trustnet", "nav_captcha", "nav_community_vote", 
+        "nav_trustnet", "nav_captcha", "nav_community_vote",
         "nav_night_mode", "nav_history", "nav_language", "nav_persona",
         # Buttons
         "save_btn", "cancel_btn", "enable_label", "disable_label",
@@ -69,6 +69,11 @@ async def get_i18n_strings(lang: str = "en"):
         # Toast messages
         "toast_save_success", "toast_delete_success", "toast_copy", "toast_no_group",
         "loading", "saved", "error", "select_group",
+        # Language page
+        "lang_notice_title", "lang_notice_body", "lang_notice_link",
+        "lang_subtitle", "lang_set", "current",
+        "lang_detected_title", "lang_detected_body",
+        "lang_use_detected", "lang_keep_english",
     ]
     
     ui_strings = {}

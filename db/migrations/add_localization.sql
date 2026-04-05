@@ -6,7 +6,7 @@
 CREATE TABLE IF NOT EXISTS user_lang_prefs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id BIGINT NOT NULL UNIQUE,
-    language_code TEXT NOT NULL DEFAULT 'en',  -- en, ar, es, fr, hi, pt, ru, tr, id, de
+    language_code TEXT NOT NULL DEFAULT 'en',  -- en, ar, es, fr, hi, pt, ru, tr, id, de, th
     auto_detected BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -28,6 +28,6 @@ CREATE TABLE IF NOT EXISTS language_usage_stats (
 );
 
 -- Insert default stats for supported languages
-INSERT INTO language_usage_stats (language_code) VALUES 
-    ('en'), ('ar'), ('es'), ('fr'), ('hi'), ('pt'), ('ru'), ('tr'), ('id'), ('de')
+INSERT INTO language_usage_stats (language_code) VALUES
+    ('en'), ('ar'), ('es'), ('fr'), ('hi'), ('pt'), ('ru'), ('tr'), ('id'), ('de'), ('th')
 ON CONFLICT (language_code) DO NOTHING;

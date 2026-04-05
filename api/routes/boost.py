@@ -232,6 +232,36 @@ async def get_recent_events(chat_id: int, limit: int = 50):
     return await get_recent_invite_events(chat_id, limit)
 
 
+@router.get("/tracking")
+async def get_boost_tracking(chat_id: int):
+    """Get all boost records with tracking info for the Mini App."""
+    records = await get_all_boost_records(chat_id)
+
+    # Enrich records with additional tracking info
+    members = []
+    for record in records:
+        # Check if record was manually granted (unlocked without enough invites)
+        total_credits = (record.get("invited_count", 0) + record.get("manual_credits", 0))
+        required = record.get("required_count", 0)
+        is_manual_grant = record.get("is_unlocked") and total_credits < required and required > 0
+
+        members.append({
+            "user_id": record.get("user_id"),
+            "username": record.get("username"),
+            "first_name": record.get("first_name"),
+            "invite_count": total_credits,
+            "required_count": required,
+            "unlocked": record.get("is_unlocked", False),
+            "granted": record.get("is_unlocked", False),
+            "manual": is_manual_grant,
+            "is_restricted": record.get("is_restricted", False),
+            "created_at": record.get("created_at"),
+            "updated_at": record.get("updated_at"),
+        })
+
+    return {"members": members}
+
+
 # ==================== Actions ====================
 
 

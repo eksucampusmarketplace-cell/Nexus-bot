@@ -362,34 +362,88 @@ async function renderGroupsSection(container) {
 
 async function renderSystemHealthSection(container) {
   const healthCard = Card({ title: '🩺 ' + t('owner_system_health', 'System Health'), subtitle: t('owner_system_health_sub', 'Check system status') });
-  
+
   const healthInfo = document.createElement('div');
   healthInfo.style.cssText = 'display:grid;grid-template-columns:repeat(2,1fr);gap:var(--sp-3);padding:var(--sp-3) 0;';
-  
+
   // Check database
   const dbStatus = document.createElement('div');
-  dbStatus.style.cssText = 'padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);text-align:center;';
+  dbStatus.style.cssText = 'padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);text-align:center;cursor:help;';
+  dbStatus.title = 'Database connection status';
   dbStatus.innerHTML = '<div style="font-size:1.5rem;">💾</div><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);">Database</div><div id="db-status" style="font-size:var(--text-xs);color:var(--success);">Checking...</div>';
   healthInfo.appendChild(dbStatus);
-  
+
   // Check webhooks
   const webhookStatus = document.createElement('div');
-  webhookStatus.style.cssText = 'padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);text-align:center;';
+  webhookStatus.style.cssText = 'padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);text-align:center;cursor:help;';
+  webhookStatus.title = 'Telegram webhook health status (real-time)';
   webhookStatus.innerHTML = '<div style="font-size:1.5rem;">🌐</div><div style="font-size:var(--text-sm);font-weight:var(--fw-semibold);">Webhooks</div><div id="webhook-status" style="font-size:var(--text-xs);color:var(--success);">Checking...</div>';
   healthInfo.appendChild(webhookStatus);
-  
+
   healthCard.appendChild(healthInfo);
   container.appendChild(healthCard);
-  
-  // Update status based on checks
+
+  // Add webhook details container (hidden by default, shown on click)
+  const webhookDetails = document.createElement('div');
+  webhookDetails.id = 'webhook-details';
+  webhookDetails.style.cssText = 'display:none;margin-top:var(--sp-3);padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);';
+  healthCard.appendChild(webhookDetails);
+
+  // Update status based on real-time checks
   try {
-    const bots = await apiFetch('/api/bots');
-    const activeWebhooks = (Array.isArray(bots) ? bots : bots?.bots || []).filter(b => b.webhook_active).length;
-    const totalBots = (Array.isArray(bots) ? bots : bots?.bots || []).length;
-    document.getElementById('webhook-status').textContent = `${activeWebhooks}/${totalBots} active`;
-    document.getElementById('webhook-status').style.color = activeWebhooks > 0 ? 'var(--success)' : 'var(--warning)';
-    document.getElementById('db-status').textContent = 'Connected';
+    // Check database
+    try {
+      await apiFetch('/api/groups');
+      document.getElementById('db-status').textContent = 'Connected';
+      document.getElementById('db-status').style.color = 'var(--success)';
+    } catch (e) {
+      document.getElementById('db-status').textContent = 'Error';
+      document.getElementById('db-status').style.color = 'var(--danger)';
+    }
+
+    // Check webhooks in real-time
+    try {
+      const webhookHealth = await apiFetch('/api/bots/webhook-health');
+      const { healthy, total, unhealthy, bots: webhookDetailsList } = webhookHealth;
+
+      // Update webhook status display
+      document.getElementById('webhook-status').textContent = `${healthy}/${total} healthy`;
+      document.getElementById('webhook-status').style.color = unhealthy > 0 ? 'var(--warning)' : 'var(--success)';
+
+      // Click to show details
+      webhookStatus.style.cursor = 'pointer';
+      webhookStatus.onclick = function() {
+        const details = document.getElementById('webhook-details');
+        details.style.display = details.style.display === 'none' ? 'block' : 'none';
+
+        if (details.style.display === 'block' && details.children.length === 0) {
+          // Show webhook details
+          details.innerHTML = webhookDetailsList.map(bot => {
+            const statusColor = bot.webhook_healthy ? 'var(--success)' : 'var(--danger)';
+            const statusIcon = bot.webhook_healthy ? '🟢' : '🔴';
+            const statusText = bot.webhook_healthy ? 'Healthy' : 'Error';
+
+            return `
+              <div style="display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2);border-bottom:1px solid var(--border);">
+                <span style="font-size:0.7rem;">${statusIcon}</span>
+                <div style="flex:1;">
+                  <div style="font-size:var(--text-sm);font-weight:var(--fw-medium);">@${bot.username}</div>
+                  ${bot.last_error ? `<div style="font-size:var(--text-xs);color:var(--danger);">${bot.last_error}</div>` : ''}
+                  ${bot.pending_updates > 0 ? `<div style="font-size:var(--text-xs);color:var(--warning);">Pending updates: ${bot.pending_updates}</div>` : ''}
+                </div>
+                <span style="font-size:var(--text-xs);color:${statusColor};font-weight:var(--fw-semibold);">${statusText}</span>
+              </div>
+            `;
+          }).join('');
+        }
+      };
+    } catch (e) {
+      console.error('[SystemHealth] Webhook check failed:', e);
+      document.getElementById('webhook-status').textContent = 'Error';
+      document.getElementById('webhook-status').style.color = 'var(--danger)';
+    }
   } catch (e) {
+    console.error('[SystemHealth] System check failed:', e);
     document.getElementById('db-status').textContent = 'Error';
     document.getElementById('db-status').style.color = 'var(--danger)';
     document.getElementById('webhook-status').textContent = 'Error';

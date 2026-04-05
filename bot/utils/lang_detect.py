@@ -49,6 +49,8 @@ TELEGRAM_LANG_MAP = {
     "de": "de", "de-DE": "de", "de-AT": "de", "de-CH": "de",
     # English
     "en": "en", "en-US": "en", "en-GB": "en", "en-AU": "en", "en-CA": "en",
+    # Thai
+    "th": "th", "th-TH": "th",
 }
 
 # Unicode block ranges for script detection
@@ -76,6 +78,12 @@ SCRIPTS = {
         "ranges": [
             (0x0900, 0x097F),    # Devanagari
             (0xA8E0, 0xA8FF),    # Devanagari Extended
+        ],
+    },
+    "th": {
+        "name": "Thai",
+        "ranges": [
+            (0x0E00, 0x0E7F),    # Thai
         ],
     },
 }
@@ -251,11 +259,53 @@ def detect_from_text(text: Optional[str] = None) -> Optional[str]:
     return detected
 
 
+def detect_from_bio(bio: Optional[str] = None) -> Optional[str]:
+    """
+    Detect language from user's bio using Unicode script analysis.
+    
+    Args:
+        bio: User's bio text
+    
+    Returns:
+        Detected language code or None
+    """
+    if not bio:
+        return None
+    
+    detected = _detect_script(bio)
+    if detected:
+        log.debug(f"[LANG_DETECT] Bio script detection: '{bio[:50]}...' -> {detected}")
+    
+    return detected
+
+
+def detect_from_group_description(description: Optional[str] = None) -> Optional[str]:
+    """
+    Detect language from group description using Unicode script analysis.
+    
+    Args:
+        description: Group description text
+    
+    Returns:
+        Detected language code or None
+    """
+    if not description:
+        return None
+    
+    detected = _detect_script(description)
+    if detected:
+        log.debug(f"[LANG_DETECT] Group description script detection -> {detected}")
+    
+    return detected
+
+
 async def auto_detect_and_store(db, user_id: int, chat_id: Optional[int] = None,
                                 telegram_code: Optional[str] = None,
                                 first_name: Optional[str] = None,
                                 last_name: Optional[str] = None,
-                                message_text: Optional[str] = None) -> Optional[str]:
+                                bio: Optional[str] = None,
+                                message_text: Optional[str] = None,
+                                group_description: Optional[str] = None) -> Optional[str]:
     """
     Main auto-detection function.
     
@@ -263,9 +313,11 @@ async def auto_detect_and_store(db, user_id: int, chat_id: Optional[int] = None,
     1. Manual preference (auto_detected=FALSE) - NEVER overridden
     2. Telegram language_code (most reliable)
     3. Name script detection
-    4. Message text script (passive detection)
-    5. Group default language (fallback)
-    6. English (final fallback)
+    4. Bio script detection
+    5. Message text script (passive detection)
+    6. Group description script detection (for new groups)
+    7. Group default language (fallback)
+    8. English (final fallback)
     
     Args:
         db: Database connection pool
@@ -274,7 +326,9 @@ async def auto_detect_and_store(db, user_id: int, chat_id: Optional[int] = None,
         telegram_code: Telegram's language_code from the message/join event
         first_name: User's first name
         last_name: User's last name
+        bio: User's bio/about text
         message_text: Message text (for passive detection)
+        group_description: Group description (for initial group language detection)
     
     Returns:
         The detected/stored language code
@@ -303,11 +357,19 @@ async def auto_detect_and_store(db, user_id: int, chat_id: Optional[int] = None,
             if not detected_lang:
                 detected_lang = detect_from_name(first_name, last_name)
             
-            # STEP 4: Try message text script (passive)
+            # STEP 4: Try bio script detection
+            if not detected_lang and bio:
+                detected_lang = detect_from_bio(bio)
+            
+            # STEP 5: Try message text script (passive)
             if not detected_lang and message_text:
                 detected_lang = detect_from_text(message_text)
             
-            # STEP 5: Fall back to group default language
+            # STEP 6: Try group description script detection
+            if not detected_lang and group_description:
+                detected_lang = detect_from_group_description(group_description)
+            
+            # STEP 7: Fall back to group default language
             if not detected_lang and chat_id:
                 try:
                     row = await conn.fetchrow(
@@ -320,7 +382,7 @@ async def auto_detect_and_store(db, user_id: int, chat_id: Optional[int] = None,
                 except Exception as e:
                     log.debug(f"[LANG_DETECT] Failed to get group language: {e}")
             
-            # STEP 6: Final fallback to English
+            # STEP 8: Final fallback to English
             if not detected_lang or detected_lang not in SUPPORTED_LANGUAGES:
                 detected_lang = DEFAULT_LANG
             
@@ -396,6 +458,8 @@ __all__ = [
     "detect_from_telegram_code",
     "detect_from_name",
     "detect_from_text",
+    "detect_from_bio",
+    "detect_from_group_description",
     "auto_detect_and_store",
     "set_user_lang_manual",
 ]

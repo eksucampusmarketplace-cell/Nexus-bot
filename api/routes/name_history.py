@@ -99,16 +99,16 @@ async def save_history_settings(
             await conn.execute(
                 """UPDATE groups
                    SET settings = COALESCE(settings, '{}'::jsonb) || jsonb_build_object(
-                       'name_history_alert_enabled', $1,
-                       'name_history_alert_threshold', $2,
-                       'name_history_federation_sync', $3,
-                       'name_history_track_photos', $4
+                       'name_history_alert_enabled', $1::boolean,
+                       'name_history_alert_threshold', $2::integer,
+                       'name_history_federation_sync', $3::boolean,
+                       'name_history_track_photos', $4::boolean
                    )
                    WHERE chat_id = $5""",
-                bool(settings.alert_enabled),
-                int(settings.alert_threshold),
-                bool(settings.federation_sync),
-                bool(settings.track_photos),
+                settings.alert_enabled,
+                settings.alert_threshold,
+                settings.federation_sync,
+                settings.track_photos,
                 chat_id,
             )
 

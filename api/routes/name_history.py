@@ -81,15 +81,25 @@ async def get_recent_name_changes(chat_id: int, user: dict = Depends(require_aut
             if not enabled:
                 return []
 
+            # Get the configured limit (NH-03 fix: honor the configured limit, not hardcoded 20)
+            limit_val = await conn.fetchval(
+                "SELECT COALESCE(name_history_limit, 20) FROM groups WHERE chat_id = $1",
+                chat_id,
+            )
+
             # Get recent name changes with proper old/new name fields
+            # NH-03 fix: include username-only changes (WHERE old_first_name OR old_username)
+            # NH-03 fix: use username as fallback when first_name is empty
             rows = await conn.fetch(
                 """SELECT uhh.user_id,
                           CASE
-                            WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' THEN uhh.first_name || ' ' || uhh.last_name
-                            ELSE COALESCE(uhh.first_name, '')
+                            WHEN uhh.last_name IS NOT NULL AND uhh.last_name != '' 
+                            THEN COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown') || ' ' || uhh.last_name
+                            ELSE COALESCE(NULLIF(uhh.first_name,''), uhh.username, 'Unknown')
                           END as user_name,
                           CASE
-                            WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' THEN uhh.old_first_name || ' ' || uhh.old_last_name
+                            WHEN uhh.old_last_name IS NOT NULL AND uhh.old_last_name != '' 
+                            THEN COALESCE(uhh.old_first_name, '') || ' ' || COALESCE(uhh.old_last_name, '')
                             ELSE COALESCE(uhh.old_first_name, '')
                           END as old_name,
                           uhh.old_username,
@@ -97,10 +107,11 @@ async def get_recent_name_changes(chat_id: int, user: dict = Depends(require_aut
                           uhh.changed_at
                    FROM user_name_history uhh
                    WHERE uhh.source_chat_id = $1
-                     AND uhh.old_first_name IS NOT NULL
+                     AND (uhh.old_first_name IS NOT NULL OR uhh.old_username IS NOT NULL)
                    ORDER BY uhh.changed_at DESC
-                   LIMIT 20""",
+                   LIMIT $2""",
                 chat_id,
+                limit_val,
             )
 
         return [

@@ -62,14 +62,12 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if optout:
                 return
             
-            # Get last snapshot
+            # Get last snapshot (direct lookup - no ORDER BY needed with unique constraint)
             last_snapshot = await conn.fetchrow(
                 """SELECT first_name, last_name, username 
                    FROM user_snapshots 
-                   WHERE user_id = $1 
-                   ORDER BY captured_at DESC 
-                   LIMIT 1""",
-                user.id
+                   WHERE user_id = $1 AND source_chat_id = $2""",
+                user.id, chat.id
             )
             
             current_first = user.first_name or ""
@@ -113,11 +111,16 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 log.debug(f"[SANGMATA] Change detected for {user.id}: {'; '.join(changes)}")
             
-            # Create/update snapshot
+            # Create/update snapshot using upsert (NH-01 fix: ON CONFLICT to prevent crashes)
             snapshot_id = await conn.fetchval(
                 """INSERT INTO user_snapshots 
                    (user_id, first_name, last_name, username, source_chat_id)
                    VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT (user_id, source_chat_id) DO UPDATE
+                     SET first_name = EXCLUDED.first_name,
+                         last_name  = EXCLUDED.last_name,
+                         username   = EXCLUDED.username,
+                         captured_at = NOW()
                    RETURNING id""",
                 user.id, current_first, current_last, current_username, chat.id
             )
@@ -130,7 +133,7 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
     except Exception as e:
-        log.debug(f"[SANGMATA] Tracking error: {e}")
+        log.error(f"[SANGMATA] Tracking error for user {user.id}: {e}")
 
 
 async def track_name_change_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -220,6 +220,9 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
         "necessary_words_active", "regex_active",
         "group_password", "password_kick_on_fail", "password_attempts", "password_timeout_mins",
         "log_channel_id", "log_include_preview", "log_include_userid", "inline_mode_enabled",
+        # Announcement Channel settings
+        "announcement_channel_id", "announcement_notifications", "announcement_auto_pin",
+        "announcement_auto_delete_mins", "announcement_restrict_replies",
         # Media locks
         "lock_photo", "lock_video", "lock_sticker", "lock_gif", "lock_voice", "lock_audio", "lock_document",
         # Communication locks
@@ -321,6 +324,9 @@ async def bulk_update_settings(
         "necessary_words_active", "regex_active",
         "group_password", "password_kick_on_fail", "password_attempts", "password_timeout_mins",
         "log_channel_id", "log_include_preview", "log_include_userid", "inline_mode_enabled",
+        # Announcement Channel settings
+        "announcement_channel_id", "announcement_notifications", "announcement_auto_pin",
+        "announcement_auto_delete_mins", "announcement_restrict_replies",
         # Media locks
         "lock_photo", "lock_video", "lock_sticker", "lock_gif", "lock_voice", "lock_audio", "lock_document",
         # Communication locks

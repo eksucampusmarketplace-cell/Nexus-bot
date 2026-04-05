@@ -1417,7 +1417,72 @@
         };
         window.saveLogChannel = () => _updateGroupSetting('log_channel_id', logCard.querySelector('#input-log-channel').value);
 
-        // ── 6. ADVANCED ───────────────────────────────────────────────────
+        // ── 6. ANNOUNCEMENTS ──────────────────────────────────────────────
+        const announcementCard = Card({
+          title: '📢 Announcements',
+          subtitle: 'Linked announcement channel settings',
+          children: `
+            <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
+              <div>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Linked Channel ID</label>
+                <input type="text" id="input-announcement-channel" class="input" placeholder="-1001234567890" value="${groupSettings.announcement_channel_id || ''}">
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);">Telegram channel ID that posts are forwarded from</div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
+                <div>
+                  <div style="font-size:var(--text-sm);">Notify admins</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Send DM to admins when announcement posted</div>
+                </div>
+                <div id="toggle-announcement-notify"></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
+                <div>
+                  <div style="font-size:var(--text-sm);">Auto-pin</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Automatically pin announcement posts</div>
+                </div>
+                <div id="toggle-announcement-pin"></div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
+                <div>
+                  <div style="font-size:var(--text-sm);">Admins-only replies</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Only admins can reply to announcements</div>
+                </div>
+                <div id="toggle-announcement-restrict"></div>
+              </div>
+              <div>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Auto-delete after</label>
+                <select id="select-announcement-delete" class="input">
+                  <option value="0" ${(groupSettings.announcement_auto_delete_mins || 0) === 0 ? 'selected' : ''}>Never</option>
+                  <option value="60" ${(groupSettings.announcement_auto_delete_mins || 0) === 60 ? 'selected' : ''}>1 hour</option>
+                  <option value="1440" ${(groupSettings.announcement_auto_delete_mins || 0) === 1440 ? 'selected' : ''}>1 day</option>
+                  <option value="10080" ${(groupSettings.announcement_auto_delete_mins || 0) === 10080 ? 'selected' : ''}>1 week</option>
+                </select>
+              </div>
+            </div>
+          `
+        });
+        container.appendChild(announcementCard);
+        announcementCard.querySelector('#input-announcement-channel').addEventListener('blur', async (e) => {
+          const val = e.target.value.trim();
+          await _updateGroupSetting('announcement_channel_id', val ? parseInt(val) : null);
+        });
+        announcementCard.querySelector('#select-announcement-delete').addEventListener('change', async (e) => {
+          await _updateGroupSetting('announcement_auto_delete_mins', parseInt(e.target.value));
+        });
+        announcementCard.querySelector('#toggle-announcement-notify').appendChild(Toggle({
+          checked: groupSettings.announcement_notifications || false,
+          onChange: (v) => _updateGroupSetting('announcement_notifications', v)
+        }));
+        announcementCard.querySelector('#toggle-announcement-pin').appendChild(Toggle({
+          checked: groupSettings.announcement_auto_pin || false,
+          onChange: (v) => _updateGroupSetting('announcement_auto_pin', v)
+        }));
+        announcementCard.querySelector('#toggle-announcement-restrict').appendChild(Toggle({
+          checked: groupSettings.announcement_restrict_replies || false,
+          onChange: (v) => _updateGroupSetting('announcement_restrict_replies', v)
+        }));
+
+        // ── 7. ADVANCED ───────────────────────────────────────────────────
         const advancedCard = Card({
           title: '⚙️ Advanced Group Settings',
           children: `

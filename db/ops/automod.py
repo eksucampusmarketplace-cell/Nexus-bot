@@ -341,6 +341,12 @@ async def update_group_setting(pool, chat_id: int, key: str, value):
         "log_include_preview",
         "log_include_userid",
         "inline_mode_enabled",
+        # Announcement Channel settings
+        "announcement_channel_id",
+        "announcement_notifications",
+        "announcement_auto_pin",
+        "announcement_auto_delete_mins",
+        "announcement_restrict_replies",
         # Media locks
         "lock_photo",
         "lock_video",
@@ -451,6 +457,12 @@ async def bulk_update_group_settings(pool, chat_id: int, settings: dict):
         "log_include_preview",
         "log_include_userid",
         "inline_mode_enabled",
+        # Announcement Channel settings
+        "announcement_channel_id",
+        "announcement_notifications",
+        "announcement_auto_pin",
+        "announcement_auto_delete_mins",
+        "announcement_restrict_replies",
         # Media locks
         "lock_photo",
         "lock_video",

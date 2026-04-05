@@ -613,6 +613,13 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         app.add_handler(handler)
     logger.info("[FACTORY] Sangmata handlers registered")
 
+    # Announcement Channel handlers
+    from bot.handlers.announcements import announcement_handlers
+
+    for handler in announcement_handlers:
+        app.add_handler(handler)
+    logger.info("[FACTORY] Announcement handlers registered")
+
     # Language setting handlers
     from bot.handlers.lang_setting import lang_setting_handlers
 

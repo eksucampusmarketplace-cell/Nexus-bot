@@ -1,13 +1,14 @@
 """
 bot/handlers/sangmata.py
 
-Sangmata - Name/Username History Tracker v21
-Tracks first name, last name, username changes passively per message.
+Sangmata - Name/Username History Tracker v22
+Tracks first name, last name, username, and profile photo changes passively per message.
+Supports federation sync for cross-group name history.
 """
 
 import logging
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 from telegram import Update
 from telegram.ext import ChatMemberHandler, ContextTypes, CommandHandler, MessageHandler, filters
@@ -112,8 +113,17 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 log.debug(f"[SANGMATA] Change detected for {user.id}: {'; '.join(changes)}")
                 
                 # F-02: Send real-time alert if enabled
+                change_type = "username" if (prev_first == current_first and prev_last == current_last) else "name"
+                if prev_username != current_username and (prev_first != current_first or prev_last != current_last):
+                    change_type = "both"
+                    
                 await _maybe_send_alert(context.bot, chat.id, user.id, prev_first, prev_last, prev_username,
-                                       current_first, current_last, current_username, conn)
+                                       current_first, current_last, current_username, conn, change_type)
+                
+                # F-07: Sync to federation if enabled
+                await _sync_to_federation(conn, chat.id, user.id,
+                                         current_first, current_last, current_username,
+                                         prev_first, prev_last, prev_username)
             
             # Create/update snapshot using upsert (NH-01 fix: ON CONFLICT to prevent crashes)
             snapshot_id = await conn.fetchval(
@@ -136,8 +146,69 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 snapshot_id, user.id
             )
             
+            # Check if profile photo tracking is enabled and track photos
+            await _maybe_track_photo(conn, context.bot, user, chat.id)
+            
     except Exception as e:
         log.error(f"[SANGMATA] Tracking error for user {user.id}: {e}")
+
+
+async def _maybe_track_photo(conn, bot, user, chat_id: int):
+    """Track profile photo changes if enabled."""
+    try:
+        # Check if photo tracking is enabled
+        track_photos = await conn.fetchval(
+            """SELECT COALESCE(settings->>'name_history_track_photos', 'true')::boolean
+               FROM groups WHERE chat_id = $1""",
+            chat_id
+        )
+        
+        if track_photos is False:
+            return
+        
+        # Get user's profile photos
+        try:
+            photos = await bot.get_user_profile_photos(user.id, limit=1)
+            if photos and photos.photos:
+                current_photo = photos.photos[0][-1]  # Get largest size
+                current_photo_id = str(current_photo.file_id)
+            else:
+                current_photo_id = None
+        except Exception:
+            # Can't access photos (privacy settings or other issue)
+            return
+        
+        # Get last known photo
+        last_photo = await conn.fetchrow(
+            """SELECT photo_id FROM user_snapshots 
+               WHERE user_id = $1 AND source_chat_id = $2""",
+            user.id, chat_id
+        )
+        
+        last_photo_id = last_photo["photo_id"] if last_photo else None
+        
+        # Check if photo changed
+        if last_photo_id != current_photo_id:
+            # Log photo change
+            await conn.execute(
+                """INSERT INTO user_photo_history
+                   (user_id, photo_id, source_chat_id)
+                   VALUES ($1, $2, $3)""",
+                user.id, current_photo_id, chat_id
+            )
+            
+            # Update snapshot with new photo
+            await conn.execute(
+                """UPDATE user_snapshots 
+                   SET photo_id = $1, captured_at = NOW()
+                   WHERE user_id = $2 AND source_chat_id = $3""",
+                current_photo_id, user.id, chat_id
+            )
+            
+            log.debug(f"[SANGMATA] Photo change tracked for user {user.id}")
+            
+    except Exception as e:
+        log.debug(f"[SANGMATA] Photo tracking skipped: {e}")
 
 
 async def track_name_change_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -247,10 +318,19 @@ async def track_name_change_chat_member(update: Update, context: ContextTypes.DE
             log.debug(f"[SANGMATA] ChatMember change detected for {new_user.id}: {'; '.join(changes)}")
             
             # F-02: Send real-time alert if enabled
+            change_type = "username" if (old_user.first_name == new_user.first_name and old_user.last_name == new_user.last_name) else "name"
+            if old_user.username != new_user.username and (old_user.first_name != new_user.first_name or old_user.last_name != new_user.last_name):
+                change_type = "both"
+                
             await _maybe_send_alert(context.bot, chat.id, new_user.id,
                                    old_user.first_name or "", old_user.last_name or "", old_user.username or "",
                                    new_user.first_name or "", new_user.last_name or "", new_user.username or "",
-                                   conn)
+                                   conn, change_type)
+            
+            # F-07: Sync to federation if enabled
+            await _sync_to_federation(conn, chat.id, new_user.id,
+                                     new_user.first_name or "", new_user.last_name or "", new_user.username or "",
+                                     old_user.first_name or "", old_user.last_name or "", old_user.username or "")
     except Exception as e:
         log.error(f"[SANGMATA] ChatMember tracking error: {e}")
 
@@ -258,7 +338,7 @@ async def track_name_change_chat_member(update: Update, context: ContextTypes.DE
 async def _maybe_send_alert(bot, chat_id: int, user_id: int,
                             old_first: str, old_last: str, old_username: str,
                             new_first: str, new_last: str, new_username: str,
-                            conn):
+                            conn, change_type: str = "name"):
     """F-02: Send real-time name change alert if enabled and threshold met."""
     try:
         # Get alert settings from groups table
@@ -293,10 +373,13 @@ async def _maybe_send_alert(bot, chat_id: int, user_id: int,
         # Build mention
         mention = f"<a href='tg://user?id={user_id}'>{new_display}</a>"
         
+        # Emoji based on change type
+        emoji = {"name": "📋", "username": "@️", "photo": "🖼️", "both": "📝"}.get(change_type, "📋")
+        
         # Send alert
         text = (
-            f"📋 <b>Name Change Detected</b>\n\n"
-            f"👤 {mention} changed their name\n"
+            f"{emoji} <b>Name Change Detected</b>\n\n"
+            f"👤 {mention} changed their {change_type}\n"
             f"Was: <code>{old_display}</code>\n"
             f"Now: <code>{new_display}</code>\n"
             f"Total changes: {change_count}"
@@ -307,6 +390,58 @@ async def _maybe_send_alert(bot, chat_id: int, user_id: int,
         
     except Exception as e:
         log.warning(f"[SANGMATA] Failed to send alert: {e}")
+
+
+async def _sync_to_federation(conn, source_chat_id: int, user_id: int, 
+                             first_name: str, last_name: str, username: str,
+                             old_first_name: str, old_last_name: str, old_username: str):
+    """Sync name change to all groups in the same federation."""
+    try:
+        # Get federation sync setting
+        sync_enabled = await conn.fetchval(
+            """SELECT COALESCE(settings->>'name_history_federation_sync', 'false')::boolean
+               FROM groups WHERE chat_id = $1""",
+            source_chat_id
+        )
+        
+        if not sync_enabled:
+            return
+        
+        # Find all federations this group is in
+        fed_ids = await conn.fetch(
+            "SELECT federation_id FROM federation_members WHERE chat_id = $1",
+            source_chat_id
+        )
+        
+        for fed in fed_ids:
+            # Get all other groups in this federation
+            member_chats = await conn.fetch(
+                "SELECT chat_id FROM federation_members WHERE federation_id = $1 AND chat_id != $2",
+                fed["federation_id"], source_chat_id
+            )
+            
+            for member in member_chats:
+                target_chat_id = member["chat_id"]
+                # Check if target has name history enabled
+                target_enabled = await conn.fetchval(
+                    "SELECT name_history_enabled FROM groups WHERE chat_id = $1",
+                    target_chat_id
+                )
+                if target_enabled:
+                    # Insert federated history entry
+                    await conn.execute(
+                        """INSERT INTO user_name_history
+                           (user_id, first_name, last_name, username, source_chat_id,
+                            old_first_name, old_last_name, old_username, is_federated)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE)
+                           ON CONFLICT DO NOTHING""",
+                        user_id, first_name, last_name, username, target_chat_id,
+                        old_first_name, old_last_name, old_username
+                    )
+                    log.debug(f"[SANGMATA] Federated name change to chat {target_chat_id}")
+                    
+    except Exception as e:
+        log.warning(f"[SANGMATA] Federation sync failed: {e}")
 
 
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):

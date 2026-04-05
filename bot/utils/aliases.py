@@ -67,7 +67,7 @@ def get_aliases_for_command(canonical: str) -> list:
     return [alias for alias, cmd in ALIASES.items() if cmd == canonical]
 
 
-def register_aliases(app: Application, handlers: dict):
+def register_aliases(app: Application, handlers: dict, quiet: bool = False):
     """
     Register every alias as a CommandHandler pointing to the same
     function as its canonical command.
@@ -83,9 +83,10 @@ def register_aliases(app: Application, handlers: dict):
             app.add_handler(CommandHandler(cmd, handlers[canonical]))
             count += 1
             logger.debug(f"[ALIAS] Registered {alias} -> {canonical}")
-        else:
+        elif not quiet:
             skipped.append(f"{alias}->{canonical}")
 
-    if skipped:
+    if skipped and not quiet:
         logger.warning(f"[ALIAS] Skipped (no handler): {', '.join(skipped)}")
-    logger.info(f"[ALIAS] Registered {count} aliases")
+    if count > 0 or not quiet:
+        logger.info(f"[ALIAS] Registered {count} aliases")

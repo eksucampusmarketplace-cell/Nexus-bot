@@ -64,6 +64,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         admin_request_callback,
         admin_request_command_handlers,
         handle_admin_mention,
+        cmd_admin_requests,
+        cmd_admin_req_stats,
+        cmd_set_admin_requests,
     )
     from bot.handlers.admin_tools import admin_tool_handlers
     from bot.handlers.advanced_automod import handle_automod_command
@@ -99,7 +102,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         unpin_handler,
     )
     from bot.handlers.errors import error_handler as global_error_handler
-    from bot.handlers.fun import fun_handlers
+    from bot.handlers.fun import fun_handlers, cmd_afk
     from bot.handlers.greetings import (
         goodbye_handler,
         goodbye_preview_handler,
@@ -533,6 +536,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         "/captcha": cmd_captcha,  # bot.handlers.join_approval
         "/antiraid": cmd_antiraid,  # bot.handlers.join_approval
         "/groupinfo": cmd_groupinfo,  # bot.handlers.public
+        "/admin_requests": cmd_admin_requests,
+        "/admin_req_stats": cmd_admin_req_stats,
+        "/set_admin_requests": cmd_set_admin_requests,
+        "/setafk": cmd_afk,
     }
     register_aliases(app, nexus_handlers)
 

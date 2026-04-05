@@ -201,10 +201,10 @@
 
     /* ── AutoMod Page Styles ───────────────────────────────────────────── */
     .section {
-      background: rgb(var(--surface));
+      background: var(--bg-card);
       border-radius: 1rem;
       overflow: hidden;
-      border: 1px solid rgb(var(--border));
+      border: 1px solid var(--border);
       margin-bottom: 0.75rem;
     }
     .section-header {
@@ -218,11 +218,11 @@
     .section-title {
       font-size: var(--text-sm);
       font-weight: var(--fw-semibold);
-      color: rgb(var(--text));
+      color: var(--text-primary);
     }
     .section-toggle {
       font-size: 10px;
-      color: rgb(var(--text-muted));
+      color: var(--text-muted);
       transition: transform 0.2s;
     }
     .section-content {
@@ -261,13 +261,13 @@
     /* Number inputs */
     .number-input {
       width: 5rem;
-      background: rgb(var(--surface-2));
+      background: var(--bg-elevated);
       border-radius: var(--r-lg);
       padding: var(--sp-2) var(--sp-3) var(--sp-1);
       font-size: var(--text-sm);
-      color: rgb(var(--text));
+      color: var(--text-primary);
       text-align: right;
-      border: 1px solid rgb(var(--border));
+      border: 1px solid var(--border);
     }
     .number-input:focus {
       outline: none;
@@ -278,12 +278,12 @@
     .time-input {
       width: 100%;
       margin-top: var(--sp-1);
-      background: rgb(var(--surface-3));
+      background: var(--bg-overlay);
       border-radius: var(--r-lg);
       padding: var(--sp-2) var(--sp-3) var(--sp-1);
       font-size: var(--text-sm);
-      color: rgb(var(--text));
-      border: 1px solid rgb(var(--border));
+      color: var(--text-primary);
+      border: 1px solid var(--border);
     }
     .time-input:focus {
       outline: none;
@@ -301,14 +301,14 @@
       align-items: center;
       gap: var(--sp-3);
       padding: var(--sp-2) var(--sp-3) var(--sp-1);
-      background: rgb(var(--surface-2));
+      background: var(--bg-elevated);
       border-radius: var(--r-xl);
       margin-bottom: var(--sp-2);
-      border: 1px solid rgb(var(--border));
+      border: 1px solid var(--border);
     }
     .rule-priority-item:active {
       cursor: grabbing;
-      background: rgb(var(--surface-3));
+      background: var(--bg-overlay);
     }
 
     /* REGEX */
@@ -578,10 +578,11 @@
         });
         // Listen for settings_change events (e.g., from reset on another device/page)
         sse.on('settings_change', async (data) => {
+          const sseState = getState();
           if (data.reset) {
             // Settings were reset - clear store and re-render current page
-            state.setSettings({});
-            const currentPage = getState().activePage;
+            sseState.setSettings({});
+            const currentPage = sseState.activePage;
             if (currentPage) {
               // Re-render the current page to get fresh settings
               try { await renderPage(currentPage); } catch (e) { console.error('[SSE] Re-render failed:', e); }
@@ -589,7 +590,7 @@
             showToast('Settings were reset', 'success');
           } else if (data.settings) {
             // Merge updated settings into store
-            state.setSettings({ ...getState().settings, ...data.settings });
+            sseState.setSettings({ ...sseState.settings, ...data.settings });
           }
         });
         sse.connect(activeChatId);
@@ -827,6 +828,7 @@
         'language': 'member',
         'persona': 'admin',
         'tickets': 'admin',
+        'modules': 'admin',
       };
       
       const requiredRole = pagePermissions[pageId] || 'member';
@@ -1092,6 +1094,11 @@
         case 'tickets': {
           const { renderTicketsPage } = await import('./src/pages/tickets.js?v=1.6.0');
           await renderTicketsPage(container);
+          break;
+        }
+        case 'modules': {
+          const { renderModulesPage } = await import('./src/pages/modules.js?v=1.6.0');
+          await renderModulesPage(container);
           break;
         }
 

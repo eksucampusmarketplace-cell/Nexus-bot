@@ -7,6 +7,7 @@
 :root {
   /* ── Brand ──────────────────────────────────────────── */
   --accent:         #00d4ff;
+  --accent-rgb:     0, 212, 255;
   --accent-dim:     #00d4ff22;
   --accent-hover:   #00b8e0;
   --violet:         #7c3aed;
@@ -101,10 +102,19 @@
   --bottomnav-h:    64px;
   --content-max:    1200px;
   --panel-w:        380px;
+
+  /* ── RGB channel tokens (for rgb()/rgba() usage) ────── */
+  --surface:        13, 17, 23;
+  --surface-2:      20, 25, 33;
+  --surface-3:      26, 32, 48;
+  --text:           255, 255, 255;
+  --text-muted-rgb: 255, 255, 255;
+  --border-rgb:     255, 255, 255;
 }
 
 /* ── Light theme ─────────────────────────────────────── */
 [data-theme="light"] {
+  --accent-rgb:     0, 212, 255;
   --bg-base:        #f0f4f8;
   --bg-card:        #ffffff;
   --bg-elevated:    #f8fafc;
@@ -118,6 +128,10 @@
   --text-disabled:  #94a3b8;
   --border:         #e2e8f0;
   --border-strong:  #cbd5e1;
+  --surface:        255, 255, 255;
+  --surface-2:      248, 250, 252;
+  --surface-3:      226, 232, 240;
+  --text:           15, 23, 42;
 }
 
 /* ── Custom accent (set via JS) ──────────────────────── */

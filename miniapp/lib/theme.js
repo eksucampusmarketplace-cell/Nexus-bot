@@ -51,6 +51,8 @@ export const ThemeEngine = {
     document.documentElement.style.setProperty('--accent', color);
     document.documentElement.style.setProperty('--accent-dim', color + '22');
     document.documentElement.style.setProperty('--accent-hover', color + 'cc');
+    const rgb = _hexToRgb(color);
+    if (rgb) document.documentElement.style.setProperty('--accent-rgb', rgb);
     localStorage.setItem('nx_accent', color);
     document.dispatchEvent(new CustomEvent('accentchange', { detail: { color } }));
   },
@@ -123,3 +125,9 @@ export const ThemeEngine = {
     }
   }
 };
+
+function _hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  if (!m) return null;
+  return `${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}`;
+}

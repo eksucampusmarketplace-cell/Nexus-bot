@@ -665,9 +665,7 @@
         { id: 'owner', label: 'Owner Panel', icon: '👑', ownerOnly: true },
         { id: 'notifications', label: 'Alerts', icon: '🔔', minRole: 'member' },
         { id: 'trustnet', label: 'TrustNet', icon: '🌐', minRole: 'member' },
-        { id: 'federation', label: 'Federation', icon: '🔗', minRole: 'admin' },
         { id: 'captcha', label: 'Captcha', icon: '🤖', minRole: 'admin' },
-        { id: 'community-vote', label: 'Community Vote', icon: '⚖️', minRole: 'admin' },
         { id: 'night-mode', label: 'Night Mode', icon: '🌙', minRole: 'admin' },
         { id: 'history', label: 'Name History', icon: '📜', minRole: 'admin' },
         { id: 'language', label: 'Language', icon: '🌍', minRole: 'member' },
@@ -1045,8 +1043,9 @@
           break;
         }
         case 'trustnet': {
-          const { renderTrustnetPage } = await import('./src/pages/trustnet.js?v=1.6.0');
-          await renderTrustnetPage(container);
+          // Use unified page combining federation and community vote
+          const { renderTrustnetUnifiedPage } = await import('./src/pages/trustnet_unified.js?v=1.6.0');
+          await renderTrustnetUnifiedPage(container);
           break;
         }
         case 'captcha': {
@@ -1054,11 +1053,7 @@
           await renderCaptchaPage(container);
           break;
         }
-        case 'community-vote': {
-          const { renderCommunityVotePage } = await import('./src/pages/community_vote.js?v=1.6.0');
-          await renderCommunityVotePage(container);
-          break;
-        }
+        // community-vote merged into trustnet unified page
         case 'night-mode': {
           const { renderNightModePage } = await import('./src/pages/night_mode.js?v=1.6.0');
           await renderNightModePage(container);
@@ -1085,8 +1080,9 @@
           break;
         }
         case 'federation': {
-          const { renderFederationPage } = await import('./src/pages/federation.js?v=1.6.0');
-          await renderFederationPage(container);
+          // Redirect to unified trustnet page
+          const { renderTrustnetUnifiedPage } = await import('./src/pages/trustnet_unified.js?v=1.6.0');
+          await renderTrustnetUnifiedPage(container);
           break;
         }
         case 'tickets': {

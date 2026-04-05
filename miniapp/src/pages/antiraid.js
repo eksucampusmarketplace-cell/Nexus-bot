@@ -318,11 +318,20 @@ async function _renderGlobalListTab(container, chatId) {
 
   container.innerHTML = '';
 
+  // Info banner with clear explanation of permissions
   const infoBanner = document.createElement('div');
   infoBanner.style.cssText = 'background:rgba(var(--accent-rgb),0.08);border:1px solid rgba(var(--accent-rgb),0.2);border-radius:var(--r-lg);padding:var(--sp-3);margin-bottom:var(--sp-3);font-size:var(--text-xs);color:var(--text-secondary);';
-  infoBanner.textContent = canManage 
-    ? 'You have permission to manage the global ban list. Users on this list are auto-kicked from all groups.'
-    : 'This is the global ban list. Contact the bot owner to request additions or removals.';
+  if (canManage) {
+    infoBanner.innerHTML = `
+      <strong>🔒 Bot Owner Access</strong><br>
+      You are the bot owner. You can add/remove users from the global ban list. Users on this list are automatically banned from ALL groups using this bot.
+    `;
+  } else {
+    infoBanner.innerHTML = `
+      <strong>🔒 Bot Owner Only</strong><br>
+      The global ban list is managed by the bot owner only. Contact the bot owner to request additions or removals. Regular group admins cannot modify this list.
+    `;
+  }
   container.appendChild(infoBanner);
 
   // Only show add form if user has manage permission

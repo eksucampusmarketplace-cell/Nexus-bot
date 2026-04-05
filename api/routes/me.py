@@ -38,6 +38,19 @@ async def get_user_telegram_status(bot, chat_id: int, user_id: int) -> str:
         else:
             return "none"
     except Exception as e:
+        error_msg = str(e).lower()
+        # User not in chat is expected - not a warning condition
+        if any(x in error_msg for x in ["member not found", "user not found", "chat not found"]):
+            logger.debug(
+                f"[ME] User not in chat | chat_id={chat_id} user_id={user_id}: {e}"
+            )
+            return "none"
+        # Bot not in chat is also expected for stale group records
+        if "bot is not a member" in error_msg:
+            logger.debug(
+                f"[ME] Bot not in chat | chat_id={chat_id}: {e}"
+            )
+            return "none"
         logger.warning(
             f"[ME] Failed to get chat member status | chat_id={chat_id} user_id={user_id}: {e}"
         )

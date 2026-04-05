@@ -227,6 +227,8 @@ class Database:
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS photo_big TEXT;
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS photo_small TEXT;
                 ALTER TABLE groups ADD COLUMN IF NOT EXISTS chat_type VARCHAR DEFAULT 'group';
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS name_history_enabled BOOLEAN DEFAULT FALSE;
+                ALTER TABLE groups ADD COLUMN IF NOT EXISTS name_history_limit INTEGER DEFAULT 10;
 
                 -- Ensure columns exist in users table
                 ALTER TABLE users ADD COLUMN IF NOT EXISTS trust_score INTEGER DEFAULT 50;
@@ -371,6 +373,38 @@ class Database:
                     notify_message_id INTEGER,
                     UNIQUE(group_id, user_id)
                 );
+
+                CREATE TABLE IF NOT EXISTS user_name_history (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id BIGINT NOT NULL,
+                    first_name TEXT,
+                    last_name TEXT,
+                    username TEXT,
+                    old_first_name TEXT,
+                    old_last_name TEXT,
+                    old_username TEXT,
+                    changed_at TIMESTAMPTZ DEFAULT NOW(),
+                    source_chat_id BIGINT,
+                    snapshot_id UUID
+                );
+
+                CREATE TABLE IF NOT EXISTS user_snapshots (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id BIGINT NOT NULL,
+                    first_name TEXT,
+                    last_name TEXT,
+                    username TEXT,
+                    photo_id TEXT,
+                    captured_at TIMESTAMPTZ DEFAULT NOW(),
+                    source_chat_id BIGINT
+                );
+
+                CREATE TABLE IF NOT EXISTS user_history_optout (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id BIGINT NOT NULL UNIQUE,
+                    opted_out_at TIMESTAMPTZ DEFAULT NOW(),
+                    reason TEXT
+                );
             """)
 
             # Create indexes
@@ -391,6 +425,10 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_manual_credits_status ON manual_add_credits(status);
                 CREATE INDEX IF NOT EXISTS idx_force_channel_group ON force_channel_records(group_id);
                 CREATE INDEX IF NOT EXISTS idx_force_channel_user ON force_channel_records(user_id);
+                CREATE INDEX IF NOT EXISTS idx_name_history_user ON user_name_history(user_id);
+                CREATE INDEX IF NOT EXISTS idx_name_history_chat ON user_name_history(source_chat_id);
+                CREATE INDEX IF NOT EXISTS idx_name_history_changed ON user_name_history(changed_at);
+                CREATE INDEX IF NOT EXISTS idx_user_snapshots_user ON user_snapshots(user_id);
             """)
             logger.info("Database schema initialized")
 

@@ -9,10 +9,10 @@ import hmac
 import json
 import logging
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Callable, Dict
 from urllib.parse import parse_qs
 
-from fastapi import HTTPException, Request, status
+from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
 from config import settings
@@ -56,7 +56,10 @@ class RateLimitMiddleware:
             if path.startswith(skip_path):
                 return True
         # Also skip static file extensions
-        static_extensions = ('.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.woff', '.woff2', '.ttf', '.eot')
+        static_extensions = (
+            '.css', '.js', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',
+            '.woff', '.woff2', '.ttf', '.eot'
+        )
         if path.lower().endswith(static_extensions):
             return True
         return False
@@ -88,10 +91,6 @@ class RateLimitMiddleware:
         current_time = time.time()
         window_start = current_time - limit_config["window"]
 
-        # Initialize rate limit bucket for this IP if needed
-        if client_ip not in self.requests:
-            self.requests[client_ip] = {}
-
         # Periodically prune stale IPs (every 2 minutes)
         if current_time - self._last_pruned > 120:
             self._last_pruned = current_time
@@ -109,6 +108,10 @@ class RateLimitMiddleware:
                     stale_ips.append(ip)
             for ip in stale_ips:
                 del self.requests[ip]
+
+        # Initialize rate limit bucket for this IP if needed
+        if client_ip not in self.requests:
+            self.requests[client_ip] = {}
 
         # Clean old requests for this limit type
         if limit_type in self.requests[client_ip]:
@@ -202,7 +205,6 @@ class RateLimitMiddleware:
             # This is a lightweight check - just see if the hash validates with any clone token
             try:
                 from bot.registry import get_all
-                from bot.utils.crypto import hash_token
 
                 received_hash = vals["hash"][0]
                 check_vals = {k: v for k, v in vals.items() if k != "hash"}

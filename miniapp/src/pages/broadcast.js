@@ -135,13 +135,15 @@ function renderBroadcastForm(container, botInfo, isOwner) {
                         content: content
                     })
                 });
-                showToast(`Broadcast started for ${result.total_targets} targets`, 'success');
+                showToast(`Broadcast started. Task ID: ${result.task_id}. Processing ${result.total_targets} targets.`, 'success');
             }
 
             document.getElementById('broadcast-content').value = '';
             renderBroadcastHistory(document.getElementById('broadcast-history-container'), botInfo.id);
         } catch (e) {
-            showToast(e.message || 'Failed to start broadcast', 'error');
+            console.error('[Broadcast] Error:', e);
+            const errorMsg = e.message || e.detail || 'Failed to start broadcast';
+            showToast(errorMsg, 'error');
         } finally {
             document.getElementById('send-broadcast-btn').disabled = false;
             document.getElementById('send-broadcast-btn').textContent = '🚀 Start Broadcast';
@@ -217,7 +219,15 @@ async function renderBroadcastHistory(container, botId) {
             children: listContainer
         }));
     } catch (e) {
-        container.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px;">${t('broadcast_history_error', 'Could not load broadcast history. Please try again later.')}</div>`;
+        console.error('[Broadcast] History load error:', e);
+        container.innerHTML = `
+            <div style="color: var(--text-muted); text-align: center; padding: 20px;">
+                ${t('broadcast_history_error', 'Could not load broadcast history.')}
+                <div style="margin-top: 8px; font-size: var(--text-xs); color: var(--danger);">
+                    ${e.message || e.detail || 'Unknown error'}
+                </div>
+            </div>
+        `;
     }
 }
 

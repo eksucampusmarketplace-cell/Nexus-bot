@@ -77,22 +77,38 @@ async function loadNotesList(chatId, listContainer) {
   try {
     const resp = await apiFetch(`/api/groups/${chatId}/notes`);
     const notes = Array.isArray(resp) ? resp : (resp?.data ?? []);
+
     listContainer.innerHTML = '';
+
     if (!Array.isArray(notes) || notes.length === 0) {
-      listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">' + t('notes_empty', 'No notes yet') + '</div>';
+      listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">' + t('notes_empty', 'No notes yet. Create your first note above.') + '</div>';
       return;
     }
+
     const list = document.createElement('div');
     list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
+
     notes.forEach(n => {
       const item = document.createElement('div');
       item.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:var(--sp-2) var(--sp-3);background:var(--bg-input);border-radius:var(--r-md);';
-      const nameSpan = document.createElement('span');
-      nameSpan.style.cssText = 'font-weight:var(--fw-semibold);font-size:var(--text-sm);';
+
+      const infoDiv = document.createElement('div');
+      infoDiv.style.cssText = 'flex:1;min-width:0;';
+
+      const nameSpan = document.createElement('div');
+      nameSpan.style.cssText = 'font-weight:var(--fw-semibold);font-size:var(--text-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
       nameSpan.textContent = '#' + n.name;
+
+      const contentPreview = document.createElement('div');
+      contentPreview.style.cssText = 'font-size:var(--text-xs);color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      contentPreview.textContent = n.content || 'No content';
+
+      infoDiv.appendChild(nameSpan);
+      infoDiv.appendChild(contentPreview);
+
       const delBtn = document.createElement('button');
       delBtn.className = 'btn btn-danger';
-      delBtn.style.cssText = 'padding:2px 8px;font-size:10px;';
+      delBtn.style.cssText = 'padding:4px 10px;font-size:11px;margin-left:var(--sp-2);flex-shrink:0;';
       delBtn.textContent = 'Delete';
       delBtn.onclick = async () => {
         if (!confirm('Delete note "' + n.name + '"?')) return;
@@ -101,16 +117,27 @@ async function loadNotesList(chatId, listContainer) {
           showToast(t('notes_deleted', 'Note deleted'), 'success');
           await loadNotesList(chatId, listContainer);
         } catch (e) {
-          showToast(t('notes_delete_failed', 'Failed to delete note. Please try again.'), 'error');
+          console.error('[Notes] Delete error:', e);
+          showToast(t('notes_delete_failed', 'Failed to delete note: ') + (e.message || 'Unknown error'), 'error');
         }
       };
-      item.appendChild(nameSpan);
+
+      item.appendChild(infoDiv);
       item.appendChild(delBtn);
       list.appendChild(item);
     });
+
     listContainer.appendChild(list);
   } catch (e) {
+    console.error('[Notes] Load error:', e);
     listContainer.innerHTML = '';
-    listContainer.innerHTML = '<div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">⚠️ ' + t('notes_load_failed', 'Could not load notes. The notes API may not be configured for this group.') + '</div>';
+    listContainer.innerHTML = `
+      <div style="padding:var(--sp-4);text-align:center;color:var(--text-muted);">
+        ⚠️ ${t('notes_load_failed', 'Could not load notes')}
+        <div style="margin-top:8px;font-size:var(--text-xs);color:var(--danger);">
+          ${e.message || 'Unknown error'}
+        </div>
+      </div>
+    `;
   }
 }

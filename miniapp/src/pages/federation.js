@@ -95,8 +95,15 @@ export async function renderFederationPage(container) {
   // Join button
   joinSection.querySelector('#join-fed-btn').onclick = async () => {
     const code = joinSection.querySelector('#invite-code').value.trim();
+    const currentChatId = useStore?.getState()?.activeChatId;
+    
     if (!code) {
       showToast(t('enter_code', 'Please enter an invite code'));
+      return;
+    }
+    
+    if (!currentChatId) {
+      showToast(t('select_group_first', 'Please select a group first'));
       return;
     }
     
@@ -104,13 +111,14 @@ export async function renderFederationPage(container) {
       showToast(t('joining', 'Joining...'));
       await apiFetch('/api/federation/join', {
         method: 'POST',
-        body: JSON.stringify({ invite_code: code })
+        body: JSON.stringify({ invite_code: code, chat_id: currentChatId })
       });
       showToast(t('joined_success', 'Joined federation!'));
       loadFederationData(myFedSection);
     } catch (err) {
       console.error('Failed to join federation:', err);
-      showToast(t('join_failed', 'Failed to join'));
+      const errorMsg = err.message || t('join_failed', 'Failed to join');
+      showToast(errorMsg);
     }
   };
 }
@@ -159,13 +167,27 @@ async function loadFederationData(container) {
       `;
       
       content.querySelector('#create-fed').onclick = async () => {
+        const chatId = useStore?.getState()?.activeChatId;
+        if (!chatId) {
+          showToast(t('select_group_first', 'Please select a group first'));
+          return;
+        }
+        // Prompt for federation name
+        const name = prompt(t('enter_fed_name', 'Enter federation name:'));
+        if (!name || !name.trim()) {
+          return;
+        }
         try {
           showToast(t('creating', 'Creating...'));
-          await apiFetch('/api/federation/create', { method: 'POST' });
+          await apiFetch('/api/federation/create', { 
+            method: 'POST',
+            body: JSON.stringify({ name: name.trim(), chat_id: chatId })
+          });
           showToast(t('created', 'Federation created!'));
           loadFederationData(container);
         } catch (err) {
-          showToast(t('create_failed', 'Failed to create'));
+          console.error('Failed to create federation:', err);
+          showToast(t('create_failed', 'Failed to create') + (err.message ? ': ' + err.message : ''));
         }
       };
     }

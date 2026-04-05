@@ -8,7 +8,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.auth import get_current_user
+from api.auth import get_current_user, require_overlord
 from db.client import db
 from db.ops.automod import update_group_setting
 
@@ -20,12 +20,14 @@ logger = logging.getLogger(__name__)
 async def _get_antiraid_settings(chat_id: int) -> dict:
     """Get merged antiraid settings from columns and JSON."""
     from db.ops.automod import get_group_settings
+
     try:
         settings = await get_group_settings(db.pool, chat_id)
         return settings
     except Exception:
         # Fallback to raw settings
         import json
+
         async with db.pool.acquire() as conn:
             row = await conn.fetchrow("SELECT settings FROM groups WHERE chat_id = $1", chat_id)
         if not row:
@@ -46,13 +48,17 @@ async def get_antiraid_status(chat_id: int, user: dict = Depends(get_current_use
 
         async with db.pool.acquire() as conn:
             active_session = await conn.fetchrow(
-                "SELECT * FROM antiraid_sessions WHERE chat_id = $1 AND is_active = TRUE ORDER BY triggered_at DESC LIMIT 1",
+                "SELECT * FROM antiraid_sessions WHERE chat_id = $1 AND is_active = TRUE "
+                "ORDER BY triggered_at DESC LIMIT 1",
                 chat_id,
             )
-            recent_joins = await conn.fetchval(
-                "SELECT COUNT(*) FROM recent_joins WHERE chat_id = $1 AND joined_at > NOW() - INTERVAL '1 minute'",
-                chat_id,
-            ) or 0
+            recent_joins = (
+                await conn.fetchval(
+                    "SELECT COUNT(*) FROM recent_joins WHERE chat_id = $1 AND joined_at > NOW() - INTERVAL '1 minute'",
+                    chat_id,
+                )
+                or 0
+            )
 
         lockdown_active = bool(active_session)
         threat_level = "low"
@@ -88,11 +94,20 @@ async def get_antiraid_status(chat_id: int, user: dict = Depends(get_current_use
 
 
 @router.put("/settings")
-async def update_antiraid_settings(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
+async def update_antiraid_settings(
+    chat_id: int, body: dict, user: dict = Depends(get_current_user)
+):
     valid_keys = [
-        "antiraid_enabled", "antiraid_mode", "antiraid_threshold",
-        "antiraid_duration_mins", "auto_antiraid_enabled", "auto_antiraid_threshold",
-        "captcha_enabled", "captcha_mode", "captcha_timeout_mins", "captcha_kick_on_timeout",
+        "antiraid_enabled",
+        "antiraid_mode",
+        "antiraid_threshold",
+        "antiraid_duration_mins",
+        "auto_antiraid_enabled",
+        "auto_antiraid_threshold",
+        "captcha_enabled",
+        "captcha_mode",
+        "captcha_timeout_mins",
+        "captcha_kick_on_timeout",
     ]
     try:
         for k in valid_keys:
@@ -108,6 +123,7 @@ async def update_antiraid_settings(chat_id: int, body: dict, user: dict = Depend
 async def activate_lockdown(chat_id: int, body: dict, user: dict = Depends(get_current_user)):
     try:
         from bot.registry import get_all
+
         bots = get_all()
         if not bots:
             raise HTTPException(status_code=503, detail="Bot unavailable")
@@ -116,6 +132,7 @@ async def activate_lockdown(chat_id: int, body: dict, user: dict = Depends(get_c
         reason = body.get("reason", "Manual lockdown via Mini App")
 
         from db.ops.automod import update_group_setting
+
         await update_group_setting(db.pool, chat_id, "antiraid_enabled", True)
 
         try:
@@ -129,7 +146,8 @@ async def activate_lockdown(chat_id: int, body: dict, user: dict = Depends(get_c
         async with db.pool.acquire() as conn:
             await conn.execute(
                 "INSERT INTO antiraid_sessions (chat_id, triggered_by, join_count) VALUES ($1, $2, 0)",
-                chat_id, reason,
+                chat_id,
+                reason,
             )
 
         return {"ok": True, "lockdown": True}
@@ -150,22 +168,41 @@ async def deactivate_lockdown(chat_id: int, user: dict = Depends(get_current_use
             )
 
         from bot.registry import get_all
+
         bots = get_all()
         if bots:
             bot_app = next(iter(bots.values()))
             try:
                 from telegram import ChatPermissions
-                await bot_app.bot.set_chat_permissions(
-                    chat_id,
-                    permissions=ChatPermissions(
+                from telegram import __version__ as PTB_VERSION
+
+                PTB_MAJOR = int(PTB_VERSION.split(".")[0])
+
+                if PTB_MAJOR >= 21:
+                    permissions = ChatPermissions(
+                        can_send_messages=True,
+                        can_send_audios=True,
+                        can_send_documents=True,
+                        can_send_photos=True,
+                        can_send_videos=True,
+                        can_send_video_notes=True,
+                        can_send_voice_notes=True,
+                        can_send_polls=True,
+                        can_send_other_messages=True,
+                        can_add_web_page_previews=True,
+                        can_invite_users=True,
+                    )
+                else:
+                    permissions = ChatPermissions(
                         can_send_messages=True,
                         can_send_media_messages=True,
                         can_send_polls=True,
                         can_send_other_messages=True,
                         can_add_web_page_previews=True,
                         can_invite_users=True,
-                    ),
-                )
+                    )
+
+                await bot_app.bot.set_chat_permissions(chat_id, permissions=permissions)
             except Exception as tg_err:
                 logger.warning(f"[AntiRaid API] Could not restore chat permissions: {tg_err}")
 
@@ -183,11 +220,16 @@ async def list_incidents(chat_id: int, page: int = 1, user: dict = Depends(get_c
         async with db.pool.acquire() as conn:
             rows = await conn.fetch(
                 "SELECT * FROM antiraid_sessions WHERE chat_id = $1 ORDER BY triggered_at DESC LIMIT $2 OFFSET $3",
-                chat_id, limit, offset,
+                chat_id,
+                limit,
+                offset,
             )
-            total = await conn.fetchval(
-                "SELECT COUNT(*) FROM antiraid_sessions WHERE chat_id = $1", chat_id
-            ) or 0
+            total = (
+                await conn.fetchval(
+                    "SELECT COUNT(*) FROM antiraid_sessions WHERE chat_id = $1", chat_id
+                )
+                or 0
+            )
         return {
             "ok": True,
             "data": [dict(r) for r in rows],
@@ -214,14 +256,18 @@ async def list_raiders(chat_id: int, page: int = 1, user: dict = Depends(get_cur
                    WHERE ars.chat_id = $1
                    ORDER BY rm.joined_at DESC
                    LIMIT 20 OFFSET $2""",
-                chat_id, offset,
+                chat_id,
+                offset,
             )
-            total = await conn.fetchval(
-                """SELECT COUNT(*) FROM raid_members rm
+            total = (
+                await conn.fetchval(
+                    """SELECT COUNT(*) FROM raid_members rm
                    JOIN antiraid_sessions ars ON rm.session_id = ars.id
                    WHERE ars.chat_id = $1""",
-                chat_id,
-            ) or 0
+                    chat_id,
+                )
+                or 0
+            )
         return {
             "ok": True,
             "raiders": [dict(r) for r in rows],
@@ -237,17 +283,27 @@ async def list_raiders(chat_id: int, page: int = 1, user: dict = Depends(get_cur
 async def antiraid_stats(chat_id: int, user: dict = Depends(get_current_user)):
     try:
         async with db.pool.acquire() as conn:
-            total_sessions = await conn.fetchval(
-                "SELECT COUNT(*) FROM antiraid_sessions WHERE chat_id = $1", chat_id
-            ) or 0
-            recent_joins = await conn.fetchval(
-                "SELECT COUNT(*) FROM recent_joins WHERE chat_id = $1 AND joined_at > NOW() - INTERVAL '24 hours'",
-                chat_id,
-            ) or 0
-            blocked_joins = await conn.fetchval(
-                "SELECT COUNT(*) FROM member_events WHERE chat_id = $1 AND event_type = 'antiraid_block' AND created_at > NOW() - INTERVAL '7 days'",
-                chat_id,
-            ) or 0
+            total_sessions = (
+                await conn.fetchval(
+                    "SELECT COUNT(*) FROM antiraid_sessions WHERE chat_id = $1", chat_id
+                )
+                or 0
+            )
+            recent_joins = (
+                await conn.fetchval(
+                    "SELECT COUNT(*) FROM recent_joins WHERE chat_id = $1 AND joined_at > NOW() - INTERVAL '24 hours'",
+                    chat_id,
+                )
+                or 0
+            )
+            blocked_joins = (
+                await conn.fetchval(
+                    "SELECT COUNT(*) FROM member_events WHERE chat_id = $1 "
+                    "AND event_type = 'antiraid_block' AND created_at > NOW() - INTERVAL '7 days'",
+                    chat_id,
+                )
+                or 0
+            )
 
         return {
             "ok": True,
@@ -262,6 +318,7 @@ async def antiraid_stats(chat_id: int, user: dict = Depends(get_current_user)):
 
 @global_router.get("/api/antiraid/banlist")
 async def get_global_banlist(page: int = 1, user: dict = Depends(get_current_user)):
+    """Get global ban list - visible to all authenticated users, but only manageable by overlords."""
     try:
         offset = (page - 1) * 50
         async with db.pool.acquire() as conn:
@@ -275,14 +332,16 @@ async def get_global_banlist(page: int = 1, user: dict = Depends(get_current_use
                 """,
                 offset,
             )
-            total = await conn.fetchval(
-                "SELECT COUNT(*) FROM raid_ban_list WHERE is_active = TRUE"
-            ) or 0
+            total = (
+                await conn.fetchval("SELECT COUNT(*) FROM raid_ban_list WHERE is_active = TRUE")
+                or 0
+            )
         return {
             "ok": True,
             "ban_list": [dict(r) for r in rows],
             "total": total,
             "page": page,
+            "can_manage": user.get("is_overlord", False),
         }
     except Exception as e:
         logger.error(f"[AntiRaid API] get_global_banlist error: {e}")
@@ -290,7 +349,8 @@ async def get_global_banlist(page: int = 1, user: dict = Depends(get_current_use
 
 
 @global_router.post("/api/antiraid/banlist")
-async def add_to_global_banlist(body: dict, user: dict = Depends(get_current_user)):
+async def add_to_global_banlist(body: dict, user: dict = Depends(require_overlord)):
+    """Add user to global ban list - requires bot owner (overlord) privileges."""
     user_id = body.get("user_id")
     if not user_id:
         raise HTTPException(400, "user_id required")
@@ -307,6 +367,9 @@ async def add_to_global_banlist(body: dict, user: dict = Depends(get_current_use
                 body.get("chat_id"),
                 body.get("reason", ""),
             )
+        logger.info(
+            f"[AntiRaid API] User {user.get('id')} added user_id={user_id} to global ban list"
+        )
         return {"ok": True}
     except Exception as e:
         logger.error(f"[AntiRaid API] add_to_global_banlist error: {e}")
@@ -314,12 +377,16 @@ async def add_to_global_banlist(body: dict, user: dict = Depends(get_current_use
 
 
 @global_router.delete("/api/antiraid/banlist/{user_id}")
-async def remove_from_global_banlist(user_id: int, user: dict = Depends(get_current_user)):
+async def remove_from_global_banlist(user_id: int, user: dict = Depends(require_overlord)):
+    """Remove user from global ban list - requires bot owner (overlord) privileges."""
     try:
         async with db.pool.acquire() as conn:
             await conn.execute(
                 "UPDATE raid_ban_list SET is_active = FALSE WHERE user_id = $1", user_id
             )
+        logger.info(
+            f"[AntiRaid API] User {user.get('id')} removed user_id={user_id} from global ban list"
+        )
         return {"ok": True}
     except Exception as e:
         logger.error(f"[AntiRaid API] remove_from_global_banlist error: {e}")

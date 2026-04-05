@@ -36,13 +36,18 @@ export async function renderTicketsPage(container) {
       <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">🎫 Support Tickets</h2>
       <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;" id="tickets-count">Loading...</p>
     </div>
-    <div style="display:flex;gap:var(--sp-2);">
-      <button id="btn-analytics" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);">📊 Analytics</button>
-      <button id="btn-sla" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);">⏱️ SLA</button>
-      <button id="btn-templates" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);">📝 Templates</button>
-    </div>
   `;
   container.appendChild(header);
+
+  // Info banner explaining the ticket system
+  const infoBanner = document.createElement('div');
+  infoBanner.style.cssText = 'background:rgba(var(--accent-rgb),0.08);border:1px solid rgba(var(--accent-rgb),0.2);border-radius:var(--r-lg);padding:var(--sp-3);margin-bottom:var(--sp-4);font-size:var(--text-xs);color:var(--text-secondary);';
+  infoBanner.innerHTML = `
+    <strong>📋 How Tickets Work:</strong><br>
+    Members use <code>/ticket</code> to create support tickets. Admins view, respond to, and close tickets here. 
+    Tickets can be assigned, prioritized, and escalated. Auto-close after 7 days of inactivity.
+  `;
+  container.appendChild(infoBanner);
 
   // ── Tab Navigation ──────────────────────────────────────────────────────
   const tabBar = document.createElement('div');

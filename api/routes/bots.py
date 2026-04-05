@@ -103,6 +103,74 @@ async def list_bots(user: dict = Depends(get_current_user)):
     return bots
 
 
+@router.get("/webhook-health")
+async def get_webhook_health(user: dict = Depends(get_current_user)):
+    """Get real-time webhook health status for all bots owned by user."""
+    from db.client import db
+    from bot.utils.crypto import decrypt_token
+
+    if not db.pool:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    user_id = user.get("id")
+    bots = await get_bots_by_owner(db.pool, user_id)
+
+    results = []
+    for bot in bots:
+        try:
+            token = decrypt_token(bot["token_encrypted"])
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"https://api.telegram.org/bot{token}/getWebhookInfo"
+                )
+                webhook_info = resp.json().get("result", {})
+
+                # Check if webhook is properly configured
+                webhook_url = webhook_info.get("url", "")
+                last_error = webhook_info.get("last_error_message", "")
+                pending_count = webhook_info.get("pending_update_count", 0)
+
+                # Webhook is healthy if it has a URL set and no recent errors
+                is_healthy = bool(
+                    webhook_url
+                    and not last_error
+                    and pending_count == 0
+                )
+
+                results.append({
+                    "bot_id": bot["bot_id"],
+                    "username": bot["username"],
+                    "is_primary": bot["is_primary"],
+                    "webhook_healthy": is_healthy,
+                    "webhook_url": webhook_url,
+                    "last_error": last_error,
+                    "pending_updates": pending_count,
+                })
+        except Exception as e:
+            logger.warning(f"[API] Failed to check webhook health for bot {bot['bot_id']}: {e}")
+            results.append({
+                "bot_id": bot["bot_id"],
+                "username": bot["username"],
+                "is_primary": bot["is_primary"],
+                "webhook_healthy": False,
+                "webhook_url": None,
+                "last_error": str(e),
+                "pending_updates": None,
+            })
+
+    # Calculate summary stats
+    total_bots = len(results)
+    healthy_bots = sum(1 for r in results if r["webhook_healthy"])
+    unhealthy_bots = total_bots - healthy_bots
+
+    return {
+        "total": total_bots,
+        "healthy": healthy_bots,
+        "unhealthy": unhealthy_bots,
+        "bots": results,
+    }
+
+
 @router.post("/clone")
 async def clone_bot(request: Request, user: dict = Depends(get_current_user)):
     """

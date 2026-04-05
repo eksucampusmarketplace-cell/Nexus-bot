@@ -48,6 +48,53 @@ async def list_federations_legacy(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Failed to fetch federations")
 
 
+@legacy_router.post("/create")
+async def create_federation_legacy(body: dict, user: dict = Depends(get_current_user)):
+    """Create a new federation (legacy endpoint)."""
+    user_id = user.get("id")
+    name = body.get("name", "").strip()
+    chat_id = body.get("chat_id")
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Federation name is required")
+
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="chat_id is required")
+
+    import secrets
+    import string
+
+    invite_code = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+    invite_code = f"FED-{invite_code}"
+
+    try:
+        async with db.pool.acquire() as conn:
+            # Create federation
+            fed_id = await conn.fetchval(
+                """INSERT INTO federations (owner_id, name, invite_code)
+                   VALUES ($1, $2, $3)
+                   RETURNING id""",
+                user_id,
+                name,
+                invite_code,
+            )
+
+            # Add the group as the first member
+            await conn.execute(
+                """INSERT INTO federation_members (federation_id, chat_id, joined_at, joined_by)
+                   VALUES ($1, $2, NOW(), $3)""",
+                fed_id,
+                chat_id,
+                user_id,
+            )
+
+        logger.info(f"[FEDERATION] Created federation {fed_id} '{name}' for user {user_id}")
+        return {"id": fed_id, "name": name, "invite_code": invite_code, "owner_id": user_id}
+    except Exception as e:
+        logger.error(f"Failed to create federation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create federation")
+
+
 @legacy_router.get("/federations")
 async def list_federations_v2(user: dict = Depends(get_current_user)):
     """List all federations owned by the user."""

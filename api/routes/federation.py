@@ -101,6 +101,76 @@ async def list_federations_v2(user: dict = Depends(get_current_user)):
     return await list_federations_legacy(user)
 
 
+@legacy_router.post("/join")
+async def join_federation_legacy(body: dict, user: dict = Depends(require_auth)):
+    """Join a federation using an invite code."""
+    user_id = user.get("id")
+    invite_code = body.get("invite_code", "").strip().upper()
+    chat_id = body.get("chat_id")
+
+    if not invite_code:
+        raise HTTPException(status_code=400, detail="Invite code is required")
+
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="chat_id is required")
+
+    # Verify user is admin of the group they want to add
+    from bot.registry import get_all
+
+    bots = get_all()
+    is_admin = False
+
+    for bot_app in bots.values():
+        try:
+            member = await bot_app.bot.get_chat_member(chat_id, user_id)
+            if member.status in ["creator", "administrator"]:
+                is_admin = True
+                break
+        except Exception:
+            continue
+
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Not an admin of this group")
+
+    try:
+        async with db.pool.acquire() as conn:
+            # Find federation by invite code
+            fed = await conn.fetchrow(
+                "SELECT id, owner_id FROM federations WHERE invite_code = $1",
+                invite_code,
+            )
+
+            if not fed:
+                raise HTTPException(status_code=404, detail="Invalid invite code")
+
+            # Check if group is already in this federation
+            existing = await conn.fetchval(
+                "SELECT 1 FROM federation_members WHERE federation_id = $1 AND chat_id = $2",
+                fed["id"],
+                chat_id,
+            )
+
+            if existing:
+                raise HTTPException(status_code=409, detail="Group is already in this federation")
+
+            # Add group to federation
+            await conn.execute(
+                """INSERT INTO federation_members (federation_id, chat_id, joined_at, joined_by)
+                   VALUES ($1, $2, NOW(), $3)""",
+                fed["id"],
+                chat_id,
+                user_id,
+            )
+
+        logger.info(f"[FEDERATION] User {user_id} added chat {chat_id} to federation {fed['id']}")
+        return {"ok": True, "federation_id": fed["id"]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to join federation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to join federation")
+
+
 @legacy_router.get("/federations/{fed_id}")
 async def get_federation_legacy(fed_id: str, user: dict = Depends(get_current_user)):
     """Get federation details."""
@@ -214,8 +284,8 @@ async def update_group_personality(
 ):
     """Update personality settings for a group."""
     try:
-        updates = []
-        values = []
+        updates: list[str] = []
+        values: list = []
 
         if tone is not None:
             updates.append("persona_tone = $" + str(len(values) + 1))

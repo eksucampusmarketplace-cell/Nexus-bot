@@ -1311,6 +1311,6 @@ def register_handlers(app):
         "/invitedby": invitedby_command,
         "/whoinvited": invitedby_command,
     }
-    register_aliases(app, booster_aliases)
+    register_aliases(app, booster_aliases, quiet=True)
 
     logger.info("[BOOSTER] All handlers registered")

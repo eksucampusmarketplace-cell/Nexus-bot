@@ -824,5 +824,11 @@ try:
     app.include_router(analytics_dashboard_api.router, tags=["analytics_dashboard"])
     logger.info("[STARTUP] ✅ Analytics Dashboard route registered")
 
+    # Banned Symbols API route (UltraPro feature)
+    from api.routes import banned_symbols as banned_symbols_api
+
+    app.include_router(banned_symbols_api.router, tags=["banned_symbols"])
+    logger.info("[STARTUP] ✅ Banned Symbols API route registered")
+
 except ImportError as e:
     logger.warning(f"Failed to load API routers: {e}")

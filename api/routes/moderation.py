@@ -215,6 +215,8 @@ VALID_LOCK_KEYS = {
     "document",
     "link",
     "forward",
+    "forward_bot",
+    "forward_channel",
     "poll",
     "contact",
     "video_note",

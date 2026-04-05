@@ -100,6 +100,7 @@ export async function renderHistoryPage(container) {
         body: { enabled, limit }
       });
       showToast(t('toast_save_success', 'Saved successfully!'));
+      loadRecentHistory(chatId, enabled);
     } catch (err) {
       console.error('Failed to save history settings:', err);
       showToast(t('error', 'Failed to save'));
@@ -107,18 +108,34 @@ export async function renderHistoryPage(container) {
   };
 
   // Load recent history (chatId passed as parameter, not relying on closure of undefined var)
-  loadRecentHistory(chatId);
+  loadRecentHistory(chatId, currentEnabled);
 }
 
-async function loadRecentHistory(chatId) {
+async function loadRecentHistory(chatId, isEnabled) {
   const list = document.getElementById('history-list');
   if (!list) return;
+
+  if (!isEnabled) {
+    list.innerHTML = `
+      <div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);font-size:0.85rem">
+        ${t('history_disabled', 'Enable tracking above to start recording name changes')}
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = `<div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);font-size:0.85rem">${t('loading', 'Loading...')}</div>`;
 
   try {
     const raw = await apiFetch(`/api/groups/${chatId}/name-history/recent`).catch(() => []);
     const history = Array.isArray(raw) ? raw : (raw?.entries ?? []);
 
     if (!history || history.length === 0) {
+      list.innerHTML = `
+        <div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);font-size:0.85rem">
+          ${t('no_history', 'No recent name changes')}
+        </div>
+      `;
       return;
     }
 
@@ -136,6 +153,11 @@ async function loadRecentHistory(chatId) {
     });
   } catch (err) {
     console.error('Failed to load history:', err);
+    list.innerHTML = `
+      <div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);font-size:0.85rem">
+        ${t('error', 'Failed to load history')}
+      </div>
+    `;
   }
 }
 

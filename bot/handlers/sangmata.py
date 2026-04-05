@@ -75,13 +75,16 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
             current_first = user.first_name or ""
             current_last = user.last_name or ""
             current_username = user.username or ""
-            
-            # Check for changes
+
+            # Check for changes (normalize NULL from DB to empty string for comparison)
             if last_snapshot:
+                prev_first = last_snapshot["first_name"] or ""
+                prev_last = last_snapshot["last_name"] or ""
+                prev_username = last_snapshot["username"] or ""
                 changed = (
-                    last_snapshot["first_name"] != current_first or
-                    last_snapshot["last_name"] != current_last or
-                    last_snapshot["username"] != current_username
+                    prev_first != current_first or
+                    prev_last != current_last or
+                    prev_username != current_username
                 )
 
                 if not changed:
@@ -89,12 +92,12 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
                 # Record what changed
                 changes = []
-                if last_snapshot["first_name"] != current_first:
-                    changes.append(f"first_name: {last_snapshot['first_name']} → {current_first}")
-                if last_snapshot["last_name"] != current_last:
-                    changes.append(f"last_name: {last_snapshot['last_name']} → {current_last}")
-                if last_snapshot["username"] != current_username:
-                    old_un = last_snapshot["username"] or "(none)"
+                if prev_first != current_first:
+                    changes.append(f"first_name: {prev_first} → {current_first}")
+                if prev_last != current_last:
+                    changes.append(f"last_name: {prev_last} → {current_last}")
+                if prev_username != current_username:
+                    old_un = prev_username or "(none)"
                     new_un = current_username or "(none)"
                     changes.append(f"username: @{old_un} → @{new_un}")
 
@@ -105,7 +108,7 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         old_first_name, old_last_name, old_username)
                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                     user.id, current_first, current_last, current_username, chat.id,
-                    last_snapshot["first_name"], last_snapshot["last_name"], last_snapshot["username"]
+                    prev_first, prev_last, prev_username
                 )
 
                 log.debug(f"[SANGMATA] Change detected for {user.id}: {'; '.join(changes)}")

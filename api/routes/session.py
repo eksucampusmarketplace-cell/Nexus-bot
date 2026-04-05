@@ -40,7 +40,7 @@ async def convert_session(body: dict, user: dict = Depends(get_current_user)):
             raise ValueError("Session string too short")
 
         # GramJS StringSession format: version(1) + dc_id(4) + ip_bytes(4) + port(2) + auth_key(256)
-        version = decoded[0]
+        # version is extracted but not used for conversion (format is compatible)
         dc_id = struct.unpack_from(">I", decoded, 1)[0]
         ip_bytes = decoded[5:9]
         port = struct.unpack_from(">H", decoded, 9)[0]
@@ -78,3 +78,10 @@ async def get_session_config():
         "api_id": int(settings.TG_API_ID or 0),
         "api_hash": settings.TG_API_HASH or "",
     }
+
+
+@router.get("/api/session/status")
+async def get_session_status():
+    """Check if session conversion is configured (TG_API_ID and TG_API_HASH set)."""
+    configured = bool(settings.TG_API_ID and settings.TG_API_HASH)
+    return {"configured": configured}

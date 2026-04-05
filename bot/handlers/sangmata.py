@@ -297,14 +297,12 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 target_id
             )
             
-            # Get current snapshot
+            # Get current snapshot (direct lookup with composite key)
             current = await conn.fetchrow(
                 """SELECT first_name, last_name, username
                    FROM user_snapshots
-                   WHERE user_id = $1
-                   ORDER BY captured_at DESC
-                   LIMIT 1""",
-                target_id
+                   WHERE user_id = $1 AND source_chat_id = $2""",
+                target_id, chat.id
             )
             
             # Check optout status

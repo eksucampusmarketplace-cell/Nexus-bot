@@ -185,6 +185,8 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         document_locked = bool(locks.get("document"))
         link_locked = bool(locks.get("link"))
         forward_locked = bool(locks.get("forward"))
+        forward_bot_locked = bool(locks.get("forward_bot"))
+        forward_channel_locked = bool(locks.get("forward_channel"))
         poll_locked = bool(locks.get("poll"))
         contact_locked = bool(locks.get("contact"))
         video_notes_locked = bool(locks.get("video_note"))
@@ -208,6 +210,10 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ):
             delete = True
         elif forward_locked and message.forward_from_chat:
+            delete = True
+        elif forward_bot_locked and message.forward_from and message.forward_from.is_bot:
+            delete = True
+        elif forward_channel_locked and message.forward_from_chat and message.forward_from_chat.type == "channel":
             delete = True
         elif poll_locked and message.poll:
             delete = True

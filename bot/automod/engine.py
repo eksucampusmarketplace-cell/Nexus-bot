@@ -548,6 +548,9 @@ def _content_matches_rule(msg, content_type: str, rule_key: str) -> bool:
         "username": lambda m: _has_username(m),
         "hashtag": lambda m: _has_hashtag(m),
         "forward": lambda m: m.forward_date is not None,
+        "forward_bot": lambda m: (
+            m.forward_from is not None and m.forward_from.is_bot
+        ),
         "forward_channel": lambda m: (
             m.forward_from_chat is not None and m.forward_from_chat.type == "channel"
         ),
@@ -597,6 +600,7 @@ def _rule_reason(rule_key: str) -> str:
         "audio": "Audio files are not allowed",
         "file": "File uploads are not allowed",
         "forward": "Forwarded messages are not allowed",
+        "forward_bot": "Forwarding from bots is not allowed",
         "forward_channel": "Forwarding from channels is not allowed",
         "game": "Games are not allowed",
         "poll": "Polls are not allowed",

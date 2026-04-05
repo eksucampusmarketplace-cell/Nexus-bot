@@ -151,6 +151,8 @@ _LOCK_KEY_TO_SHORT = {
     "lock_document": "document",
     "lock_link": "link",
     "lock_forward": "forward",
+    "lock_forward_bot": "forward_bot",
+    "lock_forward_channel": "forward_channel",
     "lock_poll": "poll",
     "lock_contact": "contact",
     "lock_username": "username",
@@ -271,6 +273,8 @@ async def update_settings(chat_id: int, settings: dict, user: dict = Depends(get
         "lock_document": "document",
         "lock_link": "link",
         "lock_forward": "forward",
+        "lock_forward_bot": "forward_bot",
+        "lock_forward_channel": "forward_channel",
         "lock_poll": "poll",
         "lock_contact": "contact",
     }
@@ -375,6 +379,8 @@ async def bulk_update_settings(
         "lock_document": "document",
         "lock_link": "link",
         "lock_forward": "forward",
+        "lock_forward_bot": "forward_bot",
+        "lock_forward_channel": "forward_channel",
         "lock_poll": "poll",
         "lock_contact": "contact",
     }

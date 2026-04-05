@@ -24,7 +24,7 @@ export const RULE_TEMPLATES = [
     description: 'Text and files only. No media spam. Strict flood control.',
     settings: {
       lock_sticker: true, lock_gif: true,
-      lock_voice: false, lock_file: false,
+      lock_voice: false, lock_document: false,
       antiflood: true, antiflood_limit: 5, antiflood_action: 'mute',
       min_words: 3,
       warn_enabled: true, warn_max: 2, warn_action: 'ban_24h',
@@ -63,7 +63,7 @@ export const RULE_TEMPLATES = [
     settings: {
       lock_text: true, lock_photo: true,
       lock_video: true, lock_sticker: true,
-      lock_file: true, lock_voice: true,
+      lock_document: true, lock_voice: true,
       lock_gif: true, lock_forward: true,
     },
   },
@@ -76,7 +76,7 @@ export const RULE_TEMPLATES = [
       lock_username: true, lock_forward: true,
       lock_photo: true, lock_video: true,
       lock_sticker: true, lock_gif: true,
-      lock_voice: true, lock_file: true,
+      lock_voice: true, lock_document: true,
       lock_unofficial_tg: true, lock_userbots: true,
       lock_bot: true, lock_bot_inviter: true,
       lock_porn: true, lock_hashtag: true,

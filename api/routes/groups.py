@@ -141,22 +141,43 @@ async def get_settings(chat_id: int, user=Depends(get_current_user)):
     return {"status": "ok", "settings": s}
 
 
+_LOCK_KEY_TO_SHORT = {
+    "lock_photo": "photo",
+    "lock_video": "video",
+    "lock_sticker": "sticker",
+    "lock_gif": "gif",
+    "lock_voice": "voice",
+    "lock_audio": "audio",
+    "lock_document": "document",
+    "lock_link": "link",
+    "lock_forward": "forward",
+    "lock_poll": "poll",
+    "lock_contact": "contact",
+    "lock_username": "username",
+    "lock_bot": "bot",
+    "lock_bot_inviter": "bot_inviter",
+    "lock_website": "website",
+    "lock_channel": "forward_channel",
+    "lock_hashtag": "hashtag",
+    "lock_unofficial_tg": "unofficial_tg",
+    "lock_userbots": "userbots",
+    "lock_text": "text",
+    "lock_no_caption": "no_caption",
+    "lock_emoji": "emoji",
+    "lock_emoji_only": "emoji_only",
+    "lock_porn": "porn",
+    "lock_spoiler": "spoiler",
+}
+
+
 def _normalize_settings(incoming: dict, existing: dict):
     if "locks" not in existing:
         existing["locks"] = {}
-    # Pop lock_* keys from incoming and move them to existing["locks"]
-    # This prevents double-processing (flat keys also being written as JSONB)
     for k in list(incoming.keys()):
         if k.startswith("lock_"):
-            existing["locks"][k[5:]] = incoming.pop(k)
+            short = _LOCK_KEY_TO_SHORT.get(k, k[5:])
+            existing["locks"][short] = incoming[k]
     incoming["locks"] = existing["locks"]
-
-    if "antiflood_limit" in incoming:
-        incoming["flood_threshold"] = incoming.pop("antiflood_limit")
-    if "antiflood_window" in incoming:
-        incoming["flood_window_sec"] = incoming.pop("antiflood_window")
-    if incoming.get("antiflood") is False:
-        incoming["flood_threshold"] = 0
 
     if "automod" not in existing:
         existing["automod"] = {}
@@ -164,10 +185,10 @@ def _normalize_settings(incoming: dict, existing: dict):
         if "antiflood" not in existing["automod"]:
             existing["automod"]["antiflood"] = {}
         existing["automod"]["antiflood"]["enabled"] = incoming["antiflood"]
-        if "flood_threshold" in incoming:
-            existing["automod"]["antiflood"]["flood_threshold"] = incoming["flood_threshold"]
-        if "flood_window_sec" in incoming:
-            existing["automod"]["antiflood"]["flood_window_sec"] = incoming["flood_window_sec"]
+        if "antiflood_limit" in incoming:
+            existing["automod"]["antiflood"]["flood_threshold"] = incoming["antiflood_limit"]
+        if "antiflood_window" in incoming:
+            existing["automod"]["antiflood"]["flood_window_sec"] = incoming["antiflood_window"]
     if "antilink" in incoming:
         if "antilink" not in existing["automod"]:
             existing["automod"]["antilink"] = {}

@@ -188,14 +188,12 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 
             from bot.antiraid.detector import MemberProfile, RaidDetector
 
+            # Create enhanced profile with all signals
             detector = RaidDetector(context.bot_data.get("redis"), db, context.bot)
-            profile = MemberProfile(
-                user_id=user.id,
-                joined_at=time.time(),
-                has_username=bool(user.username),
-                first_name=user.first_name or "",
-                username=user.username or "",
-            )
+            
+            # Create profile from user - includes API calls for photo check and age estimation
+            profile = await detector.create_profile_from_user(user, context.bot)
+            
             threat_level = await detector.on_member_join(chat.id, profile)
 
             if threat_level in ("red", "critical"):
@@ -203,6 +201,12 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 
                 lockdown = LockdownManager(context.bot_data.get("redis"), db, context.bot)
                 await lockdown.activate(chat.id, f"Raid detected ({threat_level})")
+            
+            # Check if captcha is required based on suspicion score
+            if threat_level == "captcha_required":
+                # Force captcha even if group settings don't require it
+                settings["captcha_enabled"] = True
+                settings["antiraid_mode"] = "captcha"
         except Exception as e:
             log.error(f"New anti-raid check failed: {e}")
         # ──────────────────────────────────────────────────────────────────────

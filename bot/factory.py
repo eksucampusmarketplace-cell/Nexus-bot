@@ -343,6 +343,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # Bug #98 fix: Move message_guard to group=6 to avoid conflict with captcha_message at group=0
     app.add_handler(MessageHandler(GROUP & filters.ALL, message_guard), group=6)
 
+    # ── Anti-raid message spam detection ────────────────────────────────────
+    from bot.antiraid.message_spam import register_message_spam_handler
+    register_message_spam_handler(app)
+
     # ── Full report system (replaces stub report_handler for new commands) ──
     for h in full_report_handlers:
         app.add_handler(h)

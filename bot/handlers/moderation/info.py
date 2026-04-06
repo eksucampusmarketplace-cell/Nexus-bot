@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -20,7 +18,8 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target.id,
     )
     is_muted = await db.fetchval(
-        "SELECT EXISTS(SELECT 1 FROM mutes WHERE chat_id = $1 AND user_id = $2 AND is_active = TRUE)",
+        "SELECT EXISTS(SELECT 1 FROM mutes WHERE chat_id = $1 AND user_id = $2 "
+        "AND is_active = TRUE)",
         chat_id,
         target.id,
     )
@@ -40,7 +39,44 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text += "📊 *In this group:*\n"
     text += f"├ Status: {status}\n"
     text += f"├ Warnings: {warn_count}/3\n"
-    text += f"└ Muted: {'Yes' if is_muted else 'No'}\n"
+    text += f"└ Muted: {'Yes' if is_muted else 'No'}\n\n"
+    text += "📜 Use `/history` to see full moderation history."
+
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    target, _ = await resolve_target(update, context)
+    if not target:
+        target = update.effective_user
+
+    # Fetch last 15 moderation actions for this user in this chat
+    history = await db.fetch(
+        "SELECT action, admin_name, reason, duration, done_at FROM mod_logs "
+        "WHERE chat_id = $1 AND target_id = $2 "
+        "ORDER BY done_at DESC LIMIT 15",
+        chat_id,
+        target.id,
+    )
+
+    if not history:
+        await update.message.reply_text(
+            f"✅ No moderation history for {await mention_user(target)}", parse_mode="Markdown"
+        )
+        return
+
+    text = f"📜 *Moderation History for* {await mention_user(target)}:\n\n"
+    for i, row in enumerate(history, 1):
+        action = row["action"].upper()
+        admin = row["admin_name"] or "Unknown Admin"
+        reason = row["reason"] or "No reason"
+        date = row["done_at"].strftime("%b %d, %H:%M")
+
+        text += f"{i}. *{action}* — {date}\n"
+        text += f"   └ 👮 {admin} | 📋 {reason}\n"
+        if row["duration"]:
+            text += f"   └ ⏱ Duration: {row['duration']}\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
 

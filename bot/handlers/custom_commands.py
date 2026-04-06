@@ -277,7 +277,7 @@ async def _evaluate_condition(
         return bool(re.search(url_pattern, text, re.IGNORECASE))
 
     if cond_type == "is_forwarded":
-        return bool(msg and msg.forward_origin)
+        return bool(getattr(msg, "forward_date", False))
 
     if cond_type == "user_id_match":
         target_id = condition.get("user_id", 0)
@@ -770,7 +770,7 @@ def _match_trigger(trigger: dict, message_text: str, is_command: bool, update: U
     if trigger_type == "forwarded":
         if not msg:
             return False
-        return bool(msg.forward_origin)
+        return bool(getattr(msg, "forward_date", False))
 
     if trigger_type == "is_reply":
         if not msg:

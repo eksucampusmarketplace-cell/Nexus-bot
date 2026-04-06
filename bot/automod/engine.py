@@ -32,10 +32,11 @@ Logs prefix: [AUTOMOD]
 import hashlib
 import logging
 import re
-from dataclasses import dataclass
-from datetime import datetime
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
-from telegram import Update
+from telegram import Message, Update
 from telegram.ext import ContextTypes
 
 from api.routes.events import push_event
@@ -74,7 +75,9 @@ class AutomodResult:
     actioned: bool = False
 
 
-async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> AutomodResult:
+async def check_message(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> AutomodResult:
     """
     Main entry point. Called for every message.
     Returns AutomodResult — caller doesn't need to do anything else.
@@ -83,13 +86,13 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
     chat = update.effective_chat
     user = update.effective_user
     db = context.bot_data.get("db")
+    bot_id = context.bot.id
 
     if not msg or not user or not chat:
         return AutomodResult()
 
     # Load settings
     from bot.utils.crypto import hash_token
-
     token_hash = hash_token(context.bot.token)
     settings = await get_group_settings(db, chat.id, token_hash)
     if not settings:
@@ -114,7 +117,9 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
     # ── 3. Silent time check ──────────────────────────────────────────────
     silent_times = await get_silent_times(db, chat.id)
     for slot in silent_times:
-        if slot["is_active"] and is_in_time_window(now_time, slot["start_time"], slot["end_time"]):
+        if slot["is_active"] and is_in_time_window(
+            now_time, slot["start_time"], slot["end_time"]
+        ):
             await msg.delete()
             return AutomodResult(
                 violated=True,
@@ -157,7 +162,9 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
         # Violation found — get penalty
         penalty_row = penalties.get(rule_key)
         penalty = (
-            penalty_row["penalty"] if penalty_row else settings.get("default_penalty", "delete")
+            penalty_row["penalty"]
+            if penalty_row
+            else settings.get("default_penalty", "delete")
         )
         duration = penalty_row["duration_hours"] if penalty_row else 0
 
@@ -182,7 +189,7 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
                 violated=True,
                 rule_key="spam_pattern",
                 penalty=settings.get("default_penalty", "delete"),
-                reason="Matched spam pattern",
+                reason=f"Matched spam pattern",
             )
             await _enforce(msg, user, chat, context, settings, result, 0)
             await _push_sse(context, chat, user, result)
@@ -294,7 +301,9 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
         ]
         for limit, actual, op, reason in checks:
             if limit > 0:
-                violated = (op == "<" and actual < limit) or (op == ">" and actual > limit)
+                violated = (op == "<" and actual < limit) or (
+                    op == ">" and actual > limit
+                )
                 if violated:
                     result = AutomodResult(
                         violated=True,
@@ -333,7 +342,7 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
                         violated=True,
                         rule_key="regex",
                         penalty=p.get("penalty", "delete"),
-                        reason="Message matched pattern",
+                        reason=f"Message matched pattern",
                     )
                     await _enforce(msg, user, chat, context, settings, result, 0)
                     return result
@@ -361,7 +370,9 @@ async def check_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> A
     return AutomodResult()
 
 
-async def _enforce(msg, user, chat, context, settings, result: AutomodResult, duration_hours: int):
+async def _enforce(
+    msg, user, chat, context, settings, result: AutomodResult, duration_hours: int
+):
     """Delete message, apply penalty, send admonition."""
     db = context.bot_data.get("db")
     bot = context.bot
@@ -386,7 +397,9 @@ async def _enforce(msg, user, chat, context, settings, result: AutomodResult, du
         await _record_warning(context, chat.id, user.id, settings)
 
     # Log event
-    event_type = result.penalty if result.penalty in ("ban", "mute", "kick") else "delete"
+    event_type = (
+        result.penalty if result.penalty in ("ban", "mute", "kick") else "delete"
+    )
     preview = (msg.text or "")[:200] if result.deleted else ""
     await log_event(
         bot=bot,
@@ -499,7 +512,9 @@ async def _push_sse(context, chat, user, result: AutomodResult):
             owner_id,
             {
                 "type": (
-                    "message_delete" if result.penalty == "delete" else "member_" + result.penalty
+                    "message_delete"
+                    if result.penalty == "delete"
+                    else "member_" + result.penalty
                 ),
                 "title": f"AutoMod: {result.rule_key}",
                 "body": f"{user.full_name} — {result.reason}",
@@ -532,15 +547,12 @@ def _content_matches_rule(msg, content_type: str, rule_key: str) -> bool:
         "website": lambda m: _has_website(m),
         "username": lambda m: _has_username(m),
         "hashtag": lambda m: _has_hashtag(m),
-        "forward": lambda m: m.forward_origin is not None,
+        "forward": lambda m: m.forward_date is not None,
         "forward_bot": lambda m: (
-            m.forward_origin is not None
-            and m.forward_origin.type == "user"
-            and getattr(m.forward_origin, "sender_user", None)
-            and m.forward_origin.sender_user.is_bot
+            m.forward_from is not None and m.forward_from.is_bot
         ),
         "forward_channel": lambda m: (
-            m.forward_origin is not None and m.forward_origin.type == "channel"
+            m.forward_from_chat is not None and m.forward_from_chat.type == "channel"
         ),
         "slash": lambda m: (m.text and m.text.startswith("/")),
         "no_caption": lambda m: ((m.photo or m.video) and not m.caption),
@@ -551,10 +563,11 @@ def _content_matches_rule(msg, content_type: str, rule_key: str) -> bool:
         "reply": lambda m: (m.reply_to_message is not None),
         "external_reply": lambda m: (
             m.reply_to_message is not None
-            and m.reply_to_message.forward_origin is not None
-            and m.reply_to_message.forward_origin.type == "channel"
+            and m.reply_to_message.forward_from_chat is not None
         ),
-        "bot": lambda m: (m.new_chat_members and any(u.is_bot for u in m.new_chat_members)),
+        "bot": lambda m: (
+            m.new_chat_members and any(u.is_bot for u in m.new_chat_members)
+        ),
         "userbots": lambda m: (m.via_bot is not None),
         "unofficial_tg": lambda m: False,  # handled separately
         "spoiler": lambda m: _has_spoiler(m),

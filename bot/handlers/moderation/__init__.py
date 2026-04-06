@@ -1,5 +1,5 @@
 from .ban import ban_command, sban_command, tban_command, unban_command
-from .info import id_command, info_command
+from .info import history_command, id_command, info_command
 from .kick import kick_command, skick_command
 from .locks import (
     close_group_command,
@@ -20,6 +20,8 @@ from .promote import admins_command, demote_command, promote_command
 from .purge import del_command, delall_command, purge_command, purgeme_command
 from .rules import clearrules_command, rules_command, setrules_command
 from .warn import (
+    dispute_callback,
+    history_callback,
     resetwarns_command,
     unwarn_command,
     warn_command,
@@ -42,6 +44,8 @@ __all__ = [
     "warn_command",
     "unwarn_command",
     "warns_command",
+    "history_callback",
+    "dispute_callback",
     "warnmode_command",
     "warnlimit_command",
     "resetwarns_command",
@@ -63,5 +67,6 @@ __all__ = [
     "setrules_command",
     "clearrules_command",
     "info_command",
+    "history_command",
     "id_command",
 ]

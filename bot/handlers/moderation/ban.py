@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
@@ -117,11 +117,25 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Success message
         mention = await mention_user(target)
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("🛡️ Contact Admin", url=f"tg://user?id={invoker.id}"),
+                    InlineKeyboardButton("📜 History", callback_data=f"mod_history:{target.id}"),
+                ],
+                [
+                    InlineKeyboardButton(
+                        "⚖️ Dispute (Open Ticket)", callback_data=f"dispute_ticket:{target.id}"
+                    )
+                ],
+            ]
+        )
         await update.message.reply_text(
             f"✅ Banned | {mention}\n"
             f"📋 Reason: {reason}\n"
             f"👮 By: {await mention_user(invoker)}",
             parse_mode="Markdown",
+            reply_markup=keyboard,
         )
 
         # Try to DM user
@@ -130,6 +144,21 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 target.id,
                 f"🚫 You were banned from *{update.effective_chat.title}*\n" f"📋 Reason: {reason}",
                 parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [
+                            InlineKeyboardButton(
+                                "🛡️ Contact Admin", url=f"tg://user?id={invoker.id}"
+                            )
+                        ],
+                        [
+                            InlineKeyboardButton(
+                                "⚖️ Dispute (Open Ticket)",
+                                callback_data=f"dispute_ticket:{target.id}",
+                            )
+                        ],
+                    ]
+                ),
             )
         except Exception:
             pass
@@ -322,6 +351,19 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         mention = await mention_user(target)
+        keyboard = InlineKeyboardMarkup(
+            [
+                [
+                    InlineKeyboardButton("🛡️ Contact Admin", url=f"tg://user?id={invoker.id}"),
+                    InlineKeyboardButton("📜 History", callback_data=f"mod_history:{target.id}"),
+                ],
+                [
+                    InlineKeyboardButton(
+                        "⚖️ Dispute (Open Ticket)", callback_data=f"dispute_ticket:{target.id}"
+                    )
+                ],
+            ]
+        )
         await update.message.reply_text(
             f"✅ Temp Banned | {mention}\n"
             f"⏱ Duration: {time_str}\n"
@@ -329,6 +371,7 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"👮 By: {await mention_user(invoker)}\n"
             f"Unban time: {unban_at.strftime('%Y-%m-%d %H:%M')} UTC",
             parse_mode="Markdown",
+            reply_markup=keyboard,
         )
     except Forbidden:
         await update.message.reply_text(

@@ -59,6 +59,9 @@ ALIASES = {
     "/afk": "/setafk",
     "/pinner": "/pin",
     "/unpinner": "/unpin",
+    "/verify": "/unrestrict",
+    "/unhold": "/unrestrict",
+    "/hold": "/mute",
 }
 
 

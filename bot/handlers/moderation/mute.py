@@ -453,6 +453,21 @@ async def restrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📋 Reason: {reason}\n"
             f"👮 By: {await mention_user(invoker)}",
             parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("🛡️ Contact Admin", url=f"tg://user?id={invoker.id}"),
+                        InlineKeyboardButton(
+                            "📜 History", callback_data=f"mod_history:{target.id}"
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "⚖️ Dispute (Open Ticket)", callback_data=f"dispute_ticket:{target.id}"
+                        )
+                    ],
+                ]
+            ),
         )
         await log_action(
             chat_id, "restrict", target.id, target.full_name, invoker.id, invoker.full_name, reason
@@ -504,8 +519,44 @@ async def unrestrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
             target.id,
             permissions=_get_unmute_permissions(),
         )
+
+        # Check for pending CAPTCHA and clean up
+        try:
+            from db.ops.captcha import get_pending_challenge, mark_challenge_passed
+
+            challenge = await get_pending_challenge(db.pool, chat_id, target.id)
+            if challenge:
+                await mark_challenge_passed(db.pool, challenge["challenge_id"])
+                try:
+                    await context.bot.delete_message(chat_id, challenge["message_id"])
+                except Exception:
+                    pass
+        except Exception as e:
+            log.debug(f"Failed to cleanup captcha on unrestrict: {e}")
+
+        # Clean up Member Booster and Channel Gate if applicable
+        try:
+            from db.ops.booster import grant_access, set_channel_verified
+
+            await grant_access(chat_id, target.id)
+            await set_channel_verified(chat_id, target.id)
+        except Exception as e:
+            log.debug(f"Failed to cleanup booster/gate on unrestrict: {e}")
+
+        # Also clear any active mute in DB
+        try:
+            await db.execute(
+                "UPDATE mutes SET is_active = FALSE WHERE chat_id = $1 AND user_id = $2",
+                chat_id,
+                target.id,
+            )
+        except Exception:
+            pass
+
         await update.message.reply_text(
-            f"🔓 Unrestricted | {await mention_user(target)}", parse_mode="Markdown"
+            f"🔓 Unrestricted | {await mention_user(target)}\n"
+            f"All holds (Mute, CAPTCHA, Booster, Gate) have been cleared.",
+            parse_mode="Markdown",
         )
         await log_action(
             chat_id,

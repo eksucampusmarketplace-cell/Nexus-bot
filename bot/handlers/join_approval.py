@@ -5,10 +5,11 @@ Member approval system.
 """
 
 import logging
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from db.ops.approval import add_approved_member, remove_approved_member, get_approved_members
+from db.ops.approval import add_approved_member, get_approved_members, remove_approved_member
 
 log = logging.getLogger("approval")
 
@@ -24,6 +25,45 @@ async def cmd_approve(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await add_approved_member(db, chat.id, target.id, approved_by=update.effective_user.id)
+
+    # Also unrestrict the user if they were restricted (e.g. by CAPTCHA)
+    try:
+        from bot.handlers.moderation.mute import _get_unmute_permissions
+
+        await context.bot.restrict_chat_member(
+            chat.id, target.id, permissions=_get_unmute_permissions()
+        )
+        # Check for pending CAPTCHA and clean up
+        from db.ops.captcha import get_pending_challenge, mark_challenge_passed
+
+        challenge = await get_pending_challenge(db, chat.id, target.id)
+        if challenge:
+            await mark_challenge_passed(db, challenge["challenge_id"])
+            try:
+                await context.bot.delete_message(chat.id, challenge["message_id"])
+            except Exception:
+                pass
+
+        # Clean up Member Booster and Channel Gate if applicable
+        try:
+            from db.ops.booster import grant_access, set_channel_verified
+
+            await grant_access(chat.id, target.id)
+            await set_channel_verified(chat.id, target.id)
+        except Exception:
+            pass
+
+        # Clear any active mute in DB
+        try:
+            await db.execute(
+                "UPDATE mutes SET is_active = FALSE WHERE chat_id = $1 AND user_id = $2",
+                chat.id,
+                target.id,
+            )
+        except Exception:
+            pass
+    except Exception as e:
+        log.debug(f"Failed to unrestrict on approve: {e}")
 
     name = f"@{target.username}" if target.username else target.full_name
     await msg.reply_text(
@@ -88,7 +128,7 @@ async def _resolve_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username = context.args[0].lstrip("@")
         try:
             # Note: This requires the user to be known to the bot or cached.
-            # In some cases, bot might not be able to get_chat_member by username if not admin or seen before.
+            # In some cases, bot might not be able to get_chat_member by username if not admin.
             # But we try.
             chat_member = await context.bot.get_chat_member(
                 update.effective_chat.id, f"@{username}"

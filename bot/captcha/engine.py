@@ -11,9 +11,10 @@ import string
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.error import TelegramError
 
+from bot.handlers.moderation.mute import _get_unmute_permissions
 from bot.logging.log_channel import log_event as _log_event
 from db.ops.captcha import (
     create_challenge,
@@ -213,13 +214,7 @@ async def _pass_captcha(bot, chat_id, user_id, challenge, db):
         await bot.restrict_chat_member(
             chat_id=chat_id,
             user_id=user_id,
-            permissions={
-                "can_send_messages": True,
-                "can_send_media_messages": True,
-                "can_send_polls": True,
-                "can_send_other_messages": True,
-                "can_add_web_page_previews": True,
-            },
+            permissions=_get_unmute_permissions(),
         )
     except TelegramError as e:
         log.warning(f"[CAPTCHA] Unrestrict failed | {e}")
@@ -234,7 +229,7 @@ async def _pass_captcha(bot, chat_id, user_id, challenge, db):
     try:
         await bot.send_message(
             chat_id=chat_id,
-            text=f"✅ Welcome! You've been verified.",
+            text="✅ Welcome! You've been verified.",
         )
     except TelegramError:
         pass
@@ -297,9 +292,9 @@ def _build_button_captcha(cid: str):
     """4 buttons: 1 correct (random emoji+number), 3 decoys."""
     options = random.sample(EMOJI_OPTIONS, 4)
     correct = random.randint(0, 3)
-    correct_label = f"{options[correct]} {random.randint(10,99)}"
+    correct_label = f"{options[correct]} {random.randint(10, 99)}"
 
-    decoy_labels = [f"{options[i]} {random.randint(10,99)}" for i in range(4) if i != correct]
+    decoy_labels = [f"{options[i]} {random.randint(10, 99)}" for i in range(4) if i != correct]
 
     all_labels = decoy_labels.copy()
     all_labels.insert(correct, correct_label)

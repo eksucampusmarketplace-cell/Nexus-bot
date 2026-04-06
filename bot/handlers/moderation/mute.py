@@ -37,6 +37,7 @@ def _get_unmute_permissions():
             can_send_voice_notes=True,
             can_send_polls=True,
             can_send_other_messages=True,
+            can_add_web_page_previews=True,
         )
     else:
         return ChatPermissions(
@@ -61,6 +62,7 @@ def _get_restrict_permissions():
             can_send_voice_notes=False,
             can_send_polls=False,
             can_send_other_messages=False,
+            can_add_web_page_previews=False,
         )
     else:
         return ChatPermissions(

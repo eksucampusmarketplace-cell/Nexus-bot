@@ -7,11 +7,9 @@ Supports federation sync for cross-group name history.
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional, List
 
 from telegram import Update
-from telegram.ext import ChatMemberHandler, ContextTypes, CommandHandler, MessageHandler, filters
+from telegram.ext import ChatMemberHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from bot.utils.permissions import is_admin
 
@@ -63,8 +61,8 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Get last snapshot (direct lookup - no ORDER BY needed with unique constraint)
             last_snapshot = await conn.fetchrow(
-                """SELECT first_name, last_name, username 
-                   FROM user_snapshots 
+                """SELECT first_name, last_name, username
+                   FROM user_snapshots
                    WHERE user_id = $1 AND source_chat_id = $2""",
                 user.id,
                 chat.id,
@@ -157,7 +155,7 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Create/update snapshot using upsert (NH-01 fix: ON CONFLICT to prevent crashes)
             snapshot_id = await conn.fetchval(
-                """INSERT INTO user_snapshots 
+                """INSERT INTO user_snapshots
                    (user_id, first_name, last_name, username, source_chat_id)
                    VALUES ($1, $2, $3, $4, $5)
                    ON CONFLICT (user_id, source_chat_id) DO UPDATE
@@ -175,7 +173,7 @@ async def track_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             # Update the history entry with snapshot_id
             await conn.execute(
-                """UPDATE user_name_history SET snapshot_id = $1 
+                """UPDATE user_name_history SET snapshot_id = $1
                    WHERE user_id = $2 AND snapshot_id IS NULL""",
                 snapshot_id,
                 user.id,
@@ -215,7 +213,7 @@ async def _maybe_track_photo(conn, bot, user, chat_id: int):
 
         # Get last known photo
         last_photo = await conn.fetchrow(
-            """SELECT photo_id FROM user_snapshots 
+            """SELECT photo_id FROM user_snapshots
                WHERE user_id = $1 AND source_chat_id = $2""",
             user.id,
             chat_id,
@@ -237,7 +235,7 @@ async def _maybe_track_photo(conn, bot, user, chat_id: int):
 
             # Update snapshot with new photo
             await conn.execute(
-                """UPDATE user_snapshots 
+                """UPDATE user_snapshots
                    SET photo_id = $1, captured_at = NOW()
                    WHERE user_id = $2 AND source_chat_id = $3""",
                 current_photo_id,
@@ -255,6 +253,7 @@ async def track_name_change_chat_member(update: Update, context: ContextTypes.DE
     """
     Track name changes from chat_member updates (ChatMemberHandler).
     This catches name changes even when users don't send messages.
+    Also captures name changes when a new member joins using the provided user data.
     """
     change = update.chat_member
     if not change:
@@ -276,12 +275,30 @@ async def track_name_change_chat_member(update: Update, context: ContextTypes.DE
     if not db:
         return
 
+    # Check if this is a new member joining
+    # (status changed from left/kicked to member/administrator)
+    old_status = change.old_chat_member.status
+    new_status = change.new_chat_member.status
+    is_new_member = old_status in ["left", "kicked", "restricted"] and new_status in [
+        "member",
+        "administrator",
+        "creator",
+    ]
+
     # Check if name/username actually changed
     name_changed = (
         old_user.first_name != new_user.first_name
         or old_user.last_name != new_user.last_name
         or old_user.username != new_user.username
     )
+
+    # If a new member is joining, check their name against the snapshot (not old_user vs new_user)
+    # because join events provide the current user object which may have changed since last seen
+    if is_new_member and not name_changed:
+        # Compare the joining user's current info against our stored snapshot
+        await _check_name_on_member_join(db, new_user, chat.id, context.bot)
+        return
+
     if not name_changed:
         return
 
@@ -339,7 +356,7 @@ async def track_name_change_chat_member(update: Update, context: ContextTypes.DE
 
             # Update/create snapshot
             await conn.execute(
-                """INSERT INTO user_snapshots 
+                """INSERT INTO user_snapshots
                    (user_id, first_name, last_name, username, source_chat_id)
                    VALUES ($1, $2, $3, $4, $5)
                    ON CONFLICT (user_id, source_chat_id) DO UPDATE
@@ -420,9 +437,11 @@ async def _maybe_send_alert(
     try:
         # Get alert settings from groups table
         row = await conn.fetchrow(
-            """SELECT 
-                COALESCE(settings->>'name_history_alert_enabled', 'false')::boolean as alert_enabled,
-                COALESCE(settings->>'name_history_alert_threshold', '1')::int as alert_threshold
+            """SELECT
+                COALESCE(settings->>'name_history_alert_enabled', 'false'
+                )::boolean as alert_enabled,
+                COALESCE(settings->>'name_history_alert_threshold', '1'
+                )::int as alert_threshold
                FROM groups WHERE chat_id = $1""",
             chat_id,
         )
@@ -535,6 +554,135 @@ async def _sync_to_federation(
         log.warning(f"[SANGMATA] Federation sync failed: {e}")
 
 
+async def _check_name_on_member_join(db, user, chat_id: int, bot):
+    """
+    Check if a joining member's name has changed since our last snapshot.
+    This catches name changes that happened while the user was not in the group.
+    """
+    try:
+        async with db.acquire() as conn:
+            # Check if tracking is enabled for this group
+            enabled = await conn.fetchval(
+                "SELECT name_history_enabled FROM groups WHERE chat_id = $1", chat_id
+            )
+            if not enabled:
+                return
+
+            # Check if user has opted out
+            optout = await conn.fetchval(
+                "SELECT 1 FROM user_history_optout WHERE user_id = $1", user.id
+            )
+            if optout:
+                return
+
+            # Get last snapshot
+            last_snapshot = await conn.fetchrow(
+                """SELECT first_name, last_name, username
+                   FROM user_snapshots
+                   WHERE user_id = $1 AND source_chat_id = $2""",
+                user.id,
+                chat_id,
+            )
+
+            current_first = user.first_name or ""
+            current_last = user.last_name or ""
+            current_username = user.username or ""
+
+            # If we have a snapshot, check for changes
+            if last_snapshot:
+                prev_first = last_snapshot["first_name"] or ""
+                prev_last = last_snapshot["last_name"] or ""
+                prev_username = last_snapshot["username"] or ""
+
+                changed = (
+                    prev_first != current_first
+                    or prev_last != current_last
+                    or prev_username != current_username
+                )
+
+                if changed:
+                    # Record the name change to history
+                    await conn.execute(
+                        """INSERT INTO user_name_history
+                           (user_id, first_name, last_name, username, source_chat_id,
+                            old_first_name, old_last_name, old_username)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+                        user.id,
+                        current_first,
+                        current_last,
+                        current_username,
+                        chat_id,
+                        prev_first,
+                        prev_last,
+                        prev_username,
+                    )
+
+                    log.debug(
+                        f"[SANGMATA] Name change detected on join for user {user.id}: "
+                        f"first='{prev_first}'->'{current_first}', "
+                        f"last='{prev_last}'->'{current_last}', "
+                        f"user='{prev_username}'->'{current_username}'"
+                    )
+
+                    # Send alert if enabled
+                    change_type = (
+                        "username"
+                        if (prev_first == current_first and prev_last == current_last)
+                        else "name"
+                    )
+                    if prev_username != current_username and (
+                        prev_first != current_first or prev_last != current_last
+                    ):
+                        change_type = "both"
+
+                    await _maybe_send_alert(
+                        bot,
+                        chat_id,
+                        user.id,
+                        prev_first,
+                        prev_last,
+                        prev_username,
+                        current_first,
+                        current_last,
+                        current_username,
+                        conn,
+                        change_type,
+                    )
+
+                    # Sync to federation if enabled
+                    await _sync_to_federation(
+                        conn,
+                        chat_id,
+                        user.id,
+                        current_first,
+                        current_last,
+                        current_username,
+                        prev_first,
+                        prev_last,
+                        prev_username,
+                    )
+
+            # Create/update snapshot using upsert
+            await conn.execute(
+                """INSERT INTO user_snapshots
+                   (user_id, first_name, last_name, username, source_chat_id)
+                   VALUES ($1, $2, $3, $4, $5)
+                   ON CONFLICT (user_id, source_chat_id) DO UPDATE
+                     SET first_name = EXCLUDED.first_name,
+                         last_name  = EXCLUDED.last_name,
+                         username   = EXCLUDED.username,
+                         captured_at = NOW()""",
+                user.id,
+                current_first,
+                current_last,
+                current_username,
+                chat_id,
+            )
+
+    except Exception as e:
+        log.error(f"[SANGMATA] Error checking name on member join: {e}")
+
+
 async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     /history - Show name/username history for a user (admin only).
@@ -610,7 +758,7 @@ async def cmd_history(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        lines = [f"📋 <b>Name History</b>", f"User: {target_name}"]
+        lines = ["📋 <b>Name History</b>", f"User: {target_name}"]
 
         if optout:
             lines.append("\n⚠️ <i>This user has opted out of name tracking.</i>")
@@ -730,14 +878,10 @@ async def cmd_historydelete(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         async with db.acquire() as conn:
             # Delete history
-            history_result = await conn.execute(
-                "DELETE FROM user_name_history WHERE user_id = $1", user.id
-            )
+            await conn.execute("DELETE FROM user_name_history WHERE user_id = $1", user.id)
 
             # Delete snapshots
-            snapshot_result = await conn.execute(
-                "DELETE FROM user_snapshots WHERE user_id = $1", user.id
-            )
+            await conn.execute("DELETE FROM user_snapshots WHERE user_id = $1", user.id)
 
             # Auto opt-out
             await conn.execute(

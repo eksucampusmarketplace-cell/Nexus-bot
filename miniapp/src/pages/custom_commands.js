@@ -14,22 +14,22 @@ const store = useStore;
 const getState = store.getState;
 
 const TRIGGER_TYPES = [
-  { value: 'command', label: '/command' },
-  { value: 'keyword', label: 'Keyword match' },
-  { value: 'regex', label: 'Regex pattern' },
-  { value: 'exact', label: 'Exact match' },
-  { value: 'new_member', label: 'New member joins' },
-  { value: 'left_member', label: 'Member leaves' },
-  { value: 'message', label: 'Any message' },
-  { value: 'has_attachment', label: 'Has attachment' },
-  { value: 'has_photo', label: 'Has photo' },
-  { value: 'has_video', label: 'Has video' },
-  { value: 'has_document', label: 'Has document' },
-  { value: 'has_voice', label: 'Has voice note' },
-  { value: 'has_sticker', label: 'Has sticker' },
-  { value: 'has_link', label: 'Contains link' },
-  { value: 'forwarded', label: 'Is forwarded' },
-  { value: 'is_reply', label: 'Is a reply' },
+  { value: 'command', label: t('trigger_command', '/command') },
+  { value: 'keyword', label: t('trigger_keyword', 'Keyword match') },
+  { value: 'regex', label: t('trigger_regex', 'Regex pattern') },
+  { value: 'exact', label: t('trigger_exact', 'Exact match') },
+  { value: 'new_member', label: t('trigger_new_member', 'New member joins') },
+  { value: 'left_member', label: t('trigger_left_member', 'Member leaves') },
+  { value: 'message', label: t('trigger_message', 'Any message') },
+  { value: 'has_attachment', label: t('trigger_has_attachment', 'Has attachment') },
+  { value: 'has_photo', label: t('trigger_has_photo', 'Has photo') },
+  { value: 'has_video', label: t('trigger_has_video', 'Has video') },
+  { value: 'has_document', label: t('trigger_has_document', 'Has document') },
+  { value: 'has_voice', label: t('trigger_has_voice', 'Has voice note') },
+  { value: 'has_sticker', label: t('trigger_has_sticker', 'Has sticker') },
+  { value: 'has_link', label: t('trigger_has_link', 'Contains link') },
+  { value: 'forwarded', label: t('trigger_forwarded', 'Is forwarded') },
+  { value: 'is_reply', label: t('trigger_is_reply', 'Is a reply') },
 ];
 
 // Preset examples for quick command creation
@@ -194,35 +194,35 @@ const COMMAND_EXAMPLES = [
 ];
 
 const ACTION_TYPES = [
-  { value: 'reply', label: 'Send reply' },
-  { value: 'delete', label: 'Delete message' },
-  { value: 'react', label: 'Add reaction' },
-  { value: 'warn', label: 'Warn user' },
-  { value: 'mute', label: 'Mute user' },
-  { value: 'unmute', label: 'Unmute user' },
-  { value: 'kick', label: 'Kick user' },
-  { value: 'ban', label: 'Ban user' },
-  { value: 'unban', label: 'Unban user' },
-  { value: 'promote', label: 'Promote to admin' },
-  { value: 'demote', label: 'Remove admin' },
-  { value: 'pin', label: 'Pin message' },
-  { value: 'unpin_all', label: 'Unpin all messages' },
-  { value: 'set_variable', label: 'Set variable' },
-  { value: 'send_photo', label: 'Send photo' },
-  { value: 'send_audio', label: 'Send audio' },
-  { value: 'send_video', label: 'Send video' },
-  { value: 'send_document', label: 'Send document' },
-  { value: 'send_voice', label: 'Send voice note' },
-  { value: 'send_sticker', label: 'Send sticker' },
-  { value: 'send_dice', label: 'Send dice/emoji' },
-  { value: 'send_location', label: 'Send location' },
-  { value: 'send_venue', label: 'Send venue' },
-  { value: 'send_contact', label: 'Send contact' },
-  { value: 'forward', label: 'Forward to chat' },
-  { value: 'webhook', label: 'Call webhook' },
-  { value: 'set_title', label: 'Set chat title' },
-  { value: 'set_description', label: 'Set chat description' },
-  { value: 'leave', label: 'Leave chat' },
+  { value: 'reply', label: t('trigger_reply', 'Send reply') },
+  { value: 'delete', label: t('trigger_delete', 'Delete message') },
+  { value: 'react', label: t('trigger_react', 'Add reaction') },
+  { value: 'warn', label: t('trigger_warn', 'Warn user') },
+  { value: 'mute', label: t('trigger_mute', 'Mute user') },
+  { value: 'unmute', label: t('trigger_unmute', 'Unmute user') },
+  { value: 'kick', label: t('trigger_kick', 'Kick user') },
+  { value: 'ban', label: t('trigger_ban', 'Ban user') },
+  { value: 'unban', label: t('trigger_unban', 'Unban user') },
+  { value: 'promote', label: t('trigger_promote', 'Promote to admin') },
+  { value: 'demote', label: t('trigger_demote', 'Remove admin') },
+  { value: 'pin', label: t('trigger_pin', 'Pin message') },
+  { value: 'unpin_all', label: t('trigger_unpin_all', 'Unpin all messages') },
+  { value: 'set_variable', label: t('trigger_set_variable', 'Set variable') },
+  { value: 'send_photo', label: t('trigger_send_photo', 'Send photo') },
+  { value: 'send_audio', label: t('trigger_send_audio', 'Send audio') },
+  { value: 'send_video', label: t('trigger_send_video', 'Send video') },
+  { value: 'send_document', label: t('trigger_send_document', 'Send document') },
+  { value: 'send_voice', label: t('trigger_send_voice', 'Send voice note') },
+  { value: 'send_sticker', label: t('trigger_send_sticker', 'Send sticker') },
+  { value: 'send_dice', label: t('trigger_send_dice', 'Send dice/emoji') },
+  { value: 'send_location', label: t('trigger_send_location', 'Send location') },
+  { value: 'send_venue', label: t('trigger_send_venue', 'Send venue') },
+  { value: 'send_contact', label: t('trigger_send_contact', 'Send contact') },
+  { value: 'forward', label: t('trigger_forward', 'Forward to chat') },
+  { value: 'webhook', label: t('trigger_webhook', 'Call webhook') },
+  { value: 'set_title', label: t('trigger_set_title', 'Set chat title') },
+  { value: 'set_description', label: t('trigger_set_description', 'Set chat description') },
+  { value: 'leave', label: t('trigger_leave', 'Leave chat') },
 ];
 
 const BUILTIN_VARS = [
@@ -324,8 +324,8 @@ export async function renderCustomCommandsPage(container) {
   header.style.cssText = 'margin-bottom:var(--sp-4);display:flex;justify-content:space-between;align-items:flex-start;';
   header.innerHTML = `
     <div>
-      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">Custom Commands</h2>
-      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Build custom bot commands with triggers, conditions, and actions</p>
+      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">${t('nav_custom_commands', 'Custom Commands')}</h2>
+      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">${t('cc_subtitle', 'Build custom bot commands with triggers, conditions, and actions')}</p>
     </div>
     <div style="display:flex;gap:var(--sp-2);">
       <button id="cc-refresh-btn" class="btn btn-secondary" style="padding:var(--sp-2);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
@@ -343,7 +343,7 @@ export async function renderCustomCommandsPage(container) {
   const searchInput = document.createElement('input');
   searchInput.type = 'text';
   searchInput.className = 'input';
-  searchInput.placeholder = 'Search commands by name or trigger...';
+  searchInput.placeholder = t('search_cc_placeholder', 'Search commands by name or trigger...');
   searchInput.style.width = '100%';
   searchContainer.appendChild(searchInput);
   container.appendChild(searchContainer);
@@ -358,15 +358,20 @@ export async function renderCustomCommandsPage(container) {
   };
 
   // Tab bar
-  const tabs = ['Commands', 'Create', 'Variables', 'Help'];
+  const tabs = [
+    { id: 'commands', label: t('tab_commands', 'Commands') },
+    { id: 'create', label: t('tab_create', 'Create') },
+    { id: 'variables', label: t('tab_variables', 'Variables') },
+    { id: 'help', label: t('tab_help', 'Help') }
+  ];
   const tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:var(--sp-1);margin-bottom:var(--sp-4);background:var(--bg-input);padding:4px;border-radius:var(--r-xl);';
-  tabs.forEach((label, i) => {
+  tabs.forEach((tab, i) => {
     const btn = document.createElement('button');
-    btn.textContent = label;
-    btn.dataset.tab = label.toLowerCase();
+    btn.textContent = tab.label;
+    btn.dataset.tab = tab.id;
     btn.style.cssText = `flex:1;padding:var(--sp-2) var(--sp-3);border:none;border-radius:var(--r-lg);font-size:var(--text-sm);font-weight:var(--fw-medium);cursor:pointer;transition:all var(--dur-fast);background:${i===0?'var(--bg-card)':'transparent'};color:${i===0?'var(--text-primary)':'var(--text-muted)'};`;
-    btn.onclick = () => _switchTab(label.toLowerCase(), content, chatId, tabBar);
+    btn.onclick = () => _switchTab(tab.id, content, chatId, tabBar);
     tabBar.appendChild(btn);
   });
   container.appendChild(tabBar);
@@ -408,8 +413,8 @@ async function _renderCommandsList(container, chatId, tabBar) {
   if (commands.length === 0) {
     const empty = EmptyState({
       icon: '\u2699\uFE0F',
-      title: 'No custom commands yet',
-      description: 'Create your first custom command using the Create tab.'
+      title: t('no_cc_yet', 'No custom commands yet'),
+      description: t('create_first_cc_desc', 'Create your first custom command using the Create tab.')
     });
     container.appendChild(empty);
     return;
@@ -427,7 +432,7 @@ async function _renderCommandsList(container, chatId, tabBar) {
       if (t.trigger_type === 'command') return '/' + t.trigger_value;
       if (t.trigger_type === 'keyword') return '"' + t.trigger_value + '"';
       return t.trigger_value;
-    }).join(', ') || 'No triggers';
+    }).join(', ') || t('no_triggers', 'No triggers');
 
     card.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-2);">
@@ -458,7 +463,7 @@ async function _renderCommandsList(container, chatId, tabBar) {
           await apiFetch(`/api/groups/${chatId}/custom-commands/${cmd.id}`, {
             method: 'PUT', body: JSON.stringify({ enabled: v })
           });
-          showToast(v ? 'Enabled' : 'Disabled', 'success');
+          showToast(v ? t('enabled', 'Enabled') : t('disabled', 'Disabled'), 'success');
         } catch (e) { showToast('Failed', 'error'); }
       }
     });
@@ -506,7 +511,7 @@ async function _renderCommandsList(container, chatId, tabBar) {
           method: 'POST',
           body: JSON.stringify(cloneData)
         });
-        showToast('Command cloned!', 'success');
+        showToast(t('command_cloned_toast', 'Command cloned!'), 'success');
         _renderCommandsList(container, chatId, tabBar);
       } catch (e) { showToast('Clone failed: ' + e.message, 'error'); }
     });
@@ -536,7 +541,7 @@ async function _renderCreateForm(container, chatId, tabBar) {
         method: 'POST',
         body: JSON.stringify(data)
       });
-      showToast('Command created!', 'success');
+      showToast(t('command_created_toast', 'Command created!'), 'success');
       _switchTab('commands', container, chatId, tabBar);
     } catch (e) {
       showToast('Failed: ' + (e.message || 'Unknown error'), 'error');
@@ -560,7 +565,7 @@ async function _renderEditForm(container, chatId, cmd, tabBar) {
   const backBtn = document.createElement('button');
   backBtn.className = 'btn btn-secondary';
   backBtn.style.cssText = 'margin-bottom:var(--sp-3);font-size:var(--text-xs);';
-  backBtn.textContent = 'Back to list';
+  backBtn.textContent = t('back_to_list', 'Back to list');
   backBtn.onclick = () => _switchTab('commands', container, chatId, tabBar);
   container.appendChild(backBtn);
 
@@ -595,7 +600,7 @@ async function _renderEditForm(container, chatId, cmd, tabBar) {
         });
       }
 
-      showToast('Command updated!', 'success');
+      showToast(t('command_updated_toast', 'Command updated!'), 'success');
       _switchTab('commands', container, chatId, tabBar);
     } catch (e) {
       showToast('Failed: ' + (e.message || 'Unknown error'), 'error');
@@ -615,7 +620,7 @@ function _buildCommandForm(existingCmd) {
   wrapper.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-4);';
 
   // ── Basic Info ──
-  const infoCard = Card({ title: isEdit ? 'Edit Command' : 'Create Command', subtitle: 'Define your custom command' });
+  const infoCard = Card({ title: isEdit ? t('edit_command', 'Edit Command') : t('create_command', 'Create Command'), subtitle: t('define_cc_desc', 'Define your custom command') });
 
   // Template selector (only for new commands)
   let templateSelectHtml = '';
@@ -687,7 +692,7 @@ function _buildCommandForm(existingCmd) {
   wrapper.appendChild(infoCard);
 
   // ── Triggers ──
-  const triggersCard = Card({ title: 'Triggers', subtitle: 'What activates this command?' });
+  const triggersCard = Card({ title: t('triggers_title', 'Triggers'), subtitle: t('triggers_subtitle', 'What activates this command?') });
   const triggersContainer = document.createElement('div');
   triggersContainer.id = 'cc-triggers-list';
   triggersContainer.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
@@ -743,7 +748,7 @@ function _buildCommandForm(existingCmd) {
       csInp.checked = !!trig.case_sensitive;
       csInp.onchange = () => { trig.case_sensitive = csInp.checked; };
       csLabel.appendChild(csInp);
-      csLabel.appendChild(document.createTextNode('Case sens.'));
+      csLabel.appendChild(document.createTextNode(t('case_sensitive', 'Case sens.')));
 
       const del = document.createElement('button');
       del.className = 'btn btn-danger';
@@ -765,13 +770,13 @@ function _buildCommandForm(existingCmd) {
   const addTrigBtn = document.createElement('button');
   addTrigBtn.className = 'btn btn-secondary';
   addTrigBtn.style.cssText = 'margin-top:var(--sp-2);font-size:var(--text-xs);align-self:flex-start;';
-  addTrigBtn.textContent = '+ Add Trigger';
+  addTrigBtn.textContent = t('add_trigger_btn', '+ Add Trigger');
   addTrigBtn.onclick = () => { triggers.push({ trigger_type: 'command', trigger_value: '' }); renderTriggers(); };
   triggersCard.appendChild(addTrigBtn);
   wrapper.appendChild(triggersCard);
 
   // ── Actions ──
-  const actionsCard = Card({ title: 'Actions', subtitle: 'What happens when triggered?' });
+  const actionsCard = Card({ title: t('actions_title', 'Actions'), subtitle: t('actions_subtitle', 'What happens when triggered?') });
   const actionsContainer = document.createElement('div');
   actionsContainer.id = 'cc-actions-list';
   actionsContainer.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
@@ -1193,7 +1198,7 @@ function _buildCommandForm(existingCmd) {
   const addActBtn = document.createElement('button');
   addActBtn.className = 'btn btn-secondary';
   addActBtn.style.cssText = 'margin-top:var(--sp-2);font-size:var(--text-xs);align-self:flex-start;';
-  addActBtn.textContent = '+ Add Action';
+  addActBtn.textContent = t('add_action_btn', '+ Add Action');
   addActBtn.onclick = () => { actions.push({ action_type: 'reply', action_config: {}, sort_order: actions.length, delay_secs: 0 }); renderActions(); };
   actionsCard.appendChild(addActBtn);
   wrapper.appendChild(actionsCard);
@@ -1202,12 +1207,12 @@ function _buildCommandForm(existingCmd) {
   const submitBtn = document.createElement('button');
   submitBtn.className = 'btn btn-primary';
   submitBtn.style.cssText = 'align-self:flex-start;';
-  submitBtn.textContent = isEdit ? 'Save Changes' : 'Create Command';
+  submitBtn.textContent = isEdit ? t('save_changes_btn', 'Save Changes') : t('create_command', 'Create Command');
   submitBtn.onclick = () => {
     const name = wrapper.querySelector('#cc-name').value.trim();
-    if (!name) { showToast('Command name is required', 'error'); return; }
-    if (triggers.length === 0) { showToast('Add at least one trigger', 'error'); return; }
-    if (actions.length === 0) { showToast('Add at least one action', 'error'); return; }
+    if (!name) { showToast(t('command_name_required', 'Command name is required'), 'error'); return; }
+    if (triggers.length === 0) { showToast(t('add_trigger_required', 'Add at least one trigger'), 'error'); return; }
+    if (actions.length === 0) { showToast(t('add_action_required', 'Add at least one action'), 'error'); return; }
 
     const data = {
       name,

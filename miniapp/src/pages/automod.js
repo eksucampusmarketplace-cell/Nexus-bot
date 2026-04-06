@@ -15,6 +15,7 @@ import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js?v=1
 import { RULE_TEMPLATES, applyTemplate } from '../../lib/rule_templates.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 
@@ -27,92 +28,92 @@ let _automodRenderToken = 0;
 const AUTOMOD_SECTIONS = [
   {
     id: 'antiflood',
-    title: 'Anti-Flood',
-    description: 'Prevent rapid message flooding',
+    title: t('antiflood', 'Anti-Flood'),
+    description: t('antiflood_desc', 'Prevent rapid message flooding'),
     icon: '🌊',
     settings: [
-      { key: 'antiflood', label: 'Enable Anti-Flood', type: 'toggle' },
-      { key: 'antiflood_limit', label: 'Max messages', type: 'number', min: 3, max: 20, default: 5 },
-      { key: 'antiflood_window', label: 'Time window (seconds)', type: 'number', min: 5, max: 120, default: 10 },
-      { key: 'antiflood_action', label: 'Action', type: 'select', options: [
-        { value: 'delete', label: 'Delete only' },
-        { value: 'mute', label: 'Mute' },
-        { value: 'kick', label: 'Kick' },
-        { value: 'ban', label: 'Ban' },
+      { key: 'antiflood', label: t('antiflood_enabled_lbl', 'Enable Anti-Flood'), type: 'toggle' },
+      { key: 'antiflood_limit', label: t('max_messages', 'Max messages'), type: 'number', min: 3, max: 20, default: 5 },
+      { key: 'antiflood_window', label: t('time_window_sec', 'Time window (seconds)'), type: 'number', min: 5, max: 120, default: 10 },
+      { key: 'antiflood_action', label: t('action_lbl', 'Action'), type: 'select', options: [
+        { value: 'delete', label: t('action_delete_only', 'Delete only') },
+        { value: 'mute', label: t('action_mute', 'Mute') },
+        { value: 'kick', label: t('action_kick', 'Kick') },
+        { value: 'ban', label: t('action_ban', 'Ban') },
       ], default: 'mute' },
     ],
   },
   {
     id: 'antispam',
-    title: 'Anti-Spam',
-    description: 'Block known spam patterns and bots',
+    title: t('antispam', 'Anti-Spam'),
+    description: t('antispam_desc', 'Block known spam patterns and bots'),
     icon: '🛡️',
     settings: [
-      { key: 'antispam', label: 'Enable Anti-Spam', type: 'toggle' },
-      { key: 'lock_username', label: 'Block spam usernames', type: 'toggle' },
-      { key: 'lock_bot', label: 'Block bot invites', type: 'toggle' },
-      { key: 'lock_bot_inviter', label: 'Block bots from adding users', type: 'toggle' },
-      { key: 'duplicate_limit', label: 'Max duplicate messages', type: 'number', min: 1, max: 10, default: 1 },
-      { key: 'duplicate_window_mins', label: 'Duplicate window (mins)', type: 'number', min: 1, max: 60, default: 60 },
+      { key: 'antispam', label: t('antispam_enabled_lbl', 'Enable Anti-Spam'), type: 'toggle' },
+      { key: 'lock_username', label: t('lock_username_lbl', 'Block spam usernames'), type: 'toggle' },
+      { key: 'lock_bot', label: t('lock_bot_lbl', 'Block bot invites'), type: 'toggle' },
+      { key: 'lock_bot_inviter', label: t('lock_bot_inviter_lbl', 'Block bots from adding users'), type: 'toggle' },
+      { key: 'duplicate_limit', label: t('max_duplicate_messages', 'Max duplicate messages'), type: 'number', min: 1, max: 10, default: 1 },
+      { key: 'duplicate_window_mins', label: t('duplicate_window_mins', 'Duplicate window (mins)'), type: 'number', min: 1, max: 60, default: 60 },
     ],
   },
   {
     id: 'antilink',
-    title: 'Anti-Link',
-    description: 'Control external links and forwards',
+    title: t('antilink', 'Anti-Link'),
+    description: t('antilink_desc', 'Control external links and forwards'),
     icon: '🔗',
     settings: [
-      { key: 'lock_link', label: 'Block Telegram links', type: 'toggle' },
-      { key: 'lock_website', label: 'Block external websites', type: 'toggle' },
-      { key: 'lock_forward', label: 'Block message forwards', type: 'toggle' },
-      { key: 'lock_forward_bot', label: 'Block forwards from bots', type: 'toggle' },
-      { key: 'lock_forward_channel', label: 'Block forwards from channels', type: 'toggle' },
-      { key: 'lock_channel', label: 'Block channel forwards (legacy)', type: 'toggle' },
-      { key: 'whitelist_links', label: 'Whitelist (comma URLs)', type: 'text', placeholder: 'example.com, mysite.org' },
+      { key: 'lock_link', label: t('lock_link_lbl', 'Block Telegram links'), type: 'toggle' },
+      { key: 'lock_website', label: t('lock_website_lbl', 'Block external websites'), type: 'toggle' },
+      { key: 'lock_forward', label: t('lock_forward_lbl', 'Block message forwards'), type: 'toggle' },
+      { key: 'lock_forward_bot', label: t('lock_forward_bot_lbl', 'Block forwards from bots'), type: 'toggle' },
+      { key: 'lock_forward_channel', label: t('lock_forward_channel_lbl', 'Block forwards from channels'), type: 'toggle' },
+      { key: 'lock_channel', label: t('lock_channel_lbl', 'Block channel forwards (legacy)'), type: 'toggle' },
+      { key: 'whitelist_links', label: t('whitelist_links_lbl', 'Whitelist (comma URLs)'), type: 'text', placeholder: 'example.com, mysite.org' },
     ],
   },
   {
     id: 'advanced_content',
-    title: 'Advanced Content',
-    description: 'Strict message length and content rules',
+    title: t('advanced_content', 'Advanced Content'),
+    description: t('advanced_content_desc', 'Strict message length and content rules'),
     icon: '📏',
     settings: [
-      { key: 'min_words', label: 'Min words', type: 'number', min: 0, max: 50, default: 0 },
-      { key: 'max_words', label: 'Max words', type: 'number', min: 0, max: 1000, default: 0 },
-      { key: 'min_chars', label: 'Min characters', type: 'number', min: 0, max: 500, default: 0 },
-      { key: 'max_chars', label: 'Max characters', type: 'number', min: 0, max: 4000, default: 0 },
-      { key: 'min_lines', label: 'Min lines', type: 'number', min: 0, max: 20, default: 0 },
-      { key: 'max_lines', label: 'Max lines', type: 'number', min: 0, max: 100, default: 0 },
-      { key: 'regex_active', label: 'Enable Regex Filters', type: 'toggle' },
-      { key: 'necessary_words_active', label: 'Enable Required Words', type: 'toggle' },
-      { key: 'self_destruct_enabled', label: 'Enable Self-Destruct', type: 'toggle' },
-      { key: 'self_destruct_minutes', label: 'Self-Destruct (minutes)', type: 'number', min: 1, max: 1440, default: 2 },
+      { key: 'min_words', label: t('min_words', 'Min words'), type: 'number', min: 0, max: 50, default: 0 },
+      { key: 'max_words', label: t('max_words', 'Max words'), type: 'number', min: 0, max: 1000, default: 0 },
+      { key: 'min_chars', label: t('min_chars', 'Min characters'), type: 'number', min: 0, max: 500, default: 0 },
+      { key: 'max_chars', label: t('max_chars', 'Max characters'), type: 'number', min: 0, max: 4000, default: 0 },
+      { key: 'min_lines', label: t('min_lines', 'Min lines'), type: 'number', min: 0, max: 20, default: 0 },
+      { key: 'max_lines', label: t('max_lines', 'Max lines'), type: 'number', min: 0, max: 100, default: 0 },
+      { key: 'regex_active', label: t('regex_active_lbl', 'Enable Regex Filters'), type: 'toggle' },
+      { key: 'necessary_words_active', label: t('necessary_words_active_lbl', 'Enable Required Words'), type: 'toggle' },
+      { key: 'self_destruct_enabled', label: t('self_destruct_enabled_lbl', 'Enable Self-Destruct'), type: 'toggle' },
+      { key: 'self_destruct_minutes', label: t('self_destruct_minutes', 'Self-Destruct (minutes)'), type: 'number', min: 1, max: 1440, default: 2 },
     ],
   },
   {
     id: 'media',
-    title: 'Media Restrictions',
-    description: 'Control media types in chat',
+    title: t('media_restrictions', 'Media Restrictions'),
+    description: t('media_restrictions_desc', 'Control media types in chat'),
     icon: '📸',
     settings: [
-      { key: 'lock_photo', label: 'Block photos', type: 'toggle' },
-      { key: 'lock_video', label: 'Block videos', type: 'toggle' },
-      { key: 'lock_sticker', label: 'Block stickers', type: 'toggle' },
-      { key: 'lock_gif', label: 'Block GIFs', type: 'toggle' },
-      { key: 'lock_voice', label: 'Block voice messages', type: 'toggle' },
-      { key: 'lock_document', label: 'Block files', type: 'toggle' },
+      { key: 'lock_photo', label: t('lock_photo_lbl', 'Block photos'), type: 'toggle' },
+      { key: 'lock_video', label: t('lock_video_lbl', 'Block videos'), type: 'toggle' },
+      { key: 'lock_sticker', label: t('lock_sticker_lbl', 'Block stickers'), type: 'toggle' },
+      { key: 'lock_gif', label: t('lock_gif_lbl', 'Block GIFs'), type: 'toggle' },
+      { key: 'lock_voice', label: t('lock_voice_lbl', 'Block voice messages'), type: 'toggle' },
+      { key: 'lock_document', label: t('lock_document_lbl', 'Block files'), type: 'toggle' },
     ],
   },
   {
     id: 'content',
-    title: 'Content Filter',
-    description: 'Filter specific content types',
+    title: t('content_filter', 'Content Filter'),
+    description: t('content_filter_desc', 'Filter specific content types'),
     icon: '🚫',
     settings: [
-      { key: 'lock_porn', label: 'Block adult content', type: 'toggle' },
-      { key: 'lock_hashtag', label: 'Block hashtags', type: 'toggle' },
-      { key: 'lock_unofficial_tg', label: 'Block unofficial Telegram', type: 'toggle' },
-      { key: 'lock_userbots', label: 'Block userbots', type: 'toggle' },
+      { key: 'lock_porn', label: t('lock_porn_lbl', 'Block adult content'), type: 'toggle' },
+      { key: 'lock_hashtag', label: t('lock_hashtag_lbl', 'Block hashtags'), type: 'toggle' },
+      { key: 'lock_unofficial_tg', label: t('lock_unofficial_tg_lbl', 'Block unofficial Telegram'), type: 'toggle' },
+      { key: 'lock_userbots', label: t('lock_userbots_lbl', 'Block userbots'), type: 'toggle' },
     ],
   },
 ];
@@ -144,8 +145,8 @@ export async function renderAutomodPage(container) {
   if (!finalChatId) {
     container.appendChild(EmptyState({
       icon: '👆',
-      title: 'Select a group',
-      description: 'Choose a group from the top to configure AutoMod'
+      title: t('select_group', 'Select a group'),
+      description: t('select_group_automod_desc', 'Choose a group from the top to configure AutoMod')
     }));
     return;
   }
@@ -155,7 +156,7 @@ export async function renderAutomodPage(container) {
     <div style="display: flex; align-items: center; justify-content: center; padding: 40px;">
       <div style="text-align: center; color: var(--text-muted);">
         <div style="font-size: 24px; margin-bottom: 12px;">⏳</div>
-        <div style="font-size: var(--text-sm);">Loading settings...</div>
+        <div style="font-size: var(--text-sm);">${t('loading_settings', 'Loading settings...')}</div>
       </div>
     </div>
   `;
@@ -194,7 +195,7 @@ export async function renderAutomodPage(container) {
     if (!isCurrent()) return;
   } catch (error) {
     console.error('[AutoMod] Failed to load settings:', error);
-    showToast('Failed to load settings: ' + (error.message || 'unknown error'), 'error');
+    showToast(t('failed_to_load_settings', 'Failed to load settings') + ': ' + (error.message || 'unknown error'), 'error');
     if (!isCurrent()) return;
   }
 
@@ -204,8 +205,8 @@ export async function renderAutomodPage(container) {
 
   // Templates section
   const templatesCard = Card({
-    title: 'Quick Templates',
-    subtitle: 'Apply a preset configuration',
+    title: t('quick_templates', 'Quick Templates'),
+    subtitle: t('apply_preset_config', 'Apply a preset configuration'),
   });
   container.appendChild(templatesCard);
 
@@ -254,7 +255,7 @@ function _renderTemplatesSection(chatId, currentSettings) {
 
     btn.onclick = async () => {
       btn.disabled = true;
-      btn.innerHTML = '<span style="color: var(--accent);">⏳ Applying...</span>';
+      btn.innerHTML = `<span style="color: var(--accent);">⏳ ${t('applying', 'Applying...')}</span>`;
 
       try {
         console.debug('[AutoMod] Applying template:', template.id);
@@ -262,7 +263,7 @@ function _renderTemplatesSection(chatId, currentSettings) {
         await applyTemplate(chatId, template.id);
         console.debug('[AutoMod] Template applied successfully');
 
-        btn.innerHTML = '<span style="color: var(--success);">✅ Applied! Refreshing...</span>';
+        btn.innerHTML = `<span style="color: var(--success);">✅ ${t('applied_refreshing', 'Applied! Refreshing...')}</span>`;
 
         // Re-fetch settings and re-render all sections
         try {
@@ -297,16 +298,16 @@ function _renderTemplatesSection(chatId, currentSettings) {
           if (automodContainer) {
             await renderAutomodPage(automodContainer);
           } else {
-            showToast('Template applied! Reload page to see changes.', 'success');
+            showToast(t('template_applied_reload', 'Template applied! Reload page to see changes.'), 'success');
           }
         } catch (refreshErr) {
           console.warn('[AutoMod] Could not refresh after template:', refreshErr);
-          showToast('Template applied but refresh failed', 'warning');
+          showToast(t('template_applied_refresh_failed', 'Template applied but refresh failed'), 'warning');
         }
       } catch (e) {
         console.error('[AutoMod] Failed to apply template:', e);
-        showToast('Failed to apply template: ' + (e.message || 'unknown error'), 'error');
-        btn.innerHTML = '<span style="color: var(--danger);">❌ Failed</span>';
+        showToast(t('failed_to_apply_template', 'Failed to apply template') + ': ' + (e.message || 'unknown error'), 'error');
+        btn.innerHTML = `<span style="color: var(--danger);">❌ ${t('failed', 'Failed')}</span>`;
       }
 
       setTimeout(() => {
@@ -355,10 +356,10 @@ function _renderSection(section, settings, chatId) {
       });
       console.debug(`[AutoMod] Saved ${key} successfully`);
       store.getState().updateSetting(key, val);
-      showToast('Saved', 'success');
+      showToast(t('saved', 'Saved'), 'success');
     } catch (e) {
       console.error(`[AutoMod] Failed to save ${key}:`, e);
-      showToast('Failed to save: ' + (e.message || 'unknown error'), 'error');
+      showToast(t('failed_to_save', 'Failed to save') + ': ' + (e.message || 'unknown error'), 'error');
     }
   };
 
@@ -382,7 +383,7 @@ function _renderSection(section, settings, chatId) {
         onChange: async (isChecked) => {
           await _saveSetting(setting.key, isChecked);
           if (statusLabel) {
-            statusLabel.textContent = isChecked ? '🔴 LOCKED' : '🟢 OPEN';
+            statusLabel.textContent = isChecked ? '🔴 ' + t('locked', 'LOCKED') : '🟢 ' + t('open', 'OPEN');
             statusLabel.style.color = isChecked ? 'var(--danger)' : 'var(--success)';
           }
         }
@@ -395,7 +396,7 @@ function _renderSection(section, settings, chatId) {
         statusWrapper.style.cssText = 'display: flex; align-items: center; gap: var(--sp-2);';
 
         statusLabel = document.createElement('span');
-        statusLabel.textContent = value ? '🔴 LOCKED' : '🟢 OPEN';
+        statusLabel.textContent = value ? '🔴 ' + t('locked', 'LOCKED') : '🟢 ' + t('open', 'OPEN');
         statusLabel.style.cssText = 'font-size: 10px; font-weight: 600; color: ' + (value ? 'var(--danger)' : 'var(--success)');
 
         statusWrapper.appendChild(toggle);

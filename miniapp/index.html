@@ -571,10 +571,10 @@
           console.log('[SSE] Connected');
         });
         sse.on('member_join', (data) => {
-          nc.push({ type: 'member_action', title: 'New member', body: `User joined the group` });
+          nc.push({ type: 'member_action', title: t('notif_new_member', 'New member'), body: t('notif_user_joined', `User joined the group`) });
         });
         sse.on('bot_action', (data) => {
-          nc.push({ type: 'bot_action', title: 'Bot action', body: data.action });
+          nc.push({ type: 'bot_action', title: t('notif_bot_action', 'Bot action'), body: data.action });
         });
         // Listen for settings_change events (e.g., from reset on another device/page)
         sse.on('settings_change', async (data) => {
@@ -586,7 +586,7 @@
               // Re-render the current page to get fresh settings
               try { await renderPage(currentPage); } catch (e) { console.error('[SSE] Re-render failed:', e); }
             }
-            showToast('Settings were reset', 'success');
+            showToast(t('notif_settings_reset', 'Settings were reset'), 'success');
           } else if (data.settings) {
             // Merge updated settings into store
             state.setSettings({ ...getState().settings, ...data.settings });
@@ -639,38 +639,38 @@
       const isAdmin = role === 'admin' || role === 'owner' || isSudo;
       
       const pages = [
-        { id: 'dashboard', label: 'Dashboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', minRole: 'member' },
-        { id: 'bots', label: 'My Bots', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>', minRole: 'bot_owner' },
-        { id: 'commands', label: 'Commands', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>', minRole: 'member' },
-        { id: 'moderation', label: 'Moderation', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
-        { id: 'automod', label: 'AutoMod', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
-        { id: 'members', label: 'Members', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', minRole: 'admin' },
-        { id: 'gamification', label: 'Leaderboard', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>', minRole: 'member' },
-        { id: 'roles', label: 'Roles', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>', minRole: 'admin' },
-        { id: 'engagement', label: 'XP', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', minRole: 'member' },
-        { id: 'analytics', label: 'Analytics', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>', minRole: 'admin' },
-        { id: 'webhooks', label: 'Integrations', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', minRole: 'admin' },
-        { id: 'broadcast', label: 'Broadcast', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8z"/><path d="M22 12l-4-4v8l4-4z"/></svg>', minRole: 'admin' },
-        { id: 'booster', label: 'Member Booster', icon: '🚀', minRole: 'admin' },
-        { id: 'notes', label: 'Notes', icon: '📝', minRole: 'member' },
-        { id: 'custom-commands', label: 'Custom Commands', icon: '⚙️', minRole: 'admin' },
-        { id: 'channel-gate', label: 'Channel Gate', icon: '📢', minRole: 'admin' },
-        { id: 'backup', label: 'Backup', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', minRole: 'admin' },
-        { id: 'settings', label: 'Settings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>', minRole: 'admin' },
-        { id: 'logs', label: 'Logs', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', minRole: 'admin' },
-        { id: 'greetings', label: 'Greetings', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', minRole: 'admin' },
-        { id: 'reports', label: 'Reports', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>', minRole: 'admin' },
-        { id: 'antiraid', label: 'Anti-Raid', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', minRole: 'admin' },
-        { id: 'session', label: 'Session', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>', minRole: 'member' },
-        { id: 'owner', label: 'Owner Panel', icon: '👑', ownerOnly: true },
-        { id: 'notifications', label: 'Alerts', icon: '🔔', minRole: 'member' },
-        { id: 'trustnet', label: 'TrustNet', icon: '🌐', minRole: 'member' },
-        { id: 'captcha', label: 'Captcha', icon: '🤖', minRole: 'admin' },
-        { id: 'night-mode', label: 'Night Mode', icon: '🌙', minRole: 'admin' },
-        { id: 'history', label: 'Name History', icon: '📜', minRole: 'admin' },
-        { id: 'language', label: 'Language', icon: '🌍', minRole: 'member' },
-        { id: 'persona', label: 'Bot Persona', icon: '🎭', minRole: 'admin' },
-        { id: 'tickets', label: 'Tickets', icon: '🎫', minRole: 'admin' },
+        { id: 'dashboard', label: t('nav_dashboard', 'Dashboard'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', minRole: 'member' },
+        { id: 'bots', label: t('nav_bots', 'My Bots'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>', minRole: 'bot_owner' },
+        { id: 'commands', label: t('nav_commands', 'Commands'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>', minRole: 'member' },
+        { id: 'moderation', label: t('nav_moderation', 'Moderation'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
+        { id: 'automod', label: t('nav_automod', 'AutoMod'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
+        { id: 'members', label: t('nav_members', 'Members'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', minRole: 'admin' },
+        { id: 'gamification', label: t('nav_leaderboard', 'Leaderboard'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>', minRole: 'member' },
+        { id: 'roles', label: t('nav_roles', 'Roles'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>', minRole: 'admin' },
+        { id: 'engagement', label: t('nav_xp', 'XP & Levels'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', minRole: 'member' },
+        { id: 'analytics', label: t('nav_analytics', 'Analytics'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>', minRole: 'admin' },
+        { id: 'webhooks', label: t('nav_webhooks', 'Integrations'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', minRole: 'admin' },
+        { id: 'broadcast', label: t('nav_broadcast', 'Broadcast'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8z"/><path d="M22 12l-4-4v8l4-4z"/></svg>', minRole: 'admin' },
+        { id: 'booster', label: t('nav_booster', 'Member Booster'), icon: '🚀', minRole: 'admin' },
+        { id: 'notes', label: t('nav_notes', 'Notes'), icon: '📝', minRole: 'member' },
+        { id: 'custom-commands', label: t('nav_custom_commands', 'Custom Commands'), icon: '⚙️', minRole: 'admin' },
+        { id: 'channel-gate', label: t('nav_channel_gate', 'Channel Gate'), icon: '📢', minRole: 'admin' },
+        { id: 'backup', label: t('nav_backup', 'Backup'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', minRole: 'admin' },
+        { id: 'settings', label: t('nav_settings', 'Settings'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>', minRole: 'admin' },
+        { id: 'logs', label: t('nav_logs', 'Logs'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', minRole: 'admin' },
+        { id: 'greetings', label: t('nav_greetings', 'Greetings'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', minRole: 'admin' },
+        { id: 'reports', label: t('nav_reports', 'Reports'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>', minRole: 'admin' },
+        { id: 'antiraid', label: t('nav_antiraid', 'Anti-Raid'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', minRole: 'admin' },
+        { id: 'session', label: t('nav_session', 'Session'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>', minRole: 'member' },
+        { id: 'owner', label: t('nav_owner', 'Owner Panel'), icon: '👑', ownerOnly: true },
+        { id: 'notifications', label: t('nav_alerts', 'Alerts'), icon: '🔔', minRole: 'member' },
+        { id: 'trustnet', label: t('nav_trustnet', 'TrustNet'), icon: '🌐', minRole: 'member' },
+        { id: 'captcha', label: t('nav_captcha', 'Captcha'), icon: '🤖', minRole: 'admin' },
+        { id: 'night-mode', label: t('nav_night_mode', 'Night Mode'), icon: '🌙', minRole: 'admin' },
+        { id: 'history', label: t('nav_history', 'Name History'), icon: '📜', minRole: 'admin' },
+        { id: 'language', label: t('nav_language', 'Language'), icon: '🌍', minRole: 'member' },
+        { id: 'persona', label: t('nav_persona', 'Bot Persona'), icon: '🎭', minRole: 'admin' },
+        { id: 'tickets', label: t('nav_tickets', 'Tickets'), icon: '🎫', minRole: 'admin' },
       ];
 
       // Role hierarchy for comparison
@@ -1108,18 +1108,18 @@
     const { getActionEmoji, formatAction, formatTime } = await import("./lib/helpers.js?v=1.6.0");
 
     const MODULE_LIST = [
-      { id: 'welcome',    name: '👋 Welcome Messages',  desc: 'Greet new members',               settingKey: 'welcome_enabled',      page: 'greetings' },
-      { id: 'goodbye',    name: '👋 Goodbye Messages',  desc: 'Farewell leaving members',         settingKey: 'goodbye_enabled',      page: 'greetings' },
-      { id: 'rules',      name: '📋 Group Rules',        desc: '/rules command',                   settingKey: 'rules_enabled',        page: null },
-      { id: 'captcha',    name: '🔐 Captcha',            desc: 'Verify new members',               settingKey: 'captcha_enabled',      page: 'automod' },
-      { id: 'xp',         name: '⭐ XP & Levels',        desc: 'Member progression',               settingKey: 'xp_enabled',           page: 'engagement' },
-      { id: 'games',      name: '🎮 Games',               desc: 'In-chat games',                    settingKey: 'games_enabled',        page: null },
-      { id: 'channel',    name: '📢 Channel Posting',    desc: 'Post to linked channel',           settingKey: 'channel_enabled',      page: null },
-      { id: 'logging',    name: '📋 Mod Logging',         desc: 'Log actions to channel',           settingKey: 'log_enabled',          page: 'logs' },
-      { id: 'inline',     name: '⚡ Inline Mode',         desc: '@botname queries',                 settingKey: 'inline_mode_enabled',  page: null },
-      { id: 'reports',    name: '🚨 Reports',             desc: '/report command',                  settingKey: 'reports_enabled',      page: 'reports' },
-      { id: 'notes',      name: '📝 Notes',               desc: 'Save and retrieve notes',          settingKey: 'notes_enabled',        page: 'notes' },
-      { id: 'autodelete', name: '🗑️ Auto-Delete',          desc: 'Delete messages after N seconds', settingKey: 'autodelete_enabled',   page: null },
+      { id: 'welcome',    name: '👋 ' + t('nav_greetings', 'Welcome Messages'),  desc: t('greet_new_members', 'Greet new members'),               settingKey: 'welcome_enabled',      page: 'greetings' },
+      { id: 'goodbye',    name: '👋 ' + t('goodbye_messages', 'Goodbye Messages'),  desc: t('farewell_leaving_members', 'Farewell leaving members'),         settingKey: 'goodbye_enabled',      page: 'greetings' },
+      { id: 'rules',      name: '📋 ' + t('rules_header', 'Group Rules'),        desc: t('rules_desc', '/rules command'),                   settingKey: 'rules_enabled',        page: null },
+      { id: 'captcha',    name: '🔐 ' + t('nav_captcha', 'Captcha'),            desc: t('verify_new_members', 'Verify new members'),               settingKey: 'captcha_enabled',      page: 'automod' },
+      { id: 'xp',         name: '⭐ ' + t('nav_xp', 'XP & Levels'),        desc: t('member_progression', 'Member progression'),               settingKey: 'xp_enabled',           page: 'engagement' },
+      { id: 'games',      name: '🎮 ' + t('nav_games', 'Games'),               desc: t('in_chat_games', 'In-chat games'),                    settingKey: 'games_enabled',        page: null },
+      { id: 'channel',    name: '📢 ' + t('channel_posting', 'Channel Posting'),    desc: t('post_to_linked_channel', 'Post to linked channel'),           settingKey: 'channel_enabled',      page: null },
+      { id: 'logging',    name: '📋 ' + t('nav_logs', 'Mod Logging'),         desc: t('log_actions_to_channel', 'Log actions to channel'),           settingKey: 'log_enabled',          page: 'logs' },
+      { id: 'inline',     name: '⚡ ' + t('inline_mode', 'Inline Mode'),         desc: t('inline_mode_desc', '@botname queries'),                 settingKey: 'inline_mode_enabled',  page: null },
+      { id: 'reports',    name: '🚨 ' + t('nav_reports', 'Reports'),             desc: t('reports_desc', '/report command'),                  settingKey: 'reports_enabled',      page: 'reports' },
+      { id: 'notes',      name: '📝 ' + t('nav_notes', 'Notes'),               desc: t('notes_desc', 'Save and retrieve notes'),          settingKey: 'notes_enabled',        page: 'notes' },
+      { id: 'autodelete', name: '🗑️ ' + t('auto_delete', 'Auto-Delete'),          desc: t('auto_delete_desc', 'Delete messages after N seconds'), settingKey: 'autodelete_enabled',   page: null },
     ];
 
     async function renderSettings(container) {
@@ -1180,22 +1180,22 @@
           try { return new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }).format(new Date()); } catch (e) { return ''; }
         };
         const identityCard = Card({
-          title: '🌍 Group Identity',
-          subtitle: 'Bot message language and timezone for this group',
+          title: '🌍 ' + t('settings_group_identity', 'Group Identity'),
+          subtitle: t('settings_identity_subtitle', 'Bot message language and timezone for this group'),
           children: `
             <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
               <div>
-                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Bot Message Language</label>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">${t('settings_bot_lang', 'Bot Message Language')}</label>
                 <select id="lang-select" class="input">
                   ${LANGS.map(l => `<option value="${l.code}" ${currentLang === l.code ? 'selected' : ''}>${l.label}</option>`).join('')}
                 </select>
-                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);line-height:1.5;">Language the bot uses in group messages. To change the mini app display language for yourself, use the Language page in the sidebar.</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);line-height:1.5;">${t('settings_bot_lang_help', 'Language the bot uses in group messages. To change the mini app display language for yourself, use the Language page in the sidebar.')}</div>
               </div>
               <div>
-                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Timezone</label>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">${t('settings_timezone', 'Timezone')}</label>
                 <input id="tz-input" class="input" list="tz-list" value="${currentTz}" placeholder="e.g. America/New_York">
                 <datalist id="tz-list">${allTimezones.map(z => `<option value="${z}">`).join('')}</datalist>
-                <div id="tz-preview" style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);">Right now: ${tzPreview(currentTz)}</div>
+                <div id="tz-preview" style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);">${t('settings_timezone_help', 'Right now: {time}').replace('{time}', tzPreview(currentTz))}</div>
               </div>
             </div>
           `
@@ -1205,27 +1205,27 @@
           try {
             await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: { settings: { language: e.target.value } } });
             state.updateSetting('language', e.target.value);
-            showToast('Language saved', 'success');
-          } catch (err) { showToast('Failed to save', 'error'); }
+            showToast(t('toast_lang_saved', 'Language saved'), 'success');
+          } catch (err) { showToast(t('generic_error', 'Failed to save'), 'error'); }
         };
         const tzInput = identityCard.querySelector('#tz-input');
         const tzPreviewEl = identityCard.querySelector('#tz-preview');
         tzInput.oninput = () => {
           const preview = tzPreview(tzInput.value);
-          tzPreviewEl.textContent = preview ? 'Right now: ' + preview : 'Invalid timezone';
+          tzPreviewEl.textContent = preview ? t('settings_timezone_help', 'Right now: {time}').replace('{time}', preview) : t('settings_invalid_timezone', 'Invalid timezone');
         };
         tzInput.onblur = async () => {
           try {
             await apiFetch(`/api/groups/${chatId}/settings/bulk`, { method: 'PUT', validate: false, body: { settings: { timezone: tzInput.value } } });
             state.updateSetting('timezone', tzInput.value);
-            showToast('Timezone saved', 'success');
-          } catch (err) { showToast('Failed to save', 'error'); }
+            showToast(t('toast_tz_saved', 'Timezone saved'), 'success');
+          } catch (err) { showToast(t('generic_error', 'Failed to save'), 'error'); }
         };
 
         // ── 2. FEATURE MODULES ───────────────────────────────────────────
         const modulesCard = Card({
           title: `📦 ${t('nav_modules', 'Modules')}`,
-          subtitle: t('modules_subtitle', 'Enable or disable bot features for this group'),
+          subtitle: t('settings_modules_subtitle', 'Enable or disable bot features for this group'),
         });
         const modulesListContainer = document.createElement('div');
         modulesListContainer.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
@@ -1247,7 +1247,7 @@
             const cfgBtn = document.createElement('button');
             cfgBtn.className = 'btn btn-secondary';
             cfgBtn.style.cssText = 'padding:var(--sp-1) var(--sp-2);font-size:10px;height:24px;';
-            cfgBtn.textContent = t('configure', 'Configure') + ' →';
+            cfgBtn.textContent = t('settings_configure', 'Configure') + ' →';
             cfgBtn.onclick = () => navigateToPage(m.page);
             ctrl.appendChild(cfgBtn);
           }
@@ -1271,44 +1271,44 @@
         ];
         const currentSlowMode = groupSettings.slow_mode_delay || 0;
         const secCard = Card({
-          title: '🔒 Security & Entry',
-          subtitle: 'Control who can join and how fast',
+          title: '🔒 ' + t('settings_security_title', 'Security & Entry'),
+          subtitle: t('settings_security_subtitle', 'Control who can join and how fast'),
           children: `
             <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
               <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
                 <div>
-                  <div style="font-size:var(--text-sm);">Password gate</div>
-                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Require password to send messages</div>
+                  <div style="font-size:var(--text-sm);">${t('settings_password_gate', 'Password gate')}</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('settings_password_gate_help', 'Require password to send messages')}</div>
                 </div>
                 <div id="toggle-password-gate"></div>
               </div>
               <div id="password-input-row" style="display:${groupSettings.password_gate_enabled ? 'flex' : 'none'};gap:var(--sp-2);">
-                <input id="group-password-input" class="input" placeholder="Set password..." style="min-width:0;flex:1;" value="${groupSettings.group_password || ''}">
-                <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-password-btn">Save</button>
+                <input id="group-password-input" class="input" placeholder="${t('settings_set_password', 'Set password...')}" style="min-width:0;flex:1;" value="${groupSettings.group_password || ''}">
+                <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-password-btn">${t('save_btn', 'Save')}</button>
               </div>
               <div>
-                <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Slow Mode</div>
+                <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('settings_slow_mode', 'Slow Mode')}</div>
                 <div style="display:flex;flex-wrap:wrap;gap:var(--sp-1);" id="slowmode-pills">
                   ${slowModeOptions.map(o => `<button data-val="${o.v}" class="btn ${currentSlowMode === o.v ? 'btn-primary' : 'btn-secondary'}" style="padding:var(--sp-1) var(--sp-3);font-size:var(--text-xs);min-width:48px;flex:0 0 auto;">${o.l}</button>`).join('')}
                 </div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
                 <div>
-                  <div style="font-size:var(--text-sm);">Join request approval</div>
-                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Admins must approve new join requests</div>
+                  <div style="font-size:var(--text-sm);">${t('settings_join_approval', 'Join request approval')}</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('settings_join_approval_help', 'Admins must approve new join requests')}</div>
                 </div>
                 <div id="toggle-join-approval"></div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
                 <div>
-                  <div style="font-size:var(--text-sm);">Channel gate</div>
-                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Must subscribe to a channel first</div>
+                  <div style="font-size:var(--text-sm);">${t('settings_channel_gate', 'Channel gate')}</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('settings_channel_gate_help', 'Must subscribe to a channel first')}</div>
                 </div>
                 <div id="toggle-channel-gate"></div>
               </div>
               <div id="channel-gate-input-row" style="display:${groupSettings.channel_gate_enabled ? 'flex' : 'none'};gap:var(--sp-2);">
                 <input id="channel-username-input" class="input" placeholder="@channelname" style="min-width:0;flex:1;" value="${groupSettings.channel_username || ''}">
-                <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-channel-btn">Save</button>
+                <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-channel-btn">${t('save_btn', 'Save')}</button>
               </div>
             </div>
           `
@@ -1357,9 +1357,9 @@
         const otherGroups = (store.getState().groups || []).filter(g => String(g.chat_id) !== String(chatId));
         if (otherGroups.length > 0) {
           const copyCard = Card({
-            title: '📋 Copy Settings',
-            subtitle: 'Copy these settings to other groups',
-            children: `<button class="btn btn-secondary" id="open-copy-modal" style="width:100%;">Copy settings to other groups →</button>`
+            title: '📋 ' + t('settings_copy_title', 'Copy Settings'),
+            subtitle: t('settings_copy_subtitle', 'Copy these settings to other groups'),
+            children: `<button class="btn btn-secondary" id="open-copy-modal" style="width:100%;">${t('settings_copy_btn', 'Copy settings to other groups →')}</button>`
           });
           container.appendChild(copyCard);
           copyCard.querySelector('#open-copy-modal').onclick = () => _showCopySettingsModal(chatId, otherGroups);
@@ -1369,28 +1369,28 @@
         const LOG_EVENTS = ['ban','mute','warn','kick','promote','settings','joins','leaves'];
         const currentLogEvents = groupSettings.log_events || ['ban','mute','warn','kick','promote','settings'];
         const logCard = Card({
-          title: '📋 Log Channel',
-          subtitle: 'Where to send moderation logs',
+          title: '📋 ' + t('settings_log_title', 'Log Channel'),
+          subtitle: t('settings_log_subtitle', 'Where to send moderation logs'),
           children: `
             <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
               <div>
-                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Channel ID</label>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">${t('settings_channel_id', 'Channel ID')}</label>
                 <div style="display:flex;gap:var(--sp-2);">
                   <input type="text" id="input-log-channel" class="input" style="min-width:0;flex:1;" placeholder="-100..." value="${groupSettings.log_channel_id || ''}">
-                  <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-log-channel-btn">Save</button>
-                  <button class="btn btn-secondary" style="white-space:nowrap;" id="test-log-channel-btn">Test</button>
+                  <button class="btn btn-secondary" style="white-space:nowrap;flex-shrink:0;" id="save-log-channel-btn">${t('save_btn', 'Save')}</button>
+                  <button class="btn btn-secondary" style="white-space:nowrap;" id="test-log-channel-btn">${t('settings_test_btn', 'Test')}</button>
                 </div>
               </div>
               <div>
-                <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">What to log</div>
+                <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('settings_what_to_log', 'What to log')}</div>
                 <div style="display:flex;flex-wrap:wrap;gap:var(--sp-3);row-gap:var(--sp-3);" id="log-events-list">
                   ${LOG_EVENTS.map(ev => `
                     <label style="display:flex;align-items:center;gap:var(--sp-1);font-size:var(--text-sm);cursor:pointer;">
-                      <input type="checkbox" data-ev="${ev}" ${currentLogEvents.includes(ev) ? 'checked' : ''}> ${ev.charAt(0).toUpperCase() + ev.slice(1)}
+                      <input type="checkbox" data-ev="${ev}" ${currentLogEvents.includes(ev) ? 'checked' : ''}> ${t('event_' + ev, ev.charAt(0).toUpperCase() + ev.slice(1))}
                     </label>
                   `).join('')}
                 </div>
-                <button class="btn btn-secondary" style="margin-top:var(--sp-2);font-size:var(--text-xs);" id="save-log-events-btn">Save log events</button>
+                <button class="btn btn-secondary" style="margin-top:var(--sp-2);font-size:var(--text-xs);" id="save-log-events-btn">${t('settings_save_log_events', 'Save log events')}</button>
               </div>
             </div>
           `
@@ -1415,43 +1415,43 @@
 
         // ── 6. ANNOUNCEMENTS ──────────────────────────────────────────────
         const announcementCard = Card({
-          title: '📢 Announcements',
-          subtitle: 'Linked announcement channel settings',
+          title: '📢 ' + t('settings_announcements_title', 'Announcements'),
+          subtitle: t('settings_announcements_subtitle', 'Linked announcement channel settings'),
           children: `
             <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
               <div>
-                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Linked Channel ID</label>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">${t('settings_linked_channel_id', 'Linked Channel ID')}</label>
                 <input type="text" id="input-announcement-channel" class="input" placeholder="-1001234567890" value="${groupSettings.announcement_channel_id || ''}">
-                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);">Telegram channel ID that posts are forwarded from</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--sp-1);">${t('settings_linked_channel_help', 'Telegram channel ID that posts are forwarded from')}</div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
                 <div>
-                  <div style="font-size:var(--text-sm);">Notify admins</div>
-                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Send DM to admins when announcement posted</div>
+                  <div style="font-size:var(--text-sm);">${t('settings_notify_admins', 'Notify admins')}</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('settings_notify_admins_help', 'Send DM to admins when announcement posted')}</div>
                 </div>
                 <div id="toggle-announcement-notify"></div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
                 <div>
-                  <div style="font-size:var(--text-sm);">Auto-pin</div>
-                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Automatically pin announcement posts</div>
+                  <div style="font-size:var(--text-sm);">${t('settings_auto_pin', 'Auto-pin')}</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('settings_auto_pin_help', 'Automatically pin announcement posts')}</div>
                 </div>
                 <div id="toggle-announcement-pin"></div>
               </div>
               <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;">
                 <div>
-                  <div style="font-size:var(--text-sm);">Admins-only replies</div>
-                  <div style="font-size:var(--text-xs);color:var(--text-muted);">Only admins can reply to announcements</div>
+                  <div style="font-size:var(--text-sm);">${t('settings_restrict_replies', 'Admins-only replies')}</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('settings_restrict_replies_help', 'Only admins can reply to announcements')}</div>
                 </div>
                 <div id="toggle-announcement-restrict"></div>
               </div>
               <div>
-                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">Auto-delete after</label>
+                <label style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:var(--sp-1);">${t('settings_auto_delete_after', 'Auto-delete after')}</label>
                 <select id="select-announcement-delete" class="input">
-                  <option value="0" ${(groupSettings.announcement_auto_delete_mins || 0) === 0 ? 'selected' : ''}>Never</option>
-                  <option value="60" ${(groupSettings.announcement_auto_delete_mins || 0) === 60 ? 'selected' : ''}>1 hour</option>
-                  <option value="1440" ${(groupSettings.announcement_auto_delete_mins || 0) === 1440 ? 'selected' : ''}>1 day</option>
-                  <option value="10080" ${(groupSettings.announcement_auto_delete_mins || 0) === 10080 ? 'selected' : ''}>1 week</option>
+                  <option value="0" ${(groupSettings.announcement_auto_delete_mins || 0) === 0 ? 'selected' : ''}>${t('never', 'Never')}</option>
+                  <option value="60" ${(groupSettings.announcement_auto_delete_mins || 0) === 60 ? 'selected' : ''}>1 ${t('hour', 'hour')}</option>
+                  <option value="1440" ${(groupSettings.announcement_auto_delete_mins || 0) === 1440 ? 'selected' : ''}>1 ${t('day', 'day')}</option>
+                  <option value="10080" ${(groupSettings.announcement_auto_delete_mins || 0) === 10080 ? 'selected' : ''}>1 ${t('week', 'week')}</option>
                 </select>
               </div>
             </div>
@@ -1480,15 +1480,15 @@
 
         // ── 7. ADVANCED ───────────────────────────────────────────────────
         const advancedCard = Card({
-          title: '⚙️ Advanced Group Settings',
+          title: '⚙️ ' + t('settings_advanced_title', 'Advanced Group Settings'),
           children: `
             <div style="display: flex; flex-direction: column; gap: var(--sp-2);">
               <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
-                <span style="font-size: var(--text-sm);">Silent Commands</span>
+                <span style="font-size: var(--text-sm);">${t('settings_silent_commands', 'Silent Commands')}</span>
                 <div id="toggle-silent-commands"></div>
               </div>
               <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--sp-2) 0;">
-                <span style="font-size: var(--text-sm);">Delete Join/Leave Messages</span>
+                <span style="font-size: var(--text-sm);">${t('settings_delete_join_leave', 'Delete Join/Leave Messages')}</span>
                 <div id="toggle-delete-joinleave"></div>
               </div>
             </div>
@@ -1506,8 +1506,8 @@
         autoDelRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-2) 0;gap:var(--sp-3);';
         autoDelRow.innerHTML = `
           <div style="flex:1;">
-            <div style="font-size:var(--text-sm);">🗑️ Auto-Delete Messages</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);">Auto-delete bot messages after N seconds (0 = off)</div>
+            <div style="font-size:var(--text-sm);">🗑️ ${t('settings_auto_delete_msgs', 'Auto-Delete Messages')}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">${t('settings_auto_delete_msgs_help', 'Auto-delete bot messages after N seconds (0 = off)')}</div>
           </div>
           <input type="number" id="autodelete-seconds" min="0" max="3600"
             value="${groupSettings.autodelete_seconds || groupSettings.auto_delete_seconds || 0}"
@@ -1527,16 +1527,16 @@
         const joinPwRow = document.createElement('div');
         joinPwRow.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:var(--sp-2) 0;';
         joinPwRow.innerHTML = `
-          <div style="font-size:var(--text-sm);font-weight:600;">🔑 Join Password</div>
+          <div style="font-size:var(--text-sm);font-weight:600;">🔑 ${t('settings_join_password', 'Join Password')}</div>
           <div style="font-size:var(--text-xs);color:var(--text-muted);">
-            New members must DM the bot with this word before they can chat. Leave empty to disable.
+            ${t('settings_join_password_help', 'New members must DM the bot with this word before they can chat. Leave empty to disable.')}
           </div>
           <div style="display:flex;gap:8px;">
             <input type="text" id="join-password-input" placeholder="e.g. nexusrules"
               value="${groupSettings.join_password || ''}"
               style="flex:1;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
             <button id="save-join-password-btn" style="padding:var(--sp-2) var(--sp-3);background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;">
-              Save
+              ${t('save_btn', 'Save')}
             </button>
           </div>
         `;
@@ -1545,7 +1545,7 @@
           const val = joinPwRow.querySelector('#join-password-input').value.trim();
           await _updateGroupSetting('join_password', val || null);
           await _updateGroupSetting('password_enabled', !!val);
-          showToast(val ? 'Password set' : 'Password cleared', 'success');
+          showToast(val ? t('toast_pw_set', 'Password set') : t('toast_pw_cleared', 'Password cleared'), 'success');
         });
         // Auto-save join password on blur
         joinPwRow.querySelector('#join-password-input').addEventListener('blur', async (e) => {
@@ -1559,36 +1559,36 @@
         // ── 7. DANGER ZONE ────────────────────────────────────────────────
         // Only show danger zone to group owners or sudo users
         if (isGroupOwner || isSudo) {
-          const dangerCard = Card({ title: '⚠️ Danger Zone', subtitle: 'Irreversible actions' });
+          const dangerCard = Card({ title: '⚠️ ' + t('settings_danger_zone', 'Danger Zone'), subtitle: t('settings_danger_subtitle', 'Irreversible actions') });
           dangerCard.style.cssText += '; border-color: var(--danger);';
           const dangerBody = document.createElement('div');
           dangerBody.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-3);';
           const resetBtn = document.createElement('button');
           resetBtn.className = 'btn btn-danger';
           resetBtn.style.cssText = 'align-self:flex-start;';
-          resetBtn.textContent = '🔄 Reset all settings';
+          resetBtn.textContent = '🔄 ' + t('settings_reset_all', 'Reset all settings');
           resetBtn.onclick = async () => {
-            if (!confirm('Reset ALL settings for this group? This cannot be undone.')) return;
-            if (!confirm('Are you absolutely sure?')) return;
+            if (!confirm(t('settings_reset_confirm', 'Reset ALL settings for this group? This cannot be undone.'))) return;
+            if (!confirm(t('settings_are_you_sure', 'Are you absolutely sure?'))) return;
             try {
               await apiFetch(`/api/groups/${chatId}/settings/reset`, { method: 'DELETE' });
               // Clear store settings so all pages reflect the reset
               state.setSettings({});
-              showToast('Settings reset', 'success');
+              showToast(t('toast_reset_success', 'Settings reset'), 'success');
               // Re-render settings page
               await renderSettings(container);
-            } catch (err) { showToast('Failed to reset', 'error'); }
+            } catch (err) { showToast(t('toast_reset_failed', 'Failed to reset'), 'error'); }
           };
           const leaveBtn = document.createElement('button');
           leaveBtn.className = 'btn btn-danger';
           leaveBtn.style.cssText = 'align-self:flex-start;';
-          leaveBtn.textContent = '🚪 Remove bot from group';
+          leaveBtn.textContent = '🚪 ' + t('settings_remove_bot', 'Remove bot from group');
           leaveBtn.onclick = async () => {
-            if (!confirm('Remove the bot from this group?')) return;
+            if (!confirm(t('settings_remove_bot_confirm', 'Remove the bot from this group?'))) return;
             try {
               await apiFetch(`/api/groups/${chatId}/actions/leave`, { method: 'POST' });
-              showToast('Bot left the group', 'success');
-            } catch (err) { showToast('Failed to leave group', 'error'); }
+              showToast(t('toast_bot_left', 'Bot left the group'), 'success');
+            } catch (err) { showToast(t('toast_bot_left_failed', 'Failed to leave group'), 'error'); }
           };
           dangerBody.appendChild(resetBtn);
           dangerBody.appendChild(leaveBtn);
@@ -1598,14 +1598,14 @@
       } else if (chatId && !canManageGroup) {
         // User is a member but not admin - show read-only message
         const noAccessCard = Card({
-          title: '🔒 Settings',
-          subtitle: 'Group settings are only available to administrators',
+          title: '🔒 ' + t('settings_no_access_title', 'Settings'),
+          subtitle: t('settings_no_access_subtitle', 'Group settings are only available to administrators'),
           children: `
             <div style="padding: var(--sp-4); text-align: center; color: var(--text-muted);">
               <div style="font-size: 48px; margin-bottom: var(--sp-4);">👥</div>
-              <p>You need to be a group admin to manage settings.</p>
+              <p>${t('settings_no_access_p1', 'You need to be a group admin to manage settings.')}</p>
               <p style="font-size: var(--text-xs); margin-top: var(--sp-2);">
-                Contact the group owner for assistance.
+                ${t('settings_no_access_p2', 'Contact the group owner for assistance.')}
               </p>
             </div>
           `
@@ -1614,61 +1614,61 @@
       }
 
       // ── THEME ─────────────────────────────────────────────────────────────
-      const themeCard = Card({ title: '🎨 Theme & Appearance', children: '<div id="theme-picker-container"></div>' });
+      const themeCard = Card({ title: '🎨 ' + t('settings_theme_title', 'Theme & Appearance'), children: '<div id="theme-picker-container"></div>' });
       container.appendChild(themeCard);
       ThemeEngine.renderPicker(themeCard.querySelector('#theme-picker-container'));
 
       // Bot Global Messages - only visible to bot owners (overlord or clone owner)
       if (canManageBot && userContext?.bot_info?.id) {
-        const botMsgsCard = Card({ title: '🤖 Bot Global Messages', subtitle: 'Default responses for all your groups', children: '<div id="bot-messages-container"></div>' });
+        const botMsgsCard = Card({ title: '🤖 ' + t('settings_bot_msgs_title', 'Bot Global Messages'), subtitle: t('settings_bot_msgs_subtitle', 'Default responses for all your groups'), children: '<div id="bot-messages-container"></div>' });
         container.appendChild(botMsgsCard);
         await renderCustomMessagesSection(botMsgsCard.querySelector('#bot-messages-container'), `/api/bots/${userContext.bot_info.id}/messages`);
       }
     }
 
-    function _showCopySettingsModal(chatId, otherGroups) {
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:#00000088;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:var(--sp-4);';
-      const box = document.createElement('div');
-      box.style.cssText = 'background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r-2xl);padding:var(--sp-5);width:100%;max-width:420px;box-shadow:var(--shadow-xl);max-height:80vh;overflow-y:auto;';
-      const moduleOpts = ['AutoMod','Welcome & Messages','Modules','Roles','Webhooks'];
-      box.innerHTML = `
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4);">
-          <div style="font-weight:var(--fw-semibold);font-size:var(--text-base);">📋 Copy Settings</div>
-          <button id="copy-modal-close" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;">✕</button>
-        </div>
-        <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">What to copy</div>
-        <div id="module-opts" style="display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:var(--sp-4);">
-          ${moduleOpts.map(m => `<label style="display:flex;align-items:center;gap:var(--sp-1);font-size:var(--text-sm);cursor:pointer;"><input type="checkbox" data-mod="${m.toLowerCase().replace(/ .*/,'')}" checked> ${m}</label>`).join('')}
-        </div>
-        <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">Target groups</div>
-        <div id="group-checklist" style="display:flex;flex-direction:column;gap:var(--sp-1);margin-bottom:var(--sp-4);">
-          ${otherGroups.map(g => `<label style="display:flex;align-items:center;gap:var(--sp-2);font-size:var(--text-sm);cursor:pointer;padding:var(--sp-2);background:var(--bg-input);border-radius:var(--r-lg);"><input type="checkbox" data-gid="${g.chat_id}"> ${g.title || g.chat_id}</label>`).join('')}
-        </div>
-        <div id="copy-result" style="font-size:var(--text-sm);margin-bottom:var(--sp-3);"></div>
-        <button id="copy-confirm-btn" class="btn btn-primary" style="width:100%;">Copy Settings</button>
-      `;
-      const close = () => overlay.remove();
-      box.querySelector('#copy-modal-close').onclick = close;
-      overlay.onclick = e => { if (e.target === overlay) close(); };
-      box.querySelector('#copy-confirm-btn').onclick = async () => {
-        const targetIds = [...box.querySelectorAll('#group-checklist input:checked')].map(el => parseInt(el.dataset.gid));
-        const modules = [...box.querySelectorAll('#module-opts input:checked')].map(el => el.dataset.mod);
-        if (!targetIds.length) { showToast('Select at least one group', 'error'); return; }
-        try {
-          const res = await apiFetch(`/api/groups/${chatId}/copy-settings`, {
-            method: 'POST',
-            body: JSON.stringify({ target_chat_ids: targetIds, modules })
-          });
-          const ok = (res.results || []).filter(r => r.ok).length;
-          const fail = (res.results || []).filter(r => !r.ok).length;
-          box.querySelector('#copy-result').textContent = `✓ ${ok} groups updated${fail ? `, ✗ ${fail} failed` : ''}`;
-          showToast(`Settings copied to ${ok} group(s)`, 'success');
-        } catch (err) { showToast('Failed to copy settings', 'error'); }
-      };
-      overlay.appendChild(box);
-      document.body.appendChild(overlay);
-    }
+        function _showCopySettingsModal(chatId, otherGroups) {
+          const overlay = document.createElement('div');
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:1000;background:#00000088;backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:var(--sp-4);';
+          const box = document.createElement('div');
+          box.style.cssText = 'background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r-2xl);padding:var(--sp-5);width:100%;max-width:420px;box-shadow:var(--shadow-xl);max-height:80vh;overflow-y:auto;';
+          const moduleOpts = ['AutoMod','Welcome & Messages','Modules','Roles','Webhooks'];
+          box.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--sp-4);">
+              <div style="font-weight:var(--fw-semibold);font-size:var(--text-base);">📋 ${t('copy_modal_title', 'Copy Settings')}</div>
+              <button id="copy-modal-close" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;">✕</button>
+            </div>
+            <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('copy_modal_what', 'What to copy')}</div>
+            <div id="module-opts" style="display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:var(--sp-4);">
+              ${moduleOpts.map(m => `<label style="display:flex;align-items:center;gap:var(--sp-1);font-size:var(--text-sm);cursor:pointer;"><input type="checkbox" data-mod="${m.toLowerCase().replace(/ .*/,'')}" checked> ${m}</label>`).join('')}
+            </div>
+            <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('copy_modal_target', 'Target groups')}</div>
+            <div id="group-checklist" style="display:flex;flex-direction:column;gap:var(--sp-1);margin-bottom:var(--sp-4);">
+              ${otherGroups.map(g => `<label style="display:flex;align-items:center;gap:var(--sp-2);font-size:var(--text-sm);cursor:pointer;padding:var(--sp-2);background:var(--bg-input);border-radius:var(--r-lg);"><input type="checkbox" data-gid="${g.chat_id}"> ${g.title || g.chat_id}</label>`).join('')}
+            </div>
+            <div id="copy-result" style="font-size:var(--text-sm);margin-bottom:var(--sp-3);"></div>
+            <button id="copy-confirm-btn" class="btn btn-primary" style="width:100%;">${t('copy_modal_title', 'Copy Settings')}</button>
+          `;
+          const close = () => overlay.remove();
+          box.querySelector('#copy-modal-close').onclick = close;
+          overlay.onclick = e => { if (e.target === overlay) close(); };
+          box.querySelector('#copy-confirm-btn').onclick = async () => {
+            const targetIds = [...box.querySelectorAll('#group-checklist input:checked')].map(el => parseInt(el.dataset.gid));
+            const modules = [...box.querySelectorAll('#module-opts input:checked')].map(el => el.dataset.mod);
+            if (!targetIds.length) { showToast(t('toast_select_at_least_one', 'Select at least one group'), 'error'); return; }
+            try {
+              const res = await apiFetch(`/api/groups/${chatId}/copy-settings`, {
+                method: 'POST',
+                body: JSON.stringify({ target_chat_ids: targetIds, modules })
+              });
+              const ok = (res.results || []).filter(r => r.ok).length;
+              const fail = (res.results || []).filter(r => !r.ok).length;
+              box.querySelector('#copy-result').textContent = t('copy_modal_result', 'Results') + `: ✓ ${ok} groups updated${fail ? `, ✗ ${fail} failed` : ''}`;
+              showToast(t('toast_settings_copied', 'Settings copied successfully').replace('{count}', ok), 'success');
+            } catch (err) { showToast(t('toast_failed_to_copy', 'Failed to copy settings'), 'error'); }
+          };
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+        }
 
     async function _updateGroupSetting(key, val) {
       const state = getState();
@@ -1688,123 +1688,123 @@
       }
     }
 
-    async function renderCustomMessagesSection(container, apiUrl) {
-      container.innerHTML = '<div style="text-align:center;color:var(--text-muted)">Loading...</div>';
-      try {
-        const messages = await apiFetch(apiUrl);
-        container.innerHTML = '';
-        const list = document.createElement('div');
-        list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2)';
-        Object.entries(messages).forEach(([key, data]) => {
-          const canEdit = data.canEdit !== false;
-          const item = document.createElement('div');
-          item.dataset.msgKey = key;
-          item.style.cssText = `padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border:1px solid ${data.isCustom ? 'var(--accent)' : 'var(--border)'}`;
-          const renderView = () => {
-            item.innerHTML = `
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-                <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-secondary)">${key.toUpperCase()}</span>
-                ${data.isCustom ? '<span style="font-size:10px;color:var(--accent)">Customized</span>' : ''}
-              </div>
-              <div class="msg-body" style="font-size:var(--text-sm);margin-bottom:12px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${data.body}</div>
-              <div style="display:flex;gap:8px">
-                ${canEdit ? '<button class="btn btn-secondary edit-btn" style="padding:4px 8px;font-size:12px">Edit</button>' : '<span style="font-size:11px;color:var(--text-muted)">Bot owner only</span>'}
-                ${data.isCustom && canEdit ? '<button class="btn reset-btn" style="padding:4px 8px;font-size:12px;background:none;color:var(--danger);border:1px solid var(--danger)">Reset</button>' : ''}
-              </div>
-            `;
-            if (canEdit) {
-              item.querySelector('.edit-btn')?.addEventListener('click', () => renderEdit());
-            }
-            if (data.isCustom && canEdit) {
-              item.querySelector('.reset-btn')?.addEventListener('click', async () => {
-                if (!confirm('Reset to default?')) return;
-                try { await apiFetch(`${apiUrl}/${key}`, { method: 'DELETE' }); showToast('Reset', 'success'); data.isCustom = false; data.body = ''; renderView(); }
-                catch (e) { showToast('Error', 'error'); }
-              });
-            }
-          };
-          const renderEdit = () => {
-            item.innerHTML = `
-              <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-secondary);margin-bottom:8px">${key.toUpperCase()}</div>
-              <textarea class="input edit-textarea" style="width:100%;min-height:80px;resize:vertical;font-size:var(--text-sm);margin-bottom:8px;box-sizing:border-box;">${data.body}</textarea>
-              <div style="display:flex;gap:8px">
-                <button class="btn btn-primary save-edit-btn" style="padding:4px 12px;font-size:12px">Save</button>
-                <button class="btn btn-secondary cancel-edit-btn" style="padding:4px 12px;font-size:12px">Cancel</button>
-              </div>
-            `;
-            item.querySelector('.save-edit-btn').addEventListener('click', async () => {
-              const newVal = item.querySelector('.edit-textarea').value;
-              try {
-                await apiFetch(`${apiUrl}/${key}`, { method: 'PUT', body: JSON.stringify({ body: newVal }) });
-                data.body = newVal;
-                data.isCustom = true;
-                showToast('Saved', 'success');
-                renderView();
-              } catch (e) { showToast('Error saving', 'error'); }
+        async function renderCustomMessagesSection(container, apiUrl) {
+          container.innerHTML = `<div style="text-align:center;color:var(--text-muted)">${t('loading', 'Loading...')}</div>`;
+          try {
+            const messages = await apiFetch(apiUrl);
+            container.innerHTML = '';
+            const list = document.createElement('div');
+            list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2)';
+            Object.entries(messages).forEach(([key, data]) => {
+              const canEdit = data.canEdit !== false;
+              const item = document.createElement('div');
+              item.dataset.msgKey = key;
+              item.style.cssText = `padding:var(--sp-3);background:var(--bg-input);border-radius:var(--r-lg);border:1px solid ${data.isCustom ? 'var(--accent)' : 'var(--border)'}`;
+              const renderView = () => {
+                item.innerHTML = `
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                    <span style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-secondary)">${key.toUpperCase()}</span>
+                    ${data.isCustom ? `<span style="font-size:10px;color:var(--accent)">${t('customized', 'Customized')}</span>` : ''}
+                  </div>
+                  <div class="msg-body" style="font-size:var(--text-sm);margin-bottom:12px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${data.body}</div>
+                  <div style="display:flex;gap:8px">
+                    ${canEdit ? `<button class="btn btn-secondary edit-btn" style="padding:4px 8px;font-size:12px">${t('edit', 'Edit')}</button>` : `<span style="font-size:11px;color:var(--text-muted)">${t('bot_owner_only', 'Bot owner only')}</span>`}
+                    ${data.isCustom && canEdit ? `<button class="btn reset-btn" style="padding:4px 8px;font-size:12px;background:none;color:var(--danger);border:1px solid var(--danger)">${t('reset', 'Reset')}</button>` : ''}
+                  </div>
+                `;
+                if (canEdit) {
+                  item.querySelector('.edit-btn')?.addEventListener('click', () => renderEdit());
+                }
+                if (data.isCustom && canEdit) {
+                  item.querySelector('.reset-btn')?.addEventListener('click', async () => {
+                    if (!confirm(t('reset_to_default_confirm', 'Reset to default?'))) return;
+                    try { await apiFetch(`${apiUrl}/${key}`, { method: 'DELETE' }); showToast(t('reset', 'Reset'), 'success'); data.isCustom = false; data.body = ''; renderView(); }
+                    catch (e) { showToast(t('error', 'Error'), 'error'); }
+                  });
+                }
+              };
+              const renderEdit = () => {
+                item.innerHTML = `
+                  <div style="font-size:var(--text-xs);font-weight:var(--fw-bold);color:var(--text-secondary);margin-bottom:8px">${key.toUpperCase()}</div>
+                  <textarea class="input edit-textarea" style="width:100%;min-height:80px;resize:vertical;font-size:var(--text-sm);margin-bottom:8px;box-sizing:border-box;">${data.body}</textarea>
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary save-edit-btn" style="padding:4px 12px;font-size:12px">${t('save_btn', 'Save')}</button>
+                    <button class="btn btn-secondary cancel-edit-btn" style="padding:4px 12px;font-size:12px">${t('cancel_btn', 'Cancel')}</button>
+                  </div>
+                `;
+                item.querySelector('.save-edit-btn').addEventListener('click', async () => {
+                  const newVal = item.querySelector('.edit-textarea').value;
+                  try {
+                    await apiFetch(`${apiUrl}/${key}`, { method: 'PUT', body: JSON.stringify({ body: newVal }) });
+                    data.body = newVal;
+                    data.isCustom = true;
+                    showToast(t('saved', 'Saved'), 'success');
+                    renderView();
+                  } catch (e) { showToast(t('error_saving', 'Error saving'), 'error'); }
+                });
+                item.querySelector('.cancel-edit-btn').addEventListener('click', () => renderView());
+              };
+              renderView();
+              list.appendChild(item);
             });
-            item.querySelector('.cancel-edit-btn').addEventListener('click', () => renderView());
-          };
-          renderView();
-          list.appendChild(item);
-        });
-        container.appendChild(list);
-      } catch (e) { container.innerHTML = 'Error loading messages'; }
-    }
-
-
-
-    async function renderLogs(container) {
-      const state = getState();
-      const chatId = state.activeChatId;
-      
-      container.innerHTML = '';
-      container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
-      
-      if (!chatId) {
-        container.appendChild(EmptyState({ icon: '👆', title: 'Select a group', description: 'Choose a group to view logs' }));
-        return;
-      }
-      
-      // Show loading state
-      container.innerHTML = `
-        <div style="text-align: center; padding: var(--sp-8);">
-          <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
-          <div style="color: var(--text-muted);">Loading logs...</div>
-        </div>
-      `;
-      
-      try {
-        const logs = await apiFetch(`/api/groups/${chatId}/logs`);
-        
-        // Clear loading state
-        container.innerHTML = '';
-        container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
-        
-        if (!logs || logs.length === 0) {
-          container.appendChild(Card({ 
-            title: '📋 Recent Logs', 
-            children: EmptyState({ icon: '📋', title: 'No logs yet', description: 'Activity will appear here' })
-          }));
-          return;
+            container.appendChild(list);
+          } catch (e) { container.innerHTML = t('error_loading_messages', 'Error loading messages'); }
         }
-        
-        const logsHtml = logs.slice(0, 50).map(l => `
-          <div style="padding: var(--sp-2) 0; border-bottom: 1px solid var(--border); font-size: 13px;">
-            ${getActionEmoji(l.action)} <b>${formatAction(l.action)}</b> 
-            ${l.by_username ? `by ${l.by_username}` : 'by System'} 
-            <span style="float: right; color: var(--text-muted); font-size: 11px;">${formatTime(l.timestamp)}</span>
-          </div>
-        `).join('');
-        
-        container.appendChild(Card({ 
-          title: `📋 Recent Logs (${logs.length})`,
-          children: `<div style="max-height: 600px; overflow-y: auto;">${logsHtml}</div>`
-        }));
-      } catch (e) {
-        container.innerHTML = '';
-        container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load logs', description: e.message || 'Please try again' }));
-      }
-    }
+
+
+
+        async function renderLogs(container) {
+          const state = getState();
+          const chatId = state.activeChatId;
+          
+          container.innerHTML = '';
+          container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+          
+          if (!chatId) {
+            container.appendChild(EmptyState({ icon: '👆', title: t('select_group', 'Select a group'), description: t('notes_select_group', 'Choose a group to view logs') }));
+            return;
+          }
+          
+          // Show loading state
+          container.innerHTML = `
+            <div style="text-align: center; padding: var(--sp-8);">
+              <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
+              <div style="color: var(--text-muted);">${t('loading_logs', 'Loading logs...')}</div>
+            </div>
+          `;
+          
+          try {
+            const logs = await apiFetch(`/api/groups/${chatId}/logs`);
+            
+            // Clear loading state
+            container.innerHTML = '';
+            container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
+            
+            if (!logs || logs.length === 0) {
+              container.appendChild(Card({ 
+                title: '📋 ' + t('nav_logs', 'Recent Logs'), 
+                children: EmptyState({ icon: '📋', title: t('no_logs_yet', 'No logs yet'), description: t('activity_will_appear_here', 'Activity will appear here') })
+              }));
+              return;
+            }
+            
+            const logsHtml = logs.slice(0, 50).map(l => `
+              <div style="padding: var(--sp-2) 0; border-bottom: 1px solid var(--border); font-size: 13px;">
+                ${getActionEmoji(l.action)} <b>${formatAction(l.action)}</b> 
+                ${l.by_username ? `${t('by', 'by')} ${l.by_username}` : t('by_system', 'by System')} 
+                <span style="float: right; color: var(--text-muted); font-size: 11px;">${formatTime(l.timestamp)}</span>
+              </div>
+            `).join('');
+            
+            container.appendChild(Card({ 
+              title: `📋 ${t('nav_logs', 'Recent Logs')} (${logs.length})`,
+              children: `<div style="max-height: 600px; overflow-y: auto;">${logsHtml}</div>`
+            }));
+          } catch (e) {
+            container.innerHTML = '';
+            container.appendChild(EmptyState({ icon: '⚠️', title: t('failed_to_load_logs', 'Failed to load logs'), description: e.message || t('please_try_again', 'Please try again') }));
+          }
+        }
   </script>
 </body>
 </html>

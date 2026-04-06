@@ -259,6 +259,10 @@ async function changeLanguage(newLang) {
 
     console.log('[i18n] Language changed to:', newLang);
     
+    // Clear render cache so all pages re-render with new language
+    try { if (window._renderedPages) window._renderedPages.clear(); } catch(e) {}
+    localStorage.removeItem('nexus_page_rendered_cache');
+
     // Reload page to apply translations
     window.location.reload();
   } catch (error) {

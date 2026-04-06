@@ -9,6 +9,7 @@
 import { Card, EmptyState, showToast, Toggle } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 
@@ -16,85 +17,85 @@ const store = useStore;
 const ERROR_TYPE_INFO = {
   // Clone owner notifications
   PRIVACY_MODE_ON: {
-    label: 'Privacy Mode Warnings',
-    description: 'When clone bots have privacy mode enabled',
+    label: t('notif_privacy_mode', 'Privacy Mode Warnings'),
+    description: t('notif_privacy_mode_desc', 'When clone bots have privacy mode enabled'),
     icon: '🔒'
   },
   BOT_NOT_ADMIN: {
-    label: 'Bot Not Admin',
-    description: 'When bot is added without admin rights',
+    label: t('notif_not_admin', 'Bot Not Admin'),
+    description: t('notif_not_admin_desc', 'When bot is added without admin rights'),
     icon: '⚠️'
   },
   BOT_CANT_DELETE: {
-    label: 'Cannot Delete Messages',
-    description: 'Missing delete permission in a group',
+    label: t('notif_cant_delete', 'Cannot Delete Messages'),
+    description: t('notif_cant_delete_desc', 'Missing delete permission in a group'),
     icon: '🗑️'
   },
   BOT_CANT_RESTRICT: {
-    label: 'Cannot Restrict Members',
-    description: 'Missing restrict/ban permission',
+    label: t('notif_cant_restrict', 'Cannot Restrict Members'),
+    description: t('notif_cant_restrict_desc', 'Missing restrict/ban permission'),
     icon: '🔇'
   },
   BOT_KICKED: {
-    label: 'Bot Removed',
-    description: 'When bot is kicked from a group',
+    label: t('notif_kicked', 'Bot Removed'),
+    description: t('notif_kicked_desc', 'When bot is kicked from a group'),
     icon: '👢'
   },
   FED_BAN_PROPAGATION_FAILED: {
-    label: 'TrustNet Ban Failures',
-    description: 'When federation bans cannot be enforced',
+    label: t('notif_trustnet_fail', 'TrustNet Ban Failures'),
+    description: t('notif_trustnet_fail_desc', 'When federation bans cannot be enforced'),
     icon: '🌐'
   },
   CAPTCHA_WEBAPP_URL_MISSING: {
-    label: 'Captcha URL Missing',
-    description: 'WebApp captcha mode without RENDER_EXTERNAL_URL',
+    label: t('notif_captcha_url', 'Captcha URL Missing'),
+    description: t('notif_captcha_url_desc', 'WebApp captcha mode without RENDER_EXTERNAL_URL'),
     icon: '🤖'
   },
   WEBHOOK_FAILED: {
-    label: 'Webhook Setup Failed',
-    description: 'When webhook registration fails',
+    label: t('notif_webhook_fail', 'Webhook Setup Failed'),
+    description: t('notif_webhook_fail_desc', 'When webhook registration fails'),
     icon: '🔌'
   },
   WEBHOOK_MISSING_UPDATES: {
-    label: 'Missing Updates',
-    description: 'Webhook set but no updates arriving',
+    label: t('notif_missing_updates', 'Missing Updates'),
+    description: t('notif_missing_updates_desc', 'Webhook set but no updates arriving'),
     icon: '📡'
   },
   GROUPS_NOT_APPEARING: {
-    label: 'Groups Missing',
-    description: 'When groups are missing from dashboard',
+    label: t('notif_groups_missing', 'Groups Missing'),
+    description: t('notif_groups_missing_desc', 'When groups are missing from dashboard'),
     icon: '👥'
   },
   INVALID_TOKEN: {
-    label: 'Invalid Token',
-    description: 'When Telegram rejects a bot token',
+    label: t('notif_invalid_token', 'Invalid Token'),
+    description: t('notif_invalid_token_desc', 'When Telegram rejects a bot token'),
     icon: '🔑'
   },
   // System notifications (main owner only)
   MISSING_ENV_VAR: {
-    label: 'Missing Environment Variables',
-    description: 'Required env vars not set at startup',
+    label: t('notif_missing_env', 'Missing Environment Variables'),
+    description: t('notif_missing_env_desc', 'Required env vars not set at startup'),
     icon: '⚙️'
   },
   SUPABASE_CONNECTION_FAILED: {
-    label: 'Database Connection Failed',
-    description: 'Cannot connect to Supabase',
+    label: t('notif_db_fail', 'Database Connection Failed'),
+    description: t('notif_db_fail_desc', 'Cannot connect to Supabase'),
     icon: '💾'
   },
   ANALYTICS_ERROR: {
-    label: 'Analytics Errors',
-    description: 'Persistent analytics job failures',
+    label: t('notif_analytics_error', 'Analytics Errors'),
+    description: t('notif_analytics_error_desc', 'Persistent analytics job failures'),
     icon: '📊'
   },
   // ML notifications
   ML_TRAINING_COMPLETE: {
-    label: 'ML Training Complete',
-    description: 'When spam classifier training finishes',
+    label: t('notif_ml_complete', 'ML Training Complete'),
+    description: t('notif_ml_complete_desc', 'When spam classifier training finishes'),
     icon: '✅'
   },
   ML_TRAINING_FAILED: {
-    label: 'ML Training Failed',
-    description: 'When training fails or has insufficient data',
+    label: t('notif_ml_fail', 'ML Training Failed'),
+    description: t('notif_ml_fail_desc', 'When training fails or has insufficient data'),
     icon: '❌'
   }
 };
@@ -108,16 +109,16 @@ export async function renderNotificationsPage(container) {
   header.innerHTML = `
     <div style="font-size:2rem">🔔</div>
     <div>
-      <div style="font-size:1.2rem;font-weight:700">Notification Settings</div>
-      <div style="font-size:0.875rem;color:var(--text-muted)">Manage DM alerts from your bots</div>
+      <div style="font-size:1.2rem;font-weight:700">${t('notif_settings_title', 'Notification Settings')}</div>
+      <div style="font-size:0.875rem;color:var(--text-muted)">${t('notif_settings_subtitle', 'Manage DM alerts from your bots')}</div>
     </div>
   `;
   container.appendChild(header);
 
   // Loading state
   container.appendChild(Card({
-    title: 'Loading...',
-    children: '<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted)">Loading notification preferences...</div>'
+    title: t('loading', 'Loading...'),
+    children: `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted)">${t('loading_notif_prefs', 'Loading notification preferences...')}</div>`
   }));
 
   try {
@@ -136,15 +137,15 @@ export async function renderNotificationsPage(container) {
 
     // ── Recent Notifications Section ──────────────────────────────────────
     const recentCard = Card({
-      title: '📋 Recent Notifications',
-      subtitle: 'Last 10 DM alerts sent to you'
+      title: '📋 ' + t('recent_notifications', 'Recent Notifications'),
+      subtitle: t('last_10_alerts', 'Last 10 DM alerts sent to you')
     });
 
     if (notifications.length === 0) {
       recentCard.innerHTML += EmptyState({
         icon: '📭',
-        title: 'No notifications yet',
-        description: 'You haven\'t received any DM alerts. They\'ll appear here when sent.'
+        title: t('no_notifications_yet', 'No notifications yet'),
+        description: t('no_notifications_desc', 'You haven\'t received any DM alerts. They\'ll appear here when sent.')
       });
     } else {
       const list = document.createElement('div');
@@ -181,16 +182,16 @@ export async function renderNotificationsPage(container) {
 
     // ── Notification Preferences Section ─────────────────────────────────
     const prefsCard = Card({
-      title: '⚙️ Notification Preferences',
-      subtitle: 'Toggle off to silence specific alert types'
+      title: '⚙️ ' + t('notif_prefs_title', 'Notification Preferences'),
+      subtitle: t('notif_prefs_subtitle', 'Toggle off to silence specific alert types')
     });
 
     // Group by category
     const categories = {
-      clone: { label: 'Clone Bot Alerts', items: [] },
-      system: { label: 'System Alerts', items: [] },
-      ml: { label: 'ML Training Alerts', items: [] },
-      other: { label: 'Other', items: [] }
+      clone: { label: t('notif_cat_clone', 'Clone Bot Alerts'), items: [] },
+      system: { label: t('notif_cat_system', 'System Alerts'), items: [] },
+      ml: { label: t('notif_cat_ml', 'ML Training Alerts'), items: [] },
+      other: { label: t('notif_cat_other', 'Other'), items: [] }
     };
 
     preferences.forEach(pref => {
@@ -243,64 +244,64 @@ export async function renderNotificationsPage(container) {
                 method: 'PUT',
                 body: JSON.stringify({ muted: !enabled })
               });
-              showToast(`${info.label} ${enabled ? 'enabled' : 'muted'}`, 'success');
-            } catch (e) {
-              showToast('Failed to update preference', 'error');
+              showToast(`${info.label} ${enabled ? t('enabled', 'enabled') : t('muted', 'muted')}`, 'success');
+              } catch (e) {
+              showToast(t('failed_to_update_preference', 'Failed to update preference'), 'error');
               // Revert toggle visually
               toggle.querySelector('input').checked = !enabled;
-            }
-          }
-        });
-        toggleContainer.appendChild(toggle);
+              }
+              }
+              });
+              toggleContainer.appendChild(toggle);
 
-        catSection.appendChild(row);
-      });
+              catSection.appendChild(row);
+              });
 
-      prefsCard.appendChild(catSection);
-    });
+              prefsCard.appendChild(catSection);
+              });
 
-    container.appendChild(prefsCard);
+              container.appendChild(prefsCard);
 
-    // ── Info Card ─────────────────────────────────────────────────────────
-    const infoCard = Card({
-      title: 'ℹ️ About Notifications',
-      children: `
-        <div style="font-size:0.875rem;color:var(--text-secondary);line-height:1.5;">
-          <p style="margin:0 0 var(--sp-3);">
-            <b>Deduplication:</b> Same error type + same bot = one DM per 24 hours.
-          </p>
-          <p style="margin:0 0 var(--sp-3);">
-            <b>Clone owners</b> receive alerts about their specific clones.
-            <b>Main owner</b> receives system-wide alerts.
-          </p>
-          <p style="margin:0;">
-            Muting a notification type prevents future DMs but does not affect bot functionality.
-          </p>
-        </div>
-      `
-    });
-    container.appendChild(infoCard);
+              // ── Info Card ─────────────────────────────────────────────────────────
+              const infoCard = Card({
+              title: 'ℹ️ ' + t('about_notifications', 'About Notifications'),
+              children: `
+              <div style="font-size:0.875rem;color:var(--text-secondary);line-height:1.5;">
+              <p style="margin:0 0 var(--sp-3);">
+              <b>${t('deduplication', 'Deduplication')}:</b> ${t('deduplication_desc', 'Same error type + same bot = one DM per 24 hours.')}
+              </p>
+              <p style="margin:0 0 var(--sp-3);">
+              <b>${t('clone_owners', 'Clone owners')}</b> ${t('clone_owners_notif_desc', 'receive alerts about their specific clones.')}
+              <b>${t('main_owner', 'Main owner')}</b> ${t('main_owner_notif_desc', 'receives system-wide alerts.')}
+              </p>
+              <p style="margin:0;">
+              ${t('muting_notif_hint', 'Muting a notification type prevents future DMs but does not affect bot functionality.')}
+              </p>
+              </div>
+              `
+              });
+              container.appendChild(infoCard);
 
-  } catch (e) {
-    container.innerHTML = '';
-    container.appendChild(header);
-    container.appendChild(EmptyState({
-      icon: '⚠️',
-      title: 'Failed to load',
-      description: e.message || 'Could not load notification settings.'
-    }));
-  }
-}
+              } catch (e) {
+              container.innerHTML = '';
+              container.appendChild(header);
+              container.appendChild(EmptyState({
+              icon: '⚠️',
+              title: t('failed_to_load', 'Failed to load'),
+              description: e.message || t('could_not_load_notif_settings', 'Could not load notification settings.')
+              }));
+              }
+              }
 
-function _formatTimeAgo(isoString) {
-  if (!isoString) return 'Unknown';
-  const date = new Date(isoString);
-  const now = new Date();
-  const diff = Math.floor((now - date) / 1000);
+              function _formatTimeAgo(isoString) {
+              if (!isoString) return t('unknown', 'Unknown');
+              const date = new Date(isoString);
+              const now = new Date();
+              const diff = Math.floor((now - date) / 1000);
 
-  if (diff < 60) return 'Just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
-  return date.toLocaleDateString();
-}
+              if (diff < 60) return t('just_now', 'Just now');
+              if (diff < 3600) return `${Math.floor(diff / 60)}${t('m_ago', 'm ago')}`;
+              if (diff < 86400) return `${Math.floor(diff / 3600)}${t('h_ago', 'h ago')}`;
+              if (diff < 604800) return `${Math.floor(diff / 86400)}${t('d_ago', 'd ago')}`;
+              return date.toLocaleDateString();
+              }

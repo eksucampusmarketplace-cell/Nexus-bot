@@ -15,6 +15,7 @@
  */
 
 import { Card, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 
@@ -23,125 +24,125 @@ const store = useStore;
 const MESSAGE_TYPES = [
   {
     id: 'welcome',
-    label: '👋 Welcome Message',
-    description: 'Sent when a new member joins the group.',
+    label: t('msg_type_welcome_label', '👋 Welcome Message'),
+    description: t('msg_type_welcome_desc', 'Sent when a new member joins the group.'),
     defaultText: 'Welcome {mention} to {chatname}! 🎉',
     variables: [
-      { v: '{mention}',   desc: 'Clickable mention of the user' },
+      { v: '{mention}', desc: t('var_desc_mention', 'Clickable mention of the user') },
       { v: '{first_name}',desc: "User's first name" },
       { v: '{last_name}', desc: "User's last name" },
-      { v: '{fullname}',  desc: 'Full name' },
-      { v: '{username}',  desc: 'Username (or name if none)' },
-      { v: '{chatname}',  desc: 'Group name' },
-      { v: '{count}',     desc: 'Member number they are' },
+      { v: '{fullname}', desc: t('var_desc_fullname', 'Full name') },
+      { v: '{username}', desc: t('var_desc_username', 'Username (or name if none)') },
+      { v: '{chatname}', desc: t('var_desc_chatname', 'Group name') },
+      { v: '{count}', desc: t('var_desc_count', 'Member number they are') },
     ],
     extras: ['welcome_dm', 'welcome_media'],
     supportsMedia: true,
   },
   {
     id: 'goodbye',
-    label: '👋 Goodbye Message',
-    description: 'Sent when a member leaves or is removed.',
+    label: t('msg_type_goodbye_label', '👋 Goodbye Message'),
+    description: t('msg_type_goodbye_desc', 'Sent when a member leaves or is removed.'),
     defaultText: 'Goodbye {fullname}! 👋',
     variables: [
-      { v: '{mention}',   desc: 'Clickable mention' },
+      { v: '{mention}', desc: t('var_desc_mention', 'Clickable mention') },
       { v: '{first_name}',desc: "User's first name" },
-      { v: '{fullname}',  desc: 'Full name' },
-      { v: '{username}',  desc: 'Username' },
-      { v: '{chatname}',  desc: 'Group name' },
+      { v: '{fullname}', desc: t('var_desc_fullname', 'Full name') },
+      { v: '{username}', desc: t('var_desc_username', 'Username') },
+      { v: '{chatname}', desc: t('var_desc_chatname', 'Group name') },
     ],
   },
   {
     id: 'rules',
-    label: '📋 Group Rules',
-    description: 'Shown when a user runs /rules.',
+    label: t('msg_type_rules_label', '📋 Group Rules'),
+    description: t('msg_type_rules_desc', 'Shown when a user runs /rules.'),
     defaultText: '1. Be respectful\n2. No spam\n3. No NSFW content',
     variables: [
-      { v: '{chatname}', desc: 'Group name' },
+      { v: '{chatname}', desc: t('var_desc_chatname', 'Group name') },
     ],
     isTextarea: true,
     noPreview: true,
   },
   {
     id: 'warn_dm',
-    label: '⚠️ Warning Notification (DM)',
-    description: 'Sent to user when they receive a warning.',
+    label: t('msg_type_warn_dm_label', '⚠️ Warning Notification (DM)'),
+    description: t('msg_type_warn_dm_desc', 'Sent to user when they receive a warning.'),
     defaultText: 'You have been warned in {group_name}.\nReason: {reason}\nWarnings: {warn_count}/{warn_limit}',
     variables: [
       { v: '{first_name}', desc: "User's first name" },
-      { v: '{group_name}', desc: 'Group name' },
-      { v: '{reason}',     desc: 'Warning reason' },
-      { v: '{warn_count}', desc: 'Current warn count' },
-      { v: '{warn_limit}', desc: 'Max warns before action' },
+      { v: '{group_name}', desc: t('var_desc_group_name', 'Group name') },
+      { v: '{reason}', desc: t('var_desc_reason', 'Warning reason') },
+      { v: '{warn_count}', desc: t('var_desc_warn_count', 'Current warn count') },
+      { v: '{warn_limit}', desc: t('var_desc_warn_limit', 'Max warns before action') },
     ],
   },
   {
     id: 'member_muted',
-    label: '🔇 Mute Notification (DM)',
-    description: 'Sent to user when they are muted.',
+    label: t('msg_type_member_muted_label', '🔇 Mute Notification (DM)'),
+    description: t('msg_type_member_muted_desc', 'Sent to user when they are muted.'),
     defaultText: 'You have been muted in {group_name}.\nReason: {reason}\nDuration: {duration}',
     variables: [
       { v: '{first_name}', desc: "User's first name" },
-      { v: '{group_name}', desc: 'Group name' },
-      { v: '{reason}',     desc: 'Mute reason' },
-      { v: '{duration}',   desc: 'Mute duration (e.g. 1 hour)' },
+      { v: '{group_name}', desc: t('var_desc_group_name', 'Group name') },
+      { v: '{reason}', desc: t('var_desc_reason', 'Mute reason') },
+      { v: '{duration}', desc: t('var_desc_duration', 'Mute duration (e.g. 1 hour)') },
     ],
   },
   {
     id: 'member_banned',
-    label: '🚫 Ban Notification (DM)',
-    description: 'Sent to user when they are banned.',
+    label: t('msg_type_member_banned_label', '🚫 Ban Notification (DM)'),
+    description: t('msg_type_member_banned_desc', 'Sent to user when they are banned.'),
     defaultText: 'You have been banned from {group_name}.\nReason: {reason}',
     variables: [
       { v: '{first_name}', desc: "User's first name" },
-      { v: '{group_name}', desc: 'Group name' },
-      { v: '{reason}',     desc: 'Ban reason' },
+      { v: '{group_name}', desc: t('var_desc_group_name', 'Group name') },
+      { v: '{reason}', desc: t('var_desc_reason', 'Ban reason') },
     ],
   },
   {
     id: 'captcha_prompt',
-    label: '🔐 Captcha Prompt',
-    description: 'Shown to new members for CAPTCHA verification.',
+    label: t('msg_type_captcha_prompt_label', '🔐 Captcha Prompt'),
+    description: t('msg_type_captcha_prompt_desc', 'Shown to new members for CAPTCHA verification.'),
     defaultText: 'Welcome {first_name}! Please verify you are human by pressing the button below. You have {timeout} seconds.',
     variables: [
       { v: '{first_name}', desc: "User's first name" },
-      { v: '{timeout}',    desc: 'Seconds to complete CAPTCHA' },
-      { v: '{chatname}',   desc: 'Group name' },
+      { v: '{timeout}', desc: t('var_desc_timeout', 'Seconds to complete CAPTCHA') },
+      { v: '{chatname}', desc: t('var_desc_chatname', 'Group name') },
     ],
   },
   {
     id: 'channel_gate',
-    label: '📢 Channel Gate Message',
-    description: 'Shown when user must join a channel first.',
+    label: t('msg_type_channel_gate_label', '📢 Channel Gate Message'),
+    description: t('msg_type_channel_gate_desc', 'Shown when user must join a channel first.'),
     defaultText: 'Hi {first_name}! To access this group, please join our channel first:\n{channel_link}',
     variables: [
       { v: '{first_name}',   desc: "User's first name" },
-      { v: '{channel_name}', desc: 'Required channel name' },
-      { v: '{channel_link}', desc: 'Channel join link' },
+      { v: '{channel_name}', desc: t('var_desc_channel_name', 'Required channel name') },
+      { v: '{channel_link}', desc: t('var_desc_channel_link', 'Channel join link') },
     ],
   },
   {
     id: 'boost_gate',
-    label: '🚀 Boost Gate Message',
-    description: 'Shown when user must invite members to gain access.',
+    label: t('msg_type_boost_gate_label', '🚀 Boost Gate Message'),
+    description: t('msg_type_boost_gate_desc', 'Shown when user must invite members to gain access.'),
     defaultText: 'Hi {first_name}! You need to invite {remaining} more member(s) to unlock access.\n\nYour invite link:\n{link}\n\nProgress: {bar}',
     variables: [
       { v: '{first_name}', desc: "User's first name" },
-      { v: '{required}',   desc: 'Total invites needed' },
+      { v: '{required}', desc: t('var_desc_required', 'Total invites needed') },
       { v: '{current}',    desc: "User's current invite count" },
-      { v: '{remaining}',  desc: 'Invites still needed' },
+      { v: '{remaining}', desc: t('var_desc_remaining', 'Invites still needed') },
       { v: '{link}',       desc: "User's personal invite link" },
-      { v: '{bar}',        desc: 'Visual progress bar' },
+      { v: '{bar}', desc: t('var_desc_bar', 'Visual progress bar') },
     ],
   },
   {
     id: 'boost_unlocked',
-    label: '🎉 Boost Unlocked Message',
-    description: 'Sent to user when they complete their invite goal.',
+    label: t('msg_type_boost_unlocked_label', '🎉 Boost Unlocked Message'),
+    description: t('msg_type_boost_unlocked_desc', 'Sent to user when they complete their invite goal.'),
     defaultText: 'Congratulations {first_name}! You have unlocked access to {group_name}! 🎉',
     variables: [
       { v: '{first_name}', desc: "User's first name" },
-      { v: '{group_name}', desc: 'Group name' },
+      { v: '{group_name}', desc: t('var_desc_group_name', 'Group name') },
     ],
   },
 ];
@@ -158,8 +159,8 @@ export async function renderGreetingsPage(container) {
   if (!chatId) {
     container.appendChild(EmptyState({
       icon: '👆',
-      title: 'Select a group',
-      description: 'Choose a group from the dropdown above to edit messages'
+      title: t('select_group', 'Select a group'),
+      description: t('greetings_select_group_desc', 'Choose a group from the dropdown above to edit messages')
     }));
     return;
   }
@@ -184,7 +185,7 @@ export async function renderGreetingsPage(container) {
 
   const introCard = Card({
     title: '✏️ Custom Messages',
-    subtitle: 'Customize every message the bot sends. Use variables like {first_name} for dynamic content.',
+    subtitle: t('custom_messages_subtitle', 'Customize every message the bot sends. Use variables like {first_name} for dynamic content.'),
   });
   container.appendChild(introCard);
 
@@ -299,7 +300,7 @@ function _populateCardBody(body, msgType, displayText, isCustomized, textConfig,
 
   const inputLabel = document.createElement('div');
   inputLabel.style.cssText = 'font-size:var(--text-xs);font-weight:var(--fw-semibold);color:var(--text-muted);margin-bottom:var(--sp-2);text-transform:uppercase;letter-spacing:0.05em;';
-  inputLabel.textContent = 'Message Text';
+  inputLabel.textContent = t('message_text_label', 'Message Text');
   editorWrap.appendChild(inputLabel);
 
   const textarea = document.createElement('textarea');
@@ -374,7 +375,7 @@ function _populateCardBody(body, msgType, displayText, isCustomized, textConfig,
         });
         showToast('Auto-delete saved', 'success');
       } catch (err) {
-        showToast('Failed to save', 'error');
+        showToast(t('failed_to_save_toast', 'Failed to save'), 'error');
       }
     };
     editorWrap.appendChild(deleteRow);
@@ -406,10 +407,10 @@ function _populateCardBody(body, msgType, displayText, isCustomized, textConfig,
     saveBtn.textContent = '⏳ Saving...';
     try {
       await _saveKey(chatId, initData, msgType.id, text);
-      showToast('Message saved!', 'success');
+      showToast(t('message_saved_toast', 'Message saved!'), 'success');
       _markCustomized(header, true);
     } catch (e) {
-      showToast('Failed to save', 'error');
+      showToast(t('failed_to_save_toast', 'Failed to save'), 'error');
     } finally {
       saveBtn.disabled = false;
       saveBtn.textContent = '💾 Save';

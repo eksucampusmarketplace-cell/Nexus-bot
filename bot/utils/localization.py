@@ -495,6 +495,7 @@ STRINGS = {
         "tr": "Panel",
         "id": "Dasbor",
         "de": "Dashboard",
+        "th": "แดชบอร์ด",
     },
     "nav_bots": {
         "en": "Bots",
@@ -507,6 +508,7 @@ STRINGS = {
         "tr": "Botlar",
         "id": "Bot",
         "de": "Bots",
+        "th": "บอท",
     },
     "nav_moderation": {
         "en": "Moderation",
@@ -519,6 +521,7 @@ STRINGS = {
         "tr": "Moderasyon",
         "id": "Moderasi",
         "de": "Moderation",
+        "th": "การจัดการ",
     },
     "nav_automod": {
         "en": "AutoMod",
@@ -531,6 +534,7 @@ STRINGS = {
         "tr": "AutoMod",
         "id": "AutoMod",
         "de": "AutoMod",
+        "th": "ระบบจัดการอัตโนมัติ",
     },
     "nav_members": {
         "en": "Members",
@@ -543,6 +547,7 @@ STRINGS = {
         "tr": "Üyeler",
         "id": "Anggota",
         "de": "Mitglieder",
+        "th": "สมาชิก",
     },
     "nav_analytics": {
         "en": "Analytics",
@@ -555,6 +560,7 @@ STRINGS = {
         "tr": "Analitik",
         "id": "Analitik",
         "de": "Analytik",
+        "th": "การวิเคราะห์",
     },
     "nav_broadcast": {
         "en": "Broadcast",
@@ -567,6 +573,7 @@ STRINGS = {
         "tr": "Yayın",
         "id": "Siaran",
         "de": "Broadcast",
+        "th": "การประกาศ",
     },
     "nav_reports": {
         "en": "Reports",
@@ -577,6 +584,7 @@ STRINGS = {
         "pt": "Relatórios",
         "ru": "Отчёты",
         "tr": "Raporlar",
+        "th": "รายงาน",
         "id": "Laporan",
         "de": "Berichte",
     },
@@ -591,6 +599,7 @@ STRINGS = {
         "tr": "Karşılama",
         "id": "Salam",
         "de": "Begrüßungen",
+        "th": "การต้อนรับ",
     },
     "nav_antiraid": {
         "en": "Anti-Raid",
@@ -603,6 +612,7 @@ STRINGS = {
         "tr": "Anti-Raid",
         "id": "Anti-Raid",
         "de": "Anti-Raid",
+        "th": "ป้องกันการโจมตี",
     },
     "nav_settings": {
         "en": "Settings",
@@ -615,6 +625,7 @@ STRINGS = {
         "tr": "Ayarlar",
         "id": "Pengaturan",
         "de": "Einstellungen",
+        "th": "การตั้งค่า",
     },
     "nav_logs": {
         "en": "Logs",
@@ -627,6 +638,7 @@ STRINGS = {
         "tr": "Kayıtlar",
         "id": "Log",
         "de": "Protokolle",
+        "th": "บันทึก",
     },
     "nav_roles": {
         "en": "Roles",
@@ -639,6 +651,7 @@ STRINGS = {
         "tr": "Roller",
         "id": "Peran",
         "de": "Rollen",
+        "th": "บทบาท",
     },
     "nav_notes": {
         "en": "Notes",
@@ -651,6 +664,7 @@ STRINGS = {
         "tr": "Notlar",
         "id": "Catatan",
         "de": "Notizen",
+        "th": "บันทึกย่อ",
     },
     "nav_xp": {
         "en": "XP & Levels",
@@ -663,6 +677,7 @@ STRINGS = {
         "tr": "XP ve Seviye",
         "id": "XP dan Level",
         "de": "XP und Level",
+        "th": "คะแนนและระดับ",
     },
     "nav_owner": {
         "en": "Owner",
@@ -675,6 +690,7 @@ STRINGS = {
         "tr": "Sahip",
         "id": "Pemilik",
         "de": "Eigentümer",
+        "th": "เจ้าของ",
     },
     # ============================================
     # NAVIGATION LABELS v21 (NEW)
@@ -690,6 +706,7 @@ STRINGS = {
         "tr": "Güven Ağı",
         "id": "Jaringan Kepercayaan",
         "de": "Vertrauensnetz",
+        "th": "เครือข่ายความน่าเชื่อถือ",
     },
     "nav_captcha": {
         "en": "Captcha",
@@ -702,6 +719,7 @@ STRINGS = {
         "tr": "Captcha",
         "id": "Captcha",
         "de": "Captcha",
+        "th": "แคปช่า",
     },
     "nav_community_vote": {
         "en": "Community Vote",
@@ -714,6 +732,7 @@ STRINGS = {
         "tr": "Topluluk Oylaması",
         "id": "Pemungutan Suara Komunitas",
         "de": "Community-Abstimmung",
+        "th": "การโหวตชุมชน",
     },
     "nav_night_mode": {
         "en": "Night Mode",
@@ -726,6 +745,7 @@ STRINGS = {
         "tr": "Gece Modu",
         "id": "Mode Malam",
         "de": "Nachtmodus",
+        "th": "โหมดกลางคืน",
     },
     "nav_history": {
         "en": "Name History",
@@ -738,6 +758,7 @@ STRINGS = {
         "tr": "İsim Geçmişi",
         "id": "Riwayat Nama",
         "de": "Namensverlauf",
+        "th": "ประวัติชื่อ",
     },
     "nav_language": {
         "en": "Language",
@@ -750,6 +771,7 @@ STRINGS = {
         "tr": "Dil",
         "id": "Bahasa",
         "de": "Sprache",
+        "th": "ภาษา",
     },
     "nav_persona": {
         "en": "Bot Persona",
@@ -762,6 +784,7 @@ STRINGS = {
         "tr": "Bot Kişiliği",
         "id": "Persona Bot",
         "de": "Bot-Persönlichkeit",
+        "th": "บุคลิกบอท",
     },
     # ============================================
     # BUTTON LABELS
@@ -777,6 +800,7 @@ STRINGS = {
         "tr": "Kaydet",
         "id": "Simpan",
         "de": "Speichern",
+        "th": "บันทึก",
     },
     "cancel_btn": {
         "en": "Cancel",
@@ -789,6 +813,7 @@ STRINGS = {
         "tr": "İptal",
         "id": "Batal",
         "de": "Abbrechen",
+        "th": "ยกเลิก",
     },
     "enable_label": {
         "en": "Enable",
@@ -801,6 +826,7 @@ STRINGS = {
         "tr": "Etkinleştir",
         "id": "Aktifkan",
         "de": "Aktivieren",
+        "th": "เปิดใช้งาน",
     },
     "disable_label": {
         "en": "Disable",
@@ -813,6 +839,7 @@ STRINGS = {
         "tr": "Devre Dışı Bırak",
         "id": "Nonaktifkan",
         "de": "Deaktivieren",
+        "th": "ปิดใช้งาน",
     },
     "delete": {
         "en": "Delete",
@@ -825,6 +852,7 @@ STRINGS = {
         "tr": "Sil",
         "id": "Hapus",
         "de": "Löschen",
+        "th": "ลบ",
     },
     "edit": {
         "en": "Edit",
@@ -837,6 +865,7 @@ STRINGS = {
         "tr": "Düzenle",
         "id": "Edit",
         "de": "Bearbeiten",
+        "th": "แก้ไข",
     },
     "confirm": {
         "en": "Confirm",
@@ -849,6 +878,7 @@ STRINGS = {
         "tr": "Onayla",
         "id": "Konfirmasi",
         "de": "Bestätigen",
+        "th": "ยืนยัน",
     },
     "close": {
         "en": "Close",
@@ -861,6 +891,7 @@ STRINGS = {
         "tr": "Kapat",
         "id": "Tutup",
         "de": "Schließen",
+        "th": "ปิด",
     },
     "refresh": {
         "en": "Refresh",
@@ -873,6 +904,7 @@ STRINGS = {
         "tr": "Yenile",
         "id": "Segarkan",
         "de": "Aktualisieren",
+        "th": "รีเฟรช",
     },
     "search": {
         "en": "Search",
@@ -885,6 +917,7 @@ STRINGS = {
         "tr": "Ara",
         "id": "Cari",
         "de": "Suchen",
+        "th": "ค้นหา",
     },
     "copy": {
         "en": "Copy",
@@ -897,6 +930,7 @@ STRINGS = {
         "tr": "Kopyala",
         "id": "Salin",
         "de": "Kopieren",
+        "th": "คัดลอก",
     },
     "copied": {
         "en": "Copied!",
@@ -909,6 +943,7 @@ STRINGS = {
         "tr": "Kopyalandı!",
         "id": "Disalin!",
         "de": "Kopiert!",
+        "th": "คัดลอกแล้ว!",
     },
     "reset": {
         "en": "Reset",
@@ -921,6 +956,7 @@ STRINGS = {
         "tr": "Sıfırla",
         "id": "Atur Ulang",
         "de": "Zurücksetzen",
+        "th": "รีเซ็ต",
     },
     "add_bot": {
         "en": "Add Bot",
@@ -933,6 +969,7 @@ STRINGS = {
         "tr": "Bot Ekle",
         "id": "Tambah Bot",
         "de": "Bot hinzufügen",
+        "th": "เพิ่มบอท",
     },
     "add_clone": {
         "en": "Add Clone",
@@ -945,6 +982,7 @@ STRINGS = {
         "tr": "Klon Ekle",
         "id": "Tambah Klon",
         "de": "Klon hinzufügen",
+        "th": "เพิ่มโคลน",
     },
     # ============================================
     # STATUS LABELS
@@ -960,6 +998,7 @@ STRINGS = {
         "tr": "Aktif",
         "id": "Aktif",
         "de": "Aktiv",
+        "th": "ใช้งาน",
     },
     "status_inactive": {
         "en": "Inactive",
@@ -972,6 +1011,7 @@ STRINGS = {
         "tr": "Pasif",
         "id": "Tidak Aktif",
         "de": "Inaktiv",
+        "th": "ไม่ใช้งาน",
     },
     "status_pending": {
         "en": "Pending",
@@ -984,6 +1024,7 @@ STRINGS = {
         "tr": "Beklemede",
         "id": "Tertunda",
         "de": "Ausstehend",
+        "th": "รอดำเนินการ",
     },
     "status_online": {
         "en": "Online",
@@ -996,6 +1037,7 @@ STRINGS = {
         "tr": "Çevrimiçi",
         "id": "Online",
         "de": "Online",
+        "th": "ออนไลน์",
     },
     "status_offline": {
         "en": "Offline",
@@ -1008,6 +1050,7 @@ STRINGS = {
         "tr": "Çevrimdışı",
         "id": "Offline",
         "de": "Offline",
+        "th": "ออฟไลน์",
     },
     "status_live": {
         "en": "Live",
@@ -1020,6 +1063,7 @@ STRINGS = {
         "tr": "Canlı",
         "id": "Langsung",
         "de": "Live",
+        "th": "ถ่ายทอดสด",
     },
     # ============================================
     # MODERATION LABELS
@@ -1035,6 +1079,7 @@ STRINGS = {
         "tr": "Yasakla",
         "id": "Blokir",
         "de": "Bannen",
+        "th": "แบน",
     },
     "action_kick": {
         "en": "Kick",
@@ -1047,6 +1092,7 @@ STRINGS = {
         "tr": "At",
         "id": "Tendang",
         "de": "Entfernen",
+        "th": "เตะ",
     },
     "action_mute": {
         "en": "Mute",
@@ -1059,6 +1105,7 @@ STRINGS = {
         "tr": "Sustur",
         "id": "Bisukan",
         "de": "Stummschalten",
+        "th": "ปิดเสียง",
     },
     "action_warn": {
         "en": "Warn",
@@ -1071,6 +1118,7 @@ STRINGS = {
         "tr": "Uyar",
         "id": "Peringatkan",
         "de": "Verwarnen",
+        "th": "เตือน",
     },
     "action_delete": {
         "en": "Delete",
@@ -1083,6 +1131,7 @@ STRINGS = {
         "tr": "Sil",
         "id": "Hapus",
         "de": "Löschen",
+        "th": "ลบ",
     },
     # ============================================
     # AUTOMOD LABELS
@@ -1098,6 +1147,7 @@ STRINGS = {
         "tr": "Anti-Flood",
         "id": "Anti-Flood",
         "de": "Anti-Flood",
+        "th": "ป้องกันสแปม",
     },
     "antilink": {
         "en": "Anti-Link",
@@ -1110,6 +1160,7 @@ STRINGS = {
         "tr": "Anti-Link",
         "id": "Anti-Link",
         "de": "Anti-Link",
+        "th": "ป้องกันลิงก์",
     },
     "antispam": {
         "en": "Anti-Spam",
@@ -1122,6 +1173,7 @@ STRINGS = {
         "tr": "Anti-Spam",
         "id": "Anti-Spam",
         "de": "Anti-Spam",
+        "th": "ป้องกันสแปม",
     },
     "blacklist_lbl": {
         "en": "Blacklist",
@@ -1134,6 +1186,7 @@ STRINGS = {
         "tr": "Kara Liste",
         "id": "Daftar Hitam",
         "de": "Schwarze Liste",
+        "th": "บัญชีดำ",
     },
     "locks_lbl": {
         "en": "Locks",
@@ -1146,6 +1199,7 @@ STRINGS = {
         "tr": "Kilitler",
         "id": "Kunci",
         "de": "Sperren",
+        "th": "การล็อก",
     },
     # ============================================
     # SECTION HEADERS
@@ -1161,6 +1215,7 @@ STRINGS = {
         "tr": "Genel",
         "id": "Umum",
         "de": "Allgemein",
+        "th": "ทั่วไป",
     },
     "section_warnings": {
         "en": "Warnings",
@@ -1173,6 +1228,7 @@ STRINGS = {
         "tr": "Uyarılar",
         "id": "Peringatan",
         "de": "Warnungen",
+        "th": "คำเตือน",
     },
     "section_captcha": {
         "en": "Captcha",
@@ -1185,6 +1241,7 @@ STRINGS = {
         "tr": "Captcha",
         "id": "Captcha",
         "de": "Captcha",
+        "th": "แคปช่า",
     },
     "section_antiraid": {
         "en": "Anti-Raid",
@@ -1197,6 +1254,7 @@ STRINGS = {
         "tr": "Anti-Raid",
         "id": "Anti-Raid",
         "de": "Anti-Raid",
+        "th": "ป้องกันการโจมตี",
     },
     # ============================================
     # TIME LABELS
@@ -1212,6 +1270,7 @@ STRINGS = {
         "tr": "dakika",
         "id": "menit",
         "de": "Minuten",
+        "th": "นาที",
     },
     "seconds": {
         "en": "seconds",
@@ -1224,6 +1283,7 @@ STRINGS = {
         "tr": "saniye",
         "id": "detik",
         "de": "Sekunden",
+        "th": "วินาที",
     },
     "hours": {
         "en": "hours",
@@ -1236,6 +1296,7 @@ STRINGS = {
         "tr": "saat",
         "id": "jam",
         "de": "Stunden",
+        "th": "ชั่วโมง",
     },
     "days": {
         "en": "days",
@@ -1248,6 +1309,7 @@ STRINGS = {
         "tr": "gün",
         "id": "hari",
         "de": "Tage",
+        "th": "วัน",
     },
     "threshold_lbl": {
         "en": "Threshold",
@@ -1260,6 +1322,7 @@ STRINGS = {
         "tr": "Eşik",
         "id": "Ambang",
         "de": "Schwelle",
+        "th": "เกณฑ์",
     },
     "timeout_lbl": {
         "en": "Timeout",
@@ -1272,6 +1335,7 @@ STRINGS = {
         "tr": "Zaman Aşımı",
         "id": "Waktu Habis",
         "de": "Zeitüberschreitung",
+        "th": "หมดเวลา",
     },
     # ============================================
     # PAGE-SPECIFIC LABELS
@@ -1287,6 +1351,7 @@ STRINGS = {
         "tr": "Oylama Eşiği",
         "id": "Ambang Suara",
         "de": "Abstimmungsschwelle",
+        "th": "เกณฑ์โหวต",
     },
     "vote_action": {
         "en": "Vote Action",
@@ -1299,6 +1364,7 @@ STRINGS = {
         "tr": "Oylama Eylemi",
         "id": "Aksi Suara",
         "de": "Abstimmungsaktion",
+        "th": "การกระทำโหวต",
     },
     "auto_detect_scams": {
         "en": "Auto-Detect Scams",
@@ -1311,6 +1377,7 @@ STRINGS = {
         "tr": "Dolandırıcılığı Otomatik Algıla",
         "id": "Deteksi Penipuan Otomatis",
         "de": "Betrug automatisch erkennen",
+        "th": "ตรวจจับการหลอกลวงอัตโนมัติ",
     },
     "night_schedule": {
         "en": "Night Schedule",
@@ -1323,6 +1390,7 @@ STRINGS = {
         "tr": "Gece Programı",
         "id": "Jadwal Malam",
         "de": "Nachtzeitplan",
+        "th": "กำหนดการกลางคืน",
     },
     "night_start_lbl": {
         "en": "Start Time",
@@ -1335,6 +1403,7 @@ STRINGS = {
         "tr": "Başlangıç Saati",
         "id": "Waktu Mulai",
         "de": "Startzeit",
+        "th": "เวลาเริ่มต้น",
     },
     "night_end_lbl": {
         "en": "End Time",
@@ -1347,6 +1416,7 @@ STRINGS = {
         "tr": "Bitiş Saati",
         "id": "Waktu Selesai",
         "de": "Endzeit",
+        "th": "เวลาสิ้นสุด",
     },
     "timezone_lbl": {
         "en": "Timezone",
@@ -1359,6 +1429,7 @@ STRINGS = {
         "tr": "Saat Dilimi",
         "id": "Zona Waktu",
         "de": "Zeitzone",
+        "th": "เขตเวลา",
     },
     "night_message_lbl": {
         "en": "Night Message",
@@ -1371,6 +1442,7 @@ STRINGS = {
         "tr": "Gece Mesajı",
         "id": "Pesan Malam",
         "de": "Nachtnachricht",
+        "th": "ข้อความกลางคืน",
     },
     "morning_msg_lbl": {
         "en": "Morning Message",
@@ -1383,6 +1455,7 @@ STRINGS = {
         "tr": "Sabah Mesajı",
         "id": "Pesan Pagi",
         "de": "Frühnachricht",
+        "th": "ข้อความตอนเช้า",
     },
     "fed_name_lbl": {
         "en": "Federation Name",
@@ -1395,6 +1468,7 @@ STRINGS = {
         "tr": "Federasyon Adı",
         "id": "Nama Federasi",
         "de": "Föderationsname",
+        "th": "ชื่อสหพันธ์",
     },
     "invite_code_lbl": {
         "en": "Invite Code",
@@ -1407,6 +1481,7 @@ STRINGS = {
         "tr": "Davet Kodu",
         "id": "Kode Undangan",
         "de": "Einladungscode",
+        "th": "รหัสเชิญ",
     },
     "ban_propagation": {
         "en": "Ban Propagation",
@@ -1419,6 +1494,7 @@ STRINGS = {
         "tr": "Yasak Yayılımı",
         "id": "Penegakan Blokir",
         "de": "Ban-Ausbreitung",
+        "th": "การขยายแบน",
     },
     "share_reputation": {
         "en": "Share Reputation",
@@ -1431,6 +1507,7 @@ STRINGS = {
         "tr": "İtibar Paylaş",
         "id": "Bagikan Reputasi",
         "de": "Reputation teilen",
+        "th": "แชร์ชื่อเสียง",
     },
     "my_lang_lbl": {
         "en": "My Language",
@@ -1443,6 +1520,7 @@ STRINGS = {
         "tr": "Dilim",
         "id": "Bahasa Saya",
         "de": "Meine Sprache",
+        "th": "ภาษาของฉัน",
     },
     "group_lang_lbl": {
         "en": "Group Language",
@@ -1455,6 +1533,7 @@ STRINGS = {
         "tr": "Grup Dili",
         "id": "Bahasa Grup",
         "de": "Gruppensprache",
+        "th": "ภาษากลุ่ม",
     },
     "auto_detected": {
         "en": "Auto-detected",
@@ -1467,6 +1546,7 @@ STRINGS = {
         "tr": "Otomatik Algılandı",
         "id": "Tereteksi Otomatis",
         "de": "Automatisch erkannt",
+        "th": "ตรวจพบอัตโนมัติ",
     },
     "manual_override": {
         "en": "Manual Override",
@@ -1479,6 +1559,7 @@ STRINGS = {
         "tr": "Manuel Geçersiz Kılma",
         "id": "Penggantian Manual",
         "de": "Manuelle Überschreibung",
+        "th": "แทนที่ด้วยตนเอง",
     },
     # ============================================
     # TOAST MESSAGES
@@ -1494,6 +1575,7 @@ STRINGS = {
         "tr": "Başarıyla kaydedildi!",
         "id": "Berhasil disimpan!",
         "de": "Erfolgreich gespeichert!",
+        "th": "บันทึกสำเร็จ!",
     },
     "toast_delete_success": {
         "en": "Deleted successfully!",
@@ -1506,6 +1588,7 @@ STRINGS = {
         "tr": "Başarıyla silindi!",
         "id": "Berhasil dihapus!",
         "de": "Erfolgreich gelöscht!",
+        "th": "ลบสำเร็จ!",
     },
     "toast_copy": {
         "en": "Copied to clipboard!",
@@ -1518,6 +1601,7 @@ STRINGS = {
         "tr": "Panoya kopyalandı!",
         "id": "Disalin ke clipboard!",
         "de": "In Zwischenablage kopiert!",
+        "th": "คัดลอกไปยังคลิปบอร์ด!",
     },
     "toast_no_group": {
         "en": "No group selected",
@@ -1530,6 +1614,7 @@ STRINGS = {
         "tr": "Grup seçilmedi",
         "id": "Tidak ada grup dipilih",
         "de": "Keine Gruppe ausgewählt",
+        "th": "ยังไม่ได้เลือกกลุ่ม",
     },
     "loading": {
         "en": "Loading...",
@@ -1542,6 +1627,7 @@ STRINGS = {
         "tr": "Yükleniyor...",
         "id": "Memuat...",
         "de": "Laden...",
+        "th": "กำลังโหลด...",
     },
     "saved": {
         "en": "Saved!",
@@ -1554,6 +1640,7 @@ STRINGS = {
         "tr": "Kaydedildi!",
         "id": "Tersimpan!",
         "de": "Gespeichert!",
+        "th": "บันทึกแล้ว!",
     },
     "error": {
         "en": "Error",
@@ -1566,6 +1653,7 @@ STRINGS = {
         "tr": "Hata",
         "id": "Kesalahan",
         "de": "Fehler",
+        "th": "ข้อผิดพลาด",
     },
     "select_group": {
         "en": "Select a group",
@@ -1578,6 +1666,153 @@ STRINGS = {
         "tr": "Bir grup seçin",
         "id": "Pilih grup",
         "de": "Gruppe auswählen",
+        "th": "เลือกกลุ่ม",
+    },
+    # ============================================
+    # LANGUAGE PAGE SPECIFIC
+    # ============================================
+    "lang_notice_title": {
+        "en": "This changes the mini app interface language for you only.",
+        "ar": "هذا يغير لغة واجهة التطبيق المصغرة لك فقط.",
+        "es": "Esto cambia el idioma de la interfaz de la mini app solo para ti.",
+        "fr": "Cela change la langue de l'interface de la mini app uniquement pour vous.",
+        "hi": "यह केवल आपके लिए मिनी ऐप इंटरफेस की भाषा बदलता है।",
+        "pt": "Isso muda o idioma da interface do mini app apenas para você.",
+        "ru": "Это изменяет язык интерфейса мини-приложения только для вас.",
+        "tr": "Bu, yalnızca sizin için mini uygulama arayüz dilini değiştirir.",
+        "id": "Ini mengubah bahasa antarmuka mini app hanya untuk Anda.",
+        "de": "Dies ändert die Sprache der Mini-App-Oberfläche nur für Sie.",
+        "th": "การตั้งค่านี้จะเปลี่ยนภาษาของหน้าจอแอปสำหรับคุณเท่านั้น",
+    },
+    "lang_notice_body": {
+        "en": "To change the language the bot uses when sending messages to your group, go to",
+        "ar": "لتغيير اللغة التي يستخدمها البوت عند إرسال الرسائل إلى مجموعتك، انتقل إلى",
+        "es": "Para cambiar el idioma que el bot usa al enviar mensajes a tu grupo, ve a",
+        "fr": "Pour changer la langue utilisée par le bot lors de l'envoi de messages à votre groupe, allez à",
+        "hi": "बॉट द्वारा आपके समूह में संदेश भेजते समय उपयोग की जाने वाली भाषा बदलने के लिए, यहाँ जाएं",
+        "pt": "Para alterar o idioma que o bot usa ao enviar mensagens para seu grupo, vá para",
+        "ru": "Чтобы изменить язык, который бот использует при отправке сообщений в вашу группу, перейдите в",
+        "tr": "Botun grubunuza mesaj gönderirken kullandığı dili değiştirmek için şuraya gidin",
+        "id": "Untuk mengubah bahasa yang digunakan bot saat mengirim pesan ke grup Anda, buka",
+        "de": "Um die Sprache zu ändern, die der Bot beim Senden von Nachrichten an Ihre Gruppe verwendet, gehen Sie zu",
+        "th": "หากต้องการเปลี่ยนภาษาที่บอทใช้ส่งข้อความไปยังกลุ่มของคุณ ไปที่",
+    },
+    "lang_notice_link": {
+        "en": "Settings → Group Identity → Bot Message Language",
+        "ar": "الإعدادات → هوية المجموعة → لغة رسائل البوت",
+        "es": "Configuración → Identidad del Grupo → Idioma de Mensajes del Bot",
+        "fr": "Paramètres → Identité du Groupe → Langue des Messages du Bot",
+        "hi": "सेटिंग्स → समूह पहचान → बॉट संदेश भाषा",
+        "pt": "Configurações → Identidade do Grupo → Idioma das Mensagens do Bot",
+        "ru": "Настройки → Идентичность Группы → Язык Сообщений Бота",
+        "tr": "Ayarlar → Grup Kimliği → Bot Mesaj Dili",
+        "id": "Pengaturan → Identitas Grup → Bahasa Pesan Bot",
+        "de": "Einstellungen → Gruppenidentität → Bot-Nachrichtensprache",
+        "th": "การตั้งค่า → ข้อมูลกลุ่ม → ภาษาข้อความบอท",
+    },
+    "lang_subtitle": {
+        "en": "Choose your preferred interface language",
+        "ar": "اختر لغة الواجهة المفضلة لديك",
+        "es": "Elige tu idioma de interfaz preferido",
+        "fr": "Choisissez votre langue d'interface préférée",
+        "hi": "अपनी पसंदीदा इंटरफेस भाषा चुनें",
+        "pt": "Escolha seu idioma de interface preferido",
+        "ru": "Выберите предпочитаемый язык интерфейса",
+        "tr": "Tercih ettiğiniz arayüz dilini seçin",
+        "id": "Pilih bahasa antarmuka yang Anda sukai",
+        "de": "Wählen Sie Ihre bevorzugte Oberflächensprache",
+        "th": "เลือกภาษาหน้าจอที่คุณต้องการ",
+    },
+    "lang_changed": {
+        "en": "Language changed successfully!",
+        "ar": "تم تغيير اللغة بنجاح!",
+        "es": "¡Idioma cambiado exitosamente!",
+        "fr": "Langue changée avec succès!",
+        "hi": "भाषा सफलतापूर्वक बदली गई!",
+        "pt": "Idioma alterado com sucesso!",
+        "ru": "Язык успешно изменён!",
+        "tr": "Dil başarıyla değiştirildi!",
+        "id": "Bahasa berhasil diubah!",
+        "de": "Sprache erfolgreich geändert!",
+        "th": "เปลี่ยนภาษาสำเร็จ!",
+    },
+    "current": {
+        "en": "Current",
+        "ar": "الحالي",
+        "es": "Actual",
+        "fr": "Actuel",
+        "hi": "वर्तमान",
+        "pt": "Atual",
+        "ru": "Текущий",
+        "tr": "Mevcut",
+        "id": "Saat ini",
+        "de": "Aktuell",
+        "th": "ปัจจุบัน",
+    },
+    "lang_detected_title": {
+        "en": "Language Detected",
+        "ar": "تم اكتشاف اللغة",
+        "es": "Idioma Detectado",
+        "fr": "Langue Détectée",
+        "hi": "भाषा का पता लगा",
+        "pt": "Idioma Detectado",
+        "ru": "Язык Обнаружен",
+        "tr": "Dil Algılandı",
+        "id": "Bahasa Terdeteksi",
+        "de": "Sprache Erkannt",
+        "th": "ตรวจพบภาษา",
+    },
+    "lang_detected_body": {
+        "en": "We detected you may be using {lang}. Would you like to use this language?",
+        "ar": "لقد اكتشفنا أنك قد تستخدم {lang}. هل ترغب في استخدام هذه اللغة؟",
+        "es": "Detectamos que podrías estar usando {lang}. ¿Te gustaría usar este idioma?",
+        "fr": "Nous avons détecté que vous utilisez peut-être {lang}. Voulez-vous utiliser cette langue?",
+        "hi": "हमने पाया कि आप {lang} का उपयोग कर रहे हो सकते हैं। क्या आप इस भाषा का उपयोग करना चाहेंगे?",
+        "pt": "Detectamos que você pode estar usando {lang}. Gostaria de usar este idioma?",
+        "ru": "Мы обнаружили, что вы, возможно, используете {lang}. Хотите использовать этот язык?",
+        "tr": "{lang} kullanıyor olabileceğinizi tespit ettik. Bu dili kullanmak ister misiniz?",
+        "id": "Kami mendeteksi Anda mungkin menggunakan {lang}. Apakah Anda ingin menggunakan bahasa ini?",
+        "de": "Wir haben festgestellt, dass Sie möglicherweise {lang} verwenden. Möchten Sie diese Sprache verwenden?",
+        "th": "เราตรวจพบว่าคุณอาจกำลังใช้ {lang} คุณต้องการใช้ภาษานี้หรือไม่?",
+    },
+    "lang_use_detected": {
+        "en": "Yes, use this language",
+        "ar": "نعم، استخدم هذه اللغة",
+        "es": "Sí, usar este idioma",
+        "fr": "Oui, utiliser cette langue",
+        "hi": "हां, इस भाषा का उपयोग करें",
+        "pt": "Sim, usar este idioma",
+        "ru": "Да, использовать этот язык",
+        "tr": "Evet, bu dili kullan",
+        "id": "Ya, gunakan bahasa ini",
+        "de": "Ja, diese Sprache verwenden",
+        "th": "ใช่ ใช้ภาษานี้",
+    },
+    "lang_keep_english": {
+        "en": "No, keep English",
+        "ar": "لا، احتفظ بالإنجليزية",
+        "es": "No, mantener inglés",
+        "fr": "Non, garder l'anglais",
+        "hi": "नहीं, अंग्रेजी रखें",
+        "pt": "Não, manter inglês",
+        "ru": "Нет, оставить английский",
+        "tr": "Hayır, İngilizce'yi koru",
+        "id": "Tidak, tetap gunakan bahasa Inggris",
+        "de": "Nein, Englisch beibehalten",
+        "th": "ไม่ ใช้ภาษาอังกฤษต่อ",
+    },
+    "lang_auto_detect_hint": {
+        "en": "Language is automatically detected from your name, bio, and messages.",
+        "ar": "يتم اكتشاف اللغة تلقائيًا من اسمك ونبذة عنك ورسائلك.",
+        "es": "El idioma se detecta automáticamente de tu nombre, biografía y mensajes.",
+        "fr": "La langue est détectée automatiquement à partir de votre nom, bio et messages.",
+        "hi": "भाषा आपके नाम, बायो और संदेशों से स्वचालित रूप से पता लगाई जाती है।",
+        "pt": "O idioma é detectado automaticamente a partir do seu nome, bio e mensagens.",
+        "ru": "Язык определяется автоматически по вашему имени, биографии и сообщениям.",
+        "tr": "Dil, adınızdan, biyografinizden ve mesajlarınızdan otomatik olarak algılanır.",
+        "id": "Bahasa terdeteksi secara otomatis dari nama, bio, dan pesan Anda.",
+        "de": "Die Sprache wird automatisch aus Ihrem Namen, Ihrer Bio und Ihren Nachrichten erkannt.",
+        "th": "ภาษาจะถูกตรวจจับอัตโนมัติจากชื่อ ประวัติ และข้อความของคุณ",
     },
 }
 
@@ -1671,25 +1906,25 @@ async def get_group_language(pool, chat_id: int) -> str:
 async def get_user_lang(pool, user_id: int, chat_id: int = None) -> str:
     """
     Get user's effective language for messages.
-    
+
     Priority:
     1. User's stored preference (any) - manual or auto-detected
     2. Group's default language
     3. English (fallback)
-    
+
     This function always returns a valid language code - never None.
     """
     # Try user preference first
     user_lang = await get_user_language(pool, user_id)
     if user_lang and user_lang in SUPPORTED_LANGUAGES:
         return user_lang
-    
+
     # Fall back to group language
     if chat_id:
         group_lang = await get_group_language(pool, chat_id)
         if group_lang and group_lang in SUPPORTED_LANGUAGES:
             return group_lang
-    
+
     # Final fallback
     return DEFAULT_LANG
 

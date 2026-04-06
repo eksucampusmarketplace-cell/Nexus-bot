@@ -5,7 +5,7 @@ i18n API endpoint for the miniapp.
 Returns all translated strings for a given language.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from bot.utils.localization import STRINGS, SUPPORTED_LANGUAGES
 
@@ -16,7 +16,7 @@ router = APIRouter()
 async def get_i18n_strings(lang: str = "en"):
     """
     Get all translated strings for a language.
-    
+
     Returns:
         {
             "bot": {...},      # Bot message strings
@@ -38,44 +38,118 @@ async def get_i18n_strings(lang: str = "en"):
     # Extract UI strings (navigation, buttons, status, etc.)
     ui_keys = [
         # Navigation labels
-        "nav_dashboard", "nav_bots", "nav_moderation", "nav_automod",
-        "nav_members", "nav_analytics", "nav_broadcast", "nav_reports",
-        "nav_greetings", "nav_antiraid", "nav_settings", "nav_logs",
-        "nav_roles", "nav_notes", "nav_xp", "nav_owner",
+        "nav_dashboard",
+        "nav_bots",
+        "nav_moderation",
+        "nav_automod",
+        "nav_members",
+        "nav_analytics",
+        "nav_broadcast",
+        "nav_reports",
+        "nav_greetings",
+        "nav_antiraid",
+        "nav_settings",
+        "nav_logs",
+        "nav_roles",
+        "nav_notes",
+        "nav_xp",
+        "nav_owner",
         # v21 navigation
-        "nav_trustnet", "nav_captcha", "nav_community_vote",
-        "nav_night_mode", "nav_history", "nav_language", "nav_persona",
+        "nav_trustnet",
+        "nav_captcha",
+        "nav_community_vote",
+        "nav_night_mode",
+        "nav_history",
+        "nav_language",
+        "nav_persona",
         # Buttons
-        "save_btn", "cancel_btn", "enable_label", "disable_label",
-        "delete", "edit", "confirm", "close", "refresh", "search",
-        "copy", "copied", "reset", "add_bot", "add_clone",
+        "save_btn",
+        "cancel_btn",
+        "enable_label",
+        "disable_label",
+        "delete",
+        "edit",
+        "confirm",
+        "close",
+        "refresh",
+        "search",
+        "copy",
+        "copied",
+        "reset",
+        "add_bot",
+        "add_clone",
         # Status
-        "status_active", "status_inactive", "status_pending",
-        "status_online", "status_offline", "status_live",
+        "status_active",
+        "status_inactive",
+        "status_pending",
+        "status_online",
+        "status_offline",
+        "status_live",
         # Moderation
-        "action_ban", "action_kick", "action_mute", "action_warn", "action_delete",
+        "action_ban",
+        "action_kick",
+        "action_mute",
+        "action_warn",
+        "action_delete",
         # AutoMod
-        "antiflood", "antilink", "antispam", "blacklist_lbl", "locks_lbl",
+        "antiflood",
+        "antilink",
+        "antispam",
+        "blacklist_lbl",
+        "locks_lbl",
         # Sections
-        "section_general", "section_warnings", "section_captcha", "section_antiraid",
+        "section_general",
+        "section_warnings",
+        "section_captcha",
+        "section_antiraid",
         # Time
-        "minutes", "seconds", "hours", "days", "threshold_lbl", "timeout_lbl",
+        "minutes",
+        "seconds",
+        "hours",
+        "days",
+        "threshold_lbl",
+        "timeout_lbl",
         # Page-specific
-        "vote_threshold", "vote_action", "auto_detect_scams",
-        "night_schedule", "night_start_lbl", "night_end_lbl", "timezone_lbl",
-        "night_message_lbl", "morning_msg_lbl",
-        "fed_name_lbl", "invite_code_lbl", "ban_propagation", "share_reputation",
-        "my_lang_lbl", "group_lang_lbl", "auto_detected", "manual_override",
+        "vote_threshold",
+        "vote_action",
+        "auto_detect_scams",
+        "night_schedule",
+        "night_start_lbl",
+        "night_end_lbl",
+        "timezone_lbl",
+        "night_message_lbl",
+        "morning_msg_lbl",
+        "fed_name_lbl",
+        "invite_code_lbl",
+        "ban_propagation",
+        "share_reputation",
+        "my_lang_lbl",
+        "group_lang_lbl",
+        "auto_detected",
+        "manual_override",
         # Toast messages
-        "toast_save_success", "toast_delete_success", "toast_copy", "toast_no_group",
-        "loading", "saved", "error", "select_group",
+        "toast_save_success",
+        "toast_delete_success",
+        "toast_copy",
+        "toast_no_group",
+        "loading",
+        "saved",
+        "error",
+        "select_group",
         # Language page
-        "lang_notice_title", "lang_notice_body", "lang_notice_link",
-        "lang_subtitle", "lang_set", "current",
-        "lang_detected_title", "lang_detected_body",
-        "lang_use_detected", "lang_keep_english",
+        "lang_notice_title",
+        "lang_notice_body",
+        "lang_notice_link",
+        "lang_subtitle",
+        "lang_changed",
+        "current",
+        "lang_detected_title",
+        "lang_detected_body",
+        "lang_use_detected",
+        "lang_keep_english",
+        "lang_auto_detect_hint",
     ]
-    
+
     ui_strings = {}
     for key in ui_keys:
         if key in STRINGS:

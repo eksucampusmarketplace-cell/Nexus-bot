@@ -5,6 +5,7 @@ Handle text/math CAPTCHA answers from user messages.
 """
 
 import logging
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -45,7 +46,14 @@ async def handle_captcha_message(update: Update, context: ContextTypes.DEFAULT_T
     else:
         settings = await get_settings(chat.id)
 
-    passed = await verify_text_answer(context.bot, chat.id, user.id, msg.text, db, settings)
+    await verify_text_answer(context.bot, chat.id, user.id, msg.text, db, settings)
+
+    # Clean up the user's message regardless of whether it was the right answer
+    # to keep the chat clean during CAPTCHA challenges.
+    try:
+        await msg.delete()
+    except Exception:
+        pass
 
     # Always return True because we handled/swallowed the CAPTCHA attempt
     return True

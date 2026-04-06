@@ -7,11 +7,12 @@ Unified new member join handler.
 import asyncio
 import logging
 
-from telegram import Update
+from telegram import ChatPermissions, Update
 from telegram.ext import ContextTypes
 
 from bot.antiraid.engine import handle_new_member
 from bot.captcha.engine import send_captcha
+from bot.handlers.moderation.mute import _get_restrict_permissions
 from db.ops.approval import is_member_approved
 
 log = logging.getLogger("new_member")
@@ -70,7 +71,8 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
                 log.debug(f"Language detection failed: {e}")
         # ─────────────────────────────────────────────────────────────────────
 
-        # Note: sometimes old_status is restricted if they were muted/restricted by bot before and left/rejoined
+        # Note: sometimes old_status is restricted if they were muted/restricted by
+        # bot before and left/rejoined
 
         # ── Federation Ban Check (v21) ─────────────────────────────────────────
         try:
@@ -98,7 +100,8 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
                     )
 
                 log.info(
-                    f"[FED] Ban enforced on join | chat={chat.id} user={user.id} fed={fed_ban.get('federation_id')}"
+                    f"[FED] Ban enforced on join | chat={chat.id} user={user.id} "
+                    f"fed={fed_ban.get('federation_id')}"
                 )
                 return  # Don't proceed with other join handling
         except Exception as e:
@@ -184,16 +187,14 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 
         # ── New Anti-raid System Integration ──────────────────────────────────
         try:
-            import time
-
-            from bot.antiraid.detector import MemberProfile, RaidDetector
+            from bot.antiraid.detector import RaidDetector
 
             # Create enhanced profile with all signals
             detector = RaidDetector(context.bot_data.get("redis"), db, context.bot)
-            
+
             # Create profile from user - includes API calls for photo check and age estimation
             profile = await detector.create_profile_from_user(user, context.bot)
-            
+
             threat_level = await detector.on_member_join(chat.id, profile)
 
             if threat_level in ("red", "critical"):
@@ -201,7 +202,7 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
 
                 lockdown = LockdownManager(context.bot_data.get("redis"), db, context.bot)
                 await lockdown.activate(chat.id, f"Raid detected ({threat_level})")
-            
+
             # Check if captcha is required based on suspicion score
             if threat_level == "captcha_required":
                 # Force captcha even if group settings don't require it
@@ -227,11 +228,20 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
         ):
             # Restrict first if not already restricted
             try:
+                mode = settings.get("captcha_mode", "button")
+                if mode in ("math", "text"):
+                    # Users must be able to send text answers for math/text modes
+                    # _get_restrict_permissions allows text but blocks media/links
+                    perms = _get_restrict_permissions()
+                else:
+                    # button/webapp mode can be fully restricted
+                    perms = ChatPermissions(can_send_messages=False)
+
                 await context.bot.restrict_chat_member(
-                    chat_id=chat.id, user_id=user.id, permissions={"can_send_messages": False}
+                    chat_id=chat.id, user_id=user.id, permissions=perms
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                log.debug(f"Failed to restrict member for CAPTCHA: {e}")
 
             # We don't have a message_id for the join event in ChatMemberHandler usually
             # unless it's a Message with new_chat_members, but we are using ChatMemberHandler.

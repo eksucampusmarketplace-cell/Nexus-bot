@@ -36,6 +36,22 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     rank = await get_user_rank(context.bot, chat_id, user_id)
     is_admin = rank >= RANK_ADMIN
 
+    # ── CAPTCHA Check (v21) ────────────────────────────────────────────────
+    # If user has a pending CAPTCHA, they shouldn't be getting XP or triggering filters.
+    # We only allow the message to continue if it's potentially a captcha answer.
+    if not is_admin:
+        try:
+            from db.ops.captcha import get_pending_challenge
+
+            pool = context.bot_data.get("db") or db.pool
+            challenge = await get_pending_challenge(pool, chat_id, user_id)
+            if challenge:
+                log.debug(f"[MSG_GUARD] Skipping checks for user {user_id} - pending CAPTCHA")
+                return  # Skip all checks and XP for users under CAPTCHA
+        except Exception as e:
+            log.debug(f"CAPTCHA check in message_guard failed: {e}")
+    # ───────────────────────────────────────────────────────────────────────
+
     # Admins skip enforcement (locks, flood, blacklist) but NOT keyword filters.
     # Filters (auto-replies) run for everyone including admins.
     if is_admin:
@@ -211,9 +227,17 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             delete = True
         elif forward_locked and getattr(message, "forward_from_chat", None):
             delete = True
-        elif forward_bot_locked and getattr(message, "forward_from", None) and message.forward_from.is_bot:
+        elif (
+            forward_bot_locked
+            and getattr(message, "forward_from", None)
+            and message.forward_from.is_bot
+        ):
             delete = True
-        elif forward_channel_locked and getattr(message, "forward_from_chat", None) and message.forward_from_chat.type == "channel":
+        elif (
+            forward_channel_locked
+            and getattr(message, "forward_from_chat", None)
+            and message.forward_from_chat.type == "channel"
+        ):
             delete = True
         elif poll_locked and message.poll:
             delete = True

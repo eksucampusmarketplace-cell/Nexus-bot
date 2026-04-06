@@ -4,7 +4,8 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from bot.handlers.moderation.utils import ERRORS, log_action
+from bot.handlers.moderation.utils import get_error, log_action, RANK_ADMIN, get_user_rank
+from bot.utils.localization import get_locale, get_user_lang
 
 log = logging.getLogger("[MOD_PURGE]")
 
@@ -21,12 +22,13 @@ async def _auto_delete(message, delay: int = 5):
 async def purge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     # Check if invoker is admin
-    from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
-
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     message = update.effective_message
@@ -89,6 +91,9 @@ async def purge_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def del_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     if not update.message.reply_to_message:
         return
     try:
@@ -99,13 +104,16 @@ async def del_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def delall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     if not update.message.reply_to_message:
@@ -150,6 +158,9 @@ async def delall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def purgeme_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
 
     msg_id = update.message.message_id

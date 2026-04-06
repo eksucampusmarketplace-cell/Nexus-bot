@@ -14,6 +14,7 @@ from typing import Optional
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, CallbackQueryHandler
 
+from bot.utils.localization import get_locale, get_user_lang
 from bot.utils.permissions import is_admin
 from bot.logging.log_channel import log_event
 from bot.ml.signal_collector import record_vote_outcome, VoteSession, record_pattern_match
@@ -321,23 +322,24 @@ async def cmd_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     message = update.effective_message
     reply = message.reply_to_message
+    db = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db, update.effective_user.id, chat.id)
+    locale = get_locale(lang)
     
     if not reply:
         await update.message.reply_text(
-            "⚖️ <b>Community Vote</b>\n\n"
-            "Reply to a suspicious message with <code>/vote</code> to start a vote.\n\n"
-            "The community will decide if action should be taken.",
+            locale.get("vote_started_usage", default="⚖️ <b>Community Vote</b>\n\nReply to a suspicious message with <code>/vote</code> to start a vote."),
             parse_mode="HTML"
         )
         return
     
     if not await is_admin(update, context):
-        await update.message.reply_text("❌ This command is for admins only.")
+        await update.message.reply_text(locale.get("vote_admin_only"), parse_mode="HTML")
         return
     
     target_user = reply.from_user
     if target_user.id == context.bot.id:
-        await update.message.reply_text("❌ Can't vote on bot messages.")
+        await update.message.reply_text(locale.get("vote_no_bot_target"), parse_mode="HTML")
         return
     
     await start_community_vote(

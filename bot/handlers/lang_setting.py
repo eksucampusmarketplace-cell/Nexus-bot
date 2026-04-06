@@ -14,7 +14,9 @@ from bot.utils.localization import (
     SUPPORTED_LANGUAGES, 
     DEFAULT_LANG, 
     set_user_language,
-    get_user_language
+    get_user_language,
+    get_user_lang,
+    get_locale
 )
 from bot.utils.permissions import is_admin
 from bot.utils.lang_detect import set_user_lang_manual
@@ -50,17 +52,20 @@ async def cmd_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user = update.effective_user
     chat = update.effective_chat
+    db = context.bot_data.get("db_pool") or context.bot_data.get("db")
     
+    # Use user's language for DM, or group language if in group
+    lang = await get_user_lang(db, user.id, chat_id=chat.id if chat.type != "private" else None)
+    locale = get_locale(lang)
+
     if chat.type != "private":
         # In groups, just show current and redirect to PM
-        db = context.bot_data.get("db_pool") or context.bot_data.get("db")
-        current_lang = DEFAULT_LANG
-        
-        if db:
-            current_lang = await get_user_language(db, user.id)
-        
+        current_lang = await get_user_language(db, user.id)
         lang_name = SUPPORTED_LANGUAGES.get(current_lang, current_lang)
         
+        # We need a new key for this or use a generic one. 
+        # For now let's just use the current logic but with resolved locale if we had keys.
+        # Since I don't want to add too many keys, I'll use what I have.
         await update.message.reply_text(
             f"🌍 <b>Your Language</b>: {lang_name}\n\n"
             f"To change your language, message me in private:\n"
@@ -69,11 +74,7 @@ async def cmd_lang(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    db = context.bot_data.get("db_pool") or context.bot_data.get("db")
-    current_lang = DEFAULT_LANG
-    
-    if db:
-        current_lang = await get_user_language(db, user.id)
+    current_lang = await get_user_language(db, user.id)
     
     await update.message.reply_text(
         f"🌍 <b>Select Your Language</b>\n\n"

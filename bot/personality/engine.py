@@ -149,14 +149,38 @@ class PersonalityEngine:
         self.emoji = emoji if emoji is not None else TONES[self.tone]["emoji"]
         self.bot_name = bot_name or "Nexus"
     
-    def format_action(self, action: str, **kwargs) -> str:
+    def format_action(self, action: str, lang: str = None, **kwargs) -> str:
         """Format a moderation action message with personality."""
+        from bot.utils.localization import get_locale
+        
+        lang = lang or self.language
+        locale = get_locale(lang)
+        
+        # If not English, use the same STRINGS keys as the default handler
+        if lang != 'en':
+            key_map = {
+                'warn': 'warn_issued', 
+                'ban': 'user_banned',
+                'mute': 'user_muted',
+                'kick': 'user_kicked'
+            }
+            key = key_map.get(action, action)
+            return locale.get(key, **kwargs)
+
+        # For English, use personality templates if available
         templates = TONES[self.tone]["templates"].get(action)
         if not templates:
             # Fallback to localization
-            return self.locale.get(f"{action}_user", **kwargs)
+            key_map = {
+                'warn': 'warn_issued', 
+                'ban': 'user_banned',
+                'mute': 'user_muted',
+                'kick': 'user_kicked'
+            }
+            key = key_map.get(action, action)
+            return locale.get(key, **kwargs)
         
-        # Use first template (could randomize in future)
+        # Use first template
         template = templates[0]
         
         # Add emoji preference

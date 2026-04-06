@@ -6,6 +6,7 @@ from telegram import Chat, InlineKeyboardButton, InlineKeyboardMarkup, Update, U
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
+from bot.utils.localization import get_locale, get_user_lang
 from bot.utils.text_engine import substitute_variables
 
 logger = logging.getLogger(__name__)
@@ -188,6 +189,9 @@ async def set_welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Command /setwelcome <text>
     if not await _is_admin(update, context):
         return
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
 
     text = " ".join(context.args)
     media = None
@@ -217,14 +221,16 @@ async def set_welcome_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             update.effective_chat.id,
         )
 
-    await update.message.reply_text("✅ Welcome message updated.")
+    await update.message.reply_text(locale.get("welcome_updated"))
 
 
 async def set_goodbye_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _is_admin(update, context):
         return
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     text = " ".join(context.args)
-    db_pool = context.bot_data["db_pool"]
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT text_config FROM groups WHERE chat_id = $1", update.effective_chat.id
@@ -238,14 +244,16 @@ async def set_goodbye_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             json.dumps(config),
             update.effective_chat.id,
         )
-    await update.message.reply_text("✅ Goodbye message updated.")
+    await update.message.reply_text(locale.get("goodbye_updated"))
 
 
 async def set_rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await _is_admin(update, context):
         return
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     text = " ".join(context.args)
-    db_pool = context.bot_data["db_pool"]
     async with db_pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT text_config FROM groups WHERE chat_id = $1", update.effective_chat.id
@@ -259,7 +267,7 @@ async def set_rules_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             json.dumps(config),
             update.effective_chat.id,
         )
-    await update.message.reply_text("✅ Rules updated.")
+    await update.message.reply_text(locale.get("rules_updated"))
 
 
 async def welcome_preview_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):

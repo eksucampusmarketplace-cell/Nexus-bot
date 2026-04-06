@@ -32,7 +32,7 @@ from bot.billing.stars_economy import (
     record_referral,
     REFERRAL_BONUS_STARS,
 )
-from bot.billing.entitlements import STARS_PRICES, ITEM_LABELS
+from bot.utils.localization import get_locale, get_user_lang
 
 log = logging.getLogger("economy_cmd")
 
@@ -44,7 +44,9 @@ async def cmd_redeem(update: Update, context: ContextTypes.DEFAULT_TYPE):
     Works in private chat only.
     """
     user = update.effective_user
-    db = context.bot_data.get("db")
+    db = context.bot_data.get("db") or context.bot_data.get("db_pool")
+    lang = await get_user_lang(db, user.id, chat_id=None)
+    locale = get_locale(lang)
 
     if update.effective_chat.type != "private":
         await update.message.reply_text("Please use /redeem in our private chat.")

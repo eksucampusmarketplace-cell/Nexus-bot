@@ -209,11 +209,11 @@ async def message_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message.entities and any(e.type in ["url", "text_link"] for e in message.entities)
         ):
             delete = True
-        elif forward_locked and message.forward_from_chat:
+        elif forward_locked and getattr(message, "forward_from_chat", None):
             delete = True
-        elif forward_bot_locked and message.forward_from and message.forward_from.is_bot:
+        elif forward_bot_locked and getattr(message, "forward_from", None) and message.forward_from.is_bot:
             delete = True
-        elif forward_channel_locked and message.forward_from_chat and message.forward_from_chat.type == "channel":
+        elif forward_channel_locked and getattr(message, "forward_from_chat", None) and message.forward_from_chat.type == "channel":
             delete = True
         elif poll_locked and message.poll:
             delete = True

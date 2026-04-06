@@ -2,31 +2,34 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import (
-    ERRORS,
+    get_error,
     RANK_OWNER,
     check_permissions,
     log_action,
     mention_user,
     publish_event,
     resolve_target,
+    get_user_rank
 )
+from bot.utils.localization import get_locale, get_user_lang
 from db.client import db
 
 
 async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     # Only owner can promote
-    from bot.handlers.moderation.utils import get_user_rank
-
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_OWNER:
-        await update.message.reply_text("❌ Only the group owner can promote members.")
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     target, title = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     try:
@@ -82,6 +85,9 @@ async def promote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def demote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
@@ -120,6 +126,9 @@ async def demote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def admins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     try:
         admins = await context.bot.get_chat_administrators(chat_id)
@@ -134,6 +143,9 @@ async def admins_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
@@ -143,7 +155,7 @@ async def title_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     target, title = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     if not title:

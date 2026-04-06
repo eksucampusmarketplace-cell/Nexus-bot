@@ -4,13 +4,14 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import (
-    ERRORS,
     check_permissions,
+    get_error,
     log_action,
     mention_user,
     publish_event,
     resolve_target,
 )
+from bot.utils.localization import get_locale, get_user_lang
 from db.client import db
 
 log = logging.getLogger("[MOD_WARN]")
@@ -22,15 +23,18 @@ _bg_tasks = set()
 async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     target, reason = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
     if not allowed:
-        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        await update.message.reply_text(get_error(error_key, lang))
         return
 
     reason = reason or "No reason provided"
@@ -75,17 +79,14 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         personality = await get_personality(db.pool, context.bot.id, chat_id)
         warn_message = personality.format_action(
-            "warn", user=await mention_user(target), reason=reason, count=count, limit=max_warns
+            "warn", lang=lang, user=await mention_user(target), reason=reason, count=count, limit=max_warns
         )
     except Exception as e:
         log.debug(f"Personality engine failed: {e}")
         # Fallback to default
         mention = await mention_user(target)
-        warn_message = (
-            f"⚠️ Warning | {mention}\n"
-            f"📋 Reason: {reason}\n"
-            f"🔢 Warnings: {count}/{max_warns}\n"
-            f"👮 By: {await mention_user(invoker)}"
+        warn_message = locale.get(
+            "warn_issued", name=mention, reason=reason, count=count, max=max_warns
         )
 
     # Record ML signal BEFORE reply (fire-and-forget, cannot block action)
@@ -150,18 +151,18 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id, target.id, permissions=ChatPermissions(can_send_messages=False)
             )
             await update.message.reply_text(
-                f"🔇 {target_mention} reached max warnings and was muted.", parse_mode="Markdown"
+                locale.get("muted_max_warns", name=target_mention), parse_mode="HTML"
             )
         elif warn_action == "ban":
             await context.bot.ban_chat_member(chat_id, target.id)
             await update.message.reply_text(
-                f"🚫 {target_mention} reached max warnings and was banned.", parse_mode="Markdown"
+                locale.get("banned_max_warns", name=target_mention), parse_mode="HTML"
             )
         elif warn_action == "kick":
             await context.bot.ban_chat_member(chat_id, target.id)
             await context.bot.unban_chat_member(chat_id, target.id)
             await update.message.reply_text(
-                f"👢 {target_mention} reached max warnings and was kicked.", parse_mode="Markdown"
+                locale.get("kicked_max_warns", name=target_mention), parse_mode="HTML"
             )
         # Reset warns if reset_on_kick is true
         await db.execute(
@@ -173,8 +174,14 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def unwarn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
+    user = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, user.id, chat_id)
+    locale = get_locale(lang)
+
     target, _ = await resolve_target(update, context)
     if not target:
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     # Deactivate latest warning
@@ -192,12 +199,15 @@ async def unwarn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         target.id,
     )
     await update.message.reply_text(
-        f"✅ Warning removed | {await mention_user(target)} ({count} remaining)",
-        parse_mode="Markdown",
+        locale.get("warn_removed", name=await mention_user(target), count=count),
+        parse_mode="HTML",
     )
 
 
 async def warns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     target, _ = await resolve_target(update, context)
     if not target:
@@ -225,18 +235,21 @@ async def warns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def resetwarns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     target, _ = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     await db.execute(
@@ -269,13 +282,16 @@ async def resetwarns_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def warnmode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     valid_modes = ["mute", "kick", "ban"]
@@ -297,13 +313,16 @@ async def warnmode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def warnlimit_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     if not context.args or not context.args[0].isdigit():

@@ -6,14 +6,15 @@ from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import (
-    ERRORS,
     check_permissions,
+    get_error,
     log_action,
     mention_user,
     parse_time,
     publish_event,
     resolve_target,
 )
+from bot.utils.localization import get_locale, get_user_lang
 from db.client import db
 
 log = logging.getLogger("[MOD_MUTE]")
@@ -87,17 +88,20 @@ async def _check_bot_rights(bot, chat_id: int) -> tuple[bool, str]:
 
 
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     target, reason = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
     if not allowed:
-        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        await update.message.reply_text(get_error(error_key, lang))
         return
 
     # Check bot has rights
@@ -178,6 +182,9 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def tmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
@@ -203,12 +210,12 @@ async def tmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reason = reason or "No reason provided"
 
         if not target:
-            await update.message.reply_text(ERRORS["no_target"])
+            await update.message.reply_text(get_error("no_target", lang))
             return
 
     duration = parse_time(time_str)
     if not duration:
-        await update.message.reply_text(ERRORS["invalid_time"])
+        await update.message.reply_text(get_error("invalid_time", lang))
         return
 
     # Check bot has rights
@@ -280,11 +287,14 @@ async def tmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     target, _ = await resolve_target(update, context)
 
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     # Check bot has rights
@@ -323,17 +333,20 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def smute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     target, reason = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
     if not allowed:
-        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        await update.message.reply_text(get_error(error_key, lang))
         return
 
     # Check bot has rights
@@ -391,17 +404,20 @@ async def smute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def restrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     target, reason = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
     if not allowed:
-        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        await update.message.reply_text(get_error(error_key, lang))
         return
 
     # Check bot has rights
@@ -454,12 +470,15 @@ async def restrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unrestrict_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     target, _ = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     # Check bot has rights

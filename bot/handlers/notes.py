@@ -13,7 +13,8 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from bot.handlers.moderation.utils import ERRORS, RANK_ADMIN, get_user_rank
+from bot.handlers.moderation.utils import get_error, RANK_ADMIN, get_user_rank
+from bot.utils.localization import get_locale, get_user_lang
 from db.client import db
 import db.ops.notes as notes_db
 
@@ -23,9 +24,12 @@ log = logging.getLogger("[NOTES]")
 async def savenote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     if not context.args:
@@ -71,13 +75,16 @@ async def savenote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await notes_db.save_note(
             db.pool, chat_id, name, content, file_id, media_type, [], invoker.id
         )
-        await update.message.reply_text(f"✅ Note *{name}* saved.", parse_mode="Markdown")
+        await update.message.reply_text(locale.get("note_saved", name=name), parse_mode="HTML")
         log.info(f"[NOTES] Saved note '{name}' in chat {chat_id}")
     except Exception as e:
         await update.message.reply_text(f"❌ Failed to save note: {e}")
 
 
 async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
 
     if not context.args:
@@ -134,11 +141,14 @@ async def note_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def delnote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     if not context.args:
@@ -158,6 +168,9 @@ async def delnote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def notes_list_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
 
     try:

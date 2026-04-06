@@ -6,8 +6,8 @@ from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import (
-    ERRORS,
     check_permissions,
+    get_error,
     log_action,
     mention_user,
     notify_log_channel,
@@ -15,6 +15,7 @@ from bot.handlers.moderation.utils import (
     publish_event,
     resolve_target,
 )
+from bot.utils.localization import get_locale, get_user_lang
 from db.client import db
 
 log = logging.getLogger("[MOD_BAN]")
@@ -38,15 +39,18 @@ async def _check_bot_rights(bot, chat_id: int) -> tuple[bool, str]:
 async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     target, reason = await resolve_target(update, context)
     if not target:
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
     if not allowed:
-        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        await update.message.reply_text(get_error(error_key, lang))
         return
 
     # Check bot has rights
@@ -118,10 +122,8 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Success message
         mention = await mention_user(target)
         await update.message.reply_text(
-            f"✅ Banned | {mention}\n"
-            f"📋 Reason: {reason}\n"
-            f"👮 By: {await mention_user(invoker)}",
-            parse_mode="Markdown",
+            locale.get("ban_confirmed", name=mention, reason=reason),
+            parse_mode="HTML",
         )
 
         # Try to DM user
@@ -154,6 +156,9 @@ async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     target, reason = await resolve_target(update, context)
     if not target:
@@ -170,13 +175,13 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     user_id,
                 )
                 await update.message.reply_text(
-                    f"✅ Unbanned user ID `{user_id}`", parse_mode="Markdown"
+                    f"✅ Unbanned user ID `{user_id}`", parse_mode="HTML"
                 )
                 return
             except Exception as e:
                 await update.message.reply_text(f"❌ Failed to unban: {e}")
                 return
-        await update.message.reply_text(ERRORS["no_target"])
+        await update.message.reply_text(get_error("no_target", lang))
         return
 
     try:
@@ -222,18 +227,21 @@ async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     # Usage: /tban [@user|reply] <time> [reason]
     if update.message.reply_to_message:
         target = update.message.reply_to_message.from_user
         if not context.args:
-            await update.message.reply_text("❌ Please specify duration (e.g. 1h, 1d)")
+            await update.message.reply_text(get_error("invalid_time", lang))
             return
         time_str = context.args[0]
         reason = " ".join(context.args[1:]) or "No reason provided"
     else:
         if len(context.args) < 2:
-            await update.message.reply_text("❌ Usage: /tban @user <time> [reason]")
+            await update.message.reply_text(f"❌ Usage: /tban @user <time> [reason]")
             return
         # Use resolve_target for @username support
         # Temporarily remap args so resolve_target sees [target, ...rest]
@@ -245,17 +253,17 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reason = reason or "No reason provided"
 
         if not target:
-            await update.message.reply_text(ERRORS["no_target"])
+            await update.message.reply_text(get_error("no_target", lang))
             return
 
     duration = parse_time(time_str)
     if not duration:
-        await update.message.reply_text(ERRORS["invalid_time"])
+        await update.message.reply_text(get_error("invalid_time", lang))
         return
 
     allowed, error_key = await check_permissions(context.bot, chat_id, invoker.id, target.id)
     if not allowed:
-        await update.message.reply_text(ERRORS.get(error_key, "Permission denied."))
+        await update.message.reply_text(get_error(error_key, lang))
         return
 
     # Check bot has rights
@@ -349,6 +357,9 @@ async def tban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def sban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Silent ban - delete command message, no public notification."""
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     # Similar to ban, but deletes messages
     chat_id = update.effective_chat.id
     invoker = update.effective_user

@@ -86,13 +86,18 @@ async def handle_chat_member_update(update: Update, context: ContextTypes.DEFAUL
                     fed_name = fed_ban.get("federation_name", "Unknown")
                     reason = fed_ban.get("reason", "No reason provided")
 
+                    from bot.utils.localization import get_locale, get_user_lang
+
+                    lang = await get_user_lang(db, user.id, chat.id)
+                    locale = get_locale(lang)
+
                     await context.bot.send_message(
                         chat_id=chat.id,
-                        text=(
-                            f"🚫 <b>Federation Ban Enforced</b>\n\n"
-                            f"User {user.mention_html()} was banned.\n"
-                            f"Network: {fed_name}\n"
-                            f"Reason: {reason}"
+                        text=locale.get(
+                            "fed_ban_notice",
+                            name=user.mention_html(),
+                            federation=fed_name,
+                            reason=reason,
                         ),
                         parse_mode="HTML",
                     )

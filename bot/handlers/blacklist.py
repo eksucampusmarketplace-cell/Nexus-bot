@@ -16,7 +16,8 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from bot.handlers.moderation.utils import ERRORS, RANK_ADMIN, get_user_rank
+from bot.handlers.moderation.utils import get_error, RANK_ADMIN, get_user_rank
+from bot.utils.localization import get_locale, get_user_lang
 from db.client import db
 
 log = logging.getLogger("[BLACKLIST]")
@@ -27,9 +28,12 @@ DEFAULT_BLACKLIST_ACTION = "delete"
 async def blacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     invoker = update.effective_user
+    db_pool = context.bot_data.get("db_pool") or context.bot_data.get("db")
+    lang = await get_user_lang(db_pool, invoker.id, chat_id)
+    locale = get_locale(lang)
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     if not context.args:
@@ -71,11 +75,14 @@ async def blacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unblacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     if not context.args:
@@ -101,11 +108,14 @@ async def unblacklist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def blacklistmode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    db_pool = context.bot_data.get('db_pool') or context.bot_data.get('db')
+    lang = await get_user_lang(db_pool, update.effective_user.id, update.effective_chat.id)
+    locale = get_locale(lang)
     chat_id = update.effective_chat.id
     invoker = update.effective_user
 
     if await get_user_rank(context.bot, chat_id, invoker.id) < RANK_ADMIN:
-        await update.message.reply_text(ERRORS["no_permission"])
+        await update.message.reply_text(get_error("no_permission", lang))
         return
 
     valid_modes = ["delete", "warn", "mute", "ban"]

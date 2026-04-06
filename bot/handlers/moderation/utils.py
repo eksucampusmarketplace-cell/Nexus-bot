@@ -332,18 +332,9 @@ async def publish_event(chat_id: int, event_type: str, data: dict):
         log.debug(f"[EVENTS] Failed to publish event: {e}")
 
 
-ERRORS = {
-    "no_target": "❌ Reply to a message or provide a username/ID.",
-    "cant_act_admin": "❌ I cannot act on an admin.",
-    "cant_act_owner": "❌ I cannot act on the group owner.",
-    "cant_act_self": "❌ You cannot act on yourself.",
-    "cant_act_bot": "❌ I cannot act on myself.",
-    "no_permission": "❌ You don't have permission to do this.",
-    "user_not_found": "❌ User not found in this group.",
-    "already_banned": "❌ This user is already banned.",
-    "not_banned": "❌ This user is not banned.",
-    "already_muted": "❌ This user is already muted.",
-    "not_muted": "❌ This user is not muted.",
-    "invalid_time": "❌ Invalid time format. Use: 30m, 1h, 7d, 1w",
-    "bot_no_rights": "❌ I don't have enough rights to do this. Make me an admin first.",
-}
+from bot.utils.localization import get_locale
+
+def get_error(key: str, lang: str = 'en', **kwargs) -> str:
+    """Get a localized error message."""
+    locale = get_locale(lang)
+    return locale.get(key, **kwargs)

@@ -12,6 +12,8 @@ from db.ops.captcha import (
     mark_challenge_passed,
 )
 
+from bot.utils.localization import get_locale, get_user_lang
+
 logger = logging.getLogger(__name__)
 
 
@@ -109,13 +111,16 @@ async def delete_msg_job(context: ContextTypes.DEFAULT_TYPE):
 async def send_captcha(update: Update, context: ContextTypes.DEFAULT_TYPE, member):
     chat_id = update.effective_chat.id
     user_id = member.id
-    db = context.bot_data.get("db")
+    db = context.bot_data.get("db") or context.bot_data.get("db_pool")
+    
+    lang = await get_user_lang(db, user_id, chat_id)
+    locale = get_locale(lang)
 
-    keyboard = [[InlineKeyboardButton("✅ I'm human", callback_data=f"captcha_verify_{user_id}")]]
+    keyboard = [[InlineKeyboardButton(locale.get("confirm"), callback_data=f"captcha_verify_{user_id}")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    text = f"Welcome {member.first_name}! Please click the button below to verify you're human."
-    msg = await context.bot.send_message(chat_id, text, reply_markup=reply_markup)
+    text = locale.get("captcha_prompt")
+    msg = await context.bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode="HTML")
 
     from datetime import timezone
 
@@ -170,10 +175,13 @@ async def captcha_callback_handler(update: Update, context: ContextTypes.DEFAULT
         return
 
     chat_id = update.effective_chat.id
-    db = context.bot_data.get("db")
+    db = context.bot_data.get("db") or context.bot_data.get("db_pool")
+    lang = await get_user_lang(db, query.from_user.id, chat_id)
+    locale = get_locale(lang)
+
     pending = await get_pending_challenge(db, chat_id, user_id)
     if pending and not pending.get("passed", False):
-        await query.answer("Verified! Welcome.")
+        await query.answer(locale.get("captcha_passed", name=query.from_user.first_name))
         try:
             await context.bot.delete_message(chat_id, pending["message_id"])
             await mark_challenge_passed(db, pending["challenge_id"])
@@ -181,4 +189,4 @@ async def captcha_callback_handler(update: Update, context: ContextTypes.DEFAULT
         except:
             pass
     else:
-        await query.answer("Session expired or already verified.")
+        await query.answer(locale.get("captcha_timeout"))

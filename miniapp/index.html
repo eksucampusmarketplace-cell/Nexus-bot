@@ -674,6 +674,9 @@
         { id: 'misc', label: t('nav_misc', 'Misc Tools'), icon: '🛠️', minRole: 'member' },
       ];
 
+      // Sort pages alphabetically by label
+      pages.sort((a, b) => a.label.localeCompare(b.label));
+
       // Role hierarchy for comparison
       const roleHierarchy = { 'member': 0, 'admin': 1, 'owner': 2, 'bot_owner': 2, 'overlord': 3 };
       const userRoleLevel = isSudo ? roleHierarchy['overlord'] : (isBotOwner ? roleHierarchy['bot_owner'] : roleHierarchy[role] || 0);

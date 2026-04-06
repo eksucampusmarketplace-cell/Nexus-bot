@@ -21,7 +21,7 @@ import logging
 
 from telegram import Update
 from telegram.error import TelegramError
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import ContextTypes
 
 from bot.utils.permissions import is_admin
 from db.ops.log_channel import get_log_categories, get_log_channel
@@ -51,8 +51,12 @@ async def cmd_setlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text("Usage: /setlog <channel_id>")
             return
 
-    elif msg.reply_to_message and msg.reply_to_message.forward_from_chat:
-        channel_id = msg.reply_to_message.forward_from_chat.id
+    elif msg.reply_to_message and msg.reply_to_message.forward_origin:
+        origin = msg.reply_to_message.forward_origin
+        if origin.type == "chat":
+            channel_id = origin.sender_chat.id
+        elif origin.type == "channel":
+            channel_id = origin.chat.id
 
     if not channel_id:
         await msg.reply_text(

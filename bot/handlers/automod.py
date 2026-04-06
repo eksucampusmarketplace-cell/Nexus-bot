@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 
-from telegram import Update, constants
+from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.utils.crypto import hash_token
@@ -108,6 +108,39 @@ def get_setting(settings: dict, *keys, default=None, modules=None):
                 else:
                     return default
             return default_value
+
+    # At this point, value is what was found in settings
+    # But it might be incomplete. If it's a dict and doesn't have all expected keys,
+    # merge with defaults (especially for modules that are enabled but have partial settings)
+    if isinstance(value, dict) and len(keys) >= 1:
+        # Get the full default for this key
+        default_value = DEFAULT_SETTINGS
+        for k in keys:
+            if isinstance(default_value, dict) and k in default_value:
+                default_value = default_value[k]
+
+        # If we have a complete default and the value is a dict, merge them
+        # This ensures that even partial settings get all required fields from defaults
+        if isinstance(default_value, dict) and isinstance(value, dict) and modules:
+            # Check all keys to find a matching module name and its status
+            module_name = None
+            module_enabled = None
+            for k in keys:
+                module_name = module_key_map.get(k)
+                if module_name and module_name in modules:
+                    module_enabled = modules.get(module_name)
+                    break
+
+            if module_name is not None:
+                if module_enabled is False:
+                    # Module is explicitly disabled - return defaults with enabled=False
+                    return {**default_value, "enabled": False}
+                elif module_enabled is True:
+                    # Module is enabled - ensure we have complete defaults
+                    # Start with defaults and override with any values from settings
+                    result = {**default_value, **value}
+                    return result
+
     return value if value is not None else default
 
 
@@ -314,7 +347,7 @@ async def antilink_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if not whitelisted:
                 try:
                     await update.message.delete()
-                except:
+                except Exception:
                     pass
                 return
 
@@ -368,5 +401,5 @@ async def delete_msg(context: ContextTypes.DEFAULT_TYPE):
     chat_id, msg_id = context.job.data
     try:
         await context.bot.delete_message(chat_id, msg_id)
-    except:
+    except Exception:
         pass

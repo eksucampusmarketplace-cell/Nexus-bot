@@ -7,6 +7,7 @@
 import { EmptyState, SearchInput, MemberRow, showToast } from '../../lib/components.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
@@ -16,10 +17,10 @@ let _membersPage = 0;
 const PAGE_SIZE = 50;
 
 const ACTION_LABELS = {
-  warn: 'warn',
-  mute: 'mute for 1 hour',
-  kick: 'kick from group',
-  ban: 'permanently ban',
+  warn: t('action_warn_desc', 'warn'),
+  mute: t('action_mute_desc', 'mute for 1 hour'),
+  kick: t('action_kick_desc', 'kick from group'),
+  ban: t('action_ban_desc', 'permanently ban'),
 };
 
 function filterMembers(query, all, container) {
@@ -29,7 +30,7 @@ function filterMembers(query, all, container) {
     if (!list) return;
     list.innerHTML = '';
     all.forEach(m => list.appendChild(MemberRow({
-      member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+      member: { id: m.user_id || m.id, name: m.first_name || t('user', 'User'), username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
       selectable: true,
       onSelect: (m) => getState().toggleMemberSelection(m.id)
     })));
@@ -49,13 +50,13 @@ function filterMembers(query, all, container) {
   if (filtered.length === 0) {
     const emptyMsg = document.createElement('div');
     emptyMsg.style.cssText = 'text-align: center; padding: var(--sp-8); color: var(--text-muted);';
-    emptyMsg.textContent = 'No members found matching "' + query + '"';
+    emptyMsg.textContent = t('no_members_found_matching', 'No members found matching "{query}"').replace('{query}', query);
     list.appendChild(emptyMsg);
     return;
   }
 
   filtered.forEach(m => list.appendChild(MemberRow({
-    member: { id: m.user_id || m.id, name: m.first_name || 'User', username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+    member: { id: m.user_id || m.id, name: m.first_name || t('user', 'User'), username: m.username, avatar: (m.first_name?.[0] || '?').toUpperCase(), trust_score: m.trust_score || 50, message_count: m.message_count || 0, warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
     selectable: true,
     onSelect: (m) => getState().toggleMemberSelection(m.id)
   })));
@@ -69,14 +70,14 @@ export async function renderMembers(container) {
   container.style.cssText = 'padding: var(--sp-4); max-width: var(--content-max); margin: 0 auto;';
 
   if (!chatId) {
-    container.appendChild(EmptyState({ icon: '👆', title: 'Select a group', description: 'Choose a group to view members' }));
+    container.appendChild(EmptyState({ icon: '👆', title: t('select_group', 'Select a group'), description: t('members_select_group_desc', 'Choose a group to view members') }));
     return;
   }
 
   container.innerHTML = `
     <div style="text-align: center; padding: var(--sp-8);">
       <div style="font-size: 48px; margin-bottom: var(--sp-4);">⏳</div>
-      <div style="color: var(--text-muted);">Loading members...</div>
+      <div style="color: var(--text-muted);">${t('loading_members', 'Loading members...')}</div>
     </div>
   `;
 
@@ -92,13 +93,13 @@ export async function renderMembers(container) {
     header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-4);';
     header.innerHTML = `
       <div>
-        <h2 style="font-size: 20px; font-weight: 700; margin: 0;">👥 Members</h2>
-        <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0;">${members.length} total members</p>
+        <h2 style="font-size: 20px; font-weight: 700; margin: 0;">👥 ${t('nav_members', 'Members')}</h2>
+        <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0;">${t('total_members_count', '{count} total members').replace('{count}', members.length)}</p>
       </div>
     `;
     container.appendChild(header);
 
-    container.appendChild(SearchInput({ placeholder: 'Search members...', onChange: (val) => {
+    container.appendChild(SearchInput({ placeholder: t('search_members', 'Search members...'), onChange: (val) => {
       clearTimeout(_searchTimer);
       _searchTimer = setTimeout(() => filterMembers(val, members, container), 300);
     }}));
@@ -109,14 +110,14 @@ export async function renderMembers(container) {
 
     const _hMAction = async (mid, action, cid, member) => {
       if (!mid) {
-        showToast('Cannot perform action: member ID missing', 'error');
+        showToast(t('member_id_missing', 'Cannot perform action: member ID missing'), 'error');
         return;
       }
       // Confirmation for destructive actions
       if (['kick', 'ban', 'mute'].includes(action)) {
         const label = ACTION_LABELS[action] || action;
-        const name = member.first_name || member.username || 'this member';
-        const confirmed = confirm(`Are you sure you want to ${label} ${name}?`);
+        const name = member.first_name || member.username || t('this_member', 'this member');
+        const confirmed = confirm(t('confirm_action_member', 'Are you sure you want to {action} {name}?').replace('{action}', label).replace('{name}', name));
         if (!confirmed) return;
       }
       try {
@@ -124,7 +125,7 @@ export async function renderMembers(container) {
         else if (action === 'mute') await apiFetch(`/api/groups/${cid}/mutes`, { method: 'POST', body: { user_id: mid, duration: '1h' } });
         else if (action === 'kick') await apiFetch(`/api/groups/${cid}/actions/kick`, { method: 'POST', body: { user_id: mid } });
         else if (action === 'ban') await apiFetch(`/api/groups/${cid}/bans`, { method: 'POST', body: { user_id: mid, reason: 'Manual ban' } });
-        showToast('Action success', 'success');
+        showToast(t('action_success', 'Action success'), 'success');
       } catch (e) { showToast(e.message, 'error'); }
     };
 
@@ -133,14 +134,14 @@ export async function renderMembers(container) {
       memberList.forEach(m => {
         const mID = m.user_id ?? m.id ?? null;
         targetList.appendChild(MemberRow({
-          member: { id: mID, name: m.first_name || 'User', avatar: (m.first_name?.[0] || '?').toUpperCase(), warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
+          member: { id: mID, name: m.first_name || t('user', 'User'), avatar: (m.first_name?.[0] || '?').toUpperCase(), warns: Array.isArray(m.warns) ? m.warns.length : (m.warns || 0) },
           selectable: true,
           onSelect: (m) => state.toggleMemberSelection(m.id),
           actions: [
-            { icon: '\u26A0\uFE0F', label: 'Warn', onClick: () => _hMAction(mID, 'warn', chatId, m), variant: 'warning' },
-            { icon: '\uD83D\uDD07', label: 'Mute', onClick: () => _hMAction(mID, 'mute', chatId, m), variant: 'warning' },
-            { icon: '\uD83D\uDC62', label: 'Kick', onClick: () => _hMAction(mID, 'kick', chatId, m), variant: 'danger' },
-            { icon: '\uD83D\uDEAB', label: 'Ban',  onClick: () => _hMAction(mID, 'ban',  chatId, m), variant: 'danger' }
+            { icon: '\u26A0\uFE0F', label: t('action_warn', 'Warn'), onClick: () => _hMAction(mID, 'warn', chatId, m), variant: 'warning' },
+            { icon: '\uD83D\uDD07', label: t('action_mute', 'Mute'), onClick: () => _hMAction(mID, 'mute', chatId, m), variant: 'warning' },
+            { icon: '\uD83D\uDC62', label: t('action_kick', 'Kick'), onClick: () => _hMAction(mID, 'kick', chatId, m), variant: 'danger' },
+            { icon: '\uD83D\uDEAB', label: t('action_ban', 'Ban'),  onClick: () => _hMAction(mID, 'ban',  chatId, m), variant: 'danger' }
           ]
         }));
       });
@@ -154,7 +155,7 @@ export async function renderMembers(container) {
       const loadMoreWrap = document.createElement('div');
       loadMoreWrap.style.cssText = 'text-align: center; padding: var(--sp-4);';
       const loadMore = document.createElement('button');
-      loadMore.textContent = 'Load More Members';
+      loadMore.textContent = t('load_more_members', 'Load More Members');
       loadMore.className = 'btn btn-secondary';
       loadMore.style.cssText = 'padding: var(--sp-2) var(--sp-6); border-radius: var(--r-lg); cursor: pointer;';
       loadMore.onclick = async () => {
@@ -170,6 +171,6 @@ export async function renderMembers(container) {
     }
   } catch (e) {
     container.innerHTML = '';
-    container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load members', description: e.message || 'Please try again' }));
+    container.appendChild(EmptyState({ icon: '⚠️', title: t('failed_to_load_members', 'Failed to load members'), description: e.message || t('please_try_again', 'Please try again') }));
   }
 }

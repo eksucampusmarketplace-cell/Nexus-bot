@@ -362,6 +362,7 @@ export function StatCard({ label, value, delta, icon, color = 'accent' } = {}) {
   `;
   const isPos = delta > 0;
   const isNeg = delta < 0;
+  const vsYesterday = window.tr ? window.tr('vs_yesterday', 'vs yesterday') : 'vs yesterday';
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:var(--text-sm);color:var(--text-muted)">${label}</span>
@@ -372,7 +373,7 @@ export function StatCard({ label, value, delta, icon, color = 'accent' } = {}) {
     ${delta !== undefined ? `
       <div style="font-size:var(--text-xs);
                   color:${isPos?'var(--success)':isNeg?'var(--danger)':'var(--text-muted)'}">
-        ${isPos?'▲':isNeg?'▼':'─'} ${Math.abs(delta)}% vs yesterday
+        ${isPos?'▲':isNeg?'▼':'─'} ${Math.abs(delta)}% ${vsYesterday}
       </div>` : ''}
   `;
   return el;
@@ -410,12 +411,13 @@ export function MemberRow({ member, actions = [], selectable = false, onSelect }
   
   // Build badges HTML
   const badges = [];
-  if (member.is_owner) badges.push(Badge('Owner', 'accent').outerHTML);
-  else if (member.is_admin) badges.push(Badge('Admin', 'info').outerHTML);
-  if (member.warns > 0) badges.push(Badge(`${member.warns} warns`, 'warning').outerHTML);
-  if (member.is_muted) badges.push(Badge('Muted', 'danger').outerHTML);
-  if (member.is_banned) badges.push(Badge('Banned', 'danger').outerHTML);
-  if (member.is_approved) badges.push(Badge('Approved', 'success').outerHTML);
+  const tr = window.tr || ((k, f) => f);
+  if (member.is_owner) badges.push(Badge(tr('owner', 'Owner'), 'accent').outerHTML);
+  else if (member.is_admin) badges.push(Badge(tr('admin', 'Admin'), 'info').outerHTML);
+  if (member.warns > 0) badges.push(Badge(`${member.warns} ${tr('warns', 'warns')}`, 'warning').outerHTML);
+  if (member.is_muted) badges.push(Badge(tr('muted', 'Muted'), 'danger').outerHTML);
+  if (member.is_banned) badges.push(Badge(tr('banned', 'Banned'), 'danger').outerHTML);
+  if (member.is_approved) badges.push(Badge(tr('approved', 'Approved'), 'success').outerHTML);
   
   info.innerHTML = `
     <div style="font-weight:var(--fw-medium);font-size:var(--text-sm);
@@ -541,17 +543,18 @@ export function ProgressBar(value, max, color = 'var(--accent)') {
 
 
 // ── Empty State ─────────────────────────────────────────────────────────
-export function EmptyState({ icon = '📭', title = 'Nothing here', description = '' } = {}) {
+export function EmptyState({ icon = '📭', title = '', description = '' } = {}) {
   const el = document.createElement('div');
   el.style.cssText = `
     text-align:center;
     padding:var(--sp-16) var(--sp-6);
     color:var(--text-muted);
   `;
+  const tr = window.tr || ((k, f) => f);
   el.innerHTML = `
     <div style="font-size:48px;margin-bottom:var(--sp-4)">${icon}</div>
     <div style="font-size:var(--text-lg);font-weight:var(--fw-semibold);margin-bottom:var(--sp-2)">
-      ${title}
+      ${title || tr('nothing_here', 'Nothing here')}
     </div>
     ${description ? `<div style="font-size:var(--text-sm)">${description}</div>` : ''}
   `;

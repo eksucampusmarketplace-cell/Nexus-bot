@@ -9,6 +9,7 @@
 import { Card, Toggle, EmptyState, showToast } from '../../lib/components.js?v=1.6.0';
 import { useStore } from '../../store/index.js?v=1.6.0';
 import { apiFetch } from '../../lib/api.js?v=1.6.0';
+import { t } from '../../lib/i18n.js?v=1.6.0';
 
 const store = useStore;
 const getState = store.getState;
@@ -39,8 +40,8 @@ export async function renderModerationPage(container) {
   if (!chatId) {
     container.appendChild(EmptyState({
       icon: '🛡️',
-      title: 'Select a group',
-      description: 'Choose a group to manage moderation settings.'
+      title: t('select_group', 'Select a group'),
+      description: t('moderation_select_group_desc', 'Choose a group to manage moderation settings.')
     }));
     return;
   }
@@ -49,26 +50,31 @@ export async function renderModerationPage(container) {
   header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-4);';
   header.innerHTML = `
     <div>
-      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">🛡️ Moderation</h2>
-      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">Manage moderation rules and actions</p>
+      <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">🛡️ ${t('nav_moderation', 'Moderation')}</h2>
+      <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;">${t('moderation_subtitle', 'Manage moderation rules and actions')}</p>
     </div>
     <div id="sse-status" style="display:flex;align-items:center;gap:var(--sp-2);font-size:var(--text-xs);color:var(--text-muted);">
       <span id="sse-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text-disabled);display:inline-block;"></span>
-      <span id="sse-label">Offline</span>
+      <span id="sse-label">${t('offline', 'Offline')}</span>
     </div>
   `;
   container.appendChild(header);
 
   // Tabs: Members, Actions, Warns, Filters (Locks removed)
-  const tabs = ['Members', 'Actions', 'Warns', 'Filters'];
+  const tabs = [
+    { id: 'members', label: t('tab_members', 'Members') },
+    { id: 'actions', label: t('tab_actions', 'Actions') },
+    { id: 'warns', label: t('tab_warns', 'Warns') },
+    { id: 'filters', label: t('tab_filters', 'Filters') }
+  ];
   const tabBar = document.createElement('div');
   tabBar.style.cssText = 'display:flex;gap:var(--sp-1);margin-bottom:var(--sp-4);background:var(--bg-input);padding:4px;border-radius:var(--r-xl);overflow-x:auto;';
-  tabs.forEach((t, i) => {
+  tabs.forEach((tab, i) => {
     const btn = document.createElement('button');
-    btn.textContent = t;
-    btn.dataset.tab = t.toLowerCase();
+    btn.textContent = tab.label;
+    btn.dataset.tab = tab.id;
     btn.style.cssText = `flex:1;padding:var(--sp-2) var(--sp-3);border:none;border-radius:var(--r-lg);font-size:var(--text-sm);font-weight:var(--fw-medium);cursor:pointer;white-space:nowrap;transition:all var(--dur-fast);background:${i===0?'var(--bg-card)':'transparent'};color:${i===0?'var(--text-primary)':'var(--text-muted)'};`;
-    btn.onclick = () => switchTab(t.toLowerCase(), container, chatId);
+    btn.onclick = () => switchTab(tab.id, container, chatId);
     tabBar.appendChild(btn);
   });
   container.appendChild(tabBar);
@@ -104,7 +110,7 @@ function switchTab(tab, container, chatId) {
 }
 
 async function _renderMembersTab(container, chatId) {
-  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading members...</div>`;
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">${t('loading_members', 'Loading members...')}</div>`;
 
   try {
     console.debug('[Moderation] Loading members from /api/groups/' + chatId + '/members');
@@ -116,7 +122,7 @@ async function _renderMembersTab(container, chatId) {
     list.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);';
 
     if (!members || members.length === 0) {
-      container.appendChild(EmptyState({ icon: '👥', title: 'No members', description: 'No members found in this group.' }));
+      container.appendChild(EmptyState({ icon: '👥', title: t('no_members', 'No members'), description: t('no_members_found_desc', 'No members found in this group.') }));
       return;
     }
 
@@ -128,7 +134,7 @@ async function _renderMembersTab(container, chatId) {
   } catch (e) {
     console.error('[Moderation] Failed to load members:', e);
     container.innerHTML = '';
-    container.appendChild(EmptyState({ icon: '⚠️', title: 'Failed to load', description: e.message }));
+    container.appendChild(EmptyState({ icon: '⚠️', title: t('failed_to_load', 'Failed to load'), description: e.message }));
   }
 }
 
@@ -141,22 +147,22 @@ function _buildMemberCard(m, chatId) {
   card.style.cssText = 'background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-xl);padding:var(--sp-3);';
 
   const statusChips = [];
-  if (m.is_muted) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--warning);color:white;font-size:var(--text-xs);">🔇 Muted</span>`);
-  if (m.is_banned) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--danger);color:white;font-size:var(--text-xs);">🚫 Banned</span>`);
-  if (warnCount > 0) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--warning);color:white;font-size:var(--text-xs);">⚠️ ${warnCount} Warn${warnCount > 1 ? 's' : ''}</span>`);
-  if (m.is_admin) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--accent);color:white;font-size:var(--text-xs);">${m.is_owner ? '👑 Owner' : '⭐ Admin'}</span>`);
+  if (m.is_muted) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--warning);color:white;font-size:var(--text-xs);">🔇 ${t('muted', 'Muted')}</span>`);
+  if (m.is_banned) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--danger);color:white;font-size:var(--text-xs);">🚫 ${t('banned', 'Banned')}</span>`);
+  if (warnCount > 0) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--warning);color:white;font-size:var(--text-xs);">⚠️ ${warnCount} ${t('warns', 'Warns')}</span>`);
+  if (m.is_admin) statusChips.push(`<span style="padding:2px 8px;border-radius:var(--r-full);background:var(--accent);color:white;font-size:var(--text-xs);">${m.is_owner ? '👑 ' + t('owner', 'Owner') : '⭐ ' + t('admin', 'Admin')}</span>`);
 
   card.innerHTML = `
     <div style="display:flex;align-items:flex-start;gap:var(--sp-3);">
       <div style="width:40px;height:40px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-weight:var(--fw-bold);font-size:var(--text-lg);flex-shrink:0;">${initials}</div>
       <div style="flex:1;min-width:0;">
         <div style="display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap;">
-          <span style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">${m.first_name || m.username || 'Unknown'}</span>
+          <span style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">${m.first_name || m.username || t('unknown', 'Unknown')}</span>
           ${m.username ? `<span style="color:var(--text-muted);font-size:var(--text-xs);">@${m.username}</span>` : ''}
           ${statusChips.join('')}
         </div>
         <div style="display:flex;align-items:center;gap:var(--sp-2);margin-top:4px;">
-          <span style="font-size:var(--text-xs);color:var(--text-muted);">Trust:</span>
+          <span style="font-size:var(--text-xs);color:var(--text-muted);">${t('trust', 'Trust')}:</span>
           <div style="flex:1;height:4px;background:var(--bg-overlay);border-radius:2px;max-width:80px;">
             <div style="height:100%;border-radius:2px;background:${trustColor};width:${m.trust_score || 50}%;"></div>
           </div>
@@ -172,11 +178,11 @@ function _buildMemberCard(m, chatId) {
   const inputArea = card.querySelector('.member-input-area');
 
   const actionBtns = [
-    { label: '⚠️ Warn', action: 'warn', style: 'background:var(--warning);color:white;' },
-    { label: '🔇 Mute', action: 'mute', style: 'background:var(--bg-overlay);' },
-    { label: '👢 Kick', action: 'kick', style: 'background:var(--bg-overlay);' },
-    { label: '🚫 Ban', action: 'ban', style: 'background:var(--danger);color:white;' },
-    { label: 'ℹ️ Info', action: 'info', style: 'background:var(--bg-overlay);' },
+    { label: '⚠️ ' + t('action_warn', 'Warn'), action: 'warn', style: 'background:var(--warning);color:white;' },
+    { label: '🔇 ' + t('action_mute', 'Mute'), action: 'mute', style: 'background:var(--bg-overlay);' },
+    { label: '👢 ' + t('action_kick', 'Kick'), action: 'kick', style: 'background:var(--bg-overlay);' },
+    { label: '🚫 ' + t('action_ban', 'Ban'), action: 'ban', style: 'background:var(--danger);color:white;' },
+    { label: 'ℹ️ ' + t('info', 'Info'), action: 'info', style: 'background:var(--bg-overlay);' },
   ];
 
   actionBtns.forEach(({ label, action, style }) => {
@@ -196,7 +202,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
   inputArea.innerHTML = '';
 
   if (!userId && action !== 'info') {
-    showToast('Cannot find user ID for this member', 'error');
+    showToast(t('cant_find_user_id', 'Cannot find user ID for this member'), 'error');
     inputArea.style.display = 'none';
     return;
   }
@@ -210,8 +216,8 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
   if (action === 'warn') {
     inputArea.innerHTML = `
       <div style="display:flex;gap:var(--sp-2);">
-        <input type="text" class="input action-reason" placeholder="Reason (optional)" style="flex:1;">
-        <button class="btn btn-primary action-confirm" style="font-size:var(--text-xs);">Warn</button>
+        <input type="text" class="input action-reason" placeholder="${t('reason_optional', 'Reason (optional)')}" style="flex:1;">
+        <button class="btn btn-primary action-confirm" style="font-size:var(--text-xs);">${t('action_warn', 'Warn')}</button>
         <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
       </div>
     `;
@@ -223,7 +229,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
           validate: false,
           body: { user_id: userId, reason: reason || 'Warned via Mini App' }
         });
-        showToast('Warning issued', 'success');
+        showToast(t('warning_issued_toast', 'Warning issued'), 'success');
         inputArea.style.display = 'none';
       } catch (e) { _handleActionError(e); }
     };
@@ -234,8 +240,8 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
           ${['10m','1h','12h','1d','7d'].map(d => `<button class="btn btn-secondary duration-btn" data-dur="${d}" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);">${d}</button>`).join('')}
         </div>
         <div style="display:flex;gap:var(--sp-2);">
-          <input type="text" class="input action-reason" placeholder="Reason (optional)" style="flex:1;">
-          <button class="btn btn-primary action-confirm" style="font-size:var(--text-xs);">Mute</button>
+          <input type="text" class="input action-reason" placeholder="${t('reason_optional', 'Reason (optional)')}" style="flex:1;">
+          <button class="btn btn-primary action-confirm" style="font-size:var(--text-xs);">${t('action_mute', 'Mute')}</button>
           <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
         </div>
       </div>
@@ -257,15 +263,15 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
           validate: false,
           body: { user_id: userId, reason: reason || 'Muted via Mini App', duration: selectedDuration }
         });
-        showToast('User muted', 'success');
+        showToast(t('user_muted_toast', 'User muted'), 'success');
         inputArea.style.display = 'none';
       } catch (e) { _handleActionError(e); }
     };
   } else if (action === 'kick') {
     inputArea.innerHTML = `
       <div style="display:flex;align-items:center;gap:var(--sp-2);">
-        <span style="font-size:var(--text-sm);">Kick this user?</span>
-        <button class="btn btn-danger action-confirm" style="font-size:var(--text-xs);">Kick</button>
+        <span style="font-size:var(--text-sm);">${t('kick_user_confirm', 'Kick this user?')}</span>
+        <button class="btn btn-danger action-confirm" style="font-size:var(--text-xs);">${t('action_kick', 'Kick')}</button>
         <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
       </div>
     `;
@@ -276,7 +282,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
           validate: false,
           body: { user_id: userId }
         });
-        showToast('User kicked', 'success');
+        showToast(t('user_kicked_toast', 'User kicked'), 'success');
         card.remove();
       } catch (e) { _handleActionError(e); }
     };
@@ -284,8 +290,8 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
     inputArea.innerHTML = `
       <div style="display:flex;flex-direction:column;gap:var(--sp-2);">
         <div style="display:flex;gap:var(--sp-2);">
-          <input type="text" class="input action-reason" placeholder="Reason (optional)" style="flex:1;">
-          <button class="btn btn-danger action-confirm" style="font-size:var(--text-xs);">Ban</button>
+          <input type="text" class="input action-reason" placeholder="${t('reason_optional', 'Reason (optional)')}" style="flex:1;">
+          <button class="btn btn-danger action-confirm" style="font-size:var(--text-xs);">${t('action_ban', 'Ban')}</button>
           <button class="btn btn-secondary action-cancel" style="font-size:var(--text-xs);">✕</button>
         </div>
       </div>
@@ -298,7 +304,7 @@ async function _handleMemberAction(action, member, chatId, inputArea, card) {
           validate: false,
           body: { user_id: userId, reason: reason || 'Banned via Mini App' }
         });
-        showToast('User banned', 'success');
+        showToast(t('user_banned_toast', 'User banned'), 'success');
         card.remove();
       } catch (e) { _handleActionError(e); }
     };
@@ -323,41 +329,41 @@ function _showUserProfilePanel(userId, chatId, memberData) {
   const trustColor = member.trust_score >= 70 ? 'var(--success)' : member.trust_score >= 40 ? 'var(--warning)' : 'var(--danger)';
   const warnCount = Array.isArray(member.warns) ? member.warns.length : (member.warns || 0);
 
-  panel.innerHTML = `
-    <div style="padding:var(--sp-4);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-weight:var(--fw-bold);">User Profile</span>
-      <button id="close-profile" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);">✕</button>
-    </div>
-    <div style="padding:var(--sp-4);">
-      <div style="text-align:center;margin-bottom:var(--sp-4);">
-        <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:var(--fw-bold);margin:0 auto var(--sp-2);">${initials}</div>
-        <div style="font-weight:var(--fw-bold);font-size:var(--text-lg);">${member.first_name || member.username || 'Unknown'}</div>
-        ${member.username ? `<div style="color:var(--text-muted);font-size:var(--text-sm);">@${member.username}</div>` : ''}
-        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;cursor:pointer;" onclick="navigator.clipboard.writeText('${userId}');showToast && showToast('ID copied', 'success');">ID: <code>${userId}</code> 📋</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
-        <div style="background:var(--bg-input);border-radius:var(--r-lg);padding:var(--sp-3);">
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--sp-2);">STATS</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);">
-            <div><div style="font-size:var(--text-xs);color:var(--text-muted);">Messages</div><div style="font-weight:var(--fw-semibold);">${member.message_count || 0}</div></div>
-            <div><div style="font-size:var(--text-xs);color:var(--text-muted);">Warnings</div><div style="font-weight:var(--fw-semibold);color:${warnCount > 0 ? 'var(--warning)' : 'inherit'};">${warnCount}</div></div>
+      panel.innerHTML = `
+        <div style="padding:var(--sp-4);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:var(--fw-bold);">${t('user_profile', 'User Profile')}</span>
+          <button id="close-profile" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--text-muted);">✕</button>
+        </div>
+        <div style="padding:var(--sp-4);">
+          <div style="text-align:center;margin-bottom:var(--sp-4);">
+            <div style="width:64px;height:64px;border-radius:50%;background:var(--accent);color:white;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:var(--fw-bold);margin:0 auto var(--sp-2);">${initials}</div>
+            <div style="font-weight:var(--fw-bold);font-size:var(--text-lg);">${member.first_name || member.username || t('unknown', 'Unknown')}</div>
+            ${member.username ? `<div style="color:var(--text-muted);font-size:var(--text-sm);">@${member.username}</div>` : ''}
+            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;cursor:pointer;" onclick="navigator.clipboard.writeText('${userId}');showToast && showToast(t('id_copied', 'ID copied'), 'success');">ID: <code>${userId}</code> 📋</div>
           </div>
-          <div style="margin-top:var(--sp-2);">
-            <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:4px;">Trust Score</div>
-            <div style="height:8px;background:var(--bg-overlay);border-radius:4px;">
-              <div style="height:100%;border-radius:4px;background:${trustColor};width:${member.trust_score || 50}%;"></div>
+          <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
+            <div style="background:var(--bg-input);border-radius:var(--r-lg);padding:var(--sp-3);">
+              <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--sp-2);">${t('stats', 'STATS')}</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);">
+                <div><div style="font-size:var(--text-xs);color:var(--text-muted);">${t('messages', 'Messages')}</div><div style="font-weight:var(--fw-semibold);">${member.message_count || 0}</div></div>
+                <div><div style="font-size:var(--text-xs);color:var(--text-muted);">${t('warns', 'Warnings')}</div><div style="font-weight:var(--fw-semibold);color:${warnCount > 0 ? 'var(--warning)' : 'inherit'};">${warnCount}</div></div>
+              </div>
+              <div style="margin-top:var(--sp-2);">
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:4px;">${t('trust_score', 'Trust Score')}</div>
+                <div style="height:8px;background:var(--bg-overlay);border-radius:4px;">
+                  <div style="height:100%;border-radius:4px;background:${trustColor};width:${member.trust_score || 50}%;"></div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:var(--sp-2);" id="profile-actions">
+              ${!member.is_muted ? `<button class="btn btn-secondary profile-action" data-action="mute" style="font-size:var(--text-sm);">🔇 ${t('action_mute', 'Mute')}</button>` : `<button class="btn btn-secondary profile-action" data-action="unmute" style="font-size:var(--text-sm);">🔊 ${t('action_unmute', 'Unmute')}</button>`}
+              ${!member.is_banned ? `<button class="btn btn-danger profile-action" data-action="ban" style="font-size:var(--text-sm);">🚫 ${t('action_ban', 'Ban')}</button>` : `<button class="btn btn-secondary profile-action" data-action="unban" style="font-size:var(--text-sm);">✅ ${t('action_unban', 'Unban')}</button>`}
+              <button class="btn btn-secondary profile-action" data-action="warn" style="font-size:var(--text-sm);">⚠️ ${t('action_warn', 'Warn')}</button>
+              <button class="btn btn-secondary profile-action" data-action="kick" style="font-size:var(--text-sm);">👢 ${t('action_kick', 'Kick')}</button>
             </div>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:var(--sp-2);" id="profile-actions">
-          ${!member.is_muted ? `<button class="btn btn-secondary profile-action" data-action="mute" style="font-size:var(--text-sm);">🔇 Mute</button>` : `<button class="btn btn-secondary profile-action" data-action="unmute" style="font-size:var(--text-sm);">🔊 Unmute</button>`}
-          ${!member.is_banned ? `<button class="btn btn-danger profile-action" data-action="ban" style="font-size:var(--text-sm);">🚫 Ban</button>` : `<button class="btn btn-secondary profile-action" data-action="unban" style="font-size:var(--text-sm);">✅ Unban</button>`}
-          <button class="btn btn-secondary profile-action" data-action="warn" style="font-size:var(--text-sm);">⚠️ Warn</button>
-          <button class="btn btn-secondary profile-action" data-action="kick" style="font-size:var(--text-sm);">👢 Kick</button>
-        </div>
-      </div>
-    </div>
-  `;
+      `;
 
   panel.querySelector('#close-profile').onclick = () => panel.remove();
 
@@ -365,47 +371,47 @@ function _showUserProfilePanel(userId, chatId, memberData) {
     btn.onclick = async () => {
       const action = btn.dataset.action;
       try {
-        if (action === 'warn') {
-          await apiFetch(`/api/groups/${chatId}/warnings`, {
-            method: 'POST',
-            validate: false,
-            body: { user_id: userId }
-          });
-          showToast('Warning issued', 'success');
-        } else if (action === 'mute') {
-          await apiFetch(`/api/groups/${chatId}/mutes`, {
-            method: 'POST',
-            validate: false,
-            body: { user_id: userId, duration: '1h' }
-          });
-          showToast('User muted', 'success');
-        } else if (action === 'unmute') {
-          await apiFetch(`/api/groups/${chatId}/mutes/${userId}`, {
-            method: 'DELETE',
-            validate: false
-          });
-          showToast('User unmuted', 'success');
-        } else if (action === 'ban') {
-          await apiFetch(`/api/groups/${chatId}/bans`, {
-            method: 'POST',
-            validate: false,
-            body: { user_id: userId, reason: 'Banned via Mini App' }
-          });
-          showToast('User banned', 'success');
-        } else if (action === 'unban') {
-          await apiFetch(`/api/groups/${chatId}/bans/${userId}`, {
-            method: 'DELETE',
-            validate: false
-          });
-          showToast('User unbanned', 'success');
-        } else if (action === 'kick') {
-          await apiFetch(`/api/groups/${chatId}/actions/kick`, {
-            method: 'POST',
-            validate: false,
-            body: { user_id: userId }
-          });
-          showToast('User kicked', 'success');
-        }
+            if (action === 'warn') {
+              await apiFetch(`/api/groups/${chatId}/warnings`, {
+                method: 'POST',
+                validate: false,
+                body: { user_id: userId }
+              });
+              showToast(t('warning_issued_toast', 'Warning issued'), 'success');
+            } else if (action === 'mute') {
+              await apiFetch(`/api/groups/${chatId}/mutes`, {
+                method: 'POST',
+                validate: false,
+                body: { user_id: userId, duration: '1h' }
+              });
+              showToast(t('user_muted_toast', 'User muted'), 'success');
+            } else if (action === 'unmute') {
+              await apiFetch(`/api/groups/${chatId}/mutes/${userId}`, {
+                method: 'DELETE',
+                validate: false
+              });
+              showToast(t('user_unmuted_toast', 'User unmuted'), 'success');
+            } else if (action === 'ban') {
+              await apiFetch(`/api/groups/${chatId}/bans`, {
+                method: 'POST',
+                validate: false,
+                body: { user_id: userId, reason: 'Banned via Mini App' }
+              });
+              showToast(t('user_banned_toast', 'User banned'), 'success');
+            } else if (action === 'unban') {
+              await apiFetch(`/api/groups/${chatId}/bans/${userId}`, {
+                method: 'DELETE',
+                validate: false
+              });
+              showToast(t('user_unbanned_toast', 'User unbanned'), 'success');
+            } else if (action === 'kick') {
+              await apiFetch(`/api/groups/${chatId}/actions/kick`, {
+                method: 'POST',
+                validate: false,
+                body: { user_id: userId }
+              });
+              showToast(t('user_kicked_toast', 'User kicked'), 'success');
+            }
         panel.remove();
       } catch (e) {
         _handleActionError(e);
@@ -422,7 +428,7 @@ function _showUserProfilePanel(userId, chatId, memberData) {
 }
 
 async function _renderActionsTab(container, chatId) {
-  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading actions...</div>`;
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">${t('loading_actions', 'Loading actions...')}</div>`;
 
   try {
     console.debug('[Moderation] Loading mod-log from /api/groups/' + chatId + '/mod-log?limit=50');
@@ -433,8 +439,8 @@ async function _renderActionsTab(container, chatId) {
     const header = document.createElement('div');
     header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--sp-3);';
     header.innerHTML = `
-      <span style="font-weight:var(--fw-semibold);">Recent Moderation Actions</span>
-      <button id="export-logs-btn" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);">⬇️ Export CSV</button>
+      <span style="font-weight:var(--fw-semibold);">${t('recent_mod_actions', 'Recent Moderation Actions')}</span>
+      <button id="export-logs-btn" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2) var(--sp-3);">⬇️ ${t('export_csv', 'Export CSV')}</button>
     `;
     container.appendChild(header);
 
@@ -445,7 +451,7 @@ async function _renderActionsTab(container, chatId) {
     const logList = Array.isArray(logs) ? logs : (logs.logs || []);
 
     if (logList.length === 0) {
-      feed.appendChild(EmptyState({ icon: '✅', title: 'No recent actions', description: 'Moderation actions will appear here.' }));
+      feed.appendChild(EmptyState({ icon: '✅', title: t('no_recent_actions', 'No recent actions'), description: t('mod_actions_appear_here_desc', 'Moderation actions will appear here.') }));
     } else {
       logList.forEach(log => feed.appendChild(_buildActionRow(log)));
     }
@@ -495,7 +501,7 @@ function _exportLogsCSV(logs) {
 }
 
 async function _renderWarnsTab(container, chatId) {
-  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading warn settings...</div>`;
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">${t('loading_warn_settings', 'Loading warn settings...')}</div>`;
 
   let warnSettings = { warn_max: 3, warn_action: 'mute_24h', warn_expiry: 'never' };
   try {
@@ -513,35 +519,35 @@ async function _renderWarnsTab(container, chatId) {
 
   container.innerHTML = '';
 
-  const settingsCard = Card({ title: '⚠️ Warning Settings', subtitle: 'Configure automated warning actions' });
+  const settingsCard = Card({ title: '⚠️ ' + t('warning_settings', 'Warning Settings'), subtitle: t('warning_settings_subtitle', 'Configure automated warning actions') });
   settingsCard.insertAdjacentHTML('beforeend', `
     <div style="display:flex;flex-direction:column;gap:var(--sp-3);">
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:var(--text-sm);">Max warnings before action</span>
+        <span style="font-size:var(--text-sm);">${t('max_warns_before_action', 'Max warnings before action')}</span>
         <input type="number" id="warn-max-input" class="input" value="${warnSettings.warn_max}" min="1" max="10"
           style="width:5rem;padding:var(--sp-2) var(--sp-3);text-align:right;">
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:var(--text-sm);">Action on max warns</span>
+        <span style="font-size:var(--text-sm);">${t('action_on_max_warns', 'Action on max warns')}</span>
         <select id="warn-action-select" class="input" style="width:10rem;">
-          <option value="mute_1h" ${warnSettings.warn_action==='mute_1h'?'selected':''}>Mute 1h</option>
-          <option value="mute_12h" ${warnSettings.warn_action==='mute_12h'?'selected':''}>Mute 12h</option>
-          <option value="mute_24h" ${warnSettings.warn_action==='mute_24h'?'selected':''}>Mute 24h</option>
-          <option value="kick" ${warnSettings.warn_action==='kick'?'selected':''}>Kick</option>
-          <option value="ban" ${warnSettings.warn_action==='ban'?'selected':''}>Ban</option>
-          <option value="ban_permanent" ${warnSettings.warn_action==='ban_permanent'?'selected':''}>Permanent Ban</option>
+          <option value="mute_1h" ${warnSettings.warn_action==='mute_1h'?'selected':''}>${t('mute_1h', 'Mute 1h')}</option>
+          <option value="mute_12h" ${warnSettings.warn_action==='mute_12h'?'selected':''}>${t('mute_12h', 'Mute 12h')}</option>
+          <option value="mute_24h" ${warnSettings.warn_action==='mute_24h'?'selected':''}>${t('mute_24h', 'Mute 24h')}</option>
+          <option value="kick" ${warnSettings.warn_action==='kick'?'selected':''}>${t('action_kick', 'Kick')}</option>
+          <option value="ban" ${warnSettings.warn_action==='ban'?'selected':''}>${t('action_ban', 'Ban')}</option>
+          <option value="ban_permanent" ${warnSettings.warn_action==='ban_permanent'?'selected':''}>${t('ban_permanent', 'Permanent Ban')}</option>
         </select>
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:var(--text-sm);">Warning expiry</span>
+        <span style="font-size:var(--text-sm);">${t('warning_expiry', 'Warning expiry')}</span>
         <select id="warn-expiry-select" class="input" style="width:10rem;">
-          <option value="never" ${warnSettings.warn_expiry==='never'?'selected':''}>Never</option>
-          <option value="7d" ${warnSettings.warn_expiry==='7d'?'selected':''}>7 days</option>
-          <option value="30d" ${warnSettings.warn_expiry==='30d'?'selected':''}>30 days</option>
-          <option value="90d" ${warnSettings.warn_expiry==='90d'?'selected':''}>90 days</option>
+          <option value="never" ${warnSettings.warn_expiry==='never'?'selected':''}>${t('never', 'Never')}</option>
+          <option value="7d" ${warnSettings.warn_expiry==='7d'?'selected':''}>7 ${t('days', 'days')}</option>
+          <option value="30d" ${warnSettings.warn_expiry==='30d'?'selected':''}>30 ${t('days', 'days')}</option>
+          <option value="90d" ${warnSettings.warn_expiry==='90d'?'selected':''}>90 ${t('days', 'days')}</option>
         </select>
       </div>
-      <button id="save-warn-settings-btn" class="btn btn-primary" style="align-self:flex-end;">Save Settings</button>
+      <button id="save-warn-settings-btn" class="btn btn-primary" style="align-self:flex-end;">${t('save_settings', 'Save Settings')}</button>
     </div>
   `);
   container.appendChild(settingsCard);
@@ -556,15 +562,15 @@ async function _renderWarnsTab(container, chatId) {
         validate: false,
         body: { warn_max: max, warn_action: action, warn_expiry: expiry }
       });
-      showToast('Warn settings saved', 'success');
+      showToast(t('warn_settings_saved', 'Warn settings saved'), 'success');
     } catch (e) {
-      showToast('Failed to save: ' + e.message, 'error');
+      showToast(t('failed_to_save', 'Failed to save') + ': ' + e.message, 'error');
     }
   });
 
   // Load warned users
-  const warningsCard = Card({ title: '⚠️ Warned Users', subtitle: 'Users with active warnings' });
-  warningsCard.insertAdjacentHTML('beforeend', `<div id="warned-users-list" style="display:flex;flex-direction:column;gap:var(--sp-2);"><div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);">Loading...</div></div>`);
+  const warningsCard = Card({ title: '⚠️ ' + t('warned_users', 'Warned Users'), subtitle: t('users_with_active_warns', 'Users with active warnings') });
+  warningsCard.insertAdjacentHTML('beforeend', `<div id="warned-users-list" style="display:flex;flex-direction:column;gap:var(--sp-2);"><div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);">${t('loading', 'Loading...')}</div></div>`);
   container.appendChild(warningsCard);
 
   try {
@@ -575,17 +581,17 @@ async function _renderWarnsTab(container, chatId) {
     warnedList.innerHTML = '';
 
     if (!warnedUsers || warnedUsers.length === 0) {
-      warnedList.innerHTML = '<div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);">No warned users</div>';
+      warnedList.innerHTML = `<div style="text-align:center;padding:var(--sp-4);color:var(--text-muted);">${t('no_warned_users', 'No warned users')}</div>`;
     } else {
       warnedUsers.forEach(w => {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:var(--sp-3);background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);';
         row.innerHTML = `
           <div>
-            <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">${w.first_name || w.username || 'Unknown'}</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);">${w.count} warnings</div>
+            <div style="font-weight:var(--fw-semibold);font-size:var(--text-sm);">${w.first_name || w.username || t('unknown', 'Unknown')}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">${w.count} ${t('warns', 'warnings')}</div>
           </div>
-          <button class="btn btn-secondary reset-warn-btn" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);" data-user-id="${w.user_id}">Reset</button>
+          <button class="btn btn-secondary reset-warn-btn" style="font-size:var(--text-xs);padding:var(--sp-1) var(--sp-2);" data-user-id="${w.user_id}">${t('reset', 'Reset')}</button>
         `;
         row.querySelector('.reset-warn-btn').onclick = async () => {
           try {
@@ -593,10 +599,10 @@ async function _renderWarnsTab(container, chatId) {
               method: 'DELETE',
               validate: false
             });
-            showToast('Warnings reset', 'success');
+            showToast(t('warnings_reset_toast', 'Warnings reset'), 'success');
             row.remove();
           } catch (e) {
-            showToast('Failed: ' + e.message, 'error');
+            showToast(t('failed_prefix', 'Failed') + ': ' + e.message, 'error');
           }
         };
         warnedList.appendChild(row);
@@ -604,12 +610,12 @@ async function _renderWarnsTab(container, chatId) {
     }
   } catch (e) {
     console.error('[Moderation] Failed to load warnings:', e);
-    warningsCard.querySelector('#warned-users-list').innerHTML = '<div style="text-align:center;padding:var(--sp-4);color:var(--danger);">Failed to load warnings</div>';
+    warningsCard.querySelector('#warned-users-list').innerHTML = `<div style="text-align:center;padding:var(--sp-4);color:var(--danger);">${t('failed_to_load_warnings', 'Failed to load warnings')}</div>`;
   }
 }
 
 async function _renderFiltersTab(container, chatId) {
-  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">Loading filters...</div>`;
+  container.innerHTML = `<div style="text-align:center;padding:var(--sp-8);color:var(--text-muted);">${t('loading_filters', 'Loading filters...')}</div>`;
 
   let filters = [];
   let blacklist = [];
@@ -625,7 +631,7 @@ async function _renderFiltersTab(container, chatId) {
   container.innerHTML = '';
 
   // Keyword Auto-Replies
-  const filtersCard = Card({ title: '🔑 Keyword Auto-Replies', subtitle: 'Respond automatically to specific keywords' });
+  const filtersCard = Card({ title: '🔑 ' + t('keyword_auto_replies', 'Keyword Auto-Replies'), subtitle: t('respond_automatically_keywords', 'Respond automatically to specific keywords') });
 
   const filtersList = document.createElement('div');
   filtersList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3);';
@@ -633,7 +639,7 @@ async function _renderFiltersTab(container, chatId) {
   const renderFilters = (items) => {
     filtersList.innerHTML = '';
     if (items.length === 0) {
-      filtersList.innerHTML = '<div style="color:var(--text-muted);font-size:var(--text-sm);text-align:center;padding:var(--sp-2);">No keyword filters yet</div>';
+      filtersList.innerHTML = `<div style="color:var(--text-muted);font-size:var(--text-sm);text-align:center;padding:var(--sp-2);">${t('no_keyword_filters_yet', 'No keyword filters yet')}</div>`;
       return;
     }
     items.forEach(f => {
@@ -657,8 +663,8 @@ async function _renderFiltersTab(container, chatId) {
           await apiFetch(`/api/groups/${chatId}/filters/${f.id}`, { method: 'DELETE', validate: false });
           filters = filters.filter(x => x.id !== f.id);
           renderFilters(filters);
-          showToast('Filter removed', 'success');
-        } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+          showToast(t('filter_removed_toast', 'Filter removed'), 'success');
+        } catch (e) { showToast(t('failed_prefix', 'Failed') + ': ' + e.message, 'error'); }
       };
       filtersList.appendChild(row);
     });
@@ -671,12 +677,12 @@ async function _renderFiltersTab(container, chatId) {
   // Use textarea for response to support multiline and button syntax
   addFilterRow.innerHTML = `
     <div style="display:flex;gap:var(--sp-2);">
-      <input type="text" id="filter-keyword" class="input" placeholder="Keyword" style="flex:1;">
-      <button id="add-filter-btn" class="btn btn-primary" style="white-space:nowrap;">Add</button>
+      <input type="text" id="filter-keyword" class="input" placeholder="${t('keyword', 'Keyword')}" style="flex:1;">
+      <button id="add-filter-btn" class="btn btn-primary" style="white-space:nowrap;">${t('add', 'Add')}</button>
     </div>
-    <textarea id="filter-response" class="input" placeholder="Response text. Supports HTML/Markdown.\nAdd buttons after --- on new lines:\n---\n[Button Label](https://example.com)" rows="3" style="width:100%;resize:vertical;"></textarea>
+    <textarea id="filter-response" class="input" placeholder="${t('filter_response_placeholder', 'Response text. Supports HTML/Markdown.\\nAdd buttons after --- on new lines:\\n---\\n[Button Label](https://example.com)')}" rows="3" style="width:100%;resize:vertical;"></textarea>
     <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:4px;">
-      💡 Tip: Use [Label](URL) for each button. Separate multiple button rows with a blank line.
+      💡 ${t('filter_tip', 'Tip: Use [Label](URL) for each button. Separate multiple button rows with a blank line.')}
     </div>
   `;
 
@@ -688,7 +694,7 @@ async function _renderFiltersTab(container, chatId) {
     filtersCard.querySelector('#add-filter-btn')?.addEventListener('click', async () => {
       const keyword = filtersCard.querySelector('#filter-keyword').value.trim().toLowerCase();
       const response = filtersCard.querySelector('#filter-response').value.trim();
-      if (!keyword || !response) { showToast('Keyword and response required', 'error'); return; }
+      if (!keyword || !response) { showToast(t('keyword_and_response_required', 'Keyword and response required'), 'error'); return; }
       try {
         const newFilter = await apiFetch(`/api/groups/${chatId}/filters`, {
           method: 'POST',
@@ -699,13 +705,13 @@ async function _renderFiltersTab(container, chatId) {
         renderFilters(filters);
         filtersCard.querySelector('#filter-keyword').value = '';
         filtersCard.querySelector('#filter-response').value = '';
-        showToast('Filter added', 'success');
-      } catch (e) { showToast('Failed: ' + e.message, 'error'); }
+        showToast(t('filter_added_toast', 'Filter added'), 'success');
+      } catch (e) { showToast(t('failed_prefix', 'Failed') + ': ' + e.message, 'error'); }
     });
   }, 0);
 
   // Word Blacklist
-  const blacklistCard = Card({ title: '🚫 Word Blacklist', subtitle: 'Automatically act on these words' });
+  const blacklistCard = Card({ title: '🚫 ' + t('word_blacklist', 'Word Blacklist'), subtitle: t('automatically_act_on_words', 'Automatically act on these words') });
 
   const chipsContainer = document.createElement('div');
   chipsContainer.id = 'blacklist-chips';
@@ -726,8 +732,8 @@ async function _renderFiltersTab(container, chatId) {
   const addRow = document.createElement('div');
   addRow.style.cssText = 'display:flex;gap:var(--sp-2);';
   addRow.innerHTML = `
-    <input type="text" id="blacklist-input" class="input" placeholder="Type a word and press Enter" style="flex:1;">
-    <button id="add-blacklist-btn" class="btn btn-secondary">Add</button>
+    <input type="text" id="blacklist-input" class="input" placeholder="${t('type_word_enter', 'Type a word and press Enter')}" style="flex:1;">
+    <button id="add-blacklist-btn" class="btn btn-secondary">${t('add', 'Add')}</button>
   `;
 
   const addWord = async () => {
@@ -743,9 +749,9 @@ async function _renderFiltersTab(container, chatId) {
       blacklist.push(word);
       renderChips(blacklist);
       input.value = '';
-      showToast('Word added', 'success');
+      showToast(t('word_added_toast', 'Word added'), 'success');
     } catch (e) {
-      showToast('Failed: ' + e.message, 'error');
+      showToast(t('failed_prefix', 'Failed') + ': ' + e.message, 'error');
     }
   };
 
@@ -792,7 +798,7 @@ function _connectSSE(chatId) {
     // Bug C fix: Use connected/heartbeat events as onopen fallback
     _sseSource.addEventListener('connected', () => {
       if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 1.5s infinite'; }
-      if (label) label.textContent = 'Live';
+      if (label) label.textContent = t('live', 'Live');
     });
 
     _sseSource.addEventListener('heartbeat', () => {
@@ -801,17 +807,17 @@ function _connectSSE(chatId) {
         dot.style.background = 'var(--success)';
         dot.style.animation = 'pulse 1.5s infinite';
       }
-      if (label && label.textContent !== 'Live') label.textContent = 'Live';
+      if (label && label.textContent !== t('live', 'Live')) label.textContent = t('live', 'Live');
     });
 
     _sseSource.onopen = () => {
       if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 1.5s infinite'; }
-      if (label) label.textContent = 'Live';
+      if (label) label.textContent = t('live', 'Live');
     };
 
     _sseSource.onerror = () => {
       if (dot) { dot.style.background = 'var(--danger)'; dot.style.animation = ''; }
-      if (label) label.textContent = 'Reconnecting...';
+      if (label) label.textContent = t('reconnecting', 'Reconnecting...');
       setTimeout(() => {
         // Only reconnect if token is not cancelled and the page is still active
         if (!token.cancelled && document.getElementById('sse-dot')) {
@@ -849,22 +855,22 @@ function _timeAgo(ts) {
  * Human-readable error handler for moderation actions
  */
 function _handleActionError(e) {
-  const msg = e.message || 'Unknown error';
+  const msg = e.message || t('unknown_error', 'Unknown error');
   console.error('[Moderation] Action failed:', e);
 
   // Translate common errors to friendly messages
   if (msg.includes('command injection') || msg.includes('restricted keywords')) {
-    showToast('Action blocked by input filter — use simpler reason text', 'error');
+    showToast(t('action_blocked_filter', 'Action blocked by input filter — use simpler reason text'), 'error');
   } else if (msg.includes('not an admin') || msg.includes('403')) {
-    showToast('Bot needs admin rights in this group', 'error');
+    showToast(t('bot_needs_admin', 'Bot needs admin rights in this group'), 'error');
   } else if (msg.includes('502') || msg.includes('Telegram action failed')) {
     // Extract the part after the last colon if it exists
     const parts = msg.split(':');
     const cleanMsg = parts.length > 1 ? parts[parts.length - 1].trim() : msg;
-    showToast('Telegram refused action: ' + cleanMsg, 'error');
+    showToast(t('telegram_refused_action', 'Telegram refused action') + ': ' + cleanMsg, 'error');
   } else if (msg.includes('401') || msg.includes('Unauthorized')) {
-    showToast('Session expired — reopen the Mini App', 'error');
+    showToast(t('session_expired_reopen', 'Session expired — reopen the Mini App'), 'error');
   } else {
-    showToast('Failed: ' + msg, 'error');
+    showToast(t('failed_prefix', 'Failed') + ': ' + msg, 'error');
   }
 }

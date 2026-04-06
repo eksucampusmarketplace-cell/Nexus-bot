@@ -71,10 +71,10 @@ export async function renderHistoryPage(container) {
   const tabsSection = document.createElement('div');
   tabsSection.style.cssText = 'display:flex;gap:var(--sp-2);margin-bottom:var(--sp-4);border-bottom:1px solid var(--border);';
   tabsSection.innerHTML = `
-    <button class="tab-btn ${activeTab === 'recent' ? 'active' : ''}" data-tab="recent" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'recent' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'recent' ? 'var(--accent)' : 'transparent'};">Recent</button>
-    <button class="tab-btn ${activeTab === 'stats' ? 'active' : ''}" data-tab="stats" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'stats' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'stats' ? 'var(--accent)' : 'transparent'};">Stats</button>
-    <button class="tab-btn ${activeTab === 'search' ? 'active' : ''}" data-tab="search" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'search' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'search' ? 'var(--accent)' : 'transparent'};">Search</button>
-    <button class="tab-btn ${activeTab === 'settings' ? 'active' : ''}" data-tab="settings" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'settings' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'settings' ? 'var(--accent)' : 'transparent'};">Settings</button>
+    <button class="tab-btn ${activeTab === 'recent' ? 'active' : ''}" data-tab="recent" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'recent' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'recent' ? 'var(--accent)' : 'transparent'};">${t('tab_recent', 'Recent')}</button>
+    <button class="tab-btn ${activeTab === 'stats' ? 'active' : ''}" data-tab="stats" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'stats' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'stats' ? 'var(--accent)' : 'transparent'};">${t('tab_stats', 'Stats')}</button>
+    <button class="tab-btn ${activeTab === 'search' ? 'active' : ''}" data-tab="search" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'search' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'search' ? 'var(--accent)' : 'transparent'};">${t('tab_search', 'Search')}</button>
+    <button class="tab-btn ${activeTab === 'settings' ? 'active' : ''}" data-tab="settings" style="padding:var(--sp-2) var(--sp-4);background:none;border:none;color:${activeTab === 'settings' ? 'var(--accent)' : 'var(--text-muted)'};cursor:pointer;font-weight:500;border-bottom:2px solid ${activeTab === 'settings' ? 'var(--accent)' : 'transparent'};">${t('tab_settings', 'Settings')}</button>
   `;
   container.appendChild(tabsSection);
 
@@ -117,7 +117,7 @@ async function renderRecentTab(container, chatId, isEnabled) {
   const exportBtn = document.createElement('button');
   exportBtn.className = 'btn btn-secondary';
   exportBtn.style.cssText = 'margin-bottom:var(--sp-3);width:auto;';
-  exportBtn.innerHTML = '📥 Export CSV';
+  exportBtn.innerHTML = '📥 ' + t('export_csv', 'Export CSV');
   exportBtn.onclick = () => exportHistoryCSV(chatId);
   container.appendChild(exportBtn);
 

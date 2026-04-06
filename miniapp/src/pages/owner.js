@@ -158,7 +158,7 @@ async function renderCloneOwnerPanel(container) {
 
   // Clone Bots Status
   if (statsRes?.bots?.length) {
-    const cloneCard = Card({ title: '🤖 ' + t('owner_clone_status', 'My Clone Bots'), subtitle: t('owner_clone_status_sub', 'Status of your bot clones') });
+    const cloneCard = Card({ title: '🤖 ' + t('owner_my_clones', 'My Clone Bots'), subtitle: t('owner_clone_status_sub', 'Status of your bot clones') });
     const cloneList = document.createElement('div');
     cloneList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
 
@@ -257,7 +257,7 @@ async function renderCloneStatusSection(container) {
     const botsArray = Array.isArray(botsRes) ? botsRes : (botsRes?.bots || []);
     
     if (botsArray.length > 0) {
-      const cloneCard = Card({ title: '🤖 ' + t('owner_clone_status', 'Clone Status'), subtitle: t('owner_clone_status_sub', 'Real-time status of all bot clones') });
+      const cloneCard = Card({ title: '🤖 ' + t('owner_clone_status_title', 'Clone Status'), subtitle: t('owner_clone_status_sub', 'Real-time status of all bot clones') });
       const cloneList = document.createElement('div');
       cloneList.style.cssText = 'display:flex;flex-direction:column;gap:var(--sp-2);padding-top:var(--sp-2);';
 
@@ -394,10 +394,10 @@ async function renderSystemHealthSection(container) {
     // Check database
     try {
       await apiFetch('/api/groups');
-      document.getElementById('db-status').textContent = 'Connected';
+      document.getElementById('db-status').textContent = t('connected', 'Connected');
       document.getElementById('db-status').style.color = 'var(--success)';
     } catch (e) {
-      document.getElementById('db-status').textContent = 'Error';
+      document.getElementById('db-status').textContent = t('error', 'Error');
       document.getElementById('db-status').style.color = 'var(--danger)';
     }
 
@@ -439,14 +439,14 @@ async function renderSystemHealthSection(container) {
       };
     } catch (e) {
       console.error('[SystemHealth] Webhook check failed:', e);
-      document.getElementById('webhook-status').textContent = 'Error';
+      document.getElementById('webhook-status').textContent = t('error', 'Error');
       document.getElementById('webhook-status').style.color = 'var(--danger)';
     }
   } catch (e) {
     console.error('[SystemHealth] System check failed:', e);
-    document.getElementById('db-status').textContent = 'Error';
+    document.getElementById('db-status').textContent = t('error', 'Error');
     document.getElementById('db-status').style.color = 'var(--danger)';
-    document.getElementById('webhook-status').textContent = 'Error';
+    document.getElementById('webhook-status').textContent = t('error', 'Error');
     document.getElementById('webhook-status').style.color = 'var(--danger)';
   }
 }
@@ -462,8 +462,8 @@ async function renderEconomyControls(container) {
   grantSection.innerHTML = `
     <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('owner_grant_stars', 'Grant Bonus Stars')}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <input id="grant-uid" placeholder="User ID" type="number" style="flex:1;min-width:100px;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
-      <input id="grant-amt" placeholder="Stars" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
+      <input id="grant-uid" placeholder="{t('user_id', 'User ID')}" type="number" style="flex:1;min-width:100px;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
+      <input id="grant-amt" placeholder="{t('stars', 'Stars')}" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
       <button id="grant-btn" style="padding:var(--sp-2) var(--sp-3);background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;">Grant ⭐</button>
     </div>
   `;
@@ -475,7 +475,7 @@ async function renderEconomyControls(container) {
     <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:var(--sp-2);">${t('owner_create_promo', 'Create Promo Code')}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <input id="promo-code" placeholder="Code (e.g. WELCOME50)" style="flex:1;min-width:8rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);">
-      <input id="promo-amt" placeholder="Stars" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
+      <input id="promo-amt" placeholder="{t('stars', 'Stars')}" type="number" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
       <input id="promo-uses" placeholder="Max uses" type="number" value="10" style="width:5rem;padding:var(--sp-2);border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);text-align:center;">
       <button id="promo-btn" style="padding:var(--sp-2) var(--sp-3);background:#27ae60;color:#fff;border:none;border-radius:4px;cursor:pointer;white-space:nowrap;">Create</button>
     </div>

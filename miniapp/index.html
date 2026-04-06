@@ -671,6 +671,7 @@
         { id: 'language', label: t('nav_language', 'Language'), icon: '🌍', minRole: 'member' },
         { id: 'persona', label: t('nav_persona', 'Bot Persona'), icon: '🎭', minRole: 'admin' },
         { id: 'tickets', label: t('nav_tickets', 'Tickets'), icon: '🎫', minRole: 'admin' },
+        { id: 'misc', label: t('nav_misc', 'Misc Tools'), icon: '🛠️', minRole: 'member' },
       ];
 
       // Role hierarchy for comparison
@@ -825,6 +826,7 @@
         'language': 'member',
         'persona': 'admin',
         'tickets': 'admin',
+        'misc': 'member',
       };
       
       const requiredRole = pagePermissions[pageId] || 'member';
@@ -1088,6 +1090,11 @@
         case 'tickets': {
           const { renderTicketsPage } = await import('./src/pages/tickets.js?v=1.6.0');
           await renderTicketsPage(container);
+          break;
+        }
+        case 'misc': {
+          const { renderMiscPage } = await import('./src/pages/misc.js?v=1.6.0');
+          await renderMiscPage(container);
           break;
         }
 

@@ -1,6 +1,6 @@
 import logging
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from bot.handlers.moderation.utils import (
@@ -98,13 +98,26 @@ async def warn_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     t.add_done_callback(_bg_tasks.discard)
 
     # Send warning message with Markdown fallback
+    keyboard = InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("🛡️ Contact Admin", url=f"tg://user?id={invoker.id}"),
+                InlineKeyboardButton("📜 History", callback_data=f"mod_history:{target.id}"),
+            ],
+            [
+                InlineKeyboardButton(
+                    "⚖️ Dispute (Open Ticket)", callback_data=f"dispute_ticket:{target.id}"
+                )
+            ],
+        ]
+    )
     try:
-        await update.message.reply_text(warn_message, parse_mode="Markdown")
+        await update.message.reply_text(warn_message, parse_mode="Markdown", reply_markup=keyboard)
     except Exception:
         # Fallback: send without Markdown if formatting fails
         plain = warn_message.replace("*", "").replace("`", "").replace("_", "")
         try:
-            await update.message.reply_text(plain)
+            await update.message.reply_text(plain, reply_markup=keyboard)
         except Exception as send_err:
             log.error(f"[WARN] Failed to send warning message: {send_err}")
 
@@ -222,6 +235,98 @@ async def warns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{i}. Reason: {row['reason']} — {row['issued_at'].strftime('%b %d')}\n"
 
     await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def history_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    # Pattern: mod_history:user_id
+    try:
+        _, target_id_str = query.data.split(":")
+        target_id = int(target_id_str)
+    except (ValueError, IndexError):
+        return
+
+    chat_id = update.effective_chat.id
+    user_id = query.from_user.id
+
+    # Only target or admins can see detailed history
+    from bot.handlers.moderation.utils import RANK_ADMIN, get_user_rank
+
+    is_admin = await get_user_rank(context.bot, chat_id, user_id) >= RANK_ADMIN
+    if user_id != target_id and not is_admin:
+        await query.answer(
+            "❌ Only the user themselves or an admin can view history.", show_alert=True
+        )
+        return
+
+    await query.answer()
+
+    # Fetch last 10 moderation actions for this user in this chat
+    history = await db.fetch(
+        "SELECT action, admin_name, reason, done_at FROM mod_logs "
+        "WHERE chat_id = $1 AND target_id = $2 "
+        "ORDER BY done_at DESC LIMIT 10",
+        chat_id,
+        target_id,
+    )
+
+    if not history:
+        await query.message.reply_text("✅ No moderation history found.")
+        return
+
+    text = f"📜 *Moderation History for* `{target_id}`:\n\n"
+    for i, row in enumerate(history, 1):
+        action = row["action"].upper()
+        reason = row["reason"] or "No reason"
+        date = row["done_at"].strftime("%b %d")
+        text += f"{i}. *{action}* ({date}): {reason}\n"
+
+    await query.message.reply_text(text, parse_mode="Markdown")
+
+
+async def dispute_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    # Pattern: dispute_ticket:user_id
+    try:
+        _, target_id_str = query.data.split(":")
+        target_id = int(target_id_str)
+    except (ValueError, IndexError):
+        return
+
+    chat_id = update.effective_chat.id
+    user = query.from_user
+
+    if user.id != target_id:
+        await query.answer("❌ Only the punished user can dispute this.", show_alert=True)
+        return
+
+    await query.answer()
+
+    # Create a ticket
+    from db.ops import tickets as db_tickets
+
+    subject = f"Dispute: Moderation action against {user.full_name}"
+    description = f"User is disputing a recent moderation action in {update.effective_chat.title}."
+
+    ticket = await db_tickets.create_ticket(
+        pool=db.pool,
+        chat_id=chat_id,
+        creator_id=user.id,
+        creator_name=user.full_name,
+        subject=subject,
+        description=description,
+        priority="high",
+    )
+
+    if ticket:
+        await query.message.reply_text(
+            f"✅ Ticket #{ticket['id']} has been opened for your dispute. "
+            f"Admins will review it soon."
+        )
+    else:
+        await query.answer(
+            "❌ Failed to open a ticket. Please contact admins manually.", show_alert=True
+        )
 
 
 async def resetwarns_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

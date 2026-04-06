@@ -63,10 +63,10 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     from bot.handlers.admin_request import (
         admin_request_callback,
         admin_request_command_handlers,
-        handle_admin_mention,
-        cmd_admin_requests,
         cmd_admin_req_stats,
+        cmd_admin_requests,
         cmd_set_admin_requests,
+        handle_admin_mention,
     )
     from bot.handlers.admin_tools import admin_tool_handlers
     from bot.handlers.advanced_automod import handle_automod_command
@@ -102,7 +102,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         unpin_handler,
     )
     from bot.handlers.errors import error_handler as global_error_handler
-    from bot.handlers.fun import fun_handlers, cmd_afk
+    from bot.handlers.fun import cmd_afk, fun_handlers
     from bot.handlers.greetings import (
         goodbye_handler,
         goodbye_preview_handler,
@@ -202,6 +202,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
         del_command,
         delall_command,
         demote_command,
+        dispute_callback,
+        history_callback,
+        history_command,
     )
     from bot.handlers.moderation import id_command as nexus_id_command
     from bot.handlers.moderation import info_command as nexus_info_command
@@ -252,6 +255,8 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("warn", warn_command, filters=GROUP))
     app.add_handler(CommandHandler("unwarn", unwarn_command, filters=GROUP))
     app.add_handler(CommandHandler("warns", warns_command, filters=GROUP))
+    app.add_handler(CallbackQueryHandler(history_callback, pattern=r"^mod_history:\d+$"))
+    app.add_handler(CallbackQueryHandler(dispute_callback, pattern=r"^dispute_ticket:\d+$"))
     app.add_handler(CommandHandler("kick", kick_command, filters=GROUP))
     app.add_handler(CommandHandler("purge", purge_command, filters=GROUP))
     app.add_handler(CommandHandler("del", del_command, filters=GROUP))
@@ -266,6 +271,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     app.add_handler(CommandHandler("rules", nexus_rules_command, filters=GROUP))
     app.add_handler(CommandHandler("setrules", setrules_command, filters=GROUP))
     app.add_handler(CommandHandler("clearrules", clearrules_command, filters=GROUP))
+    app.add_handler(CommandHandler("history", history_command, filters=GROUP))
     app.add_handler(CommandHandler("info", nexus_info_command, filters=GROUP))
     app.add_handler(CommandHandler("id", nexus_id_command, filters=GROUP))
     from bot.handlers.commands import stats_handler
@@ -304,9 +310,9 @@ def create_application(token: str, is_primary: bool = False) -> Application:
     # ── Banned Symbols handlers (UltraPro feature) ─────────────────────────
     from bot.handlers.banned_symbols import (
         bannedsymbol_command,
-        unbannedsymbol_command,
-        clearbannedsymbols_command,
         bannedsymbolaction_command,
+        clearbannedsymbols_command,
+        unbannedsymbol_command,
     )
 
     app.add_handler(CommandHandler("bannedsymbol", bannedsymbol_command, filters=GROUP))
@@ -345,6 +351,7 @@ def create_application(token: str, is_primary: bool = False) -> Application:
 
     # ── Anti-raid message spam detection ────────────────────────────────────
     from bot.antiraid.message_spam import register_message_spam_handler
+
     register_message_spam_handler(app)
 
     # ── Full report system (replaces stub report_handler for new commands) ──

@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from telegram import ChatPermissions, Update
+from telegram import ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes
 
@@ -159,6 +159,21 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📋 Reason: {reason}\n"
             f"👮 By: {await mention_user(invoker)}",
             parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("🛡️ Contact Admin", url=f"tg://user?id={invoker.id}"),
+                        InlineKeyboardButton(
+                            "📜 History", callback_data=f"mod_history:{target.id}"
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "⚖️ Dispute (Open Ticket)", callback_data=f"dispute_ticket:{target.id}"
+                        )
+                    ],
+                ]
+            ),
         )
     except Forbidden:
         await update.message.reply_text(
@@ -261,6 +276,21 @@ async def tmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"📋 Reason: {reason}\n"
             f"👮 By: {await mention_user(invoker)}",
             parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton("🛡️ Contact Admin", url=f"tg://user?id={invoker.id}"),
+                        InlineKeyboardButton(
+                            "📜 History", callback_data=f"mod_history:{target.id}"
+                        ),
+                    ],
+                    [
+                        InlineKeyboardButton(
+                            "⚖️ Dispute (Open Ticket)", callback_data=f"dispute_ticket:{target.id}"
+                        )
+                    ],
+                ]
+            ),
         )
     except Forbidden:
         await update.message.reply_text(

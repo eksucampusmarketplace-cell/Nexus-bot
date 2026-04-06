@@ -32,20 +32,20 @@ Logs prefix: [SCHEDULER]
 
 import asyncio
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import asyncpg
 import pytz
 from croniter import croniter
 
+from bot.logging.log_channel import log_event
+from db.ops.automod import get_group_settings
 from db.ops.scheduler import (
-    get_due_messages,
-    mark_sent,
     deactivate_message,
     get_active_silent_times,
+    get_due_messages,
+    mark_sent,
 )
-from db.ops.automod import get_group_settings
-from bot.logging.log_channel import log_event
 
 log = logging.getLogger("scheduler")
 
@@ -68,7 +68,10 @@ class NexusScheduler:
         self._tasks = [
             asyncio.create_task(self._message_loop()),
             asyncio.create_task(self._silent_time_loop()),
-            asyncio.create_task(self._name_history_purge_loop()),  # F-06: Auto-purge old name history
+            asyncio.create_task(
+                self._name_history_purge_loop()
+            ),  # F-06: Auto-purge old name history
+            asyncio.create_task(self._name_sync_loop()),  # Bug fix: Sync name history periodically
         ]
         log.info("[SCHEDULER] Started")
 
@@ -261,7 +264,7 @@ class NexusScheduler:
         """Runs nightly to purge old name history records based on retention settings."""
         # Wait a bit before first run to not interfere with startup
         await asyncio.sleep(300)  # 5 minutes
-        
+
         while True:
             try:
                 await self._purge_old_name_history()
@@ -275,7 +278,7 @@ class NexusScheduler:
                 continue
             except Exception as e:
                 log.error(f"[SCHEDULER] Name history purge error: {e}")
-            
+
             # Run once per day
             await asyncio.sleep(86400)
 
@@ -283,37 +286,178 @@ class NexusScheduler:
         """Delete name history records older than retention period for each group."""
         async with self.db.acquire() as conn:
             # Find all groups with name history enabled and retention > 0
-            rows = await conn.fetch(
-                """SELECT chat_id, name_history_retention_days 
-                   FROM groups 
-                   WHERE name_history_enabled = TRUE 
-                     AND COALESCE(name_history_retention_days, 0) > 0"""
-            )
-        
+            rows = await conn.fetch("""SELECT chat_id, name_history_retention_days
+                   FROM groups
+                   WHERE name_history_enabled = TRUE
+                     AND COALESCE(name_history_retention_days, 0) > 0""")
+
         total_deleted = 0
         for row in rows:
             chat_id = row["chat_id"]
             retention_days = row["name_history_retention_days"]
-            
+
             try:
                 async with self.db.acquire() as conn:
                     result = await conn.execute(
-                        """DELETE FROM user_name_history 
-                           WHERE source_chat_id = $1 
+                        """DELETE FROM user_name_history
+                           WHERE source_chat_id = $1
                              AND changed_at < NOW() - INTERVAL '$2 days'""",
-                        chat_id, retention_days
+                        chat_id,
+                        retention_days,
                     )
                     # Extract count from result (e.g., "DELETE 42")
                     deleted = int(result.split()[1]) if result and len(result.split()) > 1 else 0
                     total_deleted += deleted
-                    
+
                     if deleted > 0:
-                        log.info(f"[SCHEDULER] Purged {deleted} old name history records for chat={chat_id} (retention={retention_days}d)")
+                        log.info(
+                            f"[SCHEDULER] Purged {deleted} old name history for "
+                            f"chat={chat_id} (retention={retention_days}d)"
+                        )
             except Exception as e:
                 log.warning(f"[SCHEDULER] Failed to purge name history for chat={chat_id}: {e}")
-        
+
         if total_deleted > 0:
             log.info(f"[SCHEDULER] Total name history records purged: {total_deleted}")
+
+    # Bug fix: Name history sync loop - detects name changes without requiring messages
+    async def _name_sync_loop(self):
+        """Runs every 30 minutes to sync name history by scanning group administrators."""
+        # Wait before first run to not interfere with startup
+        await asyncio.sleep(60)
+
+        while True:
+            try:
+                await self._sync_name_history()
+            except asyncpg.UndefinedTableError as e:
+                log.warning(f"[SCHEDULER] Name history table missing — run migrations: {e}")
+                await asyncio.sleep(1800)
+                continue
+            except asyncpg.UndefinedColumnError as e:
+                log.warning(f"[SCHEDULER] Column missing — run migrations: {e}")
+                await asyncio.sleep(1800)
+                continue
+            except Exception as e:
+                log.error(f"[SCHEDULER] Name sync error: {e}")
+
+            # Run every 30 minutes
+            await asyncio.sleep(1800)
+
+    async def _sync_name_history(self):
+        """Sync name history by checking administrators in groups where it's enabled."""
+        async with self.db.acquire() as conn:
+            # Find all groups with name history enabled
+            rows = await conn.fetch("""SELECT chat_id
+                   FROM groups
+                   WHERE name_history_enabled = TRUE""")
+
+        for row in rows:
+            chat_id = row["chat_id"]
+            try:
+                await self._sync_group_admin_names(chat_id)
+            except Exception as e:
+                error_msg = str(e).lower()
+                # Silent handling for expected errors (bot kicked, etc.)
+                if any(
+                    x in error_msg
+                    for x in ["bot was kicked", "bot is not a member", "chat not found"]
+                ):
+                    log.debug(f"[SCHEDULER] Skipping name sync for chat={chat_id}: {e}")
+                else:
+                    log.warning(f"[SCHEDULER] Failed to sync names for chat={chat_id}: {e}")
+
+    async def _sync_group_admin_names(self, chat_id: int):
+        """Check administrators in a group and record any name changes."""
+        from telegram.error import Forbidden
+
+        try:
+            admins = await self.bot.get_chat_administrators(chat_id)
+        except Forbidden as e:
+            # Bot was kicked or doesn't have permission - log at debug and skip
+            log.debug(f"[SCHEDULER] Cannot get admins for chat={chat_id}: {e}")
+            return
+
+        async with self.db.acquire() as conn:
+            for admin in admins:
+                user = admin.user
+
+                # Skip bots
+                if user.is_bot:
+                    continue
+
+                # Check if user has opted out
+                optout = await conn.fetchval(
+                    "SELECT 1 FROM user_history_optout WHERE user_id = $1", user.id
+                )
+                if optout:
+                    continue
+
+                # Get last snapshot
+                last_snapshot = await conn.fetchrow(
+                    """SELECT first_name, last_name, username
+                       FROM user_snapshots
+                       WHERE user_id = $1 AND source_chat_id = $2""",
+                    user.id,
+                    chat_id,
+                )
+
+                current_first = user.first_name or ""
+                current_last = user.last_name or ""
+                current_username = user.username or ""
+
+                # Check for changes (normalize NULL from DB to empty string for comparison)
+                if last_snapshot:
+                    prev_first = last_snapshot["first_name"] or ""
+                    prev_last = last_snapshot["last_name"] or ""
+                    prev_username = last_snapshot["username"] or ""
+                    changed = (
+                        prev_first != current_first
+                        or prev_last != current_last
+                        or prev_username != current_username
+                    )
+
+                    if not changed:
+                        continue
+
+                    # Record the name change to history
+                    await conn.execute(
+                        """INSERT INTO user_name_history
+                           (user_id, first_name, last_name, username, source_chat_id,
+                            old_first_name, old_last_name, old_username)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
+                        user.id,
+                        current_first,
+                        current_last,
+                        current_username,
+                        chat_id,
+                        prev_first,
+                        prev_last,
+                        prev_username,
+                    )
+
+                    log.debug(
+                        f"[SCHEDULER] Name change detected for user {user.id} in chat {chat_id}: "
+                        f"first='{prev_first}'->'{current_first}', "
+                        f"last='{prev_last}'->'{current_last}', "
+                        f"user='{prev_username}'->'{current_username}'"
+                    )
+
+                # Create/update snapshot using upsert
+                await conn.execute(
+                    """INSERT INTO user_snapshots
+                       (user_id, first_name, last_name, username, source_chat_id)
+                       VALUES ($1, $2, $3, $4, $5)
+                       ON CONFLICT (user_id, source_chat_id) DO UPDATE
+                         SET first_name = EXCLUDED.first_name,
+                             last_name  = EXCLUDED.last_name,
+                             username   = EXCLUDED.username,
+                             captured_at = NOW()""",
+                    user.id,
+                    current_first,
+                    current_last,
+                    current_username,
+                    chat_id,
+                )
 
 
 def _calc_next_send(msg: dict) -> datetime:

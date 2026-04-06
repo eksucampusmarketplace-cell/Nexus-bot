@@ -10,6 +10,7 @@ Logic:
 4. Return structured role data
 """
 
+import asyncio
 import json
 import logging
 
@@ -22,6 +23,21 @@ from db.client import db
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def mark_group_inactive(chat_id: int):
+    """Mark a group as inactive when the bot is kicked."""
+    try:
+        async with db.pool.acquire() as conn:
+            await conn.execute(
+                """UPDATE groups
+                   SET is_active = FALSE, bot_left_at = NOW()
+                   WHERE chat_id = $1""",
+                chat_id,
+            )
+        logger.info(f"[ME] Bot was kicked from {chat_id} — marking inactive")
+    except Exception as e:
+        logger.warning(f"[ME] Failed to mark group {chat_id} inactive: {e}")
 
 
 async def get_user_telegram_status(bot, chat_id: int, user_id: int) -> str:
@@ -39,17 +55,23 @@ async def get_user_telegram_status(bot, chat_id: int, user_id: int) -> str:
             return "none"
     except Exception as e:
         error_msg = str(e).lower()
-        # User not in chat is expected - not a warning condition
-        if any(x in error_msg for x in ["member not found", "user not found", "chat not found"]):
-            logger.debug(
-                f"[ME] User not in chat | chat_id={chat_id} user_id={user_id}: {e}"
-            )
-            return "none"
-        # Bot not in chat is also expected for stale group records
-        if "bot is not a member" in error_msg:
-            logger.debug(
-                f"[ME] Bot not in chat | chat_id={chat_id}: {e}"
-            )
+        # Silent errors - expected conditions that don't need warnings
+        SILENT_ERRORS = [
+            "member not found",
+            "user not found",
+            "chat not found",
+            "bot is not a member",
+            "bot was kicked",
+            "forbidden",
+            "not enough rights",
+        ]
+        if any(x in error_msg for x in SILENT_ERRORS):
+            # If bot was kicked, mark the group as inactive in the background
+            if "bot was kicked" in error_msg:
+                logger.info(f"[ME] Bot kicked from {chat_id}, marking inactive")
+                asyncio.create_task(mark_group_inactive(chat_id))
+            else:
+                logger.debug(f"[ME] User not in chat | chat_id={chat_id} user_id={user_id}: {e}")
             return "none"
         logger.warning(
             f"[ME] Failed to get chat member status | chat_id={chat_id} user_id={user_id}: {e}"

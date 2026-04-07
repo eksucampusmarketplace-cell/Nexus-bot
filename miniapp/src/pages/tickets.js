@@ -36,6 +36,11 @@ export async function renderTicketsPage(container) {
       <h2 style="font-size:var(--text-xl);font-weight:var(--fw-bold);margin:0;">🎫 Support Tickets</h2>
       <p style="color:var(--text-muted);font-size:var(--text-sm);margin:4px 0 0;" id="tickets-count">Loading...</p>
     </div>
+    <div style="display:flex;gap:var(--sp-2);">
+      <button id="btn-analytics" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2);" title="Analytics">📊</button>
+      <button id="btn-sla" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2);" title="SLA Config">⏱️</button>
+      <button id="btn-templates" class="btn btn-secondary" style="font-size:var(--text-xs);padding:var(--sp-2);" title="Templates">📝</button>
+    </div>
   `;
   container.appendChild(header);
 
@@ -423,61 +428,66 @@ export async function renderTicketsPage(container) {
   }
 
   // ── Analytics Modal ─────────────────────────────────────────────────────
-  document.getElementById('btn-analytics').onclick = async () => {
-    try {
-      const res = await apiFetch(`/api/groups/${chatId}/tickets/analytics`);
-      const a = res?.analytics || {};
+  const analyticsBtn = document.getElementById('btn-analytics');
+  if (analyticsBtn) {
+    analyticsBtn.onclick = async () => {
+      try {
+        const res = await apiFetch(`/api/groups/${chatId}/tickets/analytics`);
+        const a = res?.analytics || {};
 
-      const overlay = _createModal('📊 Ticket Analytics', `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);">
-          <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
-            <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);">${a.total || 0}</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);">Total Tickets</div>
+        const overlay = _createModal('📊 Ticket Analytics', `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3);">
+            <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
+              <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);">${a.total || 0}</div>
+              <div style="font-size:var(--text-xs);color:var(--text-muted);">Total Tickets</div>
+            </div>
+            <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
+              <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--warning);">${a.open_count || 0}</div>
+              <div style="font-size:var(--text-xs);color:var(--text-muted);">Open</div>
+            </div>
+            <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
+              <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--danger);">${a.escalated_count || 0}</div>
+              <div style="font-size:var(--text-xs);color:var(--text-muted);">Escalated</div>
+            </div>
+            <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
+              <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--success);">${a.closed_count || 0}</div>
+              <div style="font-size:var(--text-xs);color:var(--text-muted);">Closed</div>
+            </div>
           </div>
-          <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
-            <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--warning);">${a.open_count || 0}</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);">Open</div>
+          <div style="margin-top:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);">
+            <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
+              <span>Avg Response Time</span>
+              <span style="font-weight:var(--fw-semibold);">${a.avg_first_response_mins != null ? a.avg_first_response_mins + ' min' : 'N/A'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
+              <span>Avg Resolution Time</span>
+              <span style="font-weight:var(--fw-semibold);">${a.avg_resolution_hours != null ? a.avg_resolution_hours + ' hrs' : 'N/A'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
+              <span>Avg Satisfaction</span>
+              <span style="font-weight:var(--fw-semibold);">${a.avg_satisfaction != null ? '⭐ ' + a.avg_satisfaction + '/5' : 'N/A'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
+              <span>SLA Response Breached</span>
+              <span style="font-weight:var(--fw-semibold);color:${(a.sla_response_breached || 0) > 0 ? 'var(--danger)' : 'var(--success)'};">${a.sla_response_breached || 0}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;">
+              <span>SLA Resolution Breached</span>
+              <span style="font-weight:var(--fw-semibold);color:${(a.sla_resolution_breached || 0) > 0 ? 'var(--danger)' : 'var(--success)'};">${a.sla_resolution_breached || 0}</span>
+            </div>
           </div>
-          <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
-            <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--danger);">${a.escalated_count || 0}</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);">Escalated</div>
-          </div>
-          <div style="background:var(--bg-input);padding:var(--sp-3);border-radius:var(--r-lg);text-align:center;">
-            <div style="font-size:var(--text-2xl);font-weight:var(--fw-bold);color:var(--success);">${a.closed_count || 0}</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);">Closed</div>
-          </div>
-        </div>
-        <div style="margin-top:var(--sp-3);display:flex;flex-direction:column;gap:var(--sp-2);">
-          <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
-            <span>Avg Response Time</span>
-            <span style="font-weight:var(--fw-semibold);">${a.avg_first_response_mins != null ? a.avg_first_response_mins + ' min' : 'N/A'}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
-            <span>Avg Resolution Time</span>
-            <span style="font-weight:var(--fw-semibold);">${a.avg_resolution_hours != null ? a.avg_resolution_hours + ' hrs' : 'N/A'}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
-            <span>Avg Satisfaction</span>
-            <span style="font-weight:var(--fw-semibold);">${a.avg_satisfaction != null ? '⭐ ' + a.avg_satisfaction + '/5' : 'N/A'}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;border-bottom:1px solid var(--border);">
-            <span>SLA Response Breached</span>
-            <span style="font-weight:var(--fw-semibold);color:${(a.sla_response_breached || 0) > 0 ? 'var(--danger)' : 'var(--success)'};">${a.sla_response_breached || 0}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);padding:var(--sp-2) 0;">
-            <span>SLA Resolution Breached</span>
-            <span style="font-weight:var(--fw-semibold);color:${(a.sla_resolution_breached || 0) > 0 ? 'var(--danger)' : 'var(--success)'};">${a.sla_resolution_breached || 0}</span>
-          </div>
-        </div>
-      `);
-      document.body.appendChild(overlay);
-    } catch (e) {
-      showToast('Failed to load analytics: ' + e.message, 'error');
-    }
-  };
+        `);
+        document.body.appendChild(overlay);
+      } catch (e) {
+        showToast('Failed to load analytics: ' + e.message, 'error');
+      }
+    };
+  }
 
   // ── SLA Config Modal ────────────────────────────────────────────────────
-  document.getElementById('btn-sla').onclick = async () => {
+  const slaBtn = document.getElementById('btn-sla');
+  if (slaBtn) {
+    slaBtn.onclick = async () => {
     try {
       const res = await apiFetch(`/api/groups/${chatId}/tickets/sla`);
       const configs = res?.sla_configs || [];
@@ -546,9 +556,12 @@ export async function renderTicketsPage(container) {
       showToast('Failed to load SLA config: ' + e.message, 'error');
     }
   };
+  }
 
   // ── Templates Modal ─────────────────────────────────────────────────────
-  document.getElementById('btn-templates').onclick = async () => {
+  const templatesBtn = document.getElementById('btn-templates');
+  if (templatesBtn) {
+    templatesBtn.onclick = async () => {
     try {
       const res = await apiFetch(`/api/groups/${chatId}/tickets/templates`);
       const templates = res?.templates || [];
@@ -585,7 +598,7 @@ export async function renderTicketsPage(container) {
               await apiFetch(`/api/groups/${chatId}/tickets/templates/${encodeURIComponent(btn.dataset.delete)}`, { method: 'DELETE' });
               showToast('Template deleted', 'success');
               overlay.remove();
-              document.getElementById('btn-templates').click();
+              templatesBtn.click();
             } catch (err) {
               showToast('Failed: ' + err.message, 'error');
             }
@@ -606,7 +619,7 @@ export async function renderTicketsPage(container) {
               });
               showToast('Template saved!', 'success');
               overlay.remove();
-              document.getElementById('btn-templates').click();
+              templatesBtn.click();
             } catch (err) {
               showToast('Failed: ' + err.message, 'error');
             }
@@ -617,6 +630,7 @@ export async function renderTicketsPage(container) {
       showToast('Failed to load templates: ' + e.message, 'error');
     }
   };
+  }
 
   // Load initial data
   await loadTickets('open');

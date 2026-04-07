@@ -79,6 +79,49 @@
     .sidebar-item:hover { background: var(--bg-hover); color: var(--text-primary); }
     .sidebar-item.active { background: var(--accent-dim); color: var(--accent); }
     .sidebar-item svg { width: 20px; height: 20px; }
+
+    /* Sidebar Groups */
+    .sidebar-group {
+      margin-bottom: var(--sp-1);
+    }
+    .sidebar-group-header {
+      padding: var(--sp-3) var(--sp-4);
+      border-radius: var(--r-lg);
+      cursor: pointer;
+      color: var(--text-muted);
+      font-weight: var(--fw-semibold);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all var(--dur-fast);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    .sidebar-group-header:hover { background: var(--bg-hover); color: var(--text-secondary); }
+    .sidebar-group-header.active { color: var(--accent); }
+    .sidebar-group-header .chevron {
+      transition: transform var(--dur-fast);
+      font-size: 12px;
+    }
+    .sidebar-group-header.expanded .chevron {
+      transform: rotate(90deg);
+    }
+    .sidebar-group-content {
+      display: none;
+      flex-direction: column;
+      gap: var(--sp-1);
+      padding-left: var(--sp-2);
+      margin-top: var(--sp-1);
+    }
+    .sidebar-group-content.expanded {
+      display: flex;
+    }
+    .sidebar-group-content .sidebar-item {
+      padding: var(--sp-2) var(--sp-3);
+      font-size: var(--text-xs);
+    }
     
     /* Bottom nav (mobile) */
     .bottom-nav-item {
@@ -439,6 +482,8 @@
       <div id="page-tickets" class="page"></div>
       <!-- Custom Commands -->
       <div id="page-custom-commands" class="page"></div>
+      <!-- Misc Tools -->
+      <div id="page-misc" class="page"></div>
       <!-- v21 pages -->
       <div id="page-trustnet" class="page"></div>
       <div id="page-federation" class="page"></div>
@@ -638,89 +683,161 @@
       const role = userContext.role || 'member';
       const isAdmin = role === 'admin' || role === 'owner' || isSudo;
       
-      const pages = [
-        { id: 'dashboard', label: t('nav_dashboard', 'Dashboard'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', minRole: 'member' },
-        { id: 'bots', label: t('nav_bots', 'My Bots'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>', minRole: 'bot_owner' },
-        { id: 'commands', label: t('nav_commands', 'Commands'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>', minRole: 'member' },
-        { id: 'moderation', label: t('nav_moderation', 'Moderation'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
-        { id: 'automod', label: t('nav_automod', 'AutoMod'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>', minRole: 'admin' },
-        { id: 'members', label: t('nav_members', 'Members'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', minRole: 'admin' },
-        { id: 'gamification', label: t('nav_leaderboard', 'Leaderboard'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>', minRole: 'member' },
-        { id: 'roles', label: t('nav_roles', 'Roles'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>', minRole: 'admin' },
-        { id: 'engagement', label: t('nav_xp', 'XP & Levels'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>', minRole: 'member' },
-        { id: 'analytics', label: t('nav_analytics', 'Analytics'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>', minRole: 'admin' },
-        { id: 'webhooks', label: t('nav_webhooks', 'Integrations'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', minRole: 'admin' },
-        { id: 'broadcast', label: t('nav_broadcast', 'Broadcast'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8z"/><path d="M22 12l-4-4v8l4-4z"/></svg>', minRole: 'admin' },
-        { id: 'booster', label: t('nav_booster', 'Member Booster'), icon: '🚀', minRole: 'admin' },
-        { id: 'notes', label: t('nav_notes', 'Notes'), icon: '📝', minRole: 'member' },
-        { id: 'custom-commands', label: t('nav_custom_commands', 'Custom Commands'), icon: '⚙️', minRole: 'admin' },
-        { id: 'channel-gate', label: t('nav_channel_gate', 'Channel Gate'), icon: '📢', minRole: 'admin' },
-        { id: 'backup', label: t('nav_backup', 'Backup'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>', minRole: 'admin' },
-        { id: 'settings', label: t('nav_settings', 'Settings'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4m0-4V8m6 6l-4 4m-4-4l4 4m6-6l-4-4m4 4l-4 4"/></svg>', minRole: 'admin' },
-        { id: 'logs', label: t('nav_logs', 'Logs'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>', minRole: 'admin' },
-        { id: 'greetings', label: t('nav_greetings', 'Greetings'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', minRole: 'admin' },
-        { id: 'reports', label: t('nav_reports', 'Reports'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>', minRole: 'admin' },
-        { id: 'antiraid', label: t('nav_antiraid', 'Anti-Raid'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', minRole: 'admin' },
-        { id: 'session', label: t('nav_session', 'Session'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>', minRole: 'member' },
-        { id: 'owner', label: t('nav_owner', 'Owner Panel'), icon: '👑', ownerOnly: true },
-        { id: 'notifications', label: t('nav_alerts', 'Alerts'), icon: '🔔', minRole: 'member' },
-        { id: 'trustnet', label: t('nav_trustnet', 'TrustNet'), icon: '🌐', minRole: 'member' },
-        { id: 'captcha', label: t('nav_captcha', 'Captcha'), icon: '🤖', minRole: 'admin' },
-        { id: 'night-mode', label: t('nav_night_mode', 'Night Mode'), icon: '🌙', minRole: 'admin' },
-        { id: 'history', label: t('nav_history', 'Name History'), icon: '📜', minRole: 'admin' },
-        { id: 'language', label: t('nav_language', 'Language'), icon: '🌍', minRole: 'member' },
-        { id: 'persona', label: t('nav_persona', 'Bot Persona'), icon: '🎭', minRole: 'admin' },
-        { id: 'tickets', label: t('nav_tickets', 'Tickets'), icon: '🎫', minRole: 'admin' },
-        { id: 'misc', label: t('nav_misc', 'Misc Tools'), icon: '🛠️', minRole: 'member' },
-      ];
-
-      // Sort pages alphabetically by label
-      pages.sort((a, b) => a.label.localeCompare(b.label));
-
       // Role hierarchy for comparison
       const roleHierarchy = { 'member': 0, 'admin': 1, 'owner': 2, 'bot_owner': 2, 'overlord': 3 };
       const userRoleLevel = isSudo ? roleHierarchy['overlord'] : (isBotOwner ? roleHierarchy['bot_owner'] : roleHierarchy[role] || 0);
       
-      // Build sidebar nav with role-based filtering
-      // Skip extra API call for non-owners - use is_sudo from /api/me
+      // Check owner status
       let ownerStatsOk = isSudo;
       if (isSudo) {
-        // Only check admin stats if already identified as owner
         ownerStatsOk = await apiFetch('/api/admin/stats').then(() => true).catch(() => false);
       }
-      
-      const visiblePages = pages.filter(p => {
-        // Check owner-only pages
-        if (p.ownerOnly) return ownerStatsOk;
-        // Check role-based access
-        const requiredLevel = roleHierarchy[p.minRole] || 0;
-        return userRoleLevel >= requiredLevel;
+
+      // Define page groups
+      const pageGroups = [
+        {
+          id: 'main',
+          label: t('nav_group_main', 'Main'),
+          pages: [
+            { id: 'dashboard', label: t('nav_dashboard', 'Dashboard'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>', minRole: 'member' },
+            { id: 'commands', label: t('nav_commands', 'Commands'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>', minRole: 'member' },
+            { id: 'bots', label: t('nav_bots', 'My Bots'), icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>', minRole: 'bot_owner' },
+          ]
+        },
+        {
+          id: 'moderation',
+          label: t('nav_group_moderation', 'Moderation'),
+          pages: [
+            { id: 'moderation', label: t('nav_moderation', 'Moderation'), icon: '🛡️', minRole: 'admin' },
+            { id: 'automod', label: t('nav_automod', 'AutoMod'), icon: '🤖', minRole: 'admin' },
+            { id: 'antiraid', label: t('nav_antiraid', 'Anti-Raid'), icon: '⚡', minRole: 'admin' },
+            { id: 'captcha', label: t('nav_captcha', 'Captcha'), icon: '🔐', minRole: 'admin' },
+            { id: 'members', label: t('nav_members', 'Members'), icon: '👥', minRole: 'admin' },
+            { id: 'reports', label: t('nav_reports', 'Reports'), icon: '🚨', minRole: 'admin' },
+            { id: 'logs', label: t('nav_logs', 'Logs'), icon: '📋', minRole: 'admin' },
+          ]
+        },
+        {
+          id: 'engagement',
+          label: t('nav_group_engagement', 'Engagement'),
+          pages: [
+            { id: 'gamification', label: t('nav_leaderboard', 'Leaderboard'), icon: '🏆', minRole: 'member' },
+            { id: 'engagement', label: t('nav_xp', 'XP & Levels'), icon: '⭐', minRole: 'member' },
+            { id: 'roles', label: t('nav_roles', 'Roles'), icon: '🎯', minRole: 'admin' },
+            { id: 'greetings', label: t('nav_greetings', 'Greetings'), icon: '👋', minRole: 'admin' },
+            { id: 'booster', label: t('nav_booster', 'Member Booster'), icon: '🚀', minRole: 'admin' },
+            { id: 'channel-gate', label: t('nav_channel_gate', 'Channel Gate'), icon: '📢', minRole: 'admin' },
+          ]
+        },
+        {
+          id: 'tools',
+          label: t('nav_group_tools', 'Tools'),
+          pages: [
+            { id: 'notes', label: t('nav_notes', 'Notes'), icon: '📝', minRole: 'member' },
+            { id: 'custom-commands', label: t('nav_custom_commands', 'Custom Commands'), icon: '⚙️', minRole: 'admin' },
+            { id: 'broadcast', label: t('nav_broadcast', 'Broadcast'), icon: '📡', minRole: 'admin' },
+            { id: 'analytics', label: t('nav_analytics', 'Analytics'), icon: '📊', minRole: 'admin' },
+            { id: 'webhooks', label: t('nav_webhooks', 'Integrations'), icon: '🔗', minRole: 'admin' },
+            { id: 'misc', label: t('nav_misc', 'Misc Tools'), icon: '🛠️', minRole: 'member' },
+          ]
+        },
+        {
+          id: 'security',
+          label: t('nav_group_security', 'Security'),
+          pages: [
+            { id: 'trustnet', label: t('nav_trustnet', 'TrustNet'), icon: '🌐', minRole: 'member' },
+            { id: 'session', label: t('nav_session', 'Session'), icon: '🔒', minRole: 'member' },
+            { id: 'night-mode', label: t('nav_night_mode', 'Night Mode'), icon: '🌙', minRole: 'admin' },
+            { id: 'history', label: t('nav_history', 'Name History'), icon: '📜', minRole: 'admin' },
+            { id: 'backup', label: t('nav_backup', 'Backup'), icon: '💾', minRole: 'admin' },
+          ]
+        },
+        {
+          id: 'settings',
+          label: t('nav_group_settings', 'Settings'),
+          pages: [
+            { id: 'settings', label: t('nav_settings', 'Group Settings'), icon: '⚙️', minRole: 'admin' },
+            { id: 'persona', label: t('nav_persona', 'Bot Persona'), icon: '🎭', minRole: 'admin' },
+            { id: 'tickets', label: t('nav_tickets', 'Tickets'), icon: '🎫', minRole: 'admin' },
+            { id: 'notifications', label: t('nav_alerts', 'Alerts'), icon: '🔔', minRole: 'member' },
+            { id: 'language', label: t('nav_language', 'Language'), icon: '🌍', minRole: 'member' },
+          ]
+        },
+        {
+          id: 'admin',
+          label: t('nav_group_admin', 'Admin'),
+          pages: [
+            { id: 'owner', label: t('nav_owner', 'Owner Panel'), icon: '👑', ownerOnly: true },
+          ]
+        },
+      ];
+
+      // Filter groups and pages based on role
+      const activePage = getState().activePage || 'dashboard';
+      let sidebarHtml = '';
+
+      pageGroups.forEach(group => {
+        // Filter pages within this group
+        const visiblePages = group.pages.filter(p => {
+          if (p.ownerOnly) return ownerStatsOk;
+          const requiredLevel = roleHierarchy[p.minRole] || 0;
+          return userRoleLevel >= requiredLevel;
+        });
+
+        if (visiblePages.length === 0) return;
+
+        // Check if any page in this group is active
+        const isGroupActive = visiblePages.some(p => p.id === activePage);
+        const expandedClass = isGroupActive ? 'expanded' : '';
+
+        sidebarHtml += `
+          <div class="sidebar-group">
+            <div class="sidebar-group-header ${expandedClass}" data-group="${group.id}">
+              <span>${group.label}</span>
+              <span class="chevron">▶</span>
+            </div>
+            <div class="sidebar-group-content ${expandedClass}" id="group-${group.id}">
+              ${visiblePages.map(p => `
+                <div class="sidebar-item ${activePage === p.id ? 'active' : ''}" data-page="${p.id}">
+                  <span style="width:20px;text-align:center;">${p.icon}</span>
+                  <span>${p.label}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
       });
-      sidebarNav.innerHTML = visiblePages.map(p => `
-        <div class="sidebar-item ${getState().activePage === p.id ? 'active' : ''}" data-page="${p.id}">
-          ${p.icon}
-          <span>${p.label}</span>
-        </div>
-      `).join('');
+
+      sidebarNav.innerHTML = sidebarHtml;
+
+      // Setup group expand/collapse
+      document.querySelectorAll('.sidebar-group-header').forEach(header => {
+        header.onclick = () => {
+          const groupId = header.dataset.group;
+          const content = document.getElementById(`group-${groupId}`);
+          header.classList.toggle('expanded');
+          content.classList.toggle('expanded');
+        };
+      });
 
       // Build bottom nav (limit to 5 most important)
       const bottomNav = document.getElementById('bottom-nav');
-      const bottomPages = [
-        pages.find(p => p.id === 'dashboard'),
-        pages.find(p => p.id === 'moderation'),
-        pages.find(p => p.id === 'members'),
-        pages.find(p => p.id === 'automod'),
-        pages.find(p => p.id === 'settings'),
-      ].filter(Boolean);
+      const bottomPageIds = ['dashboard', 'moderation', 'members', 'gamification', 'settings'];
+      const allPages = pageGroups.flatMap(g => g.pages);
+      const bottomPages = bottomPageIds.map(id => allPages.find(p => p.id === id)).filter(Boolean).filter(p => {
+        if (p.ownerOnly) return ownerStatsOk;
+        const requiredLevel = roleHierarchy[p.minRole] || 0;
+        return userRoleLevel >= requiredLevel;
+      });
 
       bottomNav.innerHTML = bottomPages.map(p => `
-        <div class="bottom-nav-item ${getState().activePage === p.id ? 'active' : ''}" data-page="${p.id}">
-          ${p.icon}
+        <div class="bottom-nav-item ${activePage === p.id ? 'active' : ''}" data-page="${p.id}">
+          <span style="font-size:20px;">${p.icon}</span>
           <span>${p.label}</span>
         </div>
       `).join('');
 
-      // Setup click handlers
+      // Setup click handlers for pages
       document.querySelectorAll('[data-page]').forEach(el => {
         el.onclick = () => {
           navigateToPage(el.dataset.page);
@@ -936,7 +1053,18 @@
       document.querySelectorAll('.bottom-nav-item').forEach(el => {
         el.classList.toggle('active', el.dataset.page === pageId);
       });
-      
+
+      // Expand the group containing the active page
+      document.querySelectorAll('.sidebar-group-content').forEach(content => {
+        const hasActivePage = content.querySelector('.sidebar-item.active');
+        const groupId = content.id.replace('group-', '');
+        const header = document.querySelector(`.sidebar-group-header[data-group="${groupId}"]`);
+        if (hasActivePage) {
+          content.classList.add('expanded');
+          header?.classList.add('expanded');
+        }
+      });
+
       // Scroll to top of main content
       document.getElementById('main').scrollTop = 0;
     }

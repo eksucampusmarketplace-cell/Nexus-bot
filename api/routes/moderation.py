@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 import db.ops.moderation as mod_db
 from api.auth import get_current_user
+from api.utils.bot_helper import get_bot_for_group
 from bot.handlers.moderation.utils import publish_event
 from db.client import db
 
@@ -112,10 +113,9 @@ class BulkActionRequest(BaseModel):
 @router.post("/bans")
 async def ban_user(chat_id: int, req: BanRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
-    from bot.registry import get_all
+    app = await get_bot_for_group(chat_id)
 
-    bots = get_all()
-    if not bots:
+    if not app:
         raise HTTPException(503, "Bot not running — cannot execute action")
 
     admin_name = user.get("first_name", "Admin")
@@ -124,22 +124,19 @@ async def ban_user(chat_id: int, req: BanRequest, user: dict = Depends(get_curre
     tg_success = False
     last_error = None
 
-    for bid, app in bots.items():
-        try:
-            member = await app.bot.get_chat_member(chat_id, req.user_id)
-            target_name = member.user.mention_html()
-            await app.bot.ban_chat_member(chat_id, req.user_id)
-            await app.bot.send_message(
-                chat_id=chat_id,
-                text=f"🚫 <b>Banned</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}",
-                parse_mode="HTML",
-            )
-            tg_success = True
-            break
-        except Exception as e:
-            last_error = str(e)
-            logger.warning(f"[BAN] bot {bid} failed: {e}")
-            continue
+    try:
+        member = await app.bot.get_chat_member(chat_id, req.user_id)
+        target_name = member.user.mention_html()
+        await app.bot.ban_chat_member(chat_id, req.user_id)
+        await app.bot.send_message(
+            chat_id=chat_id,
+            text=f"🚫 <b>Banned</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}",
+            parse_mode="HTML",
+        )
+        tg_success = True
+    except Exception as e:
+        last_error = str(e)
+        logger.warning(f"[BAN] bot failed: {e}")
 
     if not tg_success:
         raise HTTPException(502, f"Telegram action failed: {last_error}")
@@ -356,10 +353,9 @@ async def get_user_warnings(
 @router.post("/warnings")
 async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
-    from bot.registry import get_all
+    app = await get_bot_for_group(chat_id)
 
-    bots = get_all()
-    if not bots:
+    if not app:
         raise HTTPException(503, "Bot not running")
 
     admin_name = user.get("first_name", "Admin")
@@ -397,24 +393,21 @@ async def warn_user(chat_id: int, req: WarnRequest, user: dict = Depends(get_cur
         raise HTTPException(500, f"Database error: {e}")
 
     # Then send Telegram message
-    for bid, app in bots.items():
-        try:
-            member = await app.bot.get_chat_member(chat_id, req.user_id)
-            target_name = member.user.mention_html()
-            warn_text = (
-                f"⚠️ <b>Warning Issued</b>\n"
-                f"User: {target_name}\n"
-                f"Reason: {reason}\n"
-                f"Warnings: {warn_count}\n"
-                f"By: {admin_name}"
-            )
-            await app.bot.send_message(chat_id=chat_id, text=warn_text, parse_mode="HTML")
-            tg_success = True
-            break
-        except Exception as tg_err:
-            last_error = str(tg_err)
-            logger.warning(f"[WARN] bot {bid} failed: {tg_err}")
-            continue
+    try:
+        member = await app.bot.get_chat_member(chat_id, req.user_id)
+        target_name = member.user.mention_html()
+        warn_text = (
+            f"⚠️ <b>Warning Issued</b>\n"
+            f"User: {target_name}\n"
+            f"Reason: {reason}\n"
+            f"Warnings: {warn_count}\n"
+            f"By: {admin_name}"
+        )
+        await app.bot.send_message(chat_id=chat_id, text=warn_text, parse_mode="HTML")
+        tg_success = True
+    except Exception as tg_err:
+        last_error = str(tg_err)
+        logger.warning(f"[WARN] bot failed: {tg_err}")
 
     if not tg_success:
         raise HTTPException(502, f"Telegram action failed: {last_error}")
@@ -513,10 +506,9 @@ async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_cur
 
     from telegram import ChatPermissions
 
-    from bot.registry import get_all
+    app = await get_bot_for_group(chat_id)
 
-    bots = get_all()
-    if not bots:
+    if not app:
         raise HTTPException(503, "Bot not running")
 
     admin_name = user.get("first_name", "Admin")
@@ -540,33 +532,30 @@ async def mute_user(chat_id: int, req: MuteRequest, user: dict = Depends(get_cur
             if delta:
                 unmute_dt = datetime.now(tz=timezone.utc) + delta
 
-    for bid, app in bots.items():
-        try:
-            member = await app.bot.get_chat_member(chat_id, req.user_id)
-            target_name = member.user.mention_html()
-            await app.bot.restrict_chat_member(
-                chat_id=chat_id,
-                user_id=req.user_id,
-                permissions=ChatPermissions(can_send_messages=False),
-                until_date=unmute_dt,
-            )
-            await app.bot.send_message(
-                chat_id=chat_id,
-                text=(
-                    f"🔇 <b>Muted</b>\n"
-                    f"User: {target_name}\n"
-                    f"Duration: {duration_str}\n"
-                    f"Reason: {reason}\n"
-                    f"By: {admin_name}"
-                ),
-                parse_mode="HTML",
-            )
-            tg_success = True
-            break
-        except Exception as e:
-            last_error = str(e)
-            logger.warning(f"[MUTE] bot {bid} failed: {e}")
-            continue
+    try:
+        member = await app.bot.get_chat_member(chat_id, req.user_id)
+        target_name = member.user.mention_html()
+        await app.bot.restrict_chat_member(
+            chat_id=chat_id,
+            user_id=req.user_id,
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=unmute_dt,
+        )
+        await app.bot.send_message(
+            chat_id=chat_id,
+            text=(
+                f"🔇 <b>Muted</b>\n"
+                f"User: {target_name}\n"
+                f"Duration: {duration_str}\n"
+                f"Reason: {reason}\n"
+                f"By: {admin_name}"
+            ),
+            parse_mode="HTML",
+        )
+        tg_success = True
+    except Exception as e:
+        last_error = str(e)
+        logger.warning(f"[MUTE] bot failed: {e}")
 
     if not tg_success:
         raise HTTPException(502, f"Mute failed: {last_error}")
@@ -600,29 +589,28 @@ async def unmute_user(chat_id: int, target_user_id: int, user: dict = Depends(ge
     await verify_admin(chat_id, user)
     from telegram import ChatPermissions
 
-    from bot.registry import get_all
+    app = await get_bot_for_group(chat_id)
+    if not app:
+        raise HTTPException(503, "Bot not running")
 
-    bots = get_all()
     target_name = "User"
-    for bid, app in bots.items():
-        try:
-            member = await app.bot.get_chat_member(chat_id, target_user_id)
-            target_name = member.user.full_name
-            await app.bot.restrict_chat_member(
-                chat_id=chat_id,
-                user_id=target_user_id,
-                permissions=ChatPermissions(
-                    can_send_messages=True,
-                    can_send_media_messages=True,
-                    can_send_polls=True,
-                    can_send_other_messages=True,
-                    can_add_web_page_previews=True,
-                    can_invite_users=True,
-                ),
-            )
-            break
-        except Exception:
-            continue
+    try:
+        member = await app.bot.get_chat_member(chat_id, target_user_id)
+        target_name = member.user.full_name
+        await app.bot.restrict_chat_member(
+            chat_id=chat_id,
+            user_id=target_user_id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+                can_invite_users=True,
+            ),
+        )
+    except Exception:
+        pass
 
     async with db.pool.acquire() as conn:
         await conn.execute(
@@ -644,10 +632,9 @@ async def unmute_user(chat_id: int, target_user_id: int, user: dict = Depends(ge
 @router.post("/actions/kick")
 async def kick_user(chat_id: int, req: KickRequest, user: dict = Depends(get_current_user)):
     await verify_admin(chat_id, user)
-    from bot.registry import get_all
+    app = await get_bot_for_group(chat_id)
 
-    bots = get_all()
-    if not bots:
+    if not app:
         raise HTTPException(503, "Bot not running")
 
     admin_name = user.get("first_name", "Admin")
@@ -656,23 +643,20 @@ async def kick_user(chat_id: int, req: KickRequest, user: dict = Depends(get_cur
     tg_success = False
     last_error = None
 
-    for bid, app in bots.items():
-        try:
-            member = await app.bot.get_chat_member(chat_id, req.user_id)
-            target_name = member.user.mention_html()
-            await app.bot.ban_chat_member(chat_id, req.user_id)
-            await app.bot.unban_chat_member(chat_id, req.user_id)  # kick = ban+unban
-            await app.bot.send_message(
-                chat_id=chat_id,
-                text=f"👢 <b>Kicked</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}",
-                parse_mode="HTML",
-            )
-            tg_success = True
-            break
-        except Exception as e:
-            last_error = str(e)
-            logger.warning(f"[KICK] bot {bid} failed: {e}")
-            continue
+    try:
+        member = await app.bot.get_chat_member(chat_id, req.user_id)
+        target_name = member.user.mention_html()
+        await app.bot.ban_chat_member(chat_id, req.user_id)
+        await app.bot.unban_chat_member(chat_id, req.user_id)  # kick = ban+unban
+        await app.bot.send_message(
+            chat_id=chat_id,
+            text=f"👢 <b>Kicked</b>\nUser: {target_name}\nReason: {reason}\nBy: {admin_name}",
+            parse_mode="HTML",
+        )
+        tg_success = True
+    except Exception as e:
+        last_error = str(e)
+        logger.warning(f"[KICK] bot failed: {e}")
 
     if not tg_success:
         raise HTTPException(502, f"Telegram action failed: {last_error}")
